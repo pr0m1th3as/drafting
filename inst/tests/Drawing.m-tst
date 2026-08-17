@@ -1,0 +1,271 @@
+## Copyright (C) 2026 Andreas Bertsatos <abertsatos@biol.uoa.gr>
+##
+## This file is part of the drafting package for GNU Octave.
+##
+## This program is free software; you can redistribute it and/or modify it under
+## the terms of the GNU General Public License as published by the Free Software
+## Foundation; either version 3 of the License, or (at your option) any later
+## version.
+##
+## This program is distributed in the hope that it will be useful, but WITHOUT
+## ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+## FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
+## details.
+##
+## You should have received a copy of the GNU General Public License along with
+## this program; if not, see <http://www.gnu.org/licenses/>.
+
+## draw.Drawing
+
+%!test  # a new drawing is empty and sits on the DXF default layer
+%! D = draw.Drawing ();
+%! assert_equal (D.Name, 'untitled');
+%! assert_equal (D.Layer, '0');
+%! assert_equal (D.numentities (), 0);
+%! assert_equal (isempty (D), true);
+%! assert_equal (D.layers (), {});
+%!test  # the constructor names the drawing
+%! assert_equal (draw.Drawing ('plan').Name, 'plan');
+%!test  # the entity record carries every field from the outset
+%! D = draw.Drawing ();
+%! assert_equal (fieldnames (D.Entities), {'type'; 'layer'; 'pts'; 'closed'; ...
+%!               'radius'; 'angles'; 'angle'; 'text'; 'height'; 'offset'; ...
+%!               'direction'; 'pattern'; 'spacing'});
+%!error<draw.Drawing: NAME must be a non-empty character vector.> ...
+%! draw.Drawing (42)
+%!error<draw.Drawing: NAME must be a non-empty character vector.> ...
+%! draw.Drawing ('')
+
+%!test  # Name and Layer validate on assignment
+%! D = draw.Drawing ();
+%! D.Name = 'katopsi';
+%! D.Layer = 'outline';
+%! assert_equal (D.Name, 'katopsi');
+%! assert_equal (D.Layer, 'outline');
+%!error<draw.Drawing: NAME must be a non-empty character vector.> ...
+%! D = draw.Drawing (); D.Name = 5;
+%!error<draw.Drawing: LAYER must be a non-empty character vector.> ...
+%! D = draw.Drawing (); D.Layer = '';
+%!error<draw.Drawing: LAYER must be a non-empty character vector.> ...
+%! D = draw.Drawing (); D.Layer = {'a'};
+
+%!test  # line stores its two endpoints on the current layer
+%! D = draw.Drawing ();
+%! D.Layer = 'inner';
+%! D = D.line ([0, 0], [100, 50]);
+%! assert_equal (D.numentities (), 1);
+%! assert_equal (D.Entities(1).type, 'line');
+%! assert_equal (D.Entities(1).layer, 'inner');
+%! assert_equal (D.Entities(1).pts, [0, 0; 100, 50]);
+%! assert_equal (D.Entities(1).closed, false);
+%!test  # appending is a value operation and leaves the original alone
+%! D = draw.Drawing ();
+%! E = D.line ([0, 0], [1, 1]);
+%! assert_equal (D.numentities (), 0);
+%! assert_equal (E.numentities (), 1);
+%!test  # append methods chain
+%! D = draw.Drawing ().line ([0, 0], [1, 0]).line ([1, 0], [1, 1]);
+%! assert_equal (D.numentities (), 2);
+%!error<draw.Drawing.line: invalid number of input arguments.> ...
+%! draw.Drawing ().line ([0, 0])
+%!error<draw.Drawing.line: P1 must be a real finite 1-by-2 vector.> ...
+%! draw.Drawing ().line ([0, 0, 0], [1, 1])
+%!error<draw.Drawing.line: P2 must be a real finite 1-by-2 vector.> ...
+%! draw.Drawing ().line ([0, 0], [Inf, 1])
+%!error<draw.Drawing.line: P1 and P2 must not be the same point.> ...
+%! draw.Drawing ().line ([3, 4], [3, 4])
+
+%!test  # a polyline is open unless told otherwise
+%! P = [0, 0; 10, 0; 10, 10];
+%! D = draw.Drawing ().polyline (P);
+%! assert_equal (D.Entities(1).type, 'polyline');
+%! assert_equal (D.Entities(1).pts, P);
+%! assert_equal (D.Entities(1).closed, false);
+%!test  # the closed flag closes it without repeating the first vertex
+%! P = [0, 0; 10, 0; 10, 10; 0, 10];
+%! D = draw.Drawing ().polyline (P, true);
+%! assert_equal (D.Entities(1).closed, true);
+%! assert_equal (rows (D.Entities(1).pts), 4);
+%!test  # a numeric flag is accepted and stored as a logical
+%! D = draw.Drawing ().polyline ([0, 0; 1, 1], 1);
+%! assert_equal (D.Entities(1).closed, true);
+%! assert_equal (islogical (D.Entities(1).closed), true);
+%!error<draw.Drawing.polyline: invalid number of input arguments.> ...
+%! draw.Drawing ().polyline ()
+%!error<draw.Drawing.polyline: P must be an N-by-2 matrix of point coordinates.> ...
+%! draw.Drawing ().polyline ([0, 0, 0; 1, 1, 1])
+%!error<draw.Drawing.polyline: P must not contain NaN or Inf values.> ...
+%! draw.Drawing ().polyline ([0, 0; NaN, 1])
+%!error<draw.Drawing.polyline: P must contain at least 2 vertices.> ...
+%! draw.Drawing ().polyline ([0, 0])
+%!error<draw.Drawing.polyline: CLOSED must be a logical scalar.> ...
+%! draw.Drawing ().polyline ([0, 0; 1, 1], [true, false])
+
+%!test  # arc keeps its centre, radius and both angles
+%! D = draw.Drawing ().arc ([10, 20], 5, 30, 120);
+%! assert_equal (D.Entities(1).type, 'arc');
+%! assert_equal (D.Entities(1).pts, [10, 20]);
+%! assert_equal (D.Entities(1).radius, 5);
+%! assert_equal (D.Entities(1).angles, [30, 120]);
+%!error<draw.Drawing.arc: invalid number of input arguments.> ...
+%! draw.Drawing ().arc ([0, 0], 1, 0)
+%!error<draw.Drawing.arc: C must be a real finite 1-by-2 vector.> ...
+%! draw.Drawing ().arc ([0; 0], 1, 0, 90)
+%!error<draw.Drawing.arc: R must be a real positive finite scalar.> ...
+%! draw.Drawing ().arc ([0, 0], 0, 0, 90)
+%!error<draw.Drawing.arc: R must be a real positive finite scalar.> ...
+%! draw.Drawing ().arc ([0, 0], -3, 0, 90)
+%!error<draw.Drawing.arc: A1 and A2 must be real finite scalar angles in degrees.> ...
+%! draw.Drawing ().arc ([0, 0], 1, 0, Inf)
+
+%!test  # circle keeps its centre and radius
+%! D = draw.Drawing ().circle ([1, 2], 7);
+%! assert_equal (D.Entities(1).type, 'circle');
+%! assert_equal (D.Entities(1).pts, [1, 2]);
+%! assert_equal (D.Entities(1).radius, 7);
+%! assert_equal (D.Entities(1).angles, []);
+%!error<draw.Drawing.circle: invalid number of input arguments.> ...
+%! draw.Drawing ().circle ([0, 0])
+%!error<draw.Drawing.circle: C must be a real finite 1-by-2 vector.> ...
+%! draw.Drawing ().circle (0, 1)
+%!error<draw.Drawing.circle: R must be a real positive finite scalar.> ...
+%! draw.Drawing ().circle ([0, 0], [1, 2])
+
+%!test  # text defaults to a 2.5 mm cap height and no rotation
+%! D = draw.Drawing ().text ([5, 5], 'NOTE');
+%! assert_equal (D.Entities(1).type, 'text');
+%! assert_equal (D.Entities(1).pts, [5, 5]);
+%! assert_equal (D.Entities(1).text, 'NOTE');
+%! assert_equal (D.Entities(1).height, 2.5);
+%! assert_equal (D.Entities(1).angle, 0);
+%!test  # height and rotation override the defaults
+%! D = draw.Drawing ().text ([0, 0], 'A', 7, 90);
+%! assert_equal (D.Entities(1).height, 7);
+%! assert_equal (D.Entities(1).angle, 90);
+%!test  # the string is stored exactly as given
+%! D = draw.Drawing ().text ([0, 0], 'ΤΟΜΗ 160x180');
+%! assert_equal (D.Entities(1).text, 'ΤΟΜΗ 160x180');
+%!error<draw.Drawing.text: invalid number of input arguments.> ...
+%! draw.Drawing ().text ([0, 0])
+%!error<draw.Drawing.text: S must be a non-empty character vector.> ...
+%! draw.Drawing ().text ([0, 0], '')
+%!error<draw.Drawing.text: S must be a non-empty character vector.> ...
+%! draw.Drawing ().text ([0, 0], 42)
+%!error<draw.Drawing.text: H must be a real positive finite scalar.> ...
+%! draw.Drawing ().text ([0, 0], 'A', 0)
+%!error<draw.Drawing.text: ROT must be a real finite scalar.> ...
+%! draw.Drawing ().text ([0, 0], 'A', 2.5, NaN)
+
+%!test  # hatch defaults to ANSI31 at 2.5 mm and is always closed
+%! P = [0, 0; 10, 0; 10, 10];
+%! D = draw.Drawing ().hatch (P);
+%! assert_equal (D.Entities(1).type, 'hatch');
+%! assert_equal (D.Entities(1).pts, P);
+%! assert_equal (D.Entities(1).closed, true);
+%! assert_equal (D.Entities(1).pattern, 'ANSI31');
+%! assert_equal (D.Entities(1).angle, 0);
+%! assert_equal (D.Entities(1).spacing, 2.5);
+%!test  # pattern, angle and spacing override the defaults
+%! D = draw.Drawing ().hatch ([0, 0; 1, 0; 1, 1], 'ANSI37', 45, 4);
+%! assert_equal (D.Entities(1).pattern, 'ANSI37');
+%! assert_equal (D.Entities(1).angle, 45);
+%! assert_equal (D.Entities(1).spacing, 4);
+%!error<draw.Drawing.hatch: invalid number of input arguments.> ...
+%! draw.Drawing ().hatch ()
+%!error<draw.Drawing.hatch: ANGLE and SPACING must be given together.> ...
+%! draw.Drawing ().hatch ([0, 0; 1, 0; 1, 1], 'ANSI31', 45)
+%!error<draw.Drawing.hatch: P must contain at least 3 vertices.> ...
+%! draw.Drawing ().hatch ([0, 0; 1, 1])
+%!error<draw.Drawing.hatch: PATTERN must be a non-empty character vector.> ...
+%! draw.Drawing ().hatch ([0, 0; 1, 0; 1, 1], '')
+%!error<draw.Drawing.hatch: SPACING must be a real positive finite scalar.> ...
+%! draw.Drawing ().hatch ([0, 0; 1, 0; 1, 1], 'ANSI31', 0, -1)
+
+%!test  # a dimension is aligned and unlabelled by default
+%! D = draw.Drawing ().dim ([0, 0], [100, 0], -20);
+%! assert_equal (D.Entities(1).type, 'dim');
+%! assert_equal (D.Entities(1).pts, [0, 0; 100, 0]);
+%! assert_equal (D.Entities(1).offset, -20);
+%! assert_equal (D.Entities(1).direction, 'aligned');
+%! assert_equal (D.Entities(1).text, '');
+%!test  # the direction is normalised to lower case
+%! D = draw.Drawing ().dim ([0, 0], [10, 5], 3, 'HORIZONTAL');
+%! assert_equal (D.Entities(1).direction, 'horizontal');
+%!test  # a label overrides the measurement
+%! D = draw.Drawing ().dim ([0, 0], [10, 0], 5, 'aligned', 'MIN. 1200');
+%! assert_equal (D.Entities(1).text, 'MIN. 1200');
+%!error<draw.Drawing.dim: invalid number of input arguments.> ...
+%! draw.Drawing ().dim ([0, 0], [1, 1])
+%!error<draw.Drawing.dim: P1 and P2 must not be the same point.> ...
+%! draw.Drawing ().dim ([1, 1], [1, 1], 5)
+%!error<draw.Drawing.dim: OFFSET must be a real finite scalar.> ...
+%! draw.Drawing ().dim ([0, 0], [1, 1], Inf)
+%!error<draw.Drawing.dim: DIRECTION must be 'aligned', 'horizontal' or 'vertical'.> ...
+%! draw.Drawing ().dim ([0, 0], [1, 1], 5, 'diagonal')
+%!error<draw.Drawing.dim: a horizontal dimension needs two points differing in x.> ...
+%! draw.Drawing ().dim ([0, 0], [0, 10], 5, 'horizontal')
+%!error<draw.Drawing.dim: a vertical dimension needs two points differing in y.> ...
+%! draw.Drawing ().dim ([0, 0], [10, 0], 5, 'vertical')
+%!error<draw.Drawing.dim: LABEL must be a character vector.> ...
+%! draw.Drawing ().dim ([0, 0], [1, 1], 5, 'aligned', 42)
+
+%!test  # layers reports what was drawn on, sorted, without duplicates
+%! D = draw.Drawing ();
+%! D.Layer = 'walls';
+%! D = D.line ([0, 0], [1, 0]);
+%! D.Layer = 'inner';
+%! D = D.line ([0, 1], [1, 1]).line ([0, 2], [1, 2]);
+%! assert_equal (D.layers (), {'inner', 'walls'});
+%!test  # selecting a layer without drawing on it does not declare it
+%! D = draw.Drawing ().line ([0, 0], [1, 1]);
+%! D.Layer = 'never-used';
+%! assert_equal (D.layers (), {'0'});
+
+%!test  # numentities counts every type alike
+%! D = draw.Drawing ().line ([0, 0], [1, 1]).circle ([0, 0], 1);
+%! D = D.text ([0, 0], 'A').hatch ([0, 0; 1, 0; 1, 1]);
+%! assert_equal (D.numentities (), 4);
+
+%!test  # an empty drawing has no extent
+%! [B, W, H] = draw.Drawing ().bbox ();
+%! assert_equal (B, []);
+%! assert_equal (W, []);
+%! assert_equal (H, []);
+%!test  # a polyline agrees with geom.bbox on the same points
+%! P = [0, 0; 1600, 0; 1600, 1800; 0, 1800];
+%! D = draw.Drawing ().polyline (P, true);
+%! [B, W, H] = D.bbox ();
+%! assert_equal (B, geom.bbox (P));
+%! assert_equal ([W, H], [1600, 1800]);
+%!test  # a circle extends by its radius on all four sides
+%! D = draw.Drawing ().circle ([100, 200], 10);
+%! assert_equal (D.bbox (), [90, 190, 110, 210], 1e-9);
+%!test  # an arc contributes its endpoints and the cardinals it sweeps through
+%! D = draw.Drawing ().arc ([0, 0], 10, 30, 120);
+%! assert_equal (D.bbox (), [-5, 5, 10 * cosd(30), 10], 1e-9);
+%!test  # an arc from an angle back to itself is a full circle
+%! D = draw.Drawing ().arc ([0, 0], 10, 45, 45);
+%! assert_equal (D.bbox (), [-10, -10, 10, 10], 1e-9);
+%!test  # an arc crossing the zero angle sweeps through it
+%! D = draw.Drawing ().arc ([0, 0], 10, 315, 45);
+%! assert_equal (D.bbox (), [10 * cosd(45), -10 * sind(45), 10, ...
+%!                           10 * sind(45)], 1e-9);
+%!test  # only the insertion point of a text counts towards the extent
+%! D = draw.Drawing ().text ([5, 7], 'A LONG PIECE OF TEXT', 100);
+%! assert_equal (D.bbox (), [5, 7, 5, 7]);
+%!test  # only the measured points of a dimension count towards the extent
+%! D = draw.Drawing ().dim ([0, 0], [100, 0], -500, 'horizontal');
+%! assert_equal (D.bbox (), [0, 0, 100, 0]);
+%!test  # the extent spans every entity in the drawing
+%! D = draw.Drawing ().line ([-50, -50], [0, 0]).circle ([100, 100], 25);
+%! assert_equal (D.bbox (), [-50, -50, 125, 125], 1e-9);
+
+%!test  # a mixed drawing keeps one uniform field set across every entity
+%! D = draw.Drawing ('mixed');
+%! D = D.line ([0, 0], [1, 0]).polyline ([0, 0; 1, 1; 2, 0], true);
+%! D = D.arc ([0, 0], 1, 0, 90).circle ([0, 0], 2).text ([0, 0], 'A');
+%! D = D.hatch ([0, 0; 1, 0; 1, 1]).dim ([0, 0], [1, 0], 5);
+%! assert_equal (numel (D.Entities), 7);
+%! assert_equal (numel (fieldnames (D.Entities)), 13);
+%! assert_equal ({D.Entities.type}, {'line', 'polyline', 'arc', 'circle', ...
+%!                                   'text', 'hatch', 'dim'});

@@ -1,0 +1,2 @@
+All software in the 'drafting' package is published under the
+GNU General Public License version 3 (GPLv3).

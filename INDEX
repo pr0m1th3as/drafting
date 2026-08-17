@@ -1,0 +1,22 @@
+drafting >> Geometry, CAD Input/Output and Technical Drawing
+Geometry primitives
+ geom.signedarea
+ geom.bbox
+ geom.centroid
+ geom.transform
+ geom.isrectilinear
+ geom.offset
+ geom.largestrect
+ geom.triangulate
+Curve geometry
+ geom.curvature
+ geom.curvesample
+ geom.curveoffset
+ geom.selfintersects
+DXF input and output
+ dxf.read
+ dxf.write
+Drawing model and backends
+ draw.Drawing
+ draw.entities
+ draw.tikz

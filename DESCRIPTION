@@ -1,0 +1,13 @@
+Name: drafting
+Version: 0.1.0
+Date: 2026-08-17
+Author: Andreas Bertsatos
+Maintainer: Andreas Bertsatos <abertsatos@biol.uoa.gr>
+Title: Geometry, CAD Input/Output and Technical Drawing
+Description: Planar geometry primitives, ASCII DXF reading and writing,
+ and a format-agnostic technical drawing model with DXF and TikZ backends.
+ Provides the drafting layer for engineering design packages.
+Categories: Graphics
+Depends: octave (>= 11.1.0)
+Url: https://github.com/pr0m1th3as/drafting
+Tracker: https://github.com/pr0m1th3as/drafting/issues

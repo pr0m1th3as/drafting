@@ -1,0 +1,17 @@
+Summary of important user-visible changes for drafting 0.1.0:
+-------------------------------------------------------------------
+
+ ** Initial development version.  Nothing released yet.
+
+ ** `+geom` -- signed area, bounding box, centroid, affine transform,
+    rectilinear test, rectilinear polygon offset, and largest inscribed
+    rectangle.
+
+ ** `+dxf` -- AutoCAD R12 (AC1009) ASCII DXF read and write, covering LINE,
+    POLYLINE, LWPOLYLINE, CIRCLE, ARC, TEXT and POINT.  R12 has no LWPOLYLINE,
+    so an entity of that type is written as a POLYLINE with its geometry, layer
+    and closed flag preserved.
+
+ ** `+draw` -- `draw.Drawing`, a value class carrying line, polyline, arc,
+    circle, text, hatch and dimension entities on named layers; `draw.entities`
+    converts it for `dxf.write`, and `draw.tikz` emits LaTeX for reports.
