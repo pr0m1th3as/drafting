@@ -48,7 +48,20 @@
 ## @item @qcode{'Linetypes'} @tab @qcode{'true'} @tab @qcode{'true'} to draw the
 ## real dash patterns, @qcode{'approximate'} for the figure's own four styles
 ## @item @qcode{'LTScale'} @tab 1 @tab multiplies the dash lengths
+## @item @qcode{'Margin'} @tab 0.05 @tab blank space kept between the geometry
+## and the axes, as a fraction of the drawing's larger side; 0 fits the axes
+## tight to the geometry
 ## @end multitable
+##
+## @subheading Why the axes do not fit tight
+##
+## Auto-scaled limits stop exactly at the extreme coordinate, so an outline
+## lying on it is drawn along the frame and reads as part of the axes rather
+## than as geometry --- which is the common case, not a corner one: a plate is
+## usually dimensioned from its own edges.  Both axes are therefore padded by
+## the same absolute amount, which keeps the equal aspect ratio the drawing
+## depends on, and that amount is @qcode{'Margin'} times the larger of the two
+## spans.
 ##
 ## @subheading What you see is what gets written
 ##
@@ -117,7 +130,7 @@ function H = plot (varargin)
 
   opt = struct ('Axes', hax, 'LineWidth', 0.5, 'FontSize', 8, ...
                 'Layers', {{}}, 'Arc', 64, 'Hatch', 'lines', ...
-                'Linetypes', 'true', 'LTScale', 1);
+                'Linetypes', 'true', 'LTScale', 1, 'Margin', 0.05);
   known = fieldnames (opt);
   for k = 1:2:numel (varargin)
     name = varargin{k};
@@ -147,6 +160,11 @@ function H = plot (varargin)
       error ("draw.plot: %s must be a positive real finite scalar.", f{1});
     endif
   endfor
+  ## Margin admits 0, which fits the axes tight to the geometry.
+  if (! isnumeric (opt.Margin) || ! isreal (opt.Margin) ...
+      || ! isscalar (opt.Margin) || ! isfinite (opt.Margin) || opt.Margin < 0)
+    error ("draw.plot: Margin must be a non-negative real finite scalar.");
+  endif
 
   if (isempty (opt.Axes))
     opt.Axes = gca ();
@@ -208,6 +226,35 @@ function H = plot (varargin)
     endfor
 
     axis (ax, 'equal');
+
+    ## Auto-scaled limits stop at the extreme coordinate, so geometry lying on
+    ## it is drawn along the frame and reads as part of the axes.
+    xl = xlim (ax);
+    yl = ylim (ax);
+
+    ## A TEXT entity contributes only its insertion point to those limits, not
+    ## the width of the string it renders, so a label near an edge is cut off.
+    ## Widen to the extents the text objects report, which are in data units.
+    ## Text is sized in points, so widening shrinks it and the correction only
+    ## ever errs towards more room.
+    if (! isempty (H))
+      ht = H(strcmp (get (H, 'type'), 'text'));
+      for k = 1:numel (ht)
+        e = get (ht(k), 'extent');
+        xl = [min(xl(1), e(1)), max(xl(2), e(1) + e(3))];
+        yl = [min(yl(1), e(2)), max(yl(2), e(2) + e(4))];
+      endfor
+    endif
+
+    if (opt.Margin > 0)
+      m = opt.Margin * max (diff (xl), diff (yl));
+      xl += [-m, m];
+      yl += [-m, m];
+    endif
+    if (diff (xl) > 0 && diff (yl) > 0)
+      xlim (ax, xl);
+      ylim (ax, yl);
+    endif
   unwind_protect_cleanup
     if (! held)
       hold (ax, 'off');
@@ -431,6 +478,67 @@ endfunction
 %! unwind_protect_cleanup
 %!   close (f);
 %! end_unwind_protect
+
+%!test  # the geometry does not touch the frame
+%! f = figure ('visible', 'off');
+%! unwind_protect
+%!   ax = axes ('parent', f);
+%!   draw.plot (draw.Drawing ().line ([10, 10], [80, 10]), 'Axes', ax);
+%!   xl = get (ax, 'xlim');
+%!   assert_equal (xl(1) < 10 && xl(2) > 80, true);
+%! unwind_protect_cleanup
+%!   close (f);
+%! end_unwind_protect
+
+%!test  # the margin is the same absolute pad on both axes, keeping the aspect
+%! f = figure ('visible', 'off');
+%! unwind_protect
+%!   ax = axes ('parent', f);
+%!   draw.plot (draw.Drawing ().line ([10, 10], [80, 60]), 'Axes', ax, ...
+%!              'Margin', 0);
+%!   x0 = get (ax, 'xlim');
+%!   y0 = get (ax, 'ylim');
+%!   cla (ax);
+%!   draw.plot (draw.Drawing ().line ([10, 10], [80, 60]), 'Axes', ax, ...
+%!              'Margin', 0.1);
+%!   x1 = get (ax, 'xlim');
+%!   y1 = get (ax, 'ylim');
+%!   assert_equal (x0(1) - x1(1), y0(1) - y1(1), 1e-9);
+%!   assert_equal (x1(2) - x0(2), 0.1 * max (diff (x0), diff (y0)), 1e-9);
+%! unwind_protect_cleanup
+%!   close (f);
+%! end_unwind_protect
+
+%!test  # Margin 0 fits the axes tight to the geometry
+%! f = figure ('visible', 'off');
+%! unwind_protect
+%!   ax = axes ('parent', f);
+%!   draw.plot (draw.Drawing ().line ([10, 10], [80, 10]), 'Axes', ax, ...
+%!              'Margin', 0);
+%!   assert_equal (get (ax, 'xlim'), [10, 80]);
+%! unwind_protect_cleanup
+%!   close (f);
+%! end_unwind_protect
+
+%!test  # a label near an edge is held by the frame, not cut by it
+%! f = figure ('visible', 'off');
+%! unwind_protect
+%!   ax = axes ('parent', f);
+%!   D = draw.Drawing ().circle ([0, 0], 32);
+%!   D = D.leader ([15, 28; 40, 45; 50, 45], 'HARDEN');
+%!   H = draw.plot (D, 'Axes', ax);
+%!   t = H(strcmp (get (H, 'type'), 'text'));
+%!   e = get (t(1), 'extent');
+%!   xl = get (ax, 'xlim');
+%!   assert_equal (e(1) + e(3) < xl(2), true);
+%! unwind_protect_cleanup
+%!   close (f);
+%! end_unwind_protect
+
+%!error<draw.plot: Margin must be a non-negative real finite scalar.> ...
+%! draw.plot (draw.Drawing ().circle ([0, 0], 5), 'Margin', -1)
+%!error<draw.plot: Margin must be a non-negative real finite scalar.> ...
+%! draw.plot (draw.Drawing ().circle ([0, 0], 5), 'Margin', [1, 2])
 
 %!test  # colour reaches the plotted object
 %! f = figure ('visible', 'off');
