@@ -134,33 +134,33 @@ function [E, LOST] = entities (D, varargin)
     switch (e.type)
 
       case 'line'
-        E(end+1) = mkent ('LINE', e.layer, e.pts);
+        E(end+1) = mkent ('LINE', e, e.pts);
 
       case 'polyline'
-        p = mkent ('POLYLINE', e.layer, e.pts);
+        p = mkent ('POLYLINE', e, e.pts);
         p.closed = e.closed;
         E(end+1) = p;
 
       case 'arc'
-        a = mkent ('ARC', e.layer, e.pts);
+        a = mkent ('ARC', e, e.pts);
         a.radius = e.radius;
         a.angles = e.angles;
         E(end+1) = a;
 
       case 'circle'
-        c = mkent ('CIRCLE', e.layer, e.pts);
+        c = mkent ('CIRCLE', e, e.pts);
         c.radius = e.radius;
         E(end+1) = c;
 
       case 'text'
-        t = mkent ('TEXT', e.layer, e.pts);
+        t = mkent ('TEXT', e, e.pts);
         t.text = e.text;
         t.height = e.height;
         t.rotation = e.angle;
         E(end+1) = t;
 
       case 'hatch'
-        h = mkent ('POLYLINE', e.layer, e.pts);
+        h = mkent ('POLYLINE', e, e.pts);
         h.closed = true;
         E(end+1) = h;
         LOST(end+1) = struct ('index', ii, 'type', 'hatch', 'reason', ...
@@ -196,18 +196,38 @@ endfunction
 ## that the array grows by assignment.
 function E = emptyentity ()
 
-  E = struct ('type', {}, 'layer', {}, 'pts', {}, 'closed', {}, ...
+  E = struct ('type', {}, 'layer', {}, 'linetype', {}, 'colour', {}, ...
+              'pts', {}, 'closed', {}, ...
               'radius', {}, 'angles', {}, 'text', {}, 'height', {}, ...
               'rotation', {});
 
 endfunction
 
 ## One entity with the unused fields at their defaults.
-function s = mkent (type, layer, pts)
+## Build a DXF record from the drawing entity E it came from, so that layer,
+## line type and colour travel with the geometry rather than being reapplied.
+## Exploded parts of a dimension inherit them too: the rule is uniform, and a
+## caller wanting continuous dimension lines sets the line type before
+## dimensioning, which is the natural order anyway.
+function s = mkent (type, e, pts)
 
-  s = struct ('type', type, 'layer', layer, 'pts', pts, 'closed', false, ...
+  s = struct ('type', type, 'layer', e.layer, ...
+              'linetype', optfield (e, 'linetype', 'CONTINUOUS'), ...
+              'colour', optfield (e, 'colour', 256), ...
+              'pts', pts, 'closed', false, ...
               'radius', [], 'angles', [], 'text', '', 'height', [], ...
               'rotation', 0);
+
+endfunction
+
+## A field if the entity carries one, the default otherwise
+function v = optfield (e, name, dflt)
+
+  if (isfield (e, name) && ! isempty (e.(name)))
+    v = e.(name);
+  else
+    v = dflt;
+  endif
 
 endfunction
 
@@ -246,18 +266,18 @@ function parts = explodedim (e, scale)
   A2 = P2 + (e.offset - dot (d, N)) * N;
 
   ## Extension lines: start clear of the measured point, end past the dim line
-  parts = mkent ('LINE', e.layer, [P1 + gap * unitor(A1 - P1, N); ...
+  parts = mkent ('LINE', e, [P1 + gap * unitor(A1 - P1, N); ...
                                    A1 + over * unitor(A1 - P1, N)]);
-  parts(end+1) = mkent ('LINE', e.layer, [P2 + gap * unitor(A2 - P2, N); ...
+  parts(end+1) = mkent ('LINE', e, [P2 + gap * unitor(A2 - P2, N); ...
                                           A2 + over * unitor(A2 - P2, N)]);
 
   ## The dimension line itself
-  parts(end+1) = mkent ('LINE', e.layer, [A1; A2]);
+  parts(end+1) = mkent ('LINE', e, [A1; A2]);
 
   ## Oblique ticks at 45 degrees to the dimension line, centred on each foot
   T = (U + N) / sqrt (2);
-  parts(end+1) = mkent ('LINE', e.layer, [A1 - tick * T; A1 + tick * T]);
-  parts(end+1) = mkent ('LINE', e.layer, [A2 - tick * T; A2 + tick * T]);
+  parts(end+1) = mkent ('LINE', e, [A1 - tick * T; A1 + tick * T]);
+  parts(end+1) = mkent ('LINE', e, [A2 - tick * T; A2 + tick * T]);
 
   ## The label, horizontal whatever the dimension measures
   if (isempty (e.text))
@@ -308,7 +328,7 @@ function parts = explodedim (e, scale)
     endif
   endif
 
-  t = mkent ('TEXT', e.layer, [ix, iy]);
+  t = mkent ('TEXT', e, [ix, iy]);
   t.text = label;
   t.height = hgt;
   parts(end+1) = t;
@@ -359,14 +379,16 @@ endfunction
 
 %!test  # the result has exactly the fields dxf.write expects
 %! E = draw.entities (draw.Drawing ().line ([0, 0], [1, 1]));
-%! assert_equal (fieldnames (E), {'type'; 'layer'; 'pts'; 'closed'; ...
-%!               'radius'; 'angles'; 'text'; 'height'; 'rotation'});
+%! assert_equal (fieldnames (E), {'type'; 'layer'; 'linetype'; 'colour'; ...
+%!               'pts'; 'closed'; 'radius'; 'angles'; 'text'; 'height'; ...
+%!               'rotation'});
 
 %!test  # an empty drawing lowers to an empty entity array
 %! E = draw.entities (draw.Drawing ());
 %! assert_equal (isempty (E), true);
-%! assert_equal (fieldnames (E), {'type'; 'layer'; 'pts'; 'closed'; ...
-%!               'radius'; 'angles'; 'text'; 'height'; 'rotation'});
+%! assert_equal (fieldnames (E), {'type'; 'layer'; 'linetype'; 'colour'; ...
+%!               'pts'; 'closed'; 'radius'; 'angles'; 'text'; 'height'; ...
+%!               'rotation'});
 
 %!test  # an arc keeps its radius and both angles
 %! E = draw.entities (draw.Drawing ().arc ([1, 2], 3, 30, 120));
@@ -529,3 +551,24 @@ endfunction
 %! draw.entities (draw.Drawing (), 'DimScale', 0)
 %!error<draw.entities: DimScale must be a real positive finite scalar.> ...
 %! draw.entities (draw.Drawing (), 'DimScale', [1, 2])
+
+%!test  # line type and colour travel from the drawing to the DXF record
+%! D = draw.Drawing ();
+%! D.Linetype = 'CENTER';
+%! D.Colour = 'red';
+%! E = draw.entities (D.line ([0, 0], [1, 1]));
+%! assert_equal (E(1).linetype, 'CENTER');
+%! assert_equal (E(1).colour, 1);
+
+%!test  # every exploded part of a dimension inherits them
+%! D = draw.Drawing ();
+%! D.Linetype = 'HIDDEN';
+%! D.Colour = 5;
+%! E = draw.entities (D.dim ([0, 0], [100, 0], -20, 'horizontal'));
+%! assert_equal (all (strcmp ({E.linetype}, 'HIDDEN')), true);
+%! assert_equal (all ([E.colour] == 5), true);
+
+%!test  # the defaults survive translation untouched
+%! E = draw.entities (draw.Drawing ().circle ([0, 0], 5));
+%! assert_equal (E(1).linetype, 'CONTINUOUS');
+%! assert_equal (E(1).colour, 256);

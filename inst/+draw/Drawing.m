@@ -45,6 +45,18 @@
 ## another layer by assigning to @code{Layer} first; no append method takes a
 ## layer argument.
 ##
+## @code{Linetype} and @code{Colour} work the same way and are governed by the
+## same rule: they apply to what is appended after they are set, and never to
+## what came before.  @code{Linetype} is a name --- see @code{draw.linetype} ---
+## and defaults to @qcode{'CONTINUOUS'}.  @code{Colour} is an index, or a name
+## that @code{draw.colour} resolves to one, and defaults to 256, meaning take
+## the layer's colour.
+##
+## Three properties rather than arguments is what lets a caller set a drawing
+## convention once and then draw, which is how a draughtsman works and how CAD
+## is built.  It is also why a dimension's exploded parts inherit all three:
+## the rule has no exceptions.
+##
 ## Dimensions are stored @strong{semantically} --- the two measured points, a
 ## perpendicular offset and a direction --- and are turned into lines,
 ## arrowheads and text by whichever backend renders them.  Nothing about how a
@@ -109,12 +121,19 @@ classdef Drawing
     ## The current layer.  New entities are placed on it.
     Layer = '0';
 
+    ## The current line type.  New entities are drawn with it.
+    Linetype = 'CONTINUOUS';
+
+    ## The current colour index.  256 takes the layer's colour.
+    Colour = 256;
+
   endproperties
 
   properties (SetAccess = private)
 
     ## The entities, in the order they were appended.
-    Entities = struct ('type', {}, 'layer', {}, 'pts', {}, 'closed', {}, ...
+    Entities = struct ('type', {}, 'layer', {}, 'linetype', {}, ...
+                       'colour', {}, 'pts', {}, 'closed', {}, ...
                        'radius', {}, 'angles', {}, 'angle', {}, 'text', {}, ...
                        'height', {}, 'offset', {}, 'direction', {}, ...
                        'pattern', {}, 'spacing', {});
@@ -160,6 +179,30 @@ classdef Drawing
 
     endfunction
 
+    function this = set.Linetype (this, LT)
+
+      if (! ischar (LT) || ! isrow (LT) || isempty (LT))
+        error (strcat ("draw.Drawing: LINETYPE must be a non-empty", ...
+                       " character vector."));
+      endif
+      this.Linetype = LT;
+
+    endfunction
+
+    function this = set.Colour (this, C)
+
+      if (ischar (C))
+        C = draw.colour (C);
+      endif
+      if (! isnumeric (C) || ! isreal (C) || ! isscalar (C) || ! isfinite (C) ...
+          || C != fix (C) || C < 0 || C > 256)
+        error (strcat ("draw.Drawing: COLOUR must be a name or an integer", ...
+                       " index from 0 to 256."));
+      endif
+      this.Colour = C;
+
+    endfunction
+
     ## -*- texinfo -*-
     ## @deftypefn {draw.Drawing} {@var{D} =} line (@var{D}, @var{P1}, @var{P2})
     ##
@@ -186,7 +229,7 @@ classdef Drawing
         error ("draw.Drawing.line: P1 and P2 must not be the same point.");
       endif
 
-      e = makeentity ('line', this.Layer);
+      e = makeentity ('line', this.Layer, this.Linetype, this.Colour);
       e.pts = [P1; P2];
       this.Entities(end+1) = e;
 
@@ -224,7 +267,7 @@ classdef Drawing
         error ("draw.Drawing.polyline: CLOSED must be a logical scalar.");
       endif
 
-      e = makeentity ('polyline', this.Layer);
+      e = makeentity ('polyline', this.Layer, this.Linetype, this.Colour);
       e.pts = double (P);
       e.closed = logical (CLOSED);
       this.Entities(end+1) = e;
@@ -265,7 +308,7 @@ classdef Drawing
                        " scalar angles in degrees."));
       endif
 
-      e = makeentity ('arc', this.Layer);
+      e = makeentity ('arc', this.Layer, this.Linetype, this.Colour);
       e.pts = double (C);
       e.radius = double (R);
       e.angles = double ([A1, A2]);
@@ -293,7 +336,7 @@ classdef Drawing
         error ("draw.Drawing.circle: R %s", errmsg);
       endif
 
-      e = makeentity ('circle', this.Layer);
+      e = makeentity ('circle', this.Layer, this.Linetype, this.Colour);
       e.pts = double (C);
       e.radius = double (R);
       this.Entities(end+1) = e;
@@ -338,7 +381,7 @@ classdef Drawing
         error ("draw.Drawing.text: ROT must be a real finite scalar.");
       endif
 
-      e = makeentity ('text', this.Layer);
+      e = makeentity ('text', this.Layer, this.Linetype, this.Colour);
       e.pts = double (P);
       e.text = S;
       e.height = double (H);
@@ -399,7 +442,7 @@ classdef Drawing
                        " positive finite scalar."));
       endif
 
-      e = makeentity ('hatch', this.Layer);
+      e = makeentity ('hatch', this.Layer, this.Linetype, this.Colour);
       e.pts = double (P);
       e.closed = true;
       e.pattern = PATTERN;
@@ -481,7 +524,7 @@ classdef Drawing
                        " points differing in y."));
       endif
 
-      e = makeentity ('dim', this.Layer);
+      e = makeentity ('dim', this.Layer, this.Linetype, this.Colour);
       e.pts = [P1; P2];
       e.offset = double (OFFSET);
       e.direction = DIRECTION;
@@ -624,9 +667,10 @@ endclassdef
 ## empty.  Every append method starts here, which is what keeps the field set
 ## and its order identical across the whole array -- a struct array will not
 ## grow otherwise, and a backend would have to test for each field.
-function e = makeentity (type, layer)
+function e = makeentity (type, layer, linetype, colour)
 
-  e = struct ('type', type, 'layer', layer, 'pts', [], 'closed', false, ...
+  e = struct ('type', type, 'layer', layer, 'linetype', linetype, ...
+              'colour', colour, 'pts', [], 'closed', false, ...
               'radius', [], 'angles', [], 'angle', [], 'text', '', ...
               'height', [], 'offset', [], 'direction', '', 'pattern', '', ...
               'spacing', []);

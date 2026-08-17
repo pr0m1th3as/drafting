@@ -28,9 +28,10 @@
 %! assert_equal (draw.Drawing ('plan').Name, 'plan');
 %!test  # the entity record carries every field from the outset
 %! D = draw.Drawing ();
-%! assert_equal (fieldnames (D.Entities), {'type'; 'layer'; 'pts'; 'closed'; ...
-%!               'radius'; 'angles'; 'angle'; 'text'; 'height'; 'offset'; ...
-%!               'direction'; 'pattern'; 'spacing'});
+%! assert_equal (fieldnames (D.Entities), {'type'; 'layer'; 'linetype'; ...
+%!               'colour'; 'pts'; 'closed'; 'radius'; 'angles'; 'angle'; ...
+%!               'text'; 'height'; 'offset'; 'direction'; 'pattern'; ...
+%!               'spacing'});
 %!error<draw.Drawing: NAME must be a non-empty character vector.> ...
 %! draw.Drawing (42)
 %!error<draw.Drawing: NAME must be a non-empty character vector.> ...
@@ -266,6 +267,40 @@
 %! D = D.arc ([0, 0], 1, 0, 90).circle ([0, 0], 2).text ([0, 0], 'A');
 %! D = D.hatch ([0, 0; 1, 0; 1, 1]).dim ([0, 0], [1, 0], 5);
 %! assert_equal (numel (D.Entities), 7);
-%! assert_equal (numel (fieldnames (D.Entities)), 13);
+%! assert_equal (numel (fieldnames (D.Entities)), 15);
 %! assert_equal ({D.Entities.type}, {'line', 'polyline', 'arc', 'circle', ...
 %!                                   'text', 'hatch', 'dim'});
+
+%!test  # line type and colour default to continuous and byLayer
+%! D = draw.Drawing ();
+%! assert_equal (D.Linetype, 'CONTINUOUS');
+%! assert_equal (D.Colour, 256);
+
+%!test  # new entities take the current line type and colour
+%! D = draw.Drawing ();
+%! D.Linetype = 'CENTER';
+%! D.Colour = 'red';
+%! D = D.line ([0, 0], [1, 0]);
+%! assert_equal (D.Entities(1).linetype, 'CENTER');
+%! assert_equal (D.Entities(1).colour, 1);
+
+%!test  # they behave like Layer: changing them affects only what follows
+%! D = draw.Drawing ().line ([0, 0], [1, 0]);
+%! D.Linetype = 'HIDDEN';
+%! D = D.line ([0, 1], [1, 1]);
+%! assert_equal (D.Entities(1).linetype, 'CONTINUOUS');
+%! assert_equal (D.Entities(2).linetype, 'HIDDEN');
+
+%!test  # a colour may be given by name or by index
+%! D = draw.Drawing ();
+%! D.Colour = 'blue';
+%! assert_equal (D.Colour, 5);
+%! D.Colour = 3;
+%! assert_equal (D.Colour, 3);
+
+%!error<draw.Drawing: LINETYPE must be a non-empty character vector.> ...
+%! D = draw.Drawing (); D.Linetype = 42;
+%!error<draw.Drawing: COLOUR must be a name or an integer index from 0 to 256.> ...
+%! D = draw.Drawing (); D.Colour = 300;
+%!error<draw.colour: 'puce' is not a named colour> ...
+%! D = draw.Drawing (); D.Colour = 'puce';

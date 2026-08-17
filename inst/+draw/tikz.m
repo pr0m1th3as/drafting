@@ -213,16 +213,75 @@ function sty = stylenames (L)
 
 endfunction
 
+## Line type and colour as a TikZ option list, empty when both are default.
+##
+## Dash lengths are emitted at their nominal size on the page, not divided by
+## the drawing scale.  A line type is a paper-space property: a centre line
+## should read as a centre line whether the view is at 1:1 or 1:50, and scaling
+## the pattern down with the geometry would make it vanish.
+function o = dopts (e)
+
+  parts = {};
+
+  colours = {'', 'red', 'yellow', 'green', 'cyan', 'blue', 'magenta', ...
+             'black', 'gray'};
+  c = optfield (e, 'colour', 256);
+  if (c >= 1 && c <= 8)
+    parts{end+1} = colours{c + 1};
+  endif
+
+  lt = optfield (e, 'linetype', 'CONTINUOUS');
+  if (! strcmpi (lt, 'CONTINUOUS'))
+    try
+      pat = draw.linetype (lt);
+    catch
+      pat = [];
+    end_try_catch
+    if (! isempty (pat))
+      d = '';
+      for k = 1:numel (pat)
+        if (pat(k) >= 0)
+          d = sprintf ('%son %smm ', d, fmt (max (pat(k), 0.1)));
+        else
+          d = sprintf ('%soff %smm ', d, fmt (-pat(k)));
+        endif
+      endfor
+      parts{end+1} = ['dash pattern=', strtrim(d)];
+    endif
+  endif
+
+  if (isempty (parts))
+    o = '';
+  else
+    o = ['[', strjoin(parts, ', '), ']'];
+  endif
+
+endfunction
+
+## A field if present and non-empty, the default otherwise
+function v = optfield (e, name, dflt)
+
+  if (isfield (e, name) && ! isempty (e.(name)))
+    v = e.(name);
+  else
+    v = dflt;
+  endif
+
+endfunction
+
 ## Render one entity as one or more lines of TikZ.
 function lines = render (e, scale)
+
+  o = dopts (e);
 
   switch (e.type)
 
     case 'line'
-      lines = {sprintf('\\draw %s -- %s;', pt (e.pts(1,:)), pt (e.pts(2,:)))};
+      lines = {sprintf('\\draw%s %s -- %s;', o, pt (e.pts(1,:)), ...
+                       pt (e.pts(2,:)))};
 
     case 'polyline'
-      s = ['\draw ', pt(e.pts(1,:))];
+      s = ['\draw', o, ' ', pt(e.pts(1,:))];
       for ii = 2:rows (e.pts)
         s = [s, ' -- ', pt(e.pts(ii,:))];
       endfor
@@ -232,7 +291,7 @@ function lines = render (e, scale)
       lines = {[s, ';']};
 
     case 'circle'
-      lines = {sprintf('\\draw %s circle[radius=%smm];', pt (e.pts), ...
+      lines = {sprintf('\\draw%s %s circle[radius=%smm];', o, pt (e.pts), ...
                        fmt (e.radius / scale))};
 
     case 'arc'
@@ -245,9 +304,9 @@ function lines = render (e, scale)
       endif
       a1 = e.angles(1);
       start = e.pts + e.radius * [cosd(a1), sind(a1)];
-      tmpl = strcat ('\\draw %s arc[start angle=%s, end angle=%s,', ...
+      tmpl = strcat ('\\draw%s %s arc[start angle=%s, end angle=%s,', ...
                      ' radius=%smm];');
-      lines = {sprintf(tmpl, pt (start), fmt (a1), ...
+      lines = {sprintf(tmpl, o, pt (start), fmt (a1), ...
                        fmt (a1 + sweep), fmt (e.radius / scale))};
 
     case 'text'
@@ -605,3 +664,23 @@ endfunction
 %! draw.tikz (draw.Drawing (), 'File', '')
 %!error<draw.tikz: Styles must be a logical scalar.> ...
 %! draw.tikz (draw.Drawing (), 'Styles', 'yes')
+
+%!test  # a styled entity carries colour and dash pattern as draw options
+%! D = draw.Drawing ();
+%! D.Linetype = 'CENTER';
+%! D.Colour = 'red';
+%! S = draw.tikz (D.line ([0, 0], [1, 0]));
+%! assert_equal (! isempty (strfind (S, '\draw[red, dash pattern=on')), true);
+
+%!test  # a default entity carries no options at all
+%! S = draw.tikz (draw.Drawing ().line ([0, 0], [1, 0]));
+%! assert_equal (isempty (strfind (S, '\draw[')), true);
+%! assert_equal (! isempty (strfind (S, '\draw ')), true);
+
+%!test  # dash lengths are paper-space, unchanged by the drawing scale
+%! D = draw.Drawing ();
+%! D.Linetype = 'DASHED';
+%! S1 = draw.tikz (D.line ([0, 0], [1, 0]), 'scale', 1);
+%! S50 = draw.tikz (D.line ([0, 0], [1, 0]), 'scale', 50);
+%! assert_equal (! isempty (strfind (S1, 'on 0.5mm off 0.25mm')), true);
+%! assert_equal (! isempty (strfind (S50, 'on 0.5mm off 0.25mm')), true);

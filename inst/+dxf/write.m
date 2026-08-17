@@ -87,11 +87,15 @@ function write (FILE, E)
     ents{ii} = checkentity (E(ii), ii);
   endfor
 
-  ## Layers named by the entities, plus the default layer
+  ## Layers and line types named by the entities, plus the defaults
   layers = {'0'};
+  ltypes = {'CONTINUOUS'};
   for ii = 1:numel (ents)
     if (! any (strcmp (ents{ii}.layer, layers)))
       layers{end+1} = ents{ii}.layer;
+    endif
+    if (! any (strcmpi (ents{ii}.linetype, ltypes)))
+      ltypes{end+1} = ents{ii}.linetype;
     endif
   endfor
 
@@ -110,9 +114,16 @@ function write (FILE, E)
     putpair (fid, 70, 4);
     putpair (fid, 0, 'ENDSEC');
 
-    ## Tables: the layers used, all continuous and white
+    ## Tables: the line types used, then the layers
     putpair (fid, 0, 'SECTION');
     putpair (fid, 2, 'TABLES');
+    putpair (fid, 0, 'TABLE');
+    putpair (fid, 2, 'LTYPE');
+    putpair (fid, 70, numel (ltypes));
+    for ii = 1:numel (ltypes)
+      putltype (fid, ltypes{ii});
+    endfor
+    putpair (fid, 0, 'ENDTAB');
     putpair (fid, 0, 'TABLE');
     putpair (fid, 2, 'LAYER');
     putpair (fid, 70, numel (layers));
@@ -163,6 +174,20 @@ function s = checkentity (e, ii)
   s.layer = optfield (e, 'layer', '0');
   if (! ischar (s.layer) || isempty (s.layer) || ! isrow (s.layer))
     error ("dxf.write: E(%d).layer must be a non-empty character vector.", ii);
+  endif
+
+  s.linetype = optfield (e, 'linetype', 'CONTINUOUS');
+  if (! ischar (s.linetype) || isempty (s.linetype) || ! isrow (s.linetype))
+    error (strcat ("dxf.write: E(%d).linetype must be a non-empty", ...
+                   " character vector."), ii);
+  endif
+
+  s.colour = optfield (e, 'colour', 256);
+  if (! isnumeric (s.colour) || ! isreal (s.colour) || ! isscalar (s.colour) ...
+      || ! isfinite (s.colour) || s.colour != fix (s.colour) ...
+      || s.colour < 0 || s.colour > 256)
+    error (strcat ("dxf.write: E(%d).colour must be an integer index from", ...
+                   " 0 to 256."), ii);
   endif
 
   s.closed = false;
@@ -244,6 +269,43 @@ function s = checkentity (e, ii)
 
 endfunction
 
+## Layer, line type and colour, which every entity carries
+function putcommon (fid, s)
+
+  putpair (fid, 8, s.layer);
+  if (! strcmpi (s.linetype, 'CONTINUOUS'))
+    putpair (fid, 6, s.linetype);
+  endif
+  if (s.colour != 256)
+    putpair (fid, 62, s.colour);
+  endif
+
+endfunction
+
+## One line-type table record.  A name the package defines carries its dash
+## pattern; one it does not is named only, which is how a file refers to a line
+## type the receiving installation already holds.
+function putltype (fid, name)
+
+  putpair (fid, 0, 'LTYPE');
+  putpair (fid, 2, name);
+  putpair (fid, 70, 0);
+  try
+    [pat, descr] = draw.linetype (name);
+  catch
+    pat = [];
+    descr = name;
+  end_try_catch
+  putpair (fid, 3, descr);
+  putpair (fid, 72, 65);
+  putpair (fid, 73, numel (pat));
+  putpair (fid, 40, sum (abs (pat)));
+  for k = 1:numel (pat)
+    putpair (fid, 49, pat(k));
+  endfor
+
+endfunction
+
 ## Emit one entity.  R12 has no LWPOLYLINE, so both polyline types go out as a
 ## POLYLINE with its VERTEX list and closing SEQEND.
 function putentity (fid, s)
@@ -252,33 +314,33 @@ function putentity (fid, s)
 
     case 'LINE'
       putpair (fid, 0, 'LINE');
-      putpair (fid, 8, s.layer);
+      putcommon (fid, s);
       putpoint (fid, 10, s.pts(1,:));
       putpoint (fid, 11, s.pts(2,:));
 
     case {'POLYLINE', 'LWPOLYLINE'}
       putpair (fid, 0, 'POLYLINE');
-      putpair (fid, 8, s.layer);
+      putcommon (fid, s);
       putpair (fid, 66, 1);                 # vertices follow
       putpair (fid, 70, double (s.closed)); # bit 1: closed
       putpoint (fid, 10, [0, 0]);
       for ii = 1:rows (s.pts)
         putpair (fid, 0, 'VERTEX');
-        putpair (fid, 8, s.layer);
+        putcommon (fid, s);
         putpoint (fid, 10, s.pts(ii,:));
       endfor
       putpair (fid, 0, 'SEQEND');
-      putpair (fid, 8, s.layer);
+      putcommon (fid, s);
 
     case 'CIRCLE'
       putpair (fid, 0, 'CIRCLE');
-      putpair (fid, 8, s.layer);
+      putcommon (fid, s);
       putpoint (fid, 10, s.pts);
       putpair (fid, 40, s.radius);
 
     case 'ARC'
       putpair (fid, 0, 'ARC');
-      putpair (fid, 8, s.layer);
+      putcommon (fid, s);
       putpoint (fid, 10, s.pts);
       putpair (fid, 40, s.radius);
       putpair (fid, 50, s.angles(1));
@@ -286,7 +348,7 @@ function putentity (fid, s)
 
     case 'TEXT'
       putpair (fid, 0, 'TEXT');
-      putpair (fid, 8, s.layer);
+      putcommon (fid, s);
       putpoint (fid, 10, s.pts);
       putpair (fid, 40, s.height);
       putpair (fid, 1, s.text);
@@ -300,7 +362,7 @@ function putentity (fid, s)
 
     case 'POINT'
       putpair (fid, 0, 'POINT');
-      putpair (fid, 8, s.layer);
+      putcommon (fid, s);
       putpoint (fid, 10, s.pts);
 
   endswitch
@@ -318,7 +380,7 @@ endfunction
 function putpair (fid, code, value)
   if (ischar (value))
     fprintf (fid, "%d\n%s\n", code, value);
-  elseif (any (code == [70, 62, 66, 90]))
+  elseif (any (code == [70, 72, 73, 62, 66, 90]))
     fprintf (fid, "%d\n%d\n", code, round (value));
   else
     fprintf (fid, "%d\n%.6f\n", code, value);
@@ -510,3 +572,53 @@ endfunction
 %! dxf.write ('a.dxf', struct ('type', 'TEXT', 'pts', [0, 0], 'text', 'X'))
 %!error<dxf.write: E\(1\).layer must be a non-empty character vector.> ...
 %! dxf.write ('a.dxf', struct ('type', 'POINT', 'pts', [0, 0], 'layer', ''))
+
+%!test  # line type and colour survive a round trip
+%! E = struct ('type', 'LINE', 'layer', 'A', 'linetype', 'CENTER', ...
+%!             'colour', 1, 'pts', [0, 0; 1, 1]);
+%! unwind_protect
+%!   dxf.write (tmpf, E);
+%!   R = dxf.read (tmpf);
+%!   assert_equal (R.linetype, 'CENTER');
+%!   assert_equal (R.colour, 1);
+%! unwind_protect_cleanup
+%!   unlink (tmpf);
+%! end_unwind_protect
+
+%!test  # the line-type table carries the dash pattern of every type used
+%! E = struct ('type', 'LINE', 'layer', 'A', 'linetype', 'CENTER', ...
+%!             'colour', 256, 'pts', [0, 0; 1, 1]);
+%! unwind_protect
+%!   dxf.write (tmpf, E);
+%!   txt = fileread (tmpf);
+%!   assert_equal (! isempty (strfind (txt, 'LTYPE')), true);
+%!   assert_equal (! isempty (strfind (txt, 'CENTER')), true);
+%!   assert_equal (numel (strfind (txt, sprintf ('\n49\n'))), 4);
+%! unwind_protect_cleanup
+%!   unlink (tmpf);
+%! end_unwind_protect
+
+%!test  # defaults are not written as entity attributes, as DXF expects
+%! E = struct ('type', 'LINE', 'layer', 'A', 'pts', [0, 0; 1, 1]);
+%! unwind_protect
+%!   dxf.write (tmpf, E);
+%!   R = dxf.read (tmpf);
+%!   assert_equal (R.linetype, 'CONTINUOUS');
+%!   assert_equal (R.colour, 256);
+%! unwind_protect_cleanup
+%!   unlink (tmpf);
+%! end_unwind_protect
+
+%!test  # an unknown line type is carried by name rather than refused
+%! E = struct ('type', 'LINE', 'layer', 'A', 'linetype', 'HOUSESTYLE', ...
+%!             'colour', 256, 'pts', [0, 0; 1, 1]);
+%! unwind_protect
+%!   dxf.write (tmpf, E);
+%!   R = dxf.read (tmpf);
+%!   assert_equal (R.linetype, 'HOUSESTYLE');
+%! unwind_protect_cleanup
+%!   unlink (tmpf);
+%! end_unwind_protect
+
+%!error<dxf.write: E\(1\).colour must be an integer index from 0 to 256.> ...
+%! dxf.write (tmpf, struct ('type', 'LINE', 'colour', 999, 'pts', [0,0;1,1]))

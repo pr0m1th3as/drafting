@@ -18,6 +18,9 @@ DXF input and output
  dxf.write
 STL output
  stl.write
+Line types and colours
+ draw.linetype
+ draw.colour
 Drawing model and backends
  draw.Drawing
  draw.entities

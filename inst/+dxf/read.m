@@ -208,6 +208,8 @@ function [E, SKIPPED] = parseentities (codes, values, scale)
     s = blankentity ();
     s.type = type;
     s.layer = grouptext (codes(body), values(body), 8, '0');
+    s.linetype = grouptext (codes(body), values(body), 6, 'CONTINUOUS');
+    s.colour = groupnum (codes(body), values(body), 62, 256);
 
     if (strcmp (type, 'POLYLINE'))
       ## Vertices live in the VERTEX entities that follow, up to the SEQEND
@@ -315,7 +317,8 @@ endfunction
 
 ## The full field set, so that entities of different types still concatenate
 function s = blankentity ()
-  s = struct ('type', '', 'layer', '0', 'pts', zeros (0, 2), ...
+  s = struct ('type', '', 'layer', '0', 'linetype', 'CONTINUOUS', ...
+              'colour', 256, 'pts', zeros (0, 2), ...
               'closed', false, 'radius', [], 'angles', [], ...
               'text', '', 'height', [], 'rotation', []);
 endfunction
