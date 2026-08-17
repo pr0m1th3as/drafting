@@ -58,6 +58,20 @@ function [B, W, H] = bbox (P)
 
 endfunction
 
+%!demo
+%! ## The extent of a set of points, and the width and height with it.
+%!
+%! t = linspace (0, 2*pi, 181)(1:180)';
+%! P = (30 + 5 * cos (5 * t)) .* [cos(t), sin(t)];
+%! [B, W, H] = geom.bbox (P)
+%!
+%! D = draw.Drawing ().polyline (P, true);
+%! D.Linetype = 'PHANTOM';
+%! D.Colour = 'red';
+%! D = D.polyline ([B(1), B(2); B(3), B(2); B(3), B(4); B(1), B(4)], true);
+%! draw.plot (D);
+%! title ('a profile and the box that bounds it');
+
 %!test
 %! assert_equal (geom.bbox ([0, 0; 1, 0; 1, 1; 0, 1]), [0, 0, 1, 1]);
 

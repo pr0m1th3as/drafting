@@ -116,6 +116,30 @@ function [T, V, COVERAGE] = triangulate (P, HOLES = {})
 
 endfunction
 
+%!demo
+%! ## Triangulating a plate with a bore and a ring of holes --- the end cap of
+%! ## an extruded solid.  COVERAGE reports how much of the true area the
+%! ## triangles actually reach, so a caller can assert on a number rather than
+%! ## trust a description.
+%!
+%! a = linspace (0, 2*pi, 65)(1:64)';
+%! b = linspace (0, 2*pi, 33)(1:32)';
+%! outer = 40 * [cos(a), sin(a)];
+%! H = {10 * [cos(b), sin(b)]};
+%! for k = 1:5
+%!   c = 26 * [cos(2*pi*(k-1)/5), sin(2*pi*(k-1)/5)];
+%!   H{end+1} = c + 5 * [cos(b), sin(b)];
+%! endfor
+%! [T, V, COVERAGE] = geom.triangulate (outer, H);
+%! printf ('%d triangles covering %.4f of the area\n', rows (T), COVERAGE);
+%!
+%! D = draw.Drawing ();
+%! for k = 1:rows (T)
+%!   D = D.polyline (V(T(k,:),:), true);
+%! endfor
+%! draw.plot (D);
+%! title ('an end cap triangulated around its bore and holes');
+
 %!test  # a square becomes two triangles
 %! T = geom.triangulate ([0, 0; 1, 0; 1, 1; 0, 1]);
 %! assert_equal (rows (T), 2);

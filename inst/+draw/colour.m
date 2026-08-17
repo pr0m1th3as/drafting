@@ -116,6 +116,34 @@ function OUT = colour (varargin)
 
 endfunction
 
+%!demo
+%! ## Entities carry a colour index, which is the model DXF uses, so a drawing
+%! ## written and read back is unchanged.  Names resolve to indices and indices
+%! ## render as RGB.
+%!
+%! draw.colour ()
+%! draw.colour ('red')
+%! draw.colour (5)
+
+%!demo
+%! ## The named colours, drawn.  Index 256 means take the layer's colour, which
+%! ## is the default and is why an ordinary drawing needs none of this.
+%!
+%! D = draw.Drawing ();
+%! x = 0;
+%! for nm = draw.colour ()
+%!   if (any (strcmp (nm{1}, {'byBlock', 'byLayer'})))
+%!     continue;
+%!   endif
+%!   D.Colour = nm{1};
+%!   D = D.polyline ([x, 0; x + 14, 0; x + 14, 14; x, 14], true);
+%!   D.Colour = 'byLayer';
+%!   D = D.text ([x, -5], nm{1}, 3);
+%!   x += 20;
+%! endfor
+%! draw.plot (D);
+%! title ('the named colours');
+
 %!test  # names map to their indices
 %! assert_equal (draw.colour ('red'), 1);
 %! assert_equal (draw.colour ('byLayer'), 256);

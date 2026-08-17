@@ -333,6 +333,39 @@ function s = blankentity ()
               'text', '', 'height', [], 'rotation', [], 'bulge', []);
 endfunction
 
+%!demo
+%! ## Reading a DXF gives one struct per entity, with the layer, line type and
+%! ## colour it carried.  Anything the reader does not handle is counted rather
+%! ## than silently dropped.
+%!
+%! D = draw.Drawing ().circle ([0, 0], 20).polyline ([0,0; 30,0; 30,20], true);
+%! D.Linetype = 'HIDDEN';
+%! D = D.line ([-25, 0], [25, 0]);
+%!
+%! fn = [tempname(), '.dxf'];
+%! dxf.write (fn, draw.entities (D));
+%! [E, UNITS, SKIPPED] = dxf.read (fn);
+%! printf ('%d entities, units "%s", %d skipped\n', numel (E), UNITS, SKIPPED);
+%! for k = 1:numel (E)
+%!   printf ('  %-9s %d point(s), %s\n', E(k).type, ...
+%!           rows (E(k).pts), E(k).linetype);
+%! endfor
+%!
+%! ## What was read can be drawn again
+%! Q = draw.Drawing ();
+%! for k = 1:numel (E)
+%!   if (strcmp (E(k).type, 'CIRCLE'))
+%!     Q = Q.circle (E(k).pts, E(k).radius);
+%!   elseif (strcmp (E(k).type, 'POLYLINE'))
+%!     Q = Q.polyline (E(k).pts, E(k).closed);
+%!   else
+%!     Q = Q.line (E(k).pts(1,:), E(k).pts(2,:));
+%!   endif
+%! endfor
+%! draw.plot (Q);
+%! title ('read back from the file and drawn again');
+%! unlink (fn);
+
 %!shared tmpf
 %! tmpf = [tempname() '.dxf'];
 

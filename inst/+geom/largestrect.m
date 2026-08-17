@@ -147,6 +147,20 @@ function [R, B] = largestrect (P, MARGINS = 0)
 
 endfunction
 
+%!demo
+%! ## The largest axis-aligned rectangle that fits inside an outline, with a
+%! ## per-side clearance kept free.  The margins are the budget; the rectangle
+%! ## is what that budget leaves room for.
+%!
+%! P = [0, 0; 60, 0; 60, 20; 30, 20; 30, 45; 0, 45];
+%! [R, B] = geom.largestrect (P, [4, 6, 4, 3])
+%!
+%! D = draw.Drawing ().polyline (P, true);
+%! D.Colour = 'red';
+%! D = D.polyline (R, true);
+%! draw.plot (D);
+%! title ('the biggest rectangle that fits, after the clearances');
+
 %!test  # a rectangle is its own largest inscribed rectangle
 %! P = [0, 0; 10, 0; 10, 6; 0, 6];
 %! [R, B] = geom.largestrect (P);

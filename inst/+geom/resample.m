@@ -164,6 +164,34 @@ function [Q, S] = resample (P, varargin)
 
 endfunction
 
+%!demo
+%! ## Equal spacing along the curve, for a marker every so many millimetres or
+%! ## a table of inspection points.
+%!
+%! t = linspace (0, 2*pi, 361)(1:360)';
+%! P = (30 + 5 * cos (6 * t)) .* [cos(t), sin(t)];
+%! Q = geom.resample (P, 24, true);
+%!
+%! D = draw.Drawing ().polyline (P, true);
+%! D.Colour = 'red';
+%! for k = 1:rows (Q)
+%!   D = D.circle (Q(k,:), 1);
+%! endfor
+%! draw.plot (D);
+%! title ('24 points spaced equally along the profile');
+
+%!demo
+%! ## Resampling replaces the original vertices, so a corner between two
+%! ## samples is cut.  A polygon whose corners matter wants `geom.simplify`,
+%! ## which only ever removes points and so can never invent a chord across one.
+%!
+%! P = [0, 0; 40, 0; 40, 30];
+%! D = draw.Drawing ().polyline (P);
+%! D.Colour = 'red';
+%! D = D.polyline (geom.resample (P, 6));
+%! draw.plot (D);
+%! title ('the corner is cut when the samples straddle it');
+
 %!test  # N points along a straight line are evenly spaced
 %! Q = geom.resample ([0, 0; 10, 0], 5);
 %! assert_equal (Q, [0, 0; 2.5, 0; 5, 0; 7.5, 0; 10, 0], 1e-12);

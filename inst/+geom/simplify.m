@@ -130,6 +130,36 @@ function [d, k] = furthest (P, i, j)
 
 endfunction
 
+%!demo
+%! ## Simplifying removes the points that carry no shape, guaranteeing that no
+%! ## point of the original ends further than the tolerance from the result.
+%! ## Every point kept is a point of the original: nothing is interpolated.
+%!
+%! t = linspace (0, 2*pi, 721)(1:720)';
+%! P = (30 + 4 * cos (8 * t)) .* [cos(t), sin(t)];
+%! Q = geom.simplify (P, 0.05);
+%! printf ('%d points -> %d, within 0.05 mm\n', rows (P), rows (Q));
+%!
+%! D = draw.Drawing ().polyline (P, true);
+%! D.Colour = 'red';
+%! for k = 1:rows (Q)
+%!   D = D.circle (Q(k,:), 0.7);
+%! endfor
+%! draw.plot (D);
+%! title ('the points that survive are the ones carrying shape');
+
+%!demo
+%! ## The saving matters: a profile sampled far finer than the drawing needs
+%! ## carries points no reader or machine can use, and every one reaches the
+%! ## file.
+%!
+%! t = linspace (0, 2*pi, 4001)(1:4000)';
+%! P = (30 + 4 * cos (9 * t)) .* [cos(t), sin(t)];
+%! for tol = [0.001, 0.01, 0.1]
+%!   printf ('within %5.3f mm: %5d of %d points kept\n', tol, ...
+%!           rows (geom.simplify (P, tol)), rows (P));
+%! endfor
+
 %!test  # collinear points in the middle are all dropped
 %! Q = geom.simplify ([0, 0; 1, 0; 2, 0; 3, 0; 4, 0], 1e-9);
 %! assert_equal (Q, [0, 0; 4, 0]);

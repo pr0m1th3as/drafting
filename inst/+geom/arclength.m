@@ -69,6 +69,26 @@ function [L, S] = arclength (P, CLOSED = false)
 
 endfunction
 
+%!demo
+%! ## The length along a curve, and the cumulative distance at each point --
+%! ## which is what places something a given distance along it.
+%!
+%! P = [0, 0; 30, 0; 30, 40];
+%! [L, S] = geom.arclength (P)
+%!
+%! ## Closing the ring adds the segment back to the start
+%! geom.arclength (P, true)
+
+%!demo
+%! ## The length is that of the polyline, not of the smooth curve it was
+%! ## sampled from, and a polyline is always the shorter of the two.
+%!
+%! for n = [8, 60, 400]
+%!   t = linspace (0, 2*pi, n + 1)(1:n)';
+%!   printf ('%3d-sided polygon: %8.4f  (circle is %8.4f)\n', n, ...
+%!           geom.arclength (10 * [cos(t), sin(t)], true), 2 * pi * 10);
+%! endfor
+
 %!test  # a straight run is its own length
 %! assert_equal (geom.arclength ([0, 0; 3, 4]), 5, 1e-12);
 

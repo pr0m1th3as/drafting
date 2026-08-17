@@ -154,6 +154,42 @@ function L = checkline (L, name)
   endif
 endfunction
 
+%!demo
+%! ## Rounding a corner is the commonest edit a drawing gets.  `geom.fillet`
+%! ## returns the arc centre, where it meets each line, and the two angles ---
+%! ## which are exactly what `draw.Drawing.arc` takes, so the fillet is drawn by
+%! ## handing them straight on.
+%!
+%! A = [10, 60; 10, 10];
+%! B = [10, 10; 80, 10];
+%! [C, TA, TB, ANG] = geom.fillet (A, B, 20)
+%!
+%! ## Each line is drawn only as far as its tangent point, and the arc joins
+%! ## them; the red marks are where the arc meets each line.
+%! D = draw.Drawing ();
+%! D = D.line (A(1,:), TA).line (TB, B(2,:)).arc (C, 20, ANG(1), ANG(2));
+%! D.Colour = 'red';
+%! D = D.circle (TA, 1.5).circle (TB, 1.5);
+%! draw.plot (D);
+%! title ('a 20 mm fillet, and the two tangent points it meets');
+
+%!demo
+%! ## The corner filleted is the one the given points face into, so all four
+%! ## are reachable without a fifth argument.  The order of a line's two points
+%! ## does not matter; which side of the crossing they lie on does.
+%!
+%! D = draw.Drawing ();
+%! for s = [1, -1]
+%!   for t = [1, -1]
+%!     A = [0, 0; 60 * s, 0];
+%!     B = [0, 0; 0, 60 * t];
+%!     [C, TA, TB, ANG] = geom.fillet (A, B, 15);
+%!     D = D.line (A(2,:), TA).line (TB, B(2,:)).arc (C, 15, ANG(1), ANG(2));
+%!   endfor
+%! endfor
+%! draw.plot (D);
+%! title ('the same call fillets whichever corner the points face into');
+
 %!test  # a right angle at the origin, filleted with radius 5
 %! [CTR, TA, TB] = geom.fillet ([0, 0; 20, 0], [0, 0; 0, 20], 5);
 %! assert_equal (CTR, [5, 5], 1e-12);

@@ -131,6 +131,31 @@ function [PATTERN, DESCR] = linetype (varargin)
 
 endfunction
 
+%!demo
+%! ## The seven standard line types, by name, with the dash pattern each
+%! ## carries.  A positive element draws, a negative one skips, a zero is a dot.
+%!
+%! draw.linetype ()
+%! draw.linetype ('CENTER')
+%! [pat, descr] = draw.linetype ('PHANTOM')
+
+%!demo
+%! ## What each one is for, drawn.  A centre line marks an axis, a hidden line
+%! ## an edge concealed by the body, a phantom line an alternate position.
+%!
+%! D = draw.Drawing ();
+%! D = D.polyline ([0, 0; 60, 0; 60, 30; 0, 30], true);
+%! D.Linetype = 'HIDDEN';
+%! D = D.line ([20, 0], [20, 30]).line ([40, 0], [40, 30]);
+%! D.Linetype = 'CENTER';
+%! D.Colour = 'red';
+%! D = D.line ([-6, 15], [66, 15]);
+%! D.Linetype = 'PHANTOM';
+%! D.Colour = 'blue';
+%! D = D.polyline ([0, 36; 60, 36; 60, 60; 0, 60], true);
+%! draw.plot (D);
+%! title ('visible, hidden, centre and phantom');
+
 %!test  # the list names every defined type
 %! N = draw.linetype ();
 %! assert_equal (iscellstr (N), true);

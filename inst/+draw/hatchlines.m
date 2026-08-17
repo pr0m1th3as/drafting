@@ -177,6 +177,45 @@ function S = scanfill (P, adeg, spacing)
 
 endfunction
 
+%!demo
+%! ## A hatch is a set of lines, and generating them explicitly is what lets a
+%! ## format with no hatch entity of its own still carry the fill.  The
+%! ## boundary is clipped by the even-odd rule, so a concave outline fills in
+%! ## as many pieces as it takes.
+%!
+%! P = [0, 0; 60, 0; 60, 40; 35, 40; 35, 15; 25, 15; 25, 40; 0, 40];
+%! S = draw.hatchlines (P, 'ANSI31');
+%! printf ('%d segments fill the outline\n', rows (S));
+%!
+%! D = draw.Drawing ().polyline (P, true);
+%! D.Colour = 'blue';
+%! for k = 1:rows (S)
+%!   D = D.line (S(k,1:2), S(k,3:4));
+%! endfor
+%! draw.plot (D);
+%! title ('ANSI31 clipped around a re-entrant notch');
+
+%!demo
+%! ## The patterns, and the angle and spacing that override them.
+%!
+%! draw.hatchlines ()
+%!
+%! P = [0, 0; 40, 0; 40, 40; 0, 40];
+%! D = draw.Drawing ();
+%! x = 0;
+%! for nm = {'ANSI31', 'ANSI37', 'HORIZONTAL', 'CROSS'}
+%!   Q = P + [x, 0];
+%!   D = D.polyline (Q, true);
+%!   S = draw.hatchlines (Q, nm{1}, 0, 5);
+%!   for k = 1:rows (S)
+%!     D = D.line (S(k,1:2), S(k,3:4));
+%!   endfor
+%!   D = D.text ([x, -6], nm{1}, 3);
+%!   x += 50;
+%! endfor
+%! draw.plot (D);
+%! title ('four patterns at 5 mm spacing');
+
 %!test  # the list names every pattern
 %! N = draw.hatchlines ();
 %! assert_equal (iscellstr (N), true);

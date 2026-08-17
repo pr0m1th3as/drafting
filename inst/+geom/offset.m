@@ -134,6 +134,30 @@ function X = meet (A1, DIR1, A2, DIR2)
 
 endfunction
 
+%!demo
+%! ## Every edge slides along its own inward normal.  A positive distance
+%! ## shrinks the outline, a negative one grows it, and the orientation and
+%! ## vertex order are preserved.
+%!
+%! P = [0, 0; 60, 0; 60, 20; 30, 20; 30, 45; 0, 45];
+%! D = draw.Drawing ().polyline (P, true);
+%! D.Colour = 'red';
+%! D = D.polyline (geom.offset (P, 5), true);
+%! D.Colour = 'blue';
+%! D = D.polyline (geom.offset (P, -5), true);
+%! draw.plot (D);
+%! title ('an L-shaped outline offset 5 mm in (red) and out (blue)');
+
+%!demo
+%! ## An offset too large for the outline to absorb raises rather than
+%! ## returning a self-intersecting result that looks plausible.
+%!
+%! try
+%!   geom.offset ([0, 0; 40, 0; 40, 10; 0, 10], 8);
+%! catch err
+%!   disp (err.message);
+%! end_try_catch
+
 %!test  # inward offset of a counter-clockwise square
 %! P = [0, 0; 10, 0; 10, 10; 0, 10];
 %! assert_equal (geom.offset (P, 2), [2, 2; 8, 2; 8, 8; 2, 8], 1e-12);

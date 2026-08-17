@@ -633,6 +633,32 @@ function s = sign0 (x)
 
 endfunction
 
+%!demo
+%! ## `draw.entities` lowers a drawing to the primitives a file can hold.  It
+%! ## is what every backend goes through, so what it returns is what the
+%! ## recipient gets.  The second output names anything that could not survive.
+%!
+%! D = draw.Drawing ().circle ([0, 0], 10).dim ([0, 0], [40, 0], -15);
+%! D = D.hatch ([0, -40; 40, -40; 40, -55; 0, -55]);
+%! [E, LOST] = draw.entities (D);
+%! printf ('%d drawing entities -> %d file entities\n', ...
+%!         numentities (D), numel (E));
+%! unique ({E.type})
+%!
+%! ## A dimension arrives already exploded into the lines and text that draw it
+%! sum (strcmp ({E.type}, 'LINE'))
+
+%!demo
+%! ## A hatch reaches the file as its boundary and the fill lines, because R12
+%! ## has no hatch entity.  Ask for the boundary alone and the fill is dropped,
+%! ## which is then reported in LOST.
+%!
+%! D = draw.Drawing ().hatch ([0, 0; 40, 0; 40, 25; 0, 25]);
+%! numel (draw.entities (D))
+%! [E, LOST] = draw.entities (D, 'hatch', 'boundary');
+%! numel (E)
+%! LOST(1).reason
+
 %!test  # a plain drawing lowers entity for entity
 %! D = draw.Drawing ().line ([0, 0], [10, 0]).circle ([5, 5], 2);
 %! E = draw.entities (D);

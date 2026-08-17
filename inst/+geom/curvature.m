@@ -108,6 +108,24 @@ function [K, R] = curvature (P, CLOSED = false)
 
 endfunction
 
+%!demo
+%! ## Curvature is measured from the circle through each point and its two
+%! ## neighbours, so it is exact for points taken off a circle at any spacing.
+%! ## The sign says which way the curve turns.
+%!
+%! t = linspace (0, 2*pi, 361)(1:360)';
+%! P = (30 + 5 * cos (6 * t)) .* [cos(t), sin(t)];
+%! [K, R] = geom.curvature (P, true);
+%! printf ('tightest radius %.2f mm at a crest, %.2f mm in a root\n', ...
+%!         min (abs (R(K > 0))), min (abs (R(K < 0))));
+%!
+%! D = draw.Drawing ().polyline (P, true);
+%! D.Colour = 'red';
+%! [~, i] = max (K);
+%! D = D.circle (P(i,:) - R(i) * (P(i,:) / norm (P(i,:))), abs (R(i)));
+%! draw.plot (D);
+%! title ('the osculating circle at the tightest crest');
+
 %!test  # a counter-clockwise unit circle has curvature 1 everywhere
 %! t = linspace (0, 2*pi, 361)(1:360)';
 %! K = geom.curvature ([cos(t), sin(t)], true);

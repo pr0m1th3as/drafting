@@ -169,6 +169,31 @@ function T = buildmatrix (OP, varargin)
 
 endfunction
 
+%!demo
+%! ## The four named operations, each shown against the original.  A centre may
+%! ## be given so the operation happens about a point rather than the origin.
+%!
+%! P = [0, 0; 30, 0; 30, 10; 10, 10; 10, 20; 0, 20];
+%! D = draw.Drawing ().polyline (P, true);
+%! D.Colour = 'red';
+%! D = D.polyline (geom.transform (P, 'translate', [45, 0]), true);
+%! D.Colour = 'blue';
+%! D = D.polyline (geom.transform (P, 'rotate', 90, [15, 10]), true);
+%! D.Colour = 'green';
+%! D = D.polyline (geom.transform (P, 'scale', 0.5, [15, 10]), true);
+%! D.Colour = 'magenta';
+%! D = D.polyline (geom.transform (P, 'mirror', 'y'), true);
+%! draw.plot (D);
+%! title ('translate, rotate about a point, scale, mirror');
+
+%!demo
+%! ## A 3-by-3 homogeneous matrix does anything the named operations do and
+%! ## composes by ordinary multiplication, last-applied on the left.
+%!
+%! P = [0, 0; 20, 0; 20, 10];
+%! T = [1, 0, 50; 0, 1, 0; 0, 0, 1] * [0, -1, 0; 1, 0, 0; 0, 0, 1];
+%! geom.transform (P, T)
+
 %!test  # explicit matrix: translation
 %! T = [1, 0, 10; 0, 1, 20; 0, 0, 1];
 %! assert_equal (geom.transform ([1, 2; 3, 4], T), [11, 22; 13, 24], 1e-12);

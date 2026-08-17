@@ -97,6 +97,28 @@ function [P, T] = intersectcircle (L, C, R)
 
 endfunction
 
+%!demo
+%! ## Where a line cuts a circle, in the order it meets them.  A tangent gives
+%! ## exactly one point rather than two nearly equal ones.
+%!
+%! C = [0, 0];
+%! R = 30;
+%! D = draw.Drawing ().circle (C, R);
+%! D.Colour = 'red';
+%! for y = [0, 18, 30, 40]
+%!   L = [-45, y; 45, y];
+%!   P = geom.intersectcircle (L, C, R);
+%!   printf ('y = %2d: %d point(s)\n', y, rows (P));
+%!   D.Colour = 'byLayer';
+%!   D = D.line (L(1,:), L(2,:));
+%!   D.Colour = 'red';
+%!   for k = 1:rows (P)
+%!     D = D.circle (P(k,:), 1.5);
+%!   endfor
+%! endfor
+%! draw.plot (D);
+%! title ('two points, two points, one at tangency, then none');
+
 %!test  # a line through the centre cuts twice, at the ends of a diameter
 %! P = geom.intersectcircle ([-10, 0; 10, 0], [0, 0], 5);
 %! assert_equal (P, [-5, 0; 5, 0], 1e-12);

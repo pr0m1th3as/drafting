@@ -93,6 +93,35 @@ function L = checkline (L, name)
 
 endfunction
 
+%!demo
+%! ## The lines are infinite, which is what construction geometry wants: the
+%! ## crossing is usually nowhere near the points that define the lines.
+%!
+%! A = [0, 0; 30, 12];
+%! B = [60, 0; 60, 40];
+%! [P, TA, TB] = geom.intersectlines (A, B)
+%!
+%! D = draw.Drawing ();
+%! D.Linetype = 'PHANTOM';
+%! D = D.line (A(1,:), P).line (B(1,:), P);
+%! D.Linetype = 'CONTINUOUS';
+%! D = D.line (A(1,:), A(2,:)).line (B(1,:), B(2,:));
+%! D.Colour = 'red';
+%! D = D.circle (P, 2);
+%! draw.plot (D);
+%! title ('the crossing lies beyond both given segments');
+
+%!demo
+%! ## The parameters say where along each line the crossing falls, so one
+%! ## function answers both the line question and the segment question: the
+%! ## segments cross when both lie between 0 and 1.
+%!
+%! [P, TA, TB] = geom.intersectlines ([0, 0; 20, 0], [10, -5; 10, 5]);
+%! crossed = TA >= 0 && TA <= 1 && TB >= 0 && TB <= 1
+%!
+%! [P, TA, TB] = geom.intersectlines ([0, 0; 5, 0], [10, -5; 10, 5]);
+%! crossed = TA >= 0 && TA <= 1 && TB >= 0 && TB <= 1
+
 %!test  # two lines crossing at the origin
 %! P = geom.intersectlines ([-1, 0; 1, 0], [0, -1; 0, 1]);
 %! assert_equal (P, [0, 0], 1e-12);

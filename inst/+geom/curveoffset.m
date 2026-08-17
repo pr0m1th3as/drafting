@@ -171,6 +171,38 @@ function [Q, MARGIN] = curveoffset (P, D, CLOSED = false)
 
 endfunction
 
+%!demo
+%! ## An equidistant offset moves every point along the curve's own normal.  On
+%! ## a closed curve a positive distance goes inward, whichever way round the
+%! ## points happen to run.
+%!
+%! t = linspace (0, 2*pi, 241)(1:240)';
+%! P = (30 + 4 * cos (7 * t)) .* [cos(t), sin(t)];
+%!
+%! D = draw.Drawing ().polyline (P, true);
+%! D.Colour = 'red';
+%! D = D.polyline (geom.curveoffset (P, 4, true), true);
+%! D.Colour = 'blue';
+%! D = D.polyline (geom.curveoffset (P, -4, true), true);
+%! draw.plot (D);
+%! title ('a lobed profile offset 4 mm in (red) and out (blue)');
+
+%!demo
+%! ## The margin says how much further the curve could be offset before it
+%! ## folds through its own centre of curvature.  Exceeding it raises rather
+%! ## than returning a folded curve that looks plausible and cannot be cut.
+%!
+%! t = linspace (0, 2*pi, 241)(1:240)';
+%! P = (30 + 4 * cos (7 * t)) .* [cos(t), sin(t)];
+%! [Q, MARGIN] = geom.curveoffset (P, 4, true);
+%! printf ('4 mm in, with %.2f mm still in hand\n', MARGIN);
+%!
+%! try
+%!   geom.curveoffset (P, 4 + MARGIN + 1, true);
+%! catch err
+%!   disp (err.message);
+%! end_try_catch
+
 %!test  # a circle offsets to a concentric circle
 %! t = linspace (0, 2*pi, 361)(1:360)';
 %! Q = geom.curveoffset (25 * [cos(t), sin(t)], 5, true);

@@ -224,6 +224,47 @@ function T = caps (P, H, z)
 
 endfunction
 
+%!demo
+%! ## A profile becomes a printable solid by sweeping it through a z range.
+%! ## Holes are given as a cell array and are cut right through.
+%!
+%! a = linspace (0, 2*pi, 65)(1:64)';
+%! b = linspace (0, 2*pi, 33)(1:32)';
+%! outer = 30 * [cos(a), sin(a)];
+%! H = {8 * [cos(b), sin(b)]};
+%! for k = 1:4
+%!   c = 19 * [cos(2*pi*(k-1)/4), sin(2*pi*(k-1)/4)];
+%!   H{end+1} = c + 4 * [cos(b), sin(b)];
+%! endfor
+%!
+%! fn = [tempname(), '.stl'];
+%! n = stl.write (fn, struct ('profile', outer, 'z', [0, 10], 'holes', {H}));
+%! printf ('%d facets, %.1f kB\n', n, stat (fn).size / 1024);
+%! unlink (fn);
+
+%!demo
+%! ## A section stack expresses a part whose cross-section changes along its
+%! ## axis --- here a stepped shaft carrying a journal offset from the
+%! ## centreline, which no single extrusion could describe.
+%!
+%! a = linspace (0, 2*pi, 49)(1:48)';
+%! circ = @(r, c) c + r * [cos(a), sin(a)];
+%! S(1) = struct ('profile', circ (8, [0, 0]),   'z', [0, 20],  'holes', {{}});
+%! S(2) = struct ('profile', circ (14, [2, 0]),  'z', [20, 34], 'holes', {{}});
+%! S(3) = struct ('profile', circ (8, [0, 0]),   'z', [34, 55], 'holes', {{}});
+%!
+%! fn = [tempname(), '.stl'];
+%! printf ('%d facets in 3 sections\n', stl.write (fn, S));
+%! unlink (fn);
+%!
+%! ## The sections seen end-on, which is what the stack describes
+%! D = draw.Drawing ();
+%! D = D.circle ([0, 0], 8);
+%! D.Colour = 'red';
+%! D = D.circle ([2, 0], 14);
+%! draw.plot (D);
+%! title ('the journal (red) is offset 2 mm from the shaft axis');
+
 %!function [N, V] = readstl (fn)
 %!  fid = fopen (fn, 'rb');
 %!  fread (fid, 80, 'uint8');

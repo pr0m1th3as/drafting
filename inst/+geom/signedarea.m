@@ -60,6 +60,18 @@ function A = signedarea (P)
 
 endfunction
 
+%!demo
+%! ## The sign carries the orientation, so `sign (geom.signedarea (P))` is the
+%! ## cheapest orientation test there is, and `abs` of it is the plain area.
+%!
+%! P = [0, 0; 40, 0; 40, 30; 0, 30];
+%! geom.signedarea (P)                 # counter-clockwise: positive
+%! geom.signedarea (flipud (P))        # clockwise: negative
+%!
+%! ## An L-shape, whose area is not its bounding box
+%! L = [0, 0; 40, 0; 40, 15; 20, 15; 20, 30; 0, 30];
+%! geom.signedarea (L)
+
 %!test  # counter-clockwise unit square
 %! assert_equal (geom.signedarea ([0, 0; 1, 0; 1, 1; 0, 1]), 1);
 

@@ -92,6 +92,27 @@ function OUT = symbol (varargin)
 
 endfunction
 
+%!demo
+%! ## The symbols a drawing needs but a plain character set has no letter for.
+%! ## Put the code in any text and each backend renders it.
+%!
+%! draw.symbol ()
+%! draw.symbol ('diameter')
+%!
+%! label = [draw.symbol('diameter'), '25 ', draw.symbol('plusminus'), '0.05']
+
+%!demo
+%! ## They may be typed directly, which is what a CAD user already does.  Here
+%! ## all three appear on one drawing.
+%!
+%! D = draw.Drawing ().circle ([0, 0], 12.5);
+%! D = D.diam ([0, 0], 12.5, 135);
+%! D = D.text ([-20, -25], 'BORE %%c25 %%p0.02', 3.5);
+%! D = D.text ([-20, -32], 'DRAFT ANGLE 3%%d', 3.5);
+%! D = D.text ([-20, -39], 'SHRINKAGE 2%%%', 3.5);
+%! draw.plot (D);
+%! title ('the diameter, plus-minus and degree signs');
+
 %!test  # the codes are AutoCAD's own
 %! assert_equal (draw.symbol ('diameter'), '%%c');
 %! assert_equal (draw.symbol ('degree'), '%%d');

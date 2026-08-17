@@ -70,6 +70,21 @@ function C = centroid (P)
 
 endfunction
 
+%!demo
+%! ## The centroid of the enclosed area, which for an L-shape lies well away
+%! ## from the centre of its bounding box --- and outside the material for a
+%! ## shape concave enough.
+%!
+%! L = [0, 0; 60, 0; 60, 15; 20, 15; 20, 50; 0, 50];
+%! C = geom.centroid (L)
+%!
+%! D = draw.Drawing ().polyline (L, true);
+%! D.Colour = 'red';
+%! D.Linetype = 'CENTER';
+%! D = D.centremark (C, 8);
+%! draw.plot (D);
+%! title ('the centroid of an L-shaped section');
+
 %!test  # unit square
 %! assert_equal (geom.centroid ([0, 0; 1, 0; 1, 1; 0, 1]), [0.5, 0.5], 1e-12);
 

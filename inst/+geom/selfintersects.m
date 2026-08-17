@@ -139,6 +139,25 @@ function [TF, IDX] = selfintersects (P, CLOSED = false)
 
 endfunction
 
+%!demo
+%! ## The global companion to the local fold test in `geom.curveoffset`.  A
+%! ## curve can satisfy the curvature condition everywhere and still pinch
+%! ## closed somewhere along its length; only a crossing test sees that.
+%!
+%! bowtie = [0, 0; 40, 40; 40, 0; 0, 40];
+%! [TF, IDX] = geom.selfintersects (bowtie, true)
+%!
+%! D = draw.Drawing ().polyline (bowtie, true);
+%! draw.plot (D);
+%! title ('segments 1 and 3 cross');
+
+%!demo
+%! ## A simple outline crosses nothing, and reports so.
+%!
+%! t = linspace (0, 2*pi, 181)(1:180)';
+%! P = (30 + 4 * cos (5 * t)) .* [cos(t), sin(t)];
+%! geom.selfintersects (P, true)
+
 %!test  # a convex polygon does not cross itself
 %! assert_equal (geom.selfintersects ([0, 0; 4, 0; 4, 3; 0, 3], true), false);
 

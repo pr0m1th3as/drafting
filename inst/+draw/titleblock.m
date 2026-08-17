@@ -136,6 +136,27 @@ function D = titleblock (varargin)
 
 endfunction
 
+%!demo
+%! ## A sheet frame with its title block, ready to merge with the drawing it
+%! ## frames.  Everything sits on layer FRAME, so it can be dropped before the
+%! ## geometry goes to a machine that has no use for it.
+%!
+%! draw.titleblock ()
+%!
+%! F = struct ('title', 'BEARING BRACKET', 'drawing', 'BRK-014', ...
+%!             'material', 'EN8', 'scale', '1:1', 'units', 'mm', ...
+%!             'date', '2026-08-17', 'drawnby', 'AB', 'revision', 'B');
+%! sheet = draw.titleblock ('A4', F);
+%!
+%! part = draw.Drawing ().circle ([0, 0], 30).circle ([0, 0], 12);
+%! part.Linetype = 'CENTER';
+%! part.Colour = 'red';
+%! part = part.centremark ();
+%! sheet = sheet.merge (part.transform ('translate', [120, 120]));
+%!
+%! draw.plot (sheet, 'FontSize', 6);
+%! title ('an A4 sheet with its frame, block and part');
+
 %!test  # the sizes are the ISO A series
 %! S = draw.titleblock ();
 %! assert_equal (iscellstr (S), true);

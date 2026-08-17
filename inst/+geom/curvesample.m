@@ -139,6 +139,34 @@ function P = evaluate (FCN, T)
 
 endfunction
 
+%!demo
+%! ## Sampling to a chordal tolerance puts points where the curve needs them.
+%! ## The ellipse is sampled twice as finely at its sharp ends as along its
+%! ## flanks, and neither the caller nor the curve had to be told so.
+%!
+%! f = @(t) [40 * cos(t), 10 * sin(t)];
+%! [P, T] = geom.curvesample (f, [0, 2*pi], 0.05);
+%! printf ('%d points for a chord never more than 0.05 mm off the curve\n', ...
+%!         rows (P));
+%!
+%! D = draw.Drawing ().polyline (P, true);
+%! D.Colour = 'red';
+%! for k = 1:4:rows (P)
+%!   D = D.circle (P(k,:), 0.6);
+%! endfor
+%! draw.plot (D);
+%! title ('adaptive sampling: dense at the ends, sparse along the flanks');
+
+%!demo
+%! ## A tolerance is a statement about the part; a point count is not.  Ask for
+%! ## a finer chord and you get more points, in the places that needed them.
+%!
+%! f = @(t) [30 * cos(t), 30 * sin(t)];
+%! for tol = [1, 0.1, 0.01]
+%!   printf ('tolerance %5.2f mm -> %4d points\n', tol, ...
+%!           rows (geom.curvesample (f, [0, 2*pi], tol)));
+%! endfor
+
 %!test  # every sampled point of a circle is on the circle
 %! P = geom.curvesample (@(t) [cos(t), sin(t)], [0, 2*pi], 1e-3);
 %! assert_equal (sqrt (sum (P .^ 2, 2)), ones (rows (P), 1), 1e-12);

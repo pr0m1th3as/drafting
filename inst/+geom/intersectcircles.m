@@ -110,6 +110,31 @@ function checkradius (R, name)
   endif
 endfunction
 
+%!demo
+%! ## Two circles locate a point from two distances --- the compass
+%! ## construction that predates coordinates, and still how a hole is placed
+%! ## from two datums.
+%!
+%! P = geom.intersectcircles ([0, 0], 50, [70, 0], 40)
+%!
+%! D = draw.Drawing ().circle ([0, 0], 50).circle ([70, 0], 40);
+%! D.Colour = 'red';
+%! for k = 1:rows (P)
+%!   D = D.line (P(k,:) - [4, 0], P(k,:) + [4, 0]);
+%!   D = D.line (P(k,:) - [0, 4], P(k,:) + [0, 4]);
+%! endfor
+%! draw.plot (D);
+%! title ('a point located from two distances');
+
+%!demo
+%! ## Circles that touch give one point, and ones that do not reach each other
+%! ## give none.  Touching is decided against a tolerance rather than left to
+%! ## rounding, so a grazing pair never returns two points a nanometre apart.
+%!
+%! geom.intersectcircles ([0, 0], 30, [80, 0], 50)     # touching
+%! geom.intersectcircles ([0, 0], 10, [80, 0], 20)     # too far apart
+%! geom.intersectcircles ([0, 0], 50, [5, 0], 10)      # one inside the other
+
 %!test  # two unit circles two apart across the origin
 %! P = geom.intersectcircles ([-1, 0], sqrt (2), [1, 0], sqrt (2));
 %! assert_equal (sort (P(:,2)), [-1; 1], 1e-12);

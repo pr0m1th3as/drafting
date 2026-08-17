@@ -69,6 +69,22 @@ function TF = isrectilinear (P, TOL = 1e-6)
 
 endfunction
 
+%!demo
+%! ## The gate for `geom.offset` and `geom.largestrect`, both exact only on
+%! ## outlines whose edges run along the axes.
+%!
+%! geom.isrectilinear ([0, 0; 40, 0; 40, 30; 0, 30])          # a rectangle
+%! geom.isrectilinear ([0, 0; 40, 0; 40, 15; 20, 15; 20, 30; 0, 30])   # an L
+%! geom.isrectilinear ([0, 0; 40, 0; 20, 30])                 # a triangle
+
+%!demo
+%! ## The tolerance matters, because an outline that came from a CAD file
+%! ## carries rounding that an exact test would reject.
+%!
+%! P = [0, 0; 40, 1e-7; 40, 30; 0, 30];
+%! geom.isrectilinear (P)                 # default tolerance: still rectilinear
+%! geom.isrectilinear (P, 1e-12)          # exact: no longer
+
 %!assert (geom.isrectilinear ([0, 0; 1, 0; 1, 1; 0, 1]), true)
 %!assert (geom.isrectilinear ([0, 0; 4, 0; 0, 3]), false)
 

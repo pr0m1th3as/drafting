@@ -1423,3 +1423,83 @@ function P = arcextent (C, R, A1, A2)
   endfor
 
 endfunction
+
+%!demo
+%! ## A drawing is built by appending entities.  It is a value class, so every
+%! ## method returns a new drawing and the methods chain.
+%!
+%! D = draw.Drawing ('plate');
+%! D = D.polyline ([0, 0; 80, 0; 80, 50; 0, 50], true).circle ([40, 25], 12);
+%! numentities (D)
+%! [B, W, H] = bbox (D)
+%! draw.plot (D);
+%! title ('a plate with a bore');
+
+%!demo
+%! ## Layer, line type and colour are properties, not arguments: they apply to
+%! ## what is appended after they are set and never to what came before.  That
+%! ## is how a draughtsman works, and how CAD is built.
+%!
+%! D = draw.Drawing ('shaft');
+%! D.Layer = 'BODY';
+%! D = D.polyline ([0, -15; 70, -15; 70, 15; 0, 15], true);
+%! D.Layer = 'HIDDEN';
+%! D.Linetype = 'HIDDEN';
+%! D = D.line ([25, -15], [25, 15]).line ([50, -15], [50, 15]);
+%! D.Layer = 'AXES';
+%! D.Linetype = 'CENTER';
+%! D.Colour = 'red';
+%! D = D.line ([-6, 0], [76, 0]);
+%! D.layers ()
+%! draw.plot (D);
+%! title ('three layers, each with its own line type');
+
+%!demo
+%! ## `transform` and `merge` together are composition: build a part once and
+%! ## place it as often as needed.
+%!
+%! part = draw.Drawing ().circle ([0, 0], 8).line ([-12, 0], [12, 0]) ...
+%!                       .line ([0, -12], [0, 12]);
+%! sheet = draw.Drawing ('assembly');
+%! for k = 0:3
+%!   sheet = sheet.merge (part.transform ('translate', [30 * k, 0]));
+%! endfor
+%! big = part.transform ('scale', 2);
+%! sheet = sheet.merge (big.transform ('translate', [50, -45]));
+%! numentities (sheet)
+%! draw.plot (sheet);
+%! title ('one part, five placements');
+
+%!demo
+%! ## A repeated feature is better held as a block and referred to, which keeps
+%! ## the drawing --- and the file it becomes --- to one definition.
+%!
+%! bore = draw.Drawing ().circle ([0, 0], 5).line ([-8, 0], [8, 0]);
+%! D = draw.Drawing ('flange').circle ([0, 0], 45).block ('bore', bore);
+%! for k = 1:6
+%!   a = 2 * pi * (k - 1) / 6;
+%!   D = D.insert ('bore', 30 * [cos(a), sin(a)]);
+%! endfor
+%! printf ('%d entities referring to %d block\n', ...
+%!         numentities (D), numel (D.Blocks));
+%! printf ('%d once expanded\n', numentities (D.expand ()));
+%! draw.plot (D);
+%! title ('a bolt circle from one block definition');
+
+%!demo
+%! ## The dimensioning methods label themselves from the measurement, and the
+%! ## drawing symbols reach every backend.
+%!
+%! D = draw.Drawing ('dimensioned');
+%! D = D.circle ([0, 0], 15).circle ([0, 0], 32);
+%! D.Linetype = 'CENTER';
+%! D.Colour = 'red';
+%! D = D.centremark ();
+%! D.Linetype = 'CONTINUOUS';
+%! D.Colour = 'byLayer';
+%! D = D.diam ([0, 0], 15, 135);
+%! D = D.radius ([0, 0], 32, -40);
+%! D = D.angdim ([0, 0], [40, 0], [30, 30], 40);
+%! D = D.leader ([32*cosd(60), 32*sind(60); 50, 45; 62, 45], 'HARDEN %%p2 HRC');
+%! draw.plot (D);
+%! title ('diameter, radius, angle and a leader');

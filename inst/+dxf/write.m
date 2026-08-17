@@ -498,6 +498,49 @@ function v = optfield (s, name, dflt)
   endif
 endfunction
 
+%!demo
+%! ## Writing a drawing as DXF is one call on what `draw.entities` produced.
+%! ## The file carries the layers, line types and colours, and a line-type
+%! ## table with the dash patterns.
+%!
+%! D = draw.Drawing ('plate');
+%! D.Layer = 'OUTLINE';
+%! D = D.polyline ([0, 0; 60, 0; 60, 40; 0, 40], true);
+%! D.Layer = 'AXES';
+%! D.Linetype = 'CENTER';
+%! D.Colour = 'red';
+%! D = D.line ([-5, 20], [65, 20]);
+%!
+%! fn = [tempname(), '.dxf'];
+%! dxf.write (fn, draw.entities (D));
+%! printf ('%d bytes written\n', stat (fn).size);
+%! R = dxf.read (fn);
+%! for k = 1:numel (R)
+%!   printf ('  %-9s on %-8s %-11s colour %d\n', R(k).type, R(k).layer, ...
+%!           R(k).linetype, R(k).colour);
+%! endfor
+%! unlink (fn);
+
+%!demo
+%! ## A repeated feature is written once as a block and referred to, which is
+%! ## what a draughtsman expects to receive and a fraction of the file size.
+%!
+%! bore = draw.Drawing ().circle ([0, 0], 4).line ([-6, 0], [6, 0]);
+%! D = draw.Drawing ().block ('bore', bore);
+%! for k = 0:24
+%!   D = D.insert ('bore', [12 * k, 0]);
+%! endfor
+%!
+%! f1 = [tempname(), '.dxf'];
+%! f2 = [tempname(), '.dxf'];
+%! [E, LOST, B] = draw.entities (D, 'blocks', 'reference');
+%! dxf.write (f1, E, 'blocks', B);
+%! dxf.write (f2, draw.entities (D));
+%! printf ('25 instances: %d bytes referenced, %d bytes expanded\n', ...
+%!         stat (f1).size, stat (f2).size);
+%! unlink (f1);
+%! unlink (f2);
+
 %!shared tmpf
 %! tmpf = [tempname() '.dxf'];
 

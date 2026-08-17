@@ -81,6 +81,40 @@ function P = tangentpoints (C, R, Q)
 
 endfunction
 
+%!demo
+%! ## The tangent from a point is how a belt is laid onto a pulley, or a leader
+%! ## taken to a hole without crossing it.  The radius to each contact meets the
+%! ## tangent at a right angle, which is what makes it a tangent.
+%!
+%! C = [0, 0];
+%! R = 20;
+%! Q = [70, 30];
+%! P = geom.tangentpoints (C, R, Q)
+%!
+%! D = draw.Drawing ().circle (C, R);
+%! D = D.line (Q, P(1,:)).line (Q, P(2,:));
+%! ## the radius to each contact, which meets its tangent at a right angle
+%! D.Colour = 'red';
+%! D = D.line (C, P(1,:)).line (C, P(2,:));
+%! draw.plot (D);
+%! title ('tangents from a point, with the radii to their contacts');
+
+%!demo
+%! ## A belt over two pulleys is four tangents and two arcs.  Here is the open
+%! ## belt, taking the outer tangent on each side.
+%!
+%! C1 = [0, 0];  R1 = 25;
+%! C2 = [90, 0]; R2 = 12;
+%! ## The outer tangent touches where a circle of the radius difference does
+%! T = geom.tangentpoints (C1, R1 - R2, C2);
+%! D = draw.Drawing ().circle (C1, R1).circle (C2, R2);
+%! for k = 1:2
+%!   u = (T(k,:) - C1) / norm (T(k,:) - C1);
+%!   D = D.line (C1 + R1 * u, C2 + R2 * u);
+%! endfor
+%! draw.plot (D);
+%! title ('an open belt over two pulleys');
+
 %!test  # from a point on the x axis, the contacts are symmetric about it
 %! P = geom.tangentpoints ([0, 0], 3, [5, 0]);
 %! assert_equal (rows (P), 2);

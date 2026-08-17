@@ -144,6 +144,25 @@ function D = coordtable (P, ORIGIN, varargin)
 
 endfunction
 
+%!demo
+%! ## Some profiles cannot be dimensioned: a cam, an aerofoil or a cycloidal
+%! ## lobe has no centres to measure from.  Such a drawing carries a datum and
+%! ## a table of coordinates, and the two together define the part.
+%!
+%! t = linspace (0, 2*pi, 361)(1:360)';
+%! P = (30 + 4 * cos (7 * t)) .* [cos(t), sin(t)];
+%! pts = geom.resample (P, 10, true);
+%!
+%! D = draw.Drawing ().polyline (P, true);
+%! D.Colour = 'red';
+%! for k = 1:rows (pts)
+%!   D = D.circle (pts(k,:), 1);
+%!   D = D.text (pts(k,:) + [2, 2], sprintf ('%d', k), 2.5);
+%! endfor
+%! D = D.merge (draw.coordtable (pts, [55, 35], 'Decimals', 2));
+%! draw.plot (D, 'FontSize', 6);
+%! title ('the table is the dimension; the view is illustrative');
+
 %!test  # a table of three points has a heading row and three more
 %! D = draw.coordtable ([0, 0; 1, 2; 3, 4], [0, 0]);
 %! txt = {D.Entities(strcmp ({D.Entities.type}, 'text')).text};
