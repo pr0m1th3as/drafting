@@ -19,6 +19,7 @@
 ## @deftypefn  {drafting} {@var{E} =} draw.entities (@var{D})
 ## @deftypefnx {drafting} {@var{E} =} draw.entities (@var{D}, @var{NAME}, @var{VALUE}, @dots{})
 ## @deftypefnx {drafting} {[@var{E}, @var{LOST}] =} draw.entities (@dots{})
+## @deftypefnx {drafting} {[@var{E}, @var{LOST}, @var{BLOCKS}] =} draw.entities (@dots{})
 ##
 ## Lower a drawing to the flat entity struct array that @code{dxf.write} takes.
 ##
@@ -89,7 +90,7 @@
 ## @seealso{dxf.write, draw.Drawing}
 ## @end deftypefn
 
-function [E, LOST] = entities (D, varargin)
+function [E, LOST, BLOCKS] = entities (D, varargin)
 
   ## Input validation
   if (nargin < 1)
@@ -104,6 +105,9 @@ function [E, LOST] = entities (D, varargin)
 
   dimScale = 1;
   hatchMode = 'lines';
+  blockMode = 'expand';
+  chordTol = 0.01;
+  bulgeMode = 'keep';
   for ii = 1:2:numel (varargin)
     name = varargin{ii};
     if (! ischar (name) || ! isrow (name))
@@ -119,6 +123,28 @@ function [E, LOST] = entities (D, varargin)
                          " finite scalar."));
         endif
         dimScale = double (dimScale);
+      case 'chordtol'
+        chordTol = varargin{ii+1};
+        if (! isnumeric (chordTol) || ! isreal (chordTol) ...
+            || ! isscalar (chordTol) || ! isfinite (chordTol) || chordTol <= 0)
+          error (strcat ("draw.entities: ChordTol must be a real positive", ...
+                         " finite scalar."));
+        endif
+      case 'bulges'
+        bulgeMode = varargin{ii+1};
+        if (! ischar (bulgeMode) || ! isrow (bulgeMode) ...
+            || ! any (strcmpi (bulgeMode, {'keep', 'flatten'})))
+          error ("draw.entities: Bulges must be 'keep' or 'flatten'.");
+        endif
+        bulgeMode = lower (bulgeMode);
+      case 'blocks'
+        blockMode = varargin{ii+1};
+        if (! ischar (blockMode) || ! isrow (blockMode) ...
+            || ! any (strcmpi (blockMode, {'expand', 'reference'})))
+          error (strcat ("draw.entities: Blocks must be 'expand' or", ...
+                         " 'reference'."));
+        endif
+        blockMode = lower (blockMode);
       case 'hatch'
         hatchMode = varargin{ii+1};
         if (! ischar (hatchMode) || ! isrow (hatchMode) ...
@@ -134,6 +160,20 @@ function [E, LOST] = entities (D, varargin)
 
   E = emptyentity ();
   LOST = struct ('index', {}, 'type', {}, 'reason', {});
+  BLOCKS = struct ('name', {}, 'entities', {});
+
+  ## An insert is a reference the caller may want kept, but every other
+  ## consumer needs the geometry, so expansion is the default
+  if (strcmp (blockMode, 'expand'))
+    D = D.expand ();
+  else
+    for bb = 1:numel (D.Blocks)
+      BLOCKS(bb).name = D.Blocks(bb).name;
+      BLOCKS(bb).entities = draw.entities (D.Blocks(bb).drawing.expand (), ...
+                                           'dimscale', dimScale, ...
+                                           'hatch', hatchMode);
+    endfor
+  endif
 
   src = D.Entities;
   for ii = 1:numel (src)
@@ -146,8 +186,14 @@ function [E, LOST] = entities (D, varargin)
         E(end+1) = mkent ('LINE', e, e.pts);
 
       case 'polyline'
-        p = mkent ('POLYLINE', e, e.pts);
-        p.closed = e.closed;
+        if (! isempty (e.bulge) && strcmp (bulgeMode, 'flatten'))
+          p = mkent ('POLYLINE', e, flattenbulge (e, chordTol));
+          p.closed = e.closed;
+        else
+          p = mkent ('POLYLINE', e, e.pts);
+          p.closed = e.closed;
+          p.bulge = e.bulge;
+        endif
         E(end+1) = p;
 
       case 'arc'
@@ -167,6 +213,35 @@ function [E, LOST] = entities (D, varargin)
         t.height = e.height;
         t.rotation = e.angle;
         E(end+1) = t;
+
+      case 'ellipse'
+        ## R12 has no ELLIPSE, so it goes out as a closed polyline sampled to
+        ## the chordal tolerance.  Unlike a hatch, something really is lost:
+        ## the shape survives but the entity does not, and it can no longer be
+        ## edited as an ellipse.
+        a = e.radius(1);
+        b = e.radius(2);
+        c = cosd (e.angle);
+        sn = sind (e.angle);
+        f = @(t) e.pts + [a * cos(t) * c - b * sin(t) * sn, ...
+                          a * cos(t) * sn + b * sin(t) * c];
+        pts = geom.curvesample (@(t) ellipsepts (t, e.pts, a, b, c, sn), ...
+                                [0, 2*pi], chordTol);
+        pts(end,:) = [];
+        q = mkent ('POLYLINE', e, pts);
+        q.closed = true;
+        E(end+1) = q;
+        LOST(end+1) = struct ('index', ii, 'type', 'ellipse', 'reason', ...
+                              sprintf (strcat ('R12 has no ELLIPSE;', ...
+                                       ' emitted as a closed polyline of', ...
+                                       ' %d points'), rows (pts)));
+
+      case 'insert'
+        s = mkent ('INSERT', e, e.pts);
+        s.text = e.block;
+        s.rotation = e.angle;
+        s.radius = e.scale;
+        E(end+1) = s;
 
       case 'hatch'
         h = mkent ('POLYLINE', e, e.pts);
@@ -221,7 +296,7 @@ function E = emptyentity ()
   E = struct ('type', {}, 'layer', {}, 'linetype', {}, 'colour', {}, ...
               'pts', {}, 'closed', {}, ...
               'radius', {}, 'angles', {}, 'text', {}, 'height', {}, ...
-              'rotation', {});
+              'rotation', {}, 'bulge', {});
 
 endfunction
 
@@ -238,7 +313,61 @@ function s = mkent (type, e, pts)
               'colour', optfield (e, 'colour', 256), ...
               'pts', pts, 'closed', false, ...
               'radius', [], 'angles', [], 'text', '', 'height', [], ...
-              'rotation', 0);
+              'rotation', 0, 'bulge', []);
+
+endfunction
+
+## The ellipse, parameterised for geom.curvesample
+function P = ellipsepts (t, C, a, b, c, s)
+
+  x = a * cos (t);
+  y = b * sin (t);
+  P = [C(1) + x * c - y * s, C(2) + x * s + y * c];
+
+endfunction
+
+## Replace a bulged polyline's vertices with points along its arcs, for a
+## consumer that has no notion of a bulge
+function Q = flattenbulge (e, tol)
+
+  P = e.pts;
+  n = rows (P);
+  if (e.closed)
+    last = n;
+  else
+    last = n - 1;
+  endif
+
+  Q = P(1,:);
+  for k = 1:last
+    j = mod (k, n) + 1;
+    bl = 0;
+    if (numel (e.bulge) >= k)
+      bl = e.bulge(k);
+    endif
+    if (bl == 0)
+      Q(end+1,:) = P(j,:);
+      continue;
+    endif
+    ## bulge is tan of a quarter of the included angle
+    inc = 4 * atan (bl);
+    chord = P(j,:) - P(k,:);
+    L = norm (chord);
+    R = L / (2 * abs (sin (inc / 2)));
+    h = sqrt (max (0, R ^ 2 - (L / 2) ^ 2)) * sign (cos (inc / 2));
+    mid = (P(k,:) + P(j,:)) / 2;
+    nrm = [-chord(2), chord(1)] / L;
+    ctr = mid + sign (bl) * h * nrm;
+    a1 = atan2 (P(k,2) - ctr(2), P(k,1) - ctr(1));
+    steps = max (2, ceil (abs (inc) / (2 * acos (max (-1, 1 - tol / R)))));
+    for m = 1:steps
+      a = a1 + inc * m / steps;
+      Q(end+1,:) = ctr + R * [cos(a), sin(a)];
+    endfor
+  endfor
+  if (e.closed)
+    Q(end,:) = [];
+  endif
 
 endfunction
 
@@ -403,14 +532,14 @@ endfunction
 %! E = draw.entities (draw.Drawing ().line ([0, 0], [1, 1]));
 %! assert_equal (fieldnames (E), {'type'; 'layer'; 'linetype'; 'colour'; ...
 %!               'pts'; 'closed'; 'radius'; 'angles'; 'text'; 'height'; ...
-%!               'rotation'});
+%!               'rotation'; 'bulge'});
 
 %!test  # an empty drawing lowers to an empty entity array
 %! E = draw.entities (draw.Drawing ());
 %! assert_equal (isempty (E), true);
 %! assert_equal (fieldnames (E), {'type'; 'layer'; 'linetype'; 'colour'; ...
 %!               'pts'; 'closed'; 'radius'; 'angles'; 'text'; 'height'; ...
-%!               'rotation'});
+%!               'rotation'; 'bulge'});
 
 %!test  # an arc keeps its radius and both angles
 %! E = draw.entities (draw.Drawing ().arc ([1, 2], 3, 30, 120));

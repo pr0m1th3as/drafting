@@ -31,7 +31,7 @@
 %! assert_equal (fieldnames (D.Entities), {'type'; 'layer'; 'linetype'; ...
 %!               'colour'; 'pts'; 'closed'; 'radius'; 'angles'; 'angle'; ...
 %!               'text'; 'height'; 'offset'; 'direction'; 'pattern'; ...
-%!               'spacing'});
+%!               'spacing'; 'block'; 'scale'; 'bulge'});
 %!error<draw.Drawing: NAME must be a non-empty character vector.> ...
 %! draw.Drawing (42)
 %!error<draw.Drawing: NAME must be a non-empty character vector.> ...
@@ -267,7 +267,7 @@
 %! D = D.arc ([0, 0], 1, 0, 90).circle ([0, 0], 2).text ([0, 0], 'A');
 %! D = D.hatch ([0, 0; 1, 0; 1, 1]).dim ([0, 0], [1, 0], 5);
 %! assert_equal (numel (D.Entities), 7);
-%! assert_equal (numel (fieldnames (D.Entities)), 15);
+%! assert_equal (numel (fieldnames (D.Entities)), 18);
 %! assert_equal ({D.Entities.type}, {'line', 'polyline', 'arc', 'circle', ...
 %!                                   'text', 'hatch', 'dim'});
 
@@ -428,3 +428,155 @@
 %! D.transform ('rotate', 30)
 %!error<draw.Drawing.merge: argument 1 is not a draw.Drawing object.> ...
 %! draw.Drawing ().merge (42)
+
+%!test  # a block adds no entity until it is inserted
+%! bore = draw.Drawing ().circle ([0, 0], 3);
+%! D = draw.Drawing ().block ('bore', bore);
+%! assert_equal (numentities (D), 0);
+%! assert_equal (numel (D.Blocks), 1);
+
+%!test  # an insert is one entity however much geometry it stands for
+%! bore = draw.Drawing ().circle ([0, 0], 3).line ([-4, 0], [4, 0]);
+%! D = draw.Drawing ().block ('bore', bore);
+%! for k = 0:4
+%!   D = D.insert ('bore', [15 * k, 0]);
+%! endfor
+%! assert_equal (numentities (D), 5);
+%! assert_equal (numentities (D.expand ()), 10);
+
+%!test  # expanding places each instance where its reference put it
+%! bore = draw.Drawing ().circle ([0, 0], 3);
+%! D = draw.Drawing ().block ('bore', bore);
+%! D = D.insert ('bore', [0, 0]).insert ('bore', [20, 0]);
+%! X = D.expand ();
+%! assert_equal (sortrows (vertcat (X.Entities.pts)), [0, 0; 20, 0], 1e-12);
+
+%!test  # rotation and scale reach the placed geometry
+%! part = draw.Drawing ().line ([0, 0], [10, 0]);
+%! D = draw.Drawing ().block ('p', part);
+%! X = D.insert ('p', [0, 0], 90, 2).expand ();
+%! assert_equal (X.Entities(1).pts, [0, 0; 0, 20], 1e-9);
+
+%!test  # redefining a block changes every insert of it
+%! D = draw.Drawing ().block ('p', draw.Drawing ().circle ([0, 0], 1));
+%! D = D.insert ('p', [0, 0]).insert ('p', [10, 0]);
+%! D = D.block ('p', draw.Drawing ().circle ([0, 0], 5));
+%! X = D.expand ();
+%! assert_equal ([X.Entities.radius], [5, 5], 1e-12);
+%! assert_equal (numel (D.Blocks), 1);
+
+%!test  # blocks may contain inserts of other blocks
+%! inner = draw.Drawing ().circle ([0, 0], 1);
+%! pair = draw.Drawing ().block ('inner', inner);
+%! pair = pair.insert ('inner', [0, 0]).insert ('inner', [5, 0]);
+%! D = draw.Drawing ().block ('pair', pair);
+%! X = D.insert ('pair', [100, 0]).expand ();
+%! assert_equal (numentities (X), 2);
+%! assert_equal (sortrows (vertcat (X.Entities.pts)), [100, 0; 105, 0], 1e-12);
+
+%!test  # nesting several levels deep expands correctly
+%! D = draw.Drawing ().block ('L0', draw.Drawing ().circle ([0, 0], 1));
+%! for k = 1:5
+%!   inner = D.insert (sprintf ('L%d', k - 1), [10, 0]);
+%!   D = D.block (sprintf ('L%d', k), inner);
+%! endfor
+%! X = D.insert ('L5', [0, 0]).expand ();
+%! assert_equal (numentities (X), 1);
+%! assert_equal (X.Entities(1).pts, [50, 0], 1e-12);
+
+%!test  # a block captures its drawing by value, so it cannot come to refer to
+%!       # itself however the definition is later reassigned
+%! inner = draw.Drawing ().circle ([0, 0], 1);
+%! D = draw.Drawing ().block ('a', inner);
+%! user = D.insert ('a', [0, 0]);
+%! D = D.block ('a', user);
+%! X = D.insert ('a', [0, 0]).expand ();
+%! assert_equal (numentities (X), 1);
+
+%!test  # an expanded drawing holds no inserts at all
+%! D = draw.Drawing ().block ('p', draw.Drawing ().circle ([0, 0], 1));
+%! X = D.insert ('p', [0, 0]).expand ();
+%! assert_equal (any (strcmp ({X.Entities.type}, 'insert')), false);
+
+%!error<draw.Drawing.block: B must be a draw.Drawing object.> ...
+%! draw.Drawing ().block ('p', 42)
+%!error<draw.Drawing.block: NAME must be a non-empty character vector.> ...
+%! draw.Drawing ().block ('', draw.Drawing ())
+%!error<draw.Drawing.insert: no block named 'ghost' is defined; define it with block first.> ...
+%! draw.Drawing ().insert ('ghost', [0, 0])
+%!error<draw.Drawing.insert: SCALE must be a positive real finite scalar.> ...
+%! D = draw.Drawing ().block ('p', draw.Drawing ());
+%! D.insert ('p', [0, 0], 0, 0)
+
+%!test  # an ellipse keeps its two semi-axes and its rotation
+%! D = draw.Drawing ().ellipse ([1, 2], 20, 8, 30);
+%! assert_equal (D.Entities(1).pts, [1, 2]);
+%! assert_equal (D.Entities(1).radius, [20, 8]);
+%! assert_equal (D.Entities(1).angle, 30);
+
+%!test  # an ellipse with equal axes is a circle, and measures like one
+%! D = draw.Drawing ().ellipse ([0, 0], 10, 10);
+%! E = draw.entities (D);
+%! r = sqrt (sum (E(1).pts .^ 2, 2));
+%! assert_equal (r, 10 * ones (rows (E(1).pts), 1), 0.01);
+
+%!test  # its area is that of an ellipse, to the sampling tolerance
+%! D = draw.Drawing ().ellipse ([0, 0], 20, 8);
+%! E = draw.entities (D, 'chordtol', 1e-4);
+%! assert_equal (abs (geom.signedarea (E(1).pts)), pi * 20 * 8, 0.1);
+
+%!test  # rotating an ellipse turns its extent with it
+%! D = draw.Drawing ().ellipse ([0, 0], 20, 5, 90);
+%! [B, W, H] = bbox (D.transform ('translate', [0, 0]));
+%! E = draw.entities (D);
+%! assert_equal (max (E(1).pts(:,2)) > max (E(1).pts(:,1)), true);
+
+%!test  # a bulge of one makes a semicircle on the chord it spans
+%! D = draw.Drawing ().polyline ([0, 0; 20, 0], false, [1, 0]);
+%! E = draw.entities (D, 'bulges', 'flatten');
+%! r = sqrt (sum ((E(1).pts - [10, 0]) .^ 2, 2));
+%! assert_equal (r, 10 * ones (rows (E(1).pts), 1), 1e-6);
+
+%!test  # a positive bulge is the counter-clockwise arc, which lies to the
+%!       # RIGHT of the direction of travel; a negative one to the left
+%! Dp = draw.Drawing ().polyline ([0, 0; 20, 0], false, [1, 0]);
+%! Dn = draw.Drawing ().polyline ([0, 0; 20, 0], false, [-1, 0]);
+%! Ep = draw.entities (Dp, 'bulges', 'flatten');
+%! En = draw.entities (Dn, 'bulges', 'flatten');
+%! assert_equal (min (Ep(1).pts(:,2)) < 0, true);
+%! assert_equal (max (En(1).pts(:,2)) > 0, true);
+
+%!test  # a quarter-circle bulge pins the convention exactly: from (0,0) to
+%!       # (10,10) counter-clockwise the centre is (0,10), not (10,0)
+%! b = tand (22.5);
+%! D = draw.Drawing ().polyline ([0, 0; 10, 10], false, [b, 0]);
+%! E = draw.entities (D, 'bulges', 'flatten');
+%! P = E(1).pts;
+%! d = abs (sqrt (sum ((P - [0, 10]) .^ 2, 2)) - 10);
+%! assert_equal (max (d) < 1e-9, true);
+%! assert_equal (P(1,:), [0, 0], 1e-12);
+%! assert_equal (P(end,:), [10, 10], 1e-9);
+
+%!test  # a zero bulge leaves the segment straight
+%! D = draw.Drawing ().polyline ([0, 0; 10, 0; 10, 10], false, [0, 0, 0]);
+%! E = draw.entities (D, 'bulges', 'flatten');
+%! assert_equal (E(1).pts, [0, 0; 10, 0; 10, 10], 1e-12);
+
+%!test  # arcs and straight runs mix in one polyline, which is the point
+%! D = draw.Drawing ().polyline ([0, 0; 20, 0; 20, 10], false, [1, 0, 0]);
+%! E = draw.entities (D, 'bulges', 'flatten');
+%! assert_equal (rows (E(1).pts) > 4, true);
+%! assert_equal (E(1).pts(end,:), [20, 10], 1e-12);
+
+%!test  # kept rather than flattened, the bulge survives to the entity
+%! D = draw.Drawing ().polyline ([0, 0; 20, 0], false, [1, 0]);
+%! E = draw.entities (D);
+%! assert_equal (E(1).bulge, [1, 0]);
+%! assert_equal (rows (E(1).pts), 2);
+
+%!error<draw.Drawing.polyline: BULGE must hold one real finite value per vertex.> ...
+%! draw.Drawing ().polyline ([0, 0; 1, 0; 2, 0], false, [1, 0])
+%!error<draw.Drawing.ellipse: A must be a real positive finite scalar.> ...
+%! draw.Drawing ().ellipse ([0, 0], 0, 5)
+%!error<draw.Drawing.ellipse: ROT must be a real finite scalar.> ...
+%! draw.Drawing ().ellipse ([0, 0], 5, 3, Inf)

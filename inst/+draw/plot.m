@@ -156,7 +156,7 @@ function H = plot (varargin)
 
   ## The same lowering the file backends use, so the figure shows what the
   ## file will hold rather than a kinder version of it
-  E = draw.entities (D, 'hatch', lower (opt.Hatch));
+  E = draw.entities (D, 'hatch', lower (opt.Hatch), 'bulges', 'flatten');
   if (! isempty (opt.Layers) && ! isempty (E))
     E = E(ismember ({E.layer}, opt.Layers));
   endif
@@ -265,7 +265,7 @@ endfunction
 ## point for the caller to mark.
 function C = dashes (P, pat)
 
-  seglen = sqrt (sum (diff (P) .^ 2, 2));
+  seglen = sqrt (sum (diff (P, 1, 1) .^ 2, 2));
   total = sum (seglen);
   cum = [0; cumsum(seglen)];
   C = {};

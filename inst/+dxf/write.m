@@ -75,16 +75,29 @@ function write (FILE, E, varargin)
     error ("dxf.write: Name/Value arguments must come in pairs.");
   endif
   LTSCALE = 1;
+  BLOCKS = struct ('name', {}, 'entities', {});
   for k = 1:2:numel (varargin)
-    if (! ischar (varargin{k}) || ! strcmpi (varargin{k}, 'ltscale'))
+    if (! ischar (varargin{k}))
       error ("dxf.write: unknown option.");
     endif
-    LTSCALE = varargin{k+1};
-    if (! isnumeric (LTSCALE) || ! isreal (LTSCALE) || ! isscalar (LTSCALE) ...
-        || ! isfinite (LTSCALE) || LTSCALE <= 0)
-      error ("dxf.write: LTScale must be a real positive finite scalar.");
-    endif
-    LTSCALE = double (LTSCALE);
+    switch (lower (varargin{k}))
+      case 'ltscale'
+        LTSCALE = varargin{k+1};
+        if (! isnumeric (LTSCALE) || ! isreal (LTSCALE) ...
+            || ! isscalar (LTSCALE) || ! isfinite (LTSCALE) || LTSCALE <= 0)
+          error ("dxf.write: LTScale must be a real positive finite scalar.");
+        endif
+        LTSCALE = double (LTSCALE);
+      case 'blocks'
+        BLOCKS = varargin{k+1};
+        if (! isstruct (BLOCKS) || (! isempty (BLOCKS) ...
+            && (! isfield (BLOCKS, 'name') || ! isfield (BLOCKS, 'entities'))))
+          error (strcat ("dxf.write: Blocks must be a struct array with", ...
+                         " 'name' and 'entities' fields."));
+        endif
+      otherwise
+        error ("dxf.write: unknown option.");
+    endswitch
   endfor
   if (! ischar (FILE) || ! isrow (FILE) || isempty (FILE))
     error ("dxf.write: FILE must be a non-empty character vector.");
@@ -158,6 +171,26 @@ function write (FILE, E, varargin)
     putpair (fid, 0, 'ENDTAB');
     putpair (fid, 0, 'ENDSEC');
 
+    ## Blocks, which the INSERT entities refer to by name
+    putpair (fid, 0, 'SECTION');
+    putpair (fid, 2, 'BLOCKS');
+    for ii = 1:numel (BLOCKS)
+      putpair (fid, 0, 'BLOCK');
+      putpair (fid, 8, '0');
+      putpair (fid, 2, BLOCKS(ii).name);
+      putpair (fid, 70, 0);
+      putpair (fid, 10, 0);
+      putpair (fid, 20, 0);
+      putpair (fid, 30, 0);
+      putpair (fid, 3, BLOCKS(ii).name);
+      for jj = 1:numel (BLOCKS(ii).entities)
+        putentity (fid, checkentity (BLOCKS(ii).entities(jj), jj));
+      endfor
+      putpair (fid, 0, 'ENDBLK');
+      putpair (fid, 8, '0');
+    endfor
+    putpair (fid, 0, 'ENDSEC');
+
     ## Entities
     putpair (fid, 0, 'SECTION');
     putpair (fid, 2, 'ENTITIES');
@@ -177,7 +210,8 @@ endfunction
 ## carried only so that a failure names the offending element.
 function s = checkentity (e, ii)
 
-  known = {'LINE', 'POLYLINE', 'LWPOLYLINE', 'CIRCLE', 'ARC', 'TEXT', 'POINT'};
+  known = {'LINE', 'POLYLINE', 'LWPOLYLINE', 'CIRCLE', 'ARC', 'TEXT', ...
+           'POINT', 'INSERT'};
 
   if (! ischar (e.type) || ! isrow (e.type) ...
       || ! any (strcmpi (e.type, known)))
@@ -212,6 +246,11 @@ function s = checkentity (e, ii)
   endif
 
   s.closed = false;
+  s.bulge = optfield (e, 'bulge', []);
+  if (! isempty (s.bulge) && (! isnumeric (s.bulge) || ! isreal (s.bulge) ...
+      || ! all (isfinite (s.bulge))))
+    error ("dxf.write: E(%d).bulge must be real and finite.", ii);
+  endif
   s.radius = [];
   s.angles = [];
   s.text = '';
@@ -279,6 +318,28 @@ function s = checkentity (e, ii)
           || ! isscalar (s.rotation) || ! isfinite (s.rotation))
         error (strcat ("dxf.write: E(%d).rotation must be a real finite", ...
                        " scalar."), ii);
+      endif
+
+    case 'INSERT'
+      if (rows (s.pts) != 1)
+        error ("dxf.write: E(%d) INSERT needs exactly one point.", ii);
+      endif
+      s.text = optfield (e, 'text', '');
+      if (! ischar (s.text) || isempty (s.text))
+        error ("dxf.write: E(%d) INSERT needs a block name in .text.", ii);
+      endif
+      s.radius = optfield (e, 'radius', 1);
+      if (isempty (s.radius))
+        s.radius = 1;
+      endif
+      if (! isnumeric (s.radius) || ! isreal (s.radius) ...
+          || ! isscalar (s.radius) || ! isfinite (s.radius) || s.radius <= 0)
+        error (strcat ("dxf.write: E(%d).radius is the INSERT scale and", ...
+                       " must be a positive real finite scalar."), ii);
+      endif
+      s.rotation = optfield (e, 'rotation', 0);
+      if (isempty (s.rotation))
+        s.rotation = 0;
       endif
 
     case 'POINT'
@@ -349,6 +410,10 @@ function putentity (fid, s)
         putpair (fid, 0, 'VERTEX');
         putcommon (fid, s);
         putpoint (fid, 10, s.pts(ii,:));
+        ## A bulge turns the segment leaving this vertex into an arc
+        if (numel (s.bulge) >= ii && s.bulge(ii) != 0)
+          putpair (fid, 42, s.bulge(ii));
+        endif
       endfor
       putpair (fid, 0, 'SEQEND');
       putcommon (fid, s);
@@ -377,6 +442,22 @@ function putentity (fid, s)
       ## written exactly as it was before rotation was supported.  That keeps
       ## every drawing without rotated text byte-identical to the output the
       ## CAD acceptance in ARCHITECTURE.md §4.1 was run against.
+      if (s.rotation != 0)
+        putpair (fid, 50, s.rotation);
+      endif
+
+    case 'INSERT'
+      putpair (fid, 0, 'INSERT');
+      putcommon (fid, s);
+      putpair (fid, 2, s.text);
+      putpair (fid, 10, s.pts(1));
+      putpair (fid, 20, s.pts(2));
+      putpair (fid, 30, 0);
+      if (s.radius != 1)
+        putpair (fid, 41, s.radius);
+        putpair (fid, 42, s.radius);
+        putpair (fid, 43, s.radius);
+      endif
       if (s.rotation != 0)
         putpair (fid, 50, s.rotation);
       endif
@@ -670,3 +751,66 @@ endfunction
 %! dxf.write (tmpf, struct ('type', 'LINE', 'pts', [0,0;1,1]), 'ltscale', -1)
 %!error<dxf.write: unknown option.> ...
 %! dxf.write (tmpf, struct ('type', 'LINE', 'pts', [0,0;1,1]), 'fancy', 1)
+
+%!test  # a block is written once and referred to, not copied per instance
+%! bore = draw.Drawing ().circle ([0, 0], 3);
+%! D = draw.Drawing ().block ('bore', bore);
+%! for k = 0:24
+%!   D = D.insert ('bore', [10 * k, 0]);
+%! endfor
+%! [E, LOST, B] = draw.entities (D, 'blocks', 'reference');
+%! unwind_protect
+%!   dxf.write (tmpf, E, 'blocks', B);
+%!   txt = fileread (tmpf);
+%!   assert_equal (numel (strfind (txt, 'INSERT')), 25);
+%!   assert_equal (numel (strfind (txt, 'CIRCLE')), 1);
+%! unwind_protect_cleanup
+%!   unlink (tmpf);
+%! end_unwind_protect
+
+%!test  # and referring is far smaller than copying
+%! bore = draw.Drawing ().circle ([0, 0], 3).line ([-4, 0], [4, 0]);
+%! D = draw.Drawing ().block ('bore', bore);
+%! for k = 0:49
+%!   D = D.insert ('bore', [10 * k, 0]);
+%! endfor
+%! f2 = [tempname(), '.dxf'];
+%! unwind_protect
+%!   [E, L, B] = draw.entities (D, 'blocks', 'reference');
+%!   dxf.write (tmpf, E, 'blocks', B);
+%!   dxf.write (f2, draw.entities (D));
+%!   assert_equal (stat (tmpf).size < stat (f2).size / 2, true);
+%! unwind_protect_cleanup
+%!   unlink (tmpf);  unlink (f2);
+%! end_unwind_protect
+
+%!test  # an INSERT round-trips with its block name, position, scale and angle
+%! E = struct ('type', 'INSERT', 'layer', 'A', 'text', 'BORE', ...
+%!             'pts', [12, 7], 'radius', 2.5, 'rotation', 30);
+%! B = struct ('name', 'BORE', 'entities', ...
+%!             struct ('type', 'CIRCLE', 'pts', [0, 0], 'radius', 3));
+%! unwind_protect
+%!   dxf.write (tmpf, E, 'blocks', B);
+%!   R = dxf.read (tmpf);
+%!   assert_equal (R.type, 'INSERT');
+%!   assert_equal (R.text, 'BORE');
+%!   assert_equal (R.pts, [12, 7], 1e-9);
+%!   assert_equal (R.radius, 2.5, 1e-9);
+%!   assert_equal (R.rotation, 30, 1e-9);
+%! unwind_protect_cleanup
+%!   unlink (tmpf);
+%! end_unwind_protect
+
+%!error<dxf.write: Blocks must be a struct array with 'name' and 'entities' fields.> ...
+%! dxf.write (tmpf, struct ('type', 'LINE', 'pts', [0,0;1,1]), 'blocks', 42)
+
+%!test  # a bulge reaches the file as group 42 and reads back
+%! E = struct ('type', 'POLYLINE', 'layer', 'A', 'closed', false, ...
+%!             'pts', [0, 0; 20, 0], 'bulge', [1, 0]);
+%! unwind_protect
+%!   dxf.write (tmpf, E);
+%!   txt = fileread (tmpf);
+%!   assert_equal (! isempty (strfind (txt, sprintf ('\n42\n'))), true);
+%! unwind_protect_cleanup
+%!   unlink (tmpf);
+%! end_unwind_protect

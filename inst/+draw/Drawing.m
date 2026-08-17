@@ -131,12 +131,20 @@ classdef Drawing
 
   properties (SetAccess = private)
 
+    ## Block definitions, by name.  Each holds a drawing placed by 'insert'.
+    Blocks = struct ('name', {}, 'drawing', {});
+
+  endproperties
+
+  properties (SetAccess = private)
+
     ## The entities, in the order they were appended.
     Entities = struct ('type', {}, 'layer', {}, 'linetype', {}, ...
                        'colour', {}, 'pts', {}, 'closed', {}, ...
                        'radius', {}, 'angles', {}, 'angle', {}, 'text', {}, ...
                        'height', {}, 'offset', {}, 'direction', {}, ...
-                       'pattern', {}, 'spacing', {});
+                       'pattern', {}, 'spacing', {}, 'block', {}, ...
+                       'scale', {}, 'bulge', {});
 
   endproperties
 
@@ -238,6 +246,7 @@ classdef Drawing
     ## -*- texinfo -*-
     ## @deftypefn  {draw.Drawing} {@var{D} =} polyline (@var{D}, @var{P})
     ## @deftypefnx {draw.Drawing} {@var{D} =} polyline (@var{D}, @var{P}, @var{CLOSED})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} polyline (@dots{}, @var{BULGE})
     ##
     ## Append a polyline through the vertices given as rows of @var{P}.
     ##
@@ -249,10 +258,24 @@ classdef Drawing
     ## The closed flag does that work, which is the implicitly closed
     ## convention the @code{geom} namespace uses throughout.
     ##
+    ## @var{BULGE} gives one value per vertex, turning the segment that leaves
+    ## that vertex into a circular arc.  The value is the tangent of a quarter
+    ## of the arc's included angle, which is the convention DXF uses: zero is a
+    ## straight segment and 1 a semicircle.
+    ##
+    ## A @strong{positive} bulge is the arc that runs counter-clockwise from the
+    ## vertex to the next, which places it to the @emph{right} of the direction
+    ## of travel; a negative one runs clockwise, to the left.  That is worth
+    ## reading twice, because the sign is easy to guess backwards: an arc from
+    ## @code{[0, 0]} to @code{[20, 0]} with a bulge of 1 dips @emph{below} the
+    ## chord.  A polyline of arcs and lines together is how a slot, a
+    ## rounded plate or an obround is drawn as one entity rather than as a
+    ## handful that a later edit can pull apart.
+    ##
     ## @end deftypefn
-    function this = polyline (this, P, CLOSED = false)
+    function this = polyline (this, P, CLOSED = false, BULGE = [])
 
-      if (nargin < 2 || nargin > 3)
+      if (nargin < 2 || nargin > 4)
         error ("draw.Drawing.polyline: invalid number of input arguments.");
       endif
       errmsg = checkpts (P);
@@ -270,6 +293,14 @@ classdef Drawing
       e = makeentity ('polyline', this.Layer, this.Linetype, this.Colour);
       e.pts = double (P);
       e.closed = logical (CLOSED);
+      if (! isempty (BULGE))
+        if (! isnumeric (BULGE) || ! isreal (BULGE) || ! isvector (BULGE) ...
+            || numel (BULGE) != rows (P) || ! all (isfinite (BULGE)))
+          error (strcat ("draw.Drawing.polyline: BULGE must hold one real", ...
+                         " finite value per vertex."));
+        endif
+        e.bulge = BULGE(:)';
+      endif
       this.Entities(end+1) = e;
 
     endfunction
@@ -782,6 +813,224 @@ classdef Drawing
 
     endfunction
 
+
+    ## -*- texinfo -*-
+    ## @deftypefn {draw.Drawing} {@var{D} =} block (@var{D}, @var{NAME}, @var{B})
+    ##
+    ## Define a named block from another drawing.
+    ##
+    ## A block is a drawing kept once and placed as often as wanted by
+    ## @code{insert}.  Nothing of it appears until it is inserted; defining one
+    ## adds no entity.
+    ##
+    ## Redefining a name replaces the definition, and every insert of it takes
+    ## the new geometry --- which is the point of a block, and the reason a
+    ## drawing that repeats a feature two dozen times should use one.
+    ##
+    ## @seealso{insert, merge, transform}
+    ## @end deftypefn
+    function this = block (this, NAME, B)
+
+      if (nargin != 3)
+        error ("draw.Drawing.block: invalid number of input arguments.");
+      endif
+      if (! ischar (NAME) || ! isrow (NAME) || isempty (NAME))
+        error (strcat ("draw.Drawing.block: NAME must be a non-empty", ...
+                       " character vector."));
+      endif
+      if (! isa (B, 'draw.Drawing'))
+        error ("draw.Drawing.block: B must be a draw.Drawing object.");
+      endif
+
+      k = find (strcmpi (NAME, {this.Blocks.name}), 1);
+      if (isempty (k))
+        k = numel (this.Blocks) + 1;
+      endif
+      this.Blocks(k).name = NAME;
+      this.Blocks(k).drawing = B;
+
+    endfunction
+
+    ## -*- texinfo -*-
+    ## @deftypefn  {draw.Drawing} {@var{D} =} insert (@var{D}, @var{NAME}, @var{POS})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} insert (@dots{}, @var{ROT}, @var{SCALE})
+    ##
+    ## Place a defined block at a point.
+    ##
+    ## @code{@var{D} = insert (@var{D}, @var{NAME}, @var{POS})} places the block
+    ## @var{NAME} with its origin at @var{POS}.  @var{ROT} rotates it, in
+    ## degrees counter-clockwise, and @var{SCALE} scales it; both default to
+    ## leaving it alone.
+    ##
+    ## An insert is a @emph{reference}, not a copy.  Twenty-five identical bores
+    ## are one definition and twenty-five references, which is what a
+    ## draughtsman expects to receive and a fraction of the file that
+    ## twenty-five copies would make.
+    ##
+    ## The block must already be defined; inserting a name that is not raises,
+    ## rather than leaving a reference that resolves to nothing when the file is
+    ## opened.
+    ##
+    ## @seealso{block, merge, transform}
+    ## @end deftypefn
+    function this = insert (this, NAME, POS, ROT = 0, SCALE = 1)
+
+      if (nargin < 3 || nargin > 5)
+        error ("draw.Drawing.insert: invalid number of input arguments.");
+      endif
+      if (! ischar (NAME) || ! isrow (NAME) || isempty (NAME))
+        error (strcat ("draw.Drawing.insert: NAME must be a non-empty", ...
+                       " character vector."));
+      endif
+      if (isempty (this.Blocks) || ! any (strcmpi (NAME, {this.Blocks.name})))
+        error (strcat ("draw.Drawing.insert: no block named '%s' is", ...
+                       " defined; define it with block first."), NAME);
+      endif
+      errmsg = checkpt (POS);
+      if (! isempty (errmsg))
+        error ("draw.Drawing.insert: POS %s", errmsg);
+      endif
+      if (! isnumeric (ROT) || ! isreal (ROT) || ! isscalar (ROT) ...
+          || ! isfinite (ROT))
+        error ("draw.Drawing.insert: ROT must be a real finite scalar.");
+      endif
+      if (! isnumeric (SCALE) || ! isreal (SCALE) || ! isscalar (SCALE) ...
+          || ! isfinite (SCALE) || SCALE <= 0)
+        error (strcat ("draw.Drawing.insert: SCALE must be a positive real", ...
+                       " finite scalar."));
+      endif
+
+      e = makeentity ('insert', this.Layer, this.Linetype, this.Colour);
+      e.pts = POS(:)';
+      e.block = NAME;
+      e.angle = ROT;
+      e.scale = SCALE;
+      this.Entities(end+1) = e;
+
+    endfunction
+
+    ## -*- texinfo -*-
+    ## @deftypefn {draw.Drawing} {@var{D} =} expand (@var{D})
+    ##
+    ## Replace every insert with the geometry it refers to.
+    ##
+    ## The result holds no blocks and no inserts, only the entities they stood
+    ## for, each transformed to where its reference put it.  This is what a
+    ## backend with no block of its own needs, and what @code{draw.plot} and
+    ## @code{draw.tikz} do before rendering.
+    ##
+    ## Blocks may contain inserts of other blocks and are expanded through.  A
+    ## block keeps its own definitions and inherits the enclosing drawing's only
+    ## for names it does not define itself.
+    ##
+    ## A block cannot come to refer to itself: its drawing is captured by value
+    ## when the block is defined, so redefining a name later cannot reach back
+    ## into a definition already taken.  The hundred-level limit is therefore a
+    ## backstop against a construction this class does not permit, not a rule a
+    ## caller can meet by accident.
+    ##
+    ## @seealso{block, insert, draw.entities}
+    ## @end deftypefn
+    function this = expand (this, depth = 0)
+
+      if (depth > 100)
+        error (strcat ("draw.Drawing.expand: blocks are nested more than a", ...
+                       " hundred deep, or one of them refers to itself."));
+      endif
+      if (isempty (this.Entities))
+        return;
+      endif
+
+      out = this;
+      out.Entities(:) = [];
+      for ii = 1:numel (this.Entities)
+        e = this.Entities(ii);
+        if (! strcmp (e.type, 'insert'))
+          out.Entities(end+1) = e;
+          continue;
+        endif
+        k = find (strcmpi (e.block, {this.Blocks.name}), 1);
+        if (isempty (k))
+          error (strcat ("draw.Drawing.expand: entity %d inserts block", ...
+                         " '%s', which is not defined."), ii, e.block);
+        endif
+        ## A block keeps its own definitions and inherits the enclosing
+        ## drawing's only for names it does not define itself
+        sub = this.Blocks(k).drawing;
+        for bb = 1:numel (this.Blocks)
+          if (isempty (sub.Blocks) ...
+              || ! any (strcmpi (this.Blocks(bb).name, {sub.Blocks.name})))
+            sub.Blocks(end+1) = this.Blocks(bb);
+          endif
+        endfor
+        sub = expand (sub, depth + 1);
+        if (e.scale != 1)
+          sub = sub.transform ('scale', e.scale);
+        endif
+        if (e.angle != 0)
+          sub = sub.transform ('rotate', e.angle);
+        endif
+        sub = sub.transform ('translate', e.pts);
+        for jj = 1:numel (sub.Entities)
+          out.Entities(end+1) = sub.Entities(jj);
+        endfor
+      endfor
+      this = out;
+
+    endfunction
+
+
+    ## -*- texinfo -*-
+    ## @deftypefn  {draw.Drawing} {@var{D} =} ellipse (@var{D}, @var{C}, @var{A}, @var{B})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} ellipse (@var{D}, @var{C}, @var{A}, @var{B}, @var{ROT})
+    ##
+    ## Append an ellipse centred at @var{C} with semi-axes @var{A} and @var{B}.
+    ##
+    ## @var{ROT} turns the first axis away from horizontal, in degrees
+    ## counter-clockwise, and defaults to zero.
+    ##
+    ## An ellipse is what a circle becomes when a round feature is seen
+    ## obliquely, which is most of the time on an isometric or an auxiliary
+    ## view, and what a chamfer on a cylinder projects to.
+    ##
+    ## @strong{The DXF revision this package writes has no ellipse entity}, so
+    ## one reaches a file as a closed polyline sampled to a chordal tolerance,
+    ## and @code{draw.entities} records the substitution.  The shape is right to
+    ## within that tolerance; what is lost is the ability to edit it as an
+    ## ellipse afterwards.
+    ##
+    ## @seealso{circle, arc, polyline}
+    ## @end deftypefn
+    function this = ellipse (this, C, A, B, ROT = 0)
+
+      if (nargin < 4 || nargin > 5)
+        error ("draw.Drawing.ellipse: invalid number of input arguments.");
+      endif
+      errmsg = checkpt (C);
+      if (! isempty (errmsg))
+        error ("draw.Drawing.ellipse: C %s", errmsg);
+      endif
+      errmsg = checkradius (A);
+      if (! isempty (errmsg))
+        error ("draw.Drawing.ellipse: A %s", errmsg);
+      endif
+      errmsg = checkradius (B);
+      if (! isempty (errmsg))
+        error ("draw.Drawing.ellipse: B %s", errmsg);
+      endif
+      if (! isnumeric (ROT) || ! isreal (ROT) || ! isscalar (ROT) ...
+          || ! isfinite (ROT))
+        error ("draw.Drawing.ellipse: ROT must be a real finite scalar.");
+      endif
+
+      e = makeentity ('ellipse', this.Layer, this.Linetype, this.Colour);
+      e.pts = C(:)';
+      e.radius = [A, B];
+      e.angle = ROT;
+      this.Entities(end+1) = e;
+
+    endfunction
+
   endmethods
 
   methods (Hidden)
@@ -830,7 +1079,7 @@ function e = makeentity (type, layer, linetype, colour)
               'colour', colour, 'pts', [], 'closed', false, ...
               'radius', [], 'angles', [], 'angle', [], 'text', '', ...
               'height', [], 'offset', [], 'direction', '', 'pattern', '', ...
-              'spacing', []);
+              'spacing', [], 'block', '', 'scale', [], 'bulge', []);
 
 endfunction
 

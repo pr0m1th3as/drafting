@@ -183,7 +183,8 @@ function [E, SKIPPED] = parseentities (codes, values, scale)
     return;
   endif
 
-  known = {'LINE', 'LWPOLYLINE', 'POLYLINE', 'CIRCLE', 'ARC', 'TEXT', 'POINT'};
+  known = {'LINE', 'LWPOLYLINE', 'POLYLINE', 'CIRCLE', 'ARC', 'TEXT', ...
+           'POINT', 'INSERT'};
   marks = find (codes == 0);
   built = {};
   ii = 1;
@@ -271,6 +272,15 @@ function [E, SKIPPED] = parseentities (codes, values, scale)
         ## Group 50 is an angle, so the drawing-unit scale must not touch it
         s.rotation = groupnum (codes(body), values(body), 50, 0);
 
+      case 'INSERT'
+        ## The block name is carried in .text and the uniform scale in .radius,
+        ## matching what dxf.write emits and draw.entities produced
+        s.pts = [groupnum(codes(body), values(body), 10, 0), ...
+                 groupnum(codes(body), values(body), 20, 0)];
+        s.text = grouptext (codes(body), values(body), 2, '');
+        s.radius = groupnum (codes(body), values(body), 41, 1);
+        s.rotation = groupnum (codes(body), values(body), 50, 0);
+
       case 'POINT'
         s.pts = scale * [groupnum(codes(body), values(body), 10, 0), ...
                          groupnum(codes(body), values(body), 20, 0)];
@@ -320,7 +330,7 @@ function s = blankentity ()
   s = struct ('type', '', 'layer', '0', 'linetype', 'CONTINUOUS', ...
               'colour', 256, 'pts', zeros (0, 2), ...
               'closed', false, 'radius', [], 'angles', [], ...
-              'text', '', 'height', [], 'rotation', []);
+              'text', '', 'height', [], 'rotation', [], 'bulge', []);
 endfunction
 
 %!shared tmpf

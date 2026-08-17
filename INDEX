@@ -13,6 +13,15 @@ Curve geometry
  geom.curvesample
  geom.curveoffset
  geom.selfintersects
+ geom.arclength
+ geom.resample
+ geom.simplify
+Construction geometry
+ geom.intersectlines
+ geom.intersectcircle
+ geom.intersectcircles
+ geom.tangentpoints
+ geom.fillet
 DXF input and output
  dxf.read
  dxf.write
