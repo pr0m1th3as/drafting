@@ -44,21 +44,19 @@
 ## @multitable @columnfractions .16 .84
 ## @item @qcode{'Scale'} @tab Plot scale denominator: @math{50} means
 ## @math{1:50}, which is a common scale for a general-arrangement plan and the
-## default.  A
-## drawing at @math{1:1} wants @math{1}.
+## default.  A drawing at @math{1:1} wants @math{1}.
 ## @item @qcode{'File'} @tab Also write the result to this file.  The code is
 ## returned either way.
 ## @item @qcode{'Styles'} @tab Emit a @code{\tikzset} block defining one empty
-## @item @qcode{'LTScale'} @tab the drawing scale @tab multiplies line-type
-## dash lengths.  Patterns are model lengths times this factor, exactly as in
-## @code{draw.plot} and as CAD's own @code{LTSCALE} works.  Defaulting it to the
-## drawing scale cancels the reduction, so dashes reach the page at their
-## nominal size --- a centre line reads as a centre line whether the view is at
-## 1:1 or 1:50 --- while leaving the factor visible and adjustable.
-##
 ## style per layer, so that the document can restyle a layer by redefining it.
 ## True by default; set it false when the styles are already defined and
 ## redefining them would undo that.
+## @item @qcode{'LTScale'} @tab Multiplies line-type dash lengths.  Patterns
+## are model lengths times this factor, exactly as in @code{draw.plot} and as
+## CAD's own @code{LTSCALE} works.  Defaults to the drawing scale, which
+## cancels the reduction so dashes reach the page at their nominal size --- a
+## centre line reads as a centre line whether the view is at 1:1 or 1:50 ---
+## while leaving the factor visible and adjustable.
 ## @end multitable
 ##
 ## @subheading Dimensions
