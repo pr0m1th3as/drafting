@@ -304,3 +304,127 @@
 %! D = draw.Drawing (); D.Colour = 300;
 %!error<draw.colour: 'puce' is not a named colour> ...
 %! D = draw.Drawing (); D.Colour = 'puce';
+
+%!test  # translation moves every entity and changes nothing else
+%! D = draw.Drawing ().circle ([10, 0], 5).line ([0, 0], [20, 0]);
+%! T = D.transform ('translate', [0, 30]);
+%! assert_equal (T.Entities(1).pts, [10, 30]);
+%! assert_equal (T.Entities(1).radius, 5);
+%! assert_equal (T.Entities(2).pts, [0, 30; 20, 30]);
+
+%!test  # a uniform scaling scales the radius with the centre
+%! T = draw.Drawing ().circle ([10, 0], 5).transform ('scale', 2);
+%! assert_equal (T.Entities(1).pts, [20, 0]);
+%! assert_equal (T.Entities(1).radius, 10);
+
+%!test  # text scales its height and rotates with the drawing
+%! D = draw.Drawing ().text ([0, 0], 'X', 2.5, 0);
+%! T = D.transform ('rotate', 90);
+%! assert_equal (T.Entities(1).angle, 90, 1e-9);
+%! T2 = D.transform ('scale', 4);
+%! assert_equal (T2.Entities(1).height, 10, 1e-12);
+
+%!test  # a hatch rotates its pattern and scales its spacing
+%! D = draw.Drawing ().hatch ([0, 0; 10, 0; 10, 10], 'ANSI31', 0, 2);
+%! T = D.transform ('scale', 3);
+%! assert_equal (T.Entities(1).spacing, 6, 1e-12);
+
+%!test  # an arc rotates its angles
+%! T = draw.Drawing ().arc ([0, 0], 10, 30, 120).transform ('rotate', 45);
+%! assert_equal (T.Entities(1).angles, [75, 165], 1e-9);
+
+%!test  # a reflection exchanges an arc's endpoints, keeping the same piece of
+%!       # circle rather than its complement
+%! D = draw.Drawing ().arc ([0, 0], 10, 30, 120);
+%! T = D.transform ('mirror', 'y');
+%! a = T.Entities(1).angles;
+%! assert_equal (round (a), [60, 150]);
+%! sw = mod (a(2) - a(1), 360);
+%! assert_equal (sw, 90, 1e-9);
+%! mid = 10 * [cosd(a(1) + sw/2), sind(a(1) + sw/2)];
+%! assert_equal (mid, [-10*cosd(75), 10*sind(75)], 1e-9);
+
+%!test  # a quarter turn exchanges horizontal with vertical
+%! D = draw.Drawing ().dim ([0, 0], [50, 0], -10, 'horizontal');
+%! assert_equal (D.transform ('rotate', 90).Entities(1).direction, 'vertical');
+
+%!test  # a mirror leaves an axis-locked dimension on its axis
+%! D = draw.Drawing ().dim ([0, 0], [50, 0], -10, 'horizontal');
+%! T = D.transform ('mirror', 'x');
+%! assert_equal (T.Entities(1).direction, 'horizontal');
+
+%!test  # an aligned dimension rotates freely
+%! D = draw.Drawing ().dim ([0, 0], [50, 0], -10, 'aligned');
+%! T = D.transform ('rotate', 30);
+%! assert_equal (T.Entities(1).direction, 'aligned');
+
+%!test  # a dimension scales its offset with the drawing
+%! D = draw.Drawing ().dim ([0, 0], [50, 0], -10, 'aligned');
+%! assert_equal (D.transform ('scale', 2).Entities(1).offset, -20, 1e-12);
+
+%!test  # a drawing without arcs scales anisotropically without complaint
+%! T = draw.Drawing ().line ([0, 0], [10, 10]).transform ('scale', [2, 1]);
+%! assert_equal (T.Entities(1).pts, [0, 0; 20, 10]);
+
+%!test  # a homogeneous matrix works, as it does for geom.transform
+%! T = [1, 0, 5; 0, 1, 7; 0, 0, 1];
+%! assert_equal (draw.Drawing ().line ([0, 0], [1, 0]).transform (T) ...
+%!               .Entities(1).pts, [5, 7; 6, 7]);
+
+%!test  # transforming about a centre leaves that point where it was
+%! T = draw.Drawing ().circle ([10, 10], 2).transform ('rotate', 90, [10, 10]);
+%! assert_equal (T.Entities(1).pts, [10, 10], 1e-12);
+
+%!test  # merge concatenates entities in order
+%! A = draw.Drawing ('a').line ([0, 0], [1, 0]);
+%! B = draw.Drawing ('b').circle ([0, 0], 1);
+%! M = A.merge (B);
+%! assert_equal (numentities (M), 2);
+%! assert_equal (M.Entities(1).type, 'line');
+%! assert_equal (M.Entities(2).type, 'circle');
+
+%!test  # merged entities keep the layer, line type and colour they were given
+%! A = draw.Drawing ();
+%! A.Layer = 'ONE';  A = A.line ([0, 0], [1, 0]);
+%! B = draw.Drawing ();
+%! B.Layer = 'TWO';  B.Linetype = 'HIDDEN';  B.Colour = 'red';
+%! B = B.line ([0, 1], [1, 1]);
+%! M = A.merge (B);
+%! assert_equal ({M.Entities.layer}, {'ONE', 'TWO'});
+%! assert_equal (M.Entities(2).linetype, 'HIDDEN');
+%! assert_equal (M.Entities(2).colour, 1);
+%! assert_equal (M.layers (), {'ONE', 'TWO'});
+
+%!test  # the result keeps the first drawing's name and current state
+%! A = draw.Drawing ('sheet');
+%! A.Layer = 'FRAME';
+%! B = draw.Drawing ('part');
+%! B.Layer = 'BODY';
+%! M = A.merge (B.line ([0, 0], [1, 1]));
+%! assert_equal (M.Name, 'sheet');
+%! assert_equal (M.Layer, 'FRAME');
+
+%!test  # several drawings merge at once
+%! A = draw.Drawing ().line ([0, 0], [1, 0]);
+%! M = A.merge (A, A, A);
+%! assert_equal (numentities (M), 4);
+
+%!test  # build once, place many: the whole point of the pair
+%! part = draw.Drawing ().circle ([0, 0], 3).line ([-5, 0], [5, 0]);
+%! sheet = draw.Drawing ('assembly');
+%! for k = 0:3
+%!   sheet = sheet.merge (part.transform ('translate', [20 * k, 0]));
+%! endfor
+%! assert_equal (numentities (sheet), 8);
+%! [B, W] = bbox (sheet);
+%! assert_equal (W, 70, 1e-9);
+
+%!error<draw.Drawing.transform: invalid number of input arguments.> ...
+%! draw.Drawing ().transform ()
+%!error<draw.Drawing.transform: entity 1 is a circle and the scaling is not uniform; the result would be an ellipse.> ...
+%! draw.Drawing ().circle ([0, 0], 5).transform ('scale', [2, 1])
+%!error<draw.Drawing.transform: entity 1 is a 'horizontal' dimension and the transformation would leave it off its axis; make it 'aligned' first.> ...
+%! D = draw.Drawing ().dim ([0, 0], [50, 0], -10, 'horizontal');
+%! D.transform ('rotate', 30)
+%!error<draw.Drawing.merge: argument 1 is not a draw.Drawing object.> ...
+%! draw.Drawing ().merge (42)

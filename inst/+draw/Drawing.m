@@ -625,6 +625,163 @@ classdef Drawing
 
     endfunction
 
+
+    ## -*- texinfo -*-
+    ## @deftypefn  {draw.Drawing} {@var{D} =} transform (@var{D}, @var{T})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} transform (@var{D}, @var{OP}, @var{VAL})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} transform (@var{D}, @var{OP}, @var{VAL}, @var{CENTRE})
+    ##
+    ## Apply a planar transformation to every entity of the drawing.
+    ##
+    ## The arguments after the drawing are those of @code{geom.transform}, and
+    ## mean the same: a 3-by-3 homogeneous matrix, or a named operation
+    ## (@qcode{'translate'}, @qcode{'rotate'}, @qcode{'scale'},
+    ## @qcode{'mirror'}) with its value and an optional centre.
+    ##
+    ## This is what lets a part be drawn once and placed more than once, a view
+    ## be mirrored, or a detail be built at the origin and moved onto a sheet.
+    ##
+    ## @subheading Entities are transformed, not just their points
+    ##
+    ## A circle keeps its centre and scales its radius; an arc rotates its
+    ## angles; text moves, rotates and scales its height; a hatch rotates its
+    ## pattern and scales its spacing.  A dimension carries its measured points
+    ## and scales its offset.
+    ##
+    ## @strong{A reflection reverses the sweep of an arc.}  Arcs run
+    ## counter-clockwise from the first angle to the second, so mirroring one
+    ## and keeping the order would silently give the complementary arc --- the
+    ## piece that was not there before.  The endpoints are exchanged instead.
+    ##
+    ## @subheading What is refused, and why
+    ##
+    ## @strong{A non-uniform scaling that would turn a circle into an ellipse}
+    ## raises.  There is no ellipse entity to put the result in, and quietly
+    ## scaling the radius by one of the two factors would move the geometry off
+    ## the part.  A drawing with no arcs or circles scales anisotropically
+    ## without complaint.
+    ##
+    ## @strong{A rotation that would leave an axis-locked dimension off its
+    ## axis} raises, naming the entity.  A @qcode{'horizontal'} dimension
+    ## measures the horizontal distance between two points; after a rotation of
+    ## thirty degrees it would still measure a horizontal distance, but not the
+    ## one the drawing was dimensioned for, and the number on the sheet would
+    ## change without anyone asking it to.  Rotations by a multiple of a quarter
+    ## turn are fine and exchange horizontal with vertical; so are mirrors about
+    ## either axis.  A dimension made @qcode{'aligned'} rotates freely.
+    ##
+    ## @seealso{geom.transform, merge, bbox}
+    ## @end deftypefn
+    function this = transform (this, varargin)
+
+      if (nargin < 2)
+        error ("draw.Drawing.transform: invalid number of input arguments.");
+      endif
+
+      ## Recover the linear part by transforming the origin and the two unit
+      ## vectors, rather than rebuilding the matrix geom.transform already
+      ## knows how to make
+      B = geom.transform ([0, 0; 1, 0; 0, 1], varargin{:});
+      t = B(1,:);
+      M = [(B(2,:) - t)', (B(3,:) - t)'];
+
+      sx = norm (M(:,1));
+      sy = norm (M(:,2));
+      uniform = (abs (sx - sy) <= 1e-12 * max (sx, sy)) ...
+                && abs (M(:,1)' * M(:,2)) <= 1e-12 * sx * sy;
+      reflected = (det (M) < 0);
+      onaxes = (all (abs (M([2, 3])) <= 1e-12 * max (sx, sy)) ...
+                || all (abs (M([1, 4])) <= 1e-12 * max (sx, sy)));
+
+      for ii = 1:numel (this.Entities)
+        e = this.Entities(ii);
+
+        if (! isempty (e.pts))
+          e.pts = geom.transform (e.pts, varargin{:});
+        endif
+
+        switch (e.type)
+          case {'circle', 'arc'}
+            if (! uniform)
+              error (strcat ("draw.Drawing.transform: entity %d is a %s", ...
+                             " and the scaling is not uniform; the result", ...
+                             " would be an ellipse."), ii, e.type);
+            endif
+            e.radius *= sx;
+            if (strcmp (e.type, 'arc'))
+              a = [dirangle(M, e.angles(1)), dirangle(M, e.angles(2))];
+              if (reflected)
+                a = a([2, 1]);
+              endif
+              e.angles = a;
+            endif
+
+          case 'text'
+            if (! uniform)
+              error (strcat ("draw.Drawing.transform: entity %d is text", ...
+                             " and the scaling is not uniform."), ii);
+            endif
+            e.height *= sx;
+            e.angle = dirangle (M, e.angle);
+
+          case 'hatch'
+            e.angle = dirangle (M, e.angle);
+            e.spacing *= sx;
+
+          case 'dim'
+            if (! any (strcmp (e.direction, {'aligned'})) && ! onaxes)
+              error (strcat ("draw.Drawing.transform: entity %d is a '%s'", ...
+                             " dimension and the transformation would", ...
+                             " leave it off its axis; make it 'aligned'", ...
+                             " first."), ii, e.direction);
+            endif
+            if (onaxes && ! isempty (e.direction) ...
+                && ! strcmp (e.direction, 'aligned'))
+              e.direction = axisafter (M, e.direction);
+            endif
+            e.offset *= sx;
+        endswitch
+
+        this.Entities(ii) = e;
+      endfor
+
+    endfunction
+
+    ## -*- texinfo -*-
+    ## @deftypefn {draw.Drawing} {@var{D} =} merge (@var{D}, @var{D2}, @dots{})
+    ##
+    ## Append the entities of one or more drawings to this one.
+    ##
+    ## @code{@var{D} = merge (@var{D1}, @var{D2})} returns a drawing holding
+    ## every entity of @var{D1} followed by every entity of @var{D2}, each
+    ## keeping the layer, line type and colour it was drawn with.  Any number of
+    ## drawings may be given.
+    ##
+    ## The result takes its name and its current layer, line type and colour
+    ## from the first drawing.  Those are the state a caller would carry on
+    ## drawing with, and the first drawing is the one being added to.
+    ##
+    ## Merging is what turns separately-built parts into an assembly, or
+    ## separately-built views into a sheet.  With @code{transform} it is the
+    ## whole of composition: build once, place as often as needed.
+    ##
+    ## @seealso{transform, numentities, layers}
+    ## @end deftypefn
+    function this = merge (this, varargin)
+
+      for k = 1:numel (varargin)
+        other = varargin{k};
+        if (! isa (other, 'draw.Drawing'))
+          error (strcat ("draw.Drawing.merge: argument %d is not a", ...
+                         " draw.Drawing object."), k);
+        endif
+        for ii = 1:numel (other.Entities)
+          this.Entities(end+1) = other.Entities(ii);
+        endfor
+      endfor
+
+    endfunction
+
   endmethods
 
   methods (Hidden)
@@ -674,6 +831,29 @@ function e = makeentity (type, layer, linetype, colour)
               'radius', [], 'angles', [], 'angle', [], 'text', '', ...
               'height', [], 'offset', [], 'direction', '', 'pattern', '', ...
               'spacing', []);
+
+endfunction
+
+## The angle a direction takes after the linear part M is applied, in degrees
+function b = dirangle (M, adeg)
+
+  v = M * [cosd(adeg); sind(adeg)];
+  b = mod (atan2 (v(2), v(1)) * 180 / pi, 360);
+
+endfunction
+
+## Which axis a horizontal or vertical dimension measures along once M has been
+## applied.  Only called when M maps the axes onto axes.
+function d = axisafter (M, d)
+
+  swapped = (abs (M(1,1)) <= abs (M(1,2)));
+  if (swapped)
+    if (strcmp (d, 'horizontal'))
+      d = 'vertical';
+    else
+      d = 'horizontal';
+    endif
+  endif
 
 endfunction
 
