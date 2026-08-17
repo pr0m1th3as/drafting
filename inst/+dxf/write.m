@@ -65,12 +65,27 @@
 ## @seealso{dxf.read}
 ## @end deftypefn
 
-function write (FILE, E)
+function write (FILE, E, varargin)
 
   ## Input validation
-  if (nargin != 2)
+  if (nargin < 2)
     error ("dxf.write: invalid number of input arguments.");
   endif
+  if (mod (numel (varargin), 2) != 0)
+    error ("dxf.write: Name/Value arguments must come in pairs.");
+  endif
+  LTSCALE = 1;
+  for k = 1:2:numel (varargin)
+    if (! ischar (varargin{k}) || ! strcmpi (varargin{k}, 'ltscale'))
+      error ("dxf.write: unknown option.");
+    endif
+    LTSCALE = varargin{k+1};
+    if (! isnumeric (LTSCALE) || ! isreal (LTSCALE) || ! isscalar (LTSCALE) ...
+        || ! isfinite (LTSCALE) || LTSCALE <= 0)
+      error ("dxf.write: LTScale must be a real positive finite scalar.");
+    endif
+    LTSCALE = double (LTSCALE);
+  endfor
   if (! ischar (FILE) || ! isrow (FILE) || isempty (FILE))
     error ("dxf.write: FILE must be a non-empty character vector.");
   endif
@@ -112,6 +127,12 @@ function write (FILE, E)
     putpair (fid, 1, 'AC1009');
     putpair (fid, 9, '$INSUNITS');
     putpair (fid, 70, 4);
+    ## Without this the dash lengths in the LTYPE table are scaled by whatever
+    ## the receiving installation happens to have set, so the file's line types
+    ## are at the mercy of a setting the sender never sees.  Stating it makes
+    ## the drawing look the same wherever it is opened.
+    putpair (fid, 9, '$LTSCALE');
+    putpair (fid, 40, LTSCALE);
     putpair (fid, 0, 'ENDSEC');
 
     ## Tables: the line types used, then the layers
@@ -622,3 +643,30 @@ endfunction
 
 %!error<dxf.write: E\(1\).colour must be an integer index from 0 to 256.> ...
 %! dxf.write (tmpf, struct ('type', 'LINE', 'colour', 999, 'pts', [0,0;1,1]))
+
+%!test  # the header states LTSCALE, so the file's dashes do not depend on a
+%!       # setting the sender never sees
+%! E = struct ('type', 'LINE', 'layer', 'A', 'pts', [0, 0; 1, 1]);
+%! unwind_protect
+%!   dxf.write (tmpf, E);
+%!   txt = fileread (tmpf);
+%!   assert_equal (! isempty (strfind (txt, '$LTSCALE')), true);
+%! unwind_protect_cleanup
+%!   unlink (tmpf);
+%! end_unwind_protect
+
+%!test  # and it can be set
+%! E = struct ('type', 'LINE', 'layer', 'A', 'pts', [0, 0; 1, 1]);
+%! unwind_protect
+%!   dxf.write (tmpf, E, 'ltscale', 25);
+%!   txt = fileread (tmpf);
+%!   i = strfind (txt, '$LTSCALE');
+%!   assert_equal (! isempty (strfind (txt(i:i+30), '25.000000')), true);
+%! unwind_protect_cleanup
+%!   unlink (tmpf);
+%! end_unwind_protect
+
+%!error<dxf.write: LTScale must be a real positive finite scalar.> ...
+%! dxf.write (tmpf, struct ('type', 'LINE', 'pts', [0,0;1,1]), 'ltscale', -1)
+%!error<dxf.write: unknown option.> ...
+%! dxf.write (tmpf, struct ('type', 'LINE', 'pts', [0,0;1,1]), 'fancy', 1)

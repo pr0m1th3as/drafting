@@ -49,6 +49,13 @@
 ## @item @qcode{'File'} @tab Also write the result to this file.  The code is
 ## returned either way.
 ## @item @qcode{'Styles'} @tab Emit a @code{\tikzset} block defining one empty
+## @item @qcode{'LTScale'} @tab the drawing scale @tab multiplies line-type
+## dash lengths.  Patterns are model lengths times this factor, exactly as in
+## @code{draw.plot} and as CAD's own @code{LTSCALE} works.  Defaulting it to the
+## drawing scale cancels the reduction, so dashes reach the page at their
+## nominal size --- a centre line reads as a centre line whether the view is at
+## 1:1 or 1:50 --- while leaving the factor visible and adjustable.
+##
 ## style per layer, so that the document can restyle a layer by redefining it.
 ## True by default; set it false when the styles are already defined and
 ## redefining them would undo that.
@@ -98,6 +105,7 @@ function S = tikz (D, varargin)
   scale = 50;
   fname = '';
   styles = true;
+  ltscale = [];
   for ii = 1:2:numel (varargin)
     name = varargin{ii};
     val = varargin{ii+1};
@@ -123,10 +131,25 @@ function S = tikz (D, varargin)
           error ("draw.tikz: Styles must be a logical scalar.");
         endif
         styles = logical (val);
+      case 'ltscale'
+        if (! isnumeric (val) || ! isreal (val) || ! isscalar (val) ...
+            || ! isfinite (val) || val <= 0)
+          error (strcat ("draw.tikz: LTScale must be a real positive", ...
+                         " finite scalar."));
+        endif
+        ltscale = double (val);
       otherwise
         error ("draw.tikz: unknown option '%s'.", name);
     endswitch
   endfor
+
+  ## Line-type patterns are model lengths times LTScale, as in CAD and as in
+  ## draw.plot.  Defaulting LTScale to the drawing scale cancels the reduction,
+  ## so dashes arrive at their nominal size on the page -- which is what a
+  ## report figure wants -- by an explicit factor rather than by a second rule.
+  if (isempty (ltscale))
+    ltscale = scale;
+  endif
 
   ## One model millimetre, in millimetres on the page
   u = 1 / scale;
@@ -159,7 +182,7 @@ function S = tikz (D, varargin)
     out{end+1} = sprintf ('  %% layer: %s', L{ii});
     out{end+1} = sprintf ('  \\begin{scope}[%s]', sty{ii});
     for jj = idx
-      lines = render (D.Entities(jj), scale);
+      lines = render (D.Entities(jj), scale, ltscale);
       for kk = 1:numel (lines)
         out{end+1} = ['    ', lines{kk}];
       endfor
@@ -219,7 +242,7 @@ endfunction
 ## the drawing scale.  A line type is a paper-space property: a centre line
 ## should read as a centre line whether the view is at 1:1 or 1:50, and scaling
 ## the pattern down with the geometry would make it vanish.
-function o = dopts (e)
+function o = dopts (e, ltscale, scale)
 
   parts = {};
 
@@ -233,7 +256,7 @@ function o = dopts (e)
   lt = optfield (e, 'linetype', 'CONTINUOUS');
   if (! strcmpi (lt, 'CONTINUOUS'))
     try
-      pat = draw.linetype (lt);
+      pat = draw.linetype (lt) * ltscale / scale;
     catch
       pat = [];
     end_try_catch
@@ -270,9 +293,9 @@ function v = optfield (e, name, dflt)
 endfunction
 
 ## Render one entity as one or more lines of TikZ.
-function lines = render (e, scale)
+function lines = render (e, scale, ltscale)
 
-  o = dopts (e);
+  o = dopts (e, ltscale, scale);
 
   switch (e.type)
 
@@ -677,10 +700,27 @@ endfunction
 %! assert_equal (isempty (strfind (S, '\draw[')), true);
 %! assert_equal (! isempty (strfind (S, '\draw ')), true);
 
-%!test  # dash lengths are paper-space, unchanged by the drawing scale
+%!test  # by default LTScale follows the drawing scale, so dashes reach the
+%!       # page at nominal size whatever the view is drawn at
 %! D = draw.Drawing ();
 %! D.Linetype = 'DASHED';
-%! S1 = draw.tikz (D.line ([0, 0], [1, 0]), 'scale', 1);
-%! S50 = draw.tikz (D.line ([0, 0], [1, 0]), 'scale', 50);
+%! L = D.line ([0, 0], [1, 0]);
+%! S1 = draw.tikz (L, 'scale', 1);
+%! S50 = draw.tikz (L, 'scale', 50);
 %! assert_equal (! isempty (strfind (S1, 'on 0.5mm off 0.25mm')), true);
 %! assert_equal (! isempty (strfind (S50, 'on 0.5mm off 0.25mm')), true);
+
+%!test  # an explicit LTScale multiplies the pattern, as CAD's LTSCALE does
+%! D = draw.Drawing ();
+%! D.Linetype = 'DASHED';
+%! S = draw.tikz (D.line ([0, 0], [1, 0]), 'scale', 50, 'ltscale', 100);
+%! assert_equal (! isempty (strfind (S, 'on 1mm off 0.5mm')), true);
+
+%!test  # the rule is one rule: pattern times LTScale over scale
+%! D = draw.Drawing ();
+%! D.Linetype = 'DASHED';
+%! S = draw.tikz (D.line ([0, 0], [1, 0]), 'scale', 10, 'ltscale', 5);
+%! assert_equal (! isempty (strfind (S, 'on 0.25mm off 0.125mm')), true);
+
+%!error<draw.tikz: LTScale must be a real positive finite scalar.> ...
+%! draw.tikz (draw.Drawing (), 'ltscale', 0)

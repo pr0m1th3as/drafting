@@ -39,7 +39,7 @@
 ## @item @qcode{'CONTINUOUS'} @tab unbroken; visible edges
 ## @item @qcode{'HIDDEN'} @tab short dashes; edges concealed by the body
 ## @item @qcode{'CENTER'} @tab long-short-long; axes of symmetry, pitch circles
-## @item @qcode{'PHANTOM'} @tab long-short-short; alternate positions, adjacent parts
+## @item @qcode{'PHANTOM'} @tab long-short-short; alternate positions
 ## @item @qcode{'DASHED'} @tab even dashes
 ## @item @qcode{'DASHDOT'} @tab dash and dot
 ## @item @qcode{'DOT'} @tab dots only
@@ -49,12 +49,29 @@
 ## numbering, because they are what a DXF file and every CAD program expect to
 ## see.
 ##
-## The lengths are @strong{paper-space}: they are the size the dashes should
-## appear on the page, not model dimensions to be scaled with the geometry.  A
-## centre line has to read as a centre line whether its view is drawn at 1:1 or
-## at 1:50, and scaling the pattern down with the drawing would make it vanish.
-## The rendering backends emit them at nominal size for that reason; CAD applies
-## its own line-type scale factor to the same effect.
+## @subheading One rule for the lengths, everywhere
+##
+## The lengths are @strong{model} dimensions, multiplied by a line-type scale
+## factor.  That is the rule CAD uses --- its @code{LTSCALE} --- and it is the
+## rule every backend here follows, because a DXF line-type table defines the
+## lengths that way and the file backend has no choice.
+##
+## Each backend defaults the factor to whatever makes its own medium sensible,
+## and each lets a caller say otherwise:
+##
+## @multitable @columnfractions 0.24 0.24 0.52
+## @headitem Backend @tab Default @tab
+## @item @code{draw.plot} @tab 1 @tab on screen at 1:1 the pattern is already
+## the right size
+## @item @code{draw.tikz} @tab the drawing scale @tab cancels the reduction, so
+## dashes reach the page at nominal size
+## @item @code{dxf.write} @tab 1 @tab written into the file as
+## @code{$LTSCALE}, so the recipient's CAD does not supply its own
+## @end multitable
+##
+## A centre line therefore reads as a centre line whether its view is drawn at
+## 1:1 or at 1:50, without the package having to hold two contradictory ideas of
+## what a dash length means.
 ##
 ## @subheading Line types are names, not an enumeration
 ##
@@ -77,13 +94,20 @@ function [PATTERN, DESCR] = linetype (varargin)
   nin = numel (varargin);
 
   ## Pattern elements in millimetres at 1:1; positive draws, negative skips
-  T = {'CONTINUOUS', [],                                    'Solid line'; ...
-       'HIDDEN',     [0.25, -0.125],                        'Hidden ______ ______'; ...
-       'CENTER',     [1.25, -0.25, 0.25, -0.25],            'Center ____ _ ____'; ...
-       'PHANTOM',    [1.25, -0.25, 0.25, -0.25, 0.25, -0.25], 'Phantom ____ _ _ ____'; ...
-       'DASHED',     [0.5, -0.25],                          'Dashed __ __ __'; ...
-       'DASHDOT',    [0.5, -0.25, 0, -0.25],                'Dash dot __ . __ .'; ...
-       'DOT',        [0, -0.25],                            'Dot . . . . .'};
+  T = {'CONTINUOUS', [], ...
+                                            'Solid line'; ...
+       'HIDDEN',     [0.25, -0.125], ...
+                                            'Hidden ______ ______'; ...
+       'CENTER',     [1.25, -0.25, 0.25, -0.25], ...
+                                            'Center ____ _ ____'; ...
+       'PHANTOM',    [1.25, -0.25, 0.25, -0.25, 0.25, -0.25], ...
+                                            'Phantom ____ _ _ ____'; ...
+       'DASHED',     [0.5, -0.25], ...
+                                            'Dashed __ __ __'; ...
+       'DASHDOT',    [0.5, -0.25, 0, -0.25], ...
+                                            'Dash dot __ . __ .'; ...
+       'DOT',        [0, -0.25], ...
+                                            'Dot . . . . .'};
 
   if (nin == 0)
     PATTERN = T(:,1)';

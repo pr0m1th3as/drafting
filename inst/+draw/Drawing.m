@@ -194,8 +194,8 @@ classdef Drawing
       if (ischar (C))
         C = draw.colour (C);
       endif
-      if (! isnumeric (C) || ! isreal (C) || ! isscalar (C) || ! isfinite (C) ...
-          || C != fix (C) || C < 0 || C > 256)
+      if (! isnumeric (C) || ! isreal (C) || ! isscalar (C) ...
+          || ! isfinite (C) || C != fix (C) || C < 0 || C > 256)
         error (strcat ("draw.Drawing: COLOUR must be a name or an integer", ...
                        " index from 0 to 256."));
       endif

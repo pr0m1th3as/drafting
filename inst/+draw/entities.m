@@ -103,6 +103,7 @@ function [E, LOST] = entities (D, varargin)
   endif
 
   dimScale = 1;
+  hatchMode = 'lines';
   for ii = 1:2:numel (varargin)
     name = varargin{ii};
     if (! ischar (name) || ! isrow (name))
@@ -118,6 +119,14 @@ function [E, LOST] = entities (D, varargin)
                          " finite scalar."));
         endif
         dimScale = double (dimScale);
+      case 'hatch'
+        hatchMode = varargin{ii+1};
+        if (! ischar (hatchMode) || ! isrow (hatchMode) ...
+            || ! any (strcmpi (hatchMode, {'lines', 'boundary'})))
+          error (strcat ("draw.entities: Hatch must be 'lines' or", ...
+                         " 'boundary'."));
+        endif
+        hatchMode = lower (hatchMode);
       otherwise
         error ("draw.entities: unknown option '%s'.", name);
     endswitch
@@ -163,9 +172,22 @@ function [E, LOST] = entities (D, varargin)
         h = mkent ('POLYLINE', e, e.pts);
         h.closed = true;
         E(end+1) = h;
-        LOST(end+1) = struct ('index', ii, 'type', 'hatch', 'reason', ...
-                              strcat ('fill dropped: R12 has no HATCH,', ...
-                                      ' boundary emitted'));
+        if (strcmp (hatchMode, 'lines'))
+          ## R12 has no HATCH entity, so the fill is generated explicitly.
+          ## Emitting the lines is a truer degradation than dropping them:
+          ## the recipient sees the section hatched, not an empty outline.
+          S = draw.hatchlines (e.pts, e.pattern, e.angle, e.spacing);
+          for jj = 1:rows (S)
+            E(end+1) = mkent ('LINE', e, [S(jj,1:2); S(jj,3:4)]);
+          endfor
+          ## Nothing is recorded as lost: R12 has no HATCH entity, but the
+          ## fill it would have carried is present as lines, so the recipient
+          ## sees the hatch.  LOST is for what could not be carried at all.
+        else
+          LOST(end+1) = struct ('index', ii, 'type', 'hatch', 'reason', ...
+                                strcat ('fill dropped: R12 has no HATCH,', ...
+                                        ' boundary emitted'));
+        endif
 
       case 'dim'
         parts = explodedim (e, dimScale);
@@ -492,15 +514,41 @@ endfunction
 %! assert_equal (numel (E), 6);
 %! assert_equal (all (isfinite ([E(1).pts(:); E(2).pts(:)])), true);
 
-%!test  # a hatch keeps its boundary and reports the fill it could not carry
+%!test  # a hatch keeps its boundary and gains the fill as explicit lines
 %! D = draw.Drawing ().hatch ([0, 0; 10, 0; 10, 10]);
 %! [E, LOST] = draw.entities (D);
-%! assert_equal (numel (E), 1);
 %! assert_equal (E(1).type, 'POLYLINE');
 %! assert_equal (E(1).closed, true);
+%! assert_equal (numel (E) > 1, true);
+%! assert_equal (all (strcmp ({E(2:end).type}, 'LINE')), true);
+%! assert_equal (isempty (LOST), true);
+
+%!test  # asking for the boundary alone gives what it used to
+%! D = draw.Drawing ().hatch ([0, 0; 10, 0; 10, 10]);
+%! [E, LOST] = draw.entities (D, 'hatch', 'boundary');
+%! assert_equal (numel (E), 1);
+%! assert_equal (E(1).type, 'POLYLINE');
 %! assert_equal (numel (LOST), 1);
 %! assert_equal (LOST(1).type, 'hatch');
-%! assert_equal (LOST(1).index, 1);
+%! assert_equal (! isempty (strfind (LOST(1).reason, 'dropped')), true);
+
+%!test  # the fill lines inherit the hatch's layer, line type and colour
+%! D = draw.Drawing ();
+%! D.Layer = 'SECTION';
+%! D.Colour = 'blue';
+%! E = draw.entities (D.hatch ([0, 0; 10, 0; 10, 10]));
+%! assert_equal (all (strcmp ({E.layer}, 'SECTION')), true);
+%! assert_equal (all ([E.colour] == 5), true);
+
+%!test  # spacing given to the hatch reaches the generated lines
+%! D = draw.Drawing ();
+%! P = [0, 0; 20, 0; 20, 20; 0, 20];
+%! Ewide = draw.entities (D.hatch (P, 'ANSI31', 0, 4));
+%! Efine = draw.entities (D.hatch (P, 'ANSI31', 0, 1));
+%! assert_equal (numel (Efine) > numel (Ewide), true);
+
+%!error<draw.entities: Hatch must be 'lines' or 'boundary'.> ...
+%! draw.entities (draw.Drawing (), 'hatch', 'fill')
 
 %!test  # a rotated text keeps its rotation and costs nothing
 %! [E0, L0] = draw.entities (draw.Drawing ().text ([0, 0], 'A'));
@@ -513,9 +561,9 @@ endfunction
 %!test  # asking for LOST silences the warning, omitting it does not
 %! D = draw.Drawing ().hatch ([0, 0; 10, 0; 10, 10]);
 %! lastwarn ('');
-%! [E, LOST] = draw.entities (D);
+%! [E, LOST] = draw.entities (D, 'hatch', 'boundary');
 %! assert_equal (lastwarn (), '');
-%! E = draw.entities (D);
+%! E = draw.entities (D, 'hatch', 'boundary');
 %! assert_equal (isempty (lastwarn ()), false);
 
 %!test  # a lowered drawing survives a DXF round trip

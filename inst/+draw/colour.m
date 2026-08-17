@@ -104,7 +104,7 @@ function OUT = colour (varargin)
       && ARG == fix (ARG) && ARG >= 0 && ARG <= 256)
     k = find (ARG == [T{:,2}], 1);
     if (isempty (k))
-      OUT = [0.5, 0.5, 0.5];            # valid but unnamed; render, do not raise
+      OUT = [0.5, 0.5, 0.5];       # valid but unnamed: render, do not raise
     else
       OUT = T{k,3};
     endif
