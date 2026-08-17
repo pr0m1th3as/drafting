@@ -72,6 +72,18 @@
 ## --- evaluate that instead and keep this function to check it.  A few microns
 ## is a fraction of a wire-EDM tolerance, not a comfortable margin inside it.
 ##
+## @strong{A polygon is offset by passing its vertices.}  With one point per
+## corner each normal is the angle bisector, so a closed outline of straight
+## edges --- rectilinear or not --- offsets exactly, giving the mitred result.
+## Do @emph{not} pass a dense sampling of the same outline: a corner resolved
+## by sampling has a vanishing radius of curvature, and the criterion above
+## rejects it as an undercut for an offset the polygon absorbs without
+## difficulty.  Same shape, different representation, opposite answer.
+##
+## For a rectilinear outline @code{geom.offset} is the better route: it tests
+## exactly whether the outline can absorb the offset at all, which a criterion
+## evaluated point by point cannot do.
+##
 ## @strong{The criterion is local.}  It guarantees that no neighbourhood folds
 ## on itself, which is what makes an offset well defined point by point.  It
 ## does not guarantee that two distant parts of the curve stay apart: a shape

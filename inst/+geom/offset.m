@@ -42,6 +42,17 @@
 ## enough that support for arbitrary polygons can be added later without
 ## disturbing callers.
 ##
+## @strong{A general polygon is offset by @code{geom.curveoffset}} instead,
+## given its vertices and @var{CLOSED} set true.  With one point per corner
+## each normal is the angle bisector, which is the mitred offset exactly.  Pass
+## the vertices and not a dense sampling of the same outline: a corner resolved
+## by sampling has a vanishing radius of curvature, so the undercut criterion
+## rejects an offset the polygon itself absorbs without difficulty.
+##
+## What this function adds over that route is the check below --- an exact test
+## that the outline can absorb the offset at all, which a criterion evaluated
+## point by point cannot give.
+##
 ## An offset too large for the outline to absorb raises an error rather than
 ## returning a self-intersecting result.  This is detected by checking that the
 ## orientation survives and that no edge has reversed direction, which is exact
@@ -64,8 +75,8 @@ function Q = offset (P, D)
     error ("geom.offset: D must be a real finite scalar.");
   endif
   if (! geom.isrectilinear (P))
-    error (strcat ("geom.offset: P must be a rectilinear polygon;", ...
-                   " offsetting a general polygon is not implemented."));
+    error (strcat ("geom.offset: P must be a rectilinear polygon; offset a", ...
+                   " general one with geom.curveoffset, given its vertices."));
   endif
 
   if (D == 0)
@@ -225,7 +236,7 @@ endfunction
 %! geom.offset ([0, 0; 1, 0; 1, 1; 0, 1], [1, 2])
 %!error<geom.offset: D must be a real finite scalar.> ...
 %! geom.offset ([0, 0; 1, 0; 1, 1; 0, 1], Inf)
-%!error<geom.offset: P must be a rectilinear polygon; offsetting a general polygon is not implemented.> ...
+%!error<geom.offset: P must be a rectilinear polygon; offset a general one with geom.curveoffset, given its vertices.> ...
 %! geom.offset ([0, 0; 10, 0; 0, 10], 1)
 %!error<geom.offset: P has zero area, so it has no inside to offset into.> ...
 %! geom.offset ([0, 0; 1, 0; 2, 0], 1)
