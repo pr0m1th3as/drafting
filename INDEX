@@ -16,6 +16,8 @@ Curve geometry
 DXF input and output
  dxf.read
  dxf.write
+STL output
+ stl.write
 Drawing model and backends
  draw.Drawing
  draw.entities
