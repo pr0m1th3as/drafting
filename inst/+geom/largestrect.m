@@ -28,11 +28,16 @@
 ## corner.
 ##
 ## @code{@var{R} = geom.largestrect (@var{P}, @var{MARGINS})} additionally
-## keeps the rectangle clear of the bounding box of @var{P} by the given
-## margins.  @var{MARGINS} is a scalar applied to all four sides, or the 1-by-4
-## vector @code{[@var{left}, @var{bottom}, @var{right}, @var{top}]} naming them
+## keeps the rectangle clear of @emph{every} wall of @var{P} by the given
+## margins, the face of a notch included and not merely the bounding box.
+## @var{MARGINS} is a scalar applied to all four sides, or the 1-by-4 vector
+## @code{[@var{left}, @var{bottom}, @var{right}, @var{top}]} naming them
 ## individually, in the units of @var{P}.  All values must be non-negative and
 ## it defaults to zero.
+##
+## Clearance is measured per axis, so the @var{right} margin is held against
+## whichever wall bounds the rectangle on its right --- the outline's own
+## right-hand side, or the inner face of a notch, whichever it meets first.
 ##
 ## This is the operation that fits a usable rectangle inside an irregular
 ## outline: the per-side margins are the clearance budget --- whatever has to be
@@ -82,11 +87,14 @@ function [R, B] = largestrect (P, MARGINS = 0)
     MARGINS = MARGINS * ones (1, 4);
   endif
 
-  ## Shrink the bounding box by the margins to get the search window
+  ## The search window is the whole bounding box.  The margins are not taken
+  ## out of it, but out of each candidate rectangle below, so that they are
+  ## measured from whichever wall of P that rectangle actually meets --- a
+  ## re-entrant one included.
   box = geom.bbox (P);
-  win = [box(1) + MARGINS(1), box(2) + MARGINS(2), ...
-         box(3) - MARGINS(3), box(4) - MARGINS(4)];
-  if (win(1) >= win(3) || win(2) >= win(4))
+  win = box;
+  if (MARGINS(1) + MARGINS(3) >= box(3) - box(1) ...
+      || MARGINS(2) + MARGINS(4) >= box(4) - box(2))
     error (strcat ("geom.largestrect: MARGINS leave no room inside the", ...
                    " bounding box of P."));
   endif
@@ -117,12 +125,23 @@ function [R, B] = largestrect (P, MARGINS = 0)
   ## Search every pair of x bounds against every pair of y bounds
   bestArea = 0;
   B = [];
+  ## A rectangle stands off every wall of P by MARGINS exactly when the
+  ## rectangle grown by MARGINS is inside P.  So the block of cells tested is
+  ## the grown rectangle, and what is scored and returned is that block less
+  ## the margins.
   for i1 = 1:nx-1
     for i2 = i1+1:nx
-      wide = xs(i2) - xs(i1);
+      wide = xs(i2) - xs(i1) - MARGINS(1) - MARGINS(3);
+      if (wide <= 0)
+        continue;
+      endif
       for j1 = 1:ny-1
         for j2 = j1+1:ny
-          area = wide * (ys(j2) - ys(j1));
+          high = ys(j2) - ys(j1) - MARGINS(2) - MARGINS(4);
+          if (high <= 0)
+            continue;
+          endif
+          area = wide * high;
           if (area <= bestArea)
             continue;
           endif
@@ -130,7 +149,8 @@ function [R, B] = largestrect (P, MARGINS = 0)
           nIn = total(i2,j2) - total(i1,j2) - total(i2,j1) + total(i1,j1);
           if (nIn == (i2 - i1) * (j2 - j1))
             bestArea = area;
-            B = [xs(i1), ys(j1), xs(i2), ys(j2)];
+            B = [xs(i1) + MARGINS(1), ys(j1) + MARGINS(2), ...
+                 xs(i2) - MARGINS(3), ys(j2) - MARGINS(4)];
           endif
         endfor
       endfor
@@ -191,6 +211,16 @@ endfunction
 %! [~, B] = geom.largestrect (outline, [50, 200, 50, 100]);
 %! assert_equal (B(3) - B(1), 1500);     # width
 %! assert_equal (B(4) - B(2), 1500);     # depth
+
+%!test  # a margin is held against a re-entrant wall, not just the bounding box
+%! P = [0, 0; 60, 0; 60, 20; 30, 20; 30, 45; 0, 45];
+%! [~, B] = geom.largestrect (P, [4, 6, 4, 3]);
+%! assert_equal (B, [4, 6, 26, 42], 1e-9);
+
+%!test  # the clearance from a notch face equals the margin for that side
+%! P = [0, 0; 60, 0; 60, 5; 30, 5; 30, 45; 0, 45];
+%! [~, B] = geom.largestrect (P, [0, 0, 7, 0]);
+%! assert_equal (30 - B(3), 7, 1e-9);
 
 %!test  # the notch of an L shape is excluded: 40, not the 64 of the outline
 %! P = [0, 0; 10, 0; 10, 4; 4, 4; 4, 10; 0, 10];
