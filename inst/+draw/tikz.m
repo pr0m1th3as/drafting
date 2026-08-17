@@ -154,7 +154,17 @@ function S = tikz (D, varargin)
   ## One model millimetre, in millimetres on the page
   u = 1 / scale;
 
-  L = layers (D);
+  ## Lowered through draw.entities, exactly as draw.plot is, so that the three
+  ## backends agree and none of them can silently fail to know an entity type.
+  ## That is not hypothetical: this one did, when the dimensioning entities
+  ## arrived and only this backend still rendered from the drawing model.
+  E = draw.entities (D, 'bulges', 'flatten');
+
+  if (isempty (E))
+    L = {};
+  else
+    L = unique ({E.layer});
+  endif
   sty = stylenames (L);
 
   out = {};
@@ -162,10 +172,6 @@ function S = tikz (D, varargin)
   out{end+1} = sprintf ('%% Drawing: %s', D.Name);
   out{end+1} = sprintf (strcat ('%% Plot scale 1:%s. Coordinates are model', ...
                                 ' millimetres.'), fmt (scale));
-  if (any (strcmp ({D.Entities.type}, 'hatch')))
-    out{end+1} = '% Needs \usetikzlibrary{patterns}.';
-  endif
-
   if (styles && ! isempty (L))
     out{end+1} = '\tikzset{';
     for ii = 1:numel (L)
@@ -178,11 +184,11 @@ function S = tikz (D, varargin)
                                 ' line width=0.18mm]'), fmt (u), fmt (u));
 
   for ii = 1:numel (L)
-    idx = find (strcmp ({D.Entities.layer}, L{ii}));
+    idx = find (strcmp ({E.layer}, L{ii}));
     out{end+1} = sprintf ('  %% layer: %s', L{ii});
     out{end+1} = sprintf ('  \\begin{scope}[%s]', sty{ii});
     for jj = idx
-      lines = render (D.Entities(jj), scale, ltscale);
+      lines = render (E(jj), scale, ltscale);
       for kk = 1:numel (lines)
         out{end+1} = ['    ', lines{kk}];
       endfor
@@ -299,11 +305,11 @@ function lines = render (e, scale, ltscale)
 
   switch (e.type)
 
-    case 'line'
+    case 'LINE'
       lines = {sprintf('\\draw%s %s -- %s;', o, pt (e.pts(1,:)), ...
                        pt (e.pts(2,:)))};
 
-    case 'polyline'
+    case {'POLYLINE', 'LWPOLYLINE'}
       s = ['\draw', o, ' ', pt(e.pts(1,:))];
       for ii = 2:rows (e.pts)
         s = [s, ' -- ', pt(e.pts(ii,:))];
@@ -313,11 +319,11 @@ function lines = render (e, scale, ltscale)
       endif
       lines = {[s, ';']};
 
-    case 'circle'
+    case 'CIRCLE'
       lines = {sprintf('\\draw%s %s circle[radius=%smm];', o, pt (e.pts), ...
                        fmt (e.radius / scale))};
 
-    case 'arc'
+    case 'ARC'
       ## TikZ draws an arc from the current point, counter-clockwise when the
       ## end angle exceeds the start, so the sweep is unrolled rather than
       ## passed as the two stored angles.
@@ -332,25 +338,21 @@ function lines = render (e, scale, ltscale)
       lines = {sprintf(tmpl, o, pt (start), fmt (a1), ...
                        fmt (a1 + sweep), fmt (e.radius / scale))};
 
-    case 'text'
+    case 'TEXT'
       opts = sprintf ('anchor=base west, inner sep=0pt, font=%s', ...
                       fontfor (e.height, scale));
-      if (e.angle != 0)
-        opts = sprintf ('%s, rotate=%s', opts, fmt (e.angle));
+      if (e.rotation != 0)
+        opts = sprintf ('%s, rotate=%s', opts, fmt (e.rotation));
       endif
       lines = {sprintf('\\node[%s] at %s {%s};', opts, pt (e.pts), ...
                        texescape (e.text))};
 
-    case 'hatch'
-      s = sprintf ('\\path[pattern=%s] %s', pattern (e.pattern), ...
-                   pt (e.pts(1,:)));
-      for ii = 2:rows (e.pts)
-        s = [s, ' -- ', pt(e.pts(ii,:))];
-      endfor
-      lines = {[s, ' -- cycle;']};
+    case 'POINT'
+      lines = {sprintf('\\fill%s %s circle[radius=0.3mm];', o, ...
+                       pt (e.pts))};
 
-    case 'dim'
-      lines = renderdim (e, scale);
+    otherwise
+      lines = {};
 
   endswitch
 
@@ -461,25 +463,19 @@ endfunction
 
 ## Map a CAD hatch pattern onto a TikZ one.  Only the patterns an engineering
 ## drawing actually uses are worth naming; anything else falls back rather than
-## emitting a pattern name TikZ has never heard of.
-function s = pattern (name)
-
-  switch (upper (name))
-    case 'ANSI31'
-      s = 'north east lines';
-    case 'ANSI37'
-      s = 'crosshatch';
-    case 'SOLID'
-      s = 'horizontal lines';
-    otherwise
-      s = 'north east lines';
-  endswitch
-
-endfunction
-
 ## Escape the characters LaTeX would otherwise act on.  The backslash has to go
 ## first, or the escapes introduced for everything else get escaped in turn.
 function s = texescape (t)
+
+  ## Drawing symbols first, before the escaping turns their per cent signs into
+  ## literals.  The replacements need no package beyond what any document has.
+  t = strrep (t, '%%%', "\x00PC\x00");
+  t = strrep (t, '%%c', "\x00DIA\x00");
+  t = strrep (t, '%%C', "\x00DIA\x00");
+  t = strrep (t, '%%d', "\x00DEG\x00");
+  t = strrep (t, '%%D', "\x00DEG\x00");
+  t = strrep (t, '%%p', "\x00PM\x00");
+  t = strrep (t, '%%P', "\x00PM\x00");
 
   s = strrep (t, '\', '\textbackslash');
   s = strrep (s, '{', '\{');
@@ -490,6 +486,11 @@ function s = texescape (t)
   endfor
   s = strrep (s, '~', '\textasciitilde{}');
   s = strrep (s, '^', '\textasciicircum{}');
+
+  s = strrep (s, "\x00DIA\x00", '\O{}');
+  s = strrep (s, "\x00DEG\x00", '$^\circ$');
+  s = strrep (s, "\x00PM\x00", '$\pm$');
+  s = strrep (s, "\x00PC\x00", '\%');
 
 endfunction
 
@@ -611,11 +612,14 @@ endfunction
 %! S = draw.tikz (draw.Drawing ().line ([0, 0], [1, 0]));
 %! assert_equal (! isempty (strfind (S, 'dr1/.style={}')), true);
 
-%!test  # a hatch is emitted as a pattern and announces the library it needs
+%!test  # a hatch arrives as its boundary and the fill lines that draw.entities
+%!       # generates, the same ones the DXF file carries.  The native TikZ
+%!       # pattern this replaced stroked no boundary at all and ignored the
+%!       # angle and spacing the hatch was given.
 %! S = draw.tikz (draw.Drawing ().hatch ([0, 0; 10, 0; 10, 10]));
-%! assert_equal (! isempty (strfind (S, 'pattern=north east lines')), true);
-%! assert_equal (! isempty (strfind (S, '\usetikzlibrary{patterns}')), true);
 %! assert_equal (! isempty (strfind (S, '-- cycle;')), true);
+%! assert_equal (numel (strfind (S, '\draw')) > 3, true);
+%! assert_equal (isempty (strfind (S, 'pattern=')), true);
 
 %!test  # a drawing without a hatch does not ask for the patterns library
 %! S = draw.tikz (draw.Drawing ().line ([0, 0], [1, 0]));
@@ -643,13 +647,19 @@ endfunction
 %!                                     'MIN. 100%'));
 %! assert_equal (! isempty (strfind (S, '{MIN. 100\%}')), true);
 
-%!test  # the label anchors against the side the dimension was offset to
-%! Su = draw.tikz (draw.Drawing ().dim ([0, 0], [100, 0], 20, 'horizontal'));
-%! Sd = draw.tikz (draw.Drawing ().dim ([0, 0], [100, 0], -20, 'horizontal'));
-%! Sl = draw.tikz (draw.Drawing ().dim ([0, 0], [0, 100], 20, 'vertical'));
-%! assert_equal (! isempty (strfind (Su, 'anchor=south')), true);
-%! assert_equal (! isempty (strfind (Sd, 'anchor=north')), true);
-%! assert_equal (! isempty (strfind (Sl, 'anchor=east')), true);
+%!test  # a dimension arrives already exploded, so the label is placed the same
+%!       # way here as it is in the file
+%! S = draw.tikz (draw.Drawing ().dim ([0, 0], [100, 0], 20, 'horizontal'));
+%! assert_equal (! isempty (strfind (S, '\node')), true);
+%! assert_equal (numel (strfind (S, '\draw')) >= 5, true);
+
+%!test  # every entity type reaches the backend, including the ones added last
+%! D = draw.Drawing ().diam ([0, 0], 10).radius ([40, 0], 5);
+%! D = D.angdim ([80, 0], [90, 0], [80, 10], 6).centremark ([0, 0], 10);
+%! D = D.leader ([10, 10; 20, 20; 30, 20], 'NOTE').ellipse ([120, 0], 20, 8);
+%! S = draw.tikz (D);
+%! assert_equal (numel (strfind (S, '\draw')) > 8, true);
+%! assert_equal (numel (strfind (S, '\node')), 4);
 
 %!test  # an empty drawing still yields a valid, empty picture
 %! S = draw.tikz (draw.Drawing ());
@@ -724,3 +734,16 @@ endfunction
 
 %!error<draw.tikz: LTScale must be a real positive finite scalar.> ...
 %! draw.tikz (draw.Drawing (), 'ltscale', 0)
+
+%!test  # the spacing given to a hatch reaches the page, which the native
+%!       # pattern it replaced could not carry
+%! P = [0, 0; 40, 0; 40, 40; 0, 40];
+%! Swide = draw.tikz (draw.Drawing ().hatch (P, 'ANSI31', 0, 8));
+%! Sfine = draw.tikz (draw.Drawing ().hatch (P, 'ANSI31', 0, 2));
+%! assert_equal (numel (strfind (Sfine, '\draw')) ...
+%!               > numel (strfind (Swide, '\draw')), true);
+
+%!test  # and a sectioned area is drawn with its outline
+%! P = [0, 0; 40, 0; 40, 40; 0, 40];
+%! S = draw.tikz (draw.Drawing ().hatch (P, 'ANSI31'));
+%! assert_equal (! isempty (strfind (S, '-- cycle;')), true);

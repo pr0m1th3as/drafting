@@ -30,6 +30,10 @@ STL output
 Rendering
  draw.plot
  draw.hatchlines
+Sheet composition
+ draw.titleblock
+ draw.coordtable
+ draw.symbol
 Line types and colours
  draw.linetype
  draw.colour

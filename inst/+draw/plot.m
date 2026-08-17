@@ -194,7 +194,8 @@ function H = plot (varargin)
           H = [H; polydraw(ax, P, e.linetype, col, opt)];
 
         case 'TEXT'
-          H(end+1, 1) = text (e.pts(1), e.pts(2), e.text, 'parent', ax, ...
+          H(end+1, 1) = text (e.pts(1), e.pts(2), plainsymbols (e.text), ...
+                              'parent', ax, ...
                               'color', col, 'fontsize', opt.FontSize, ...
                               'rotation', e.rotation, ...
                               'horizontalalignment', 'left', ...
@@ -319,6 +320,29 @@ function Q = runbetween (P, cum, t0, t1)
     Q = [Q; P(mid,:)];
   endif
   Q = [Q; interpat(P, cum, t1)];
+
+endfunction
+
+## Drawing symbols as characters a figure font is likely to hold.  A capital O
+## with a stroke stands in for the diameter sign, as it does on a great many
+## real drawings; the true glyph is not in every font, and a missing one shows
+## as a box, which is worse than a near miss.
+function t = plainsymbols (t)
+
+  t = strrep (t, '%%%', "\x00PC\x00");
+  for c = {'c', 'C'}
+    t = strrep (t, ['%%', c{1}], "\x00DIA\x00");
+  endfor
+  for c = {'d', 'D'}
+    t = strrep (t, ['%%', c{1}], "\x00DEG\x00");
+  endfor
+  for c = {'p', 'P'}
+    t = strrep (t, ['%%', c{1}], "\x00PM\x00");
+  endfor
+  t = strrep (t, "\x00DIA\x00", 'Ø');
+  t = strrep (t, "\x00DEG\x00", '°');
+  t = strrep (t, "\x00PM\x00", '±');
+  t = strrep (t, "\x00PC\x00", '%');
 
 endfunction
 

@@ -236,6 +236,30 @@ function [E, LOST, BLOCKS] = entities (D, varargin)
                                        ' emitted as a closed polyline of', ...
                                        ' %d points'), rows (pts)));
 
+      case {'diam', 'radius'}
+        parts = explodecirc (e, dimScale);
+        for kk = 1:numel (parts)
+          E(end+1) = parts(kk);
+        endfor
+
+      case 'angdim'
+        parts = explodeang (e, dimScale);
+        for kk = 1:numel (parts)
+          E(end+1) = parts(kk);
+        endfor
+
+      case 'centremark'
+        parts = explodemark (e, dimScale);
+        for kk = 1:numel (parts)
+          E(end+1) = parts(kk);
+        endfor
+
+      case 'leader'
+        parts = explodeleader (e, dimScale);
+        for kk = 1:numel (parts)
+          E(end+1) = parts(kk);
+        endfor
+
       case 'insert'
         s = mkent ('INSERT', e, e.pts);
         s.text = e.block;
@@ -314,6 +338,104 @@ function s = mkent (type, e, pts)
               'pts', pts, 'closed', false, ...
               'radius', [], 'angles', [], 'text', '', 'height', [], ...
               'rotation', 0, 'bulge', []);
+
+endfunction
+
+## A diameter or radius dimension: the measuring line, a tick where it meets
+## the feature, and the text.  A diameter runs right across; a radius runs from
+## the centre out, which is why the two share everything but their first point.
+function parts = explodecirc (e, scale)
+
+  tick = 1.25 * scale;
+  hgt = 2.5 * scale;
+  u = [cosd(e.angle), sind(e.angle)];
+  outer = e.pts + e.radius * u;
+  if (strcmp (e.type, 'diam'))
+    inner = e.pts - e.radius * u;
+  else
+    inner = e.pts;
+  endif
+
+  n = [-u(2), u(1)];
+  parts = mkent ('LINE', e, [inner; outer]);
+  parts(end+1) = mkent ('LINE', e, [outer - tick * (u + n) / sqrt(2); ...
+                                    outer + tick * (u + n) / sqrt(2)]);
+  if (strcmp (e.type, 'diam'))
+    parts(end+1) = mkent ('LINE', e, [inner - tick * (u + n) / sqrt(2); ...
+                                      inner + tick * (u + n) / sqrt(2)]);
+  endif
+
+  t = mkent ('TEXT', e, outer + 0.5 * hgt * (u + n));
+  t.text = e.text;
+  t.height = hgt;
+  t.rotation = 0;
+  parts(end+1) = t;
+
+endfunction
+
+## An angular dimension: the arc between the arms, a tick at each end, and the
+## text outside the arc at its middle
+function parts = explodeang (e, scale)
+
+  tick = 1.25 * scale;
+  hgt = 2.5 * scale;
+  V = e.pts(1,:);
+  a1 = atan2 (e.pts(2,2) - V(2), e.pts(2,1) - V(1)) * 180 / pi;
+  a2 = atan2 (e.pts(3,2) - V(2), e.pts(3,1) - V(1)) * 180 / pi;
+
+  arc = mkent ('ARC', e, V);
+  arc.radius = e.radius;
+  arc.angles = [mod(a1, 360), mod(a2, 360)];
+  parts = arc;
+
+  for a = [a1, a2]
+    u = [cosd(a), sind(a)];
+    n = [-u(2), u(1)];
+    p = V + e.radius * u;
+    parts(end+1) = mkent ('LINE', e, [p - tick * n / 2; p + tick * n / 2]);
+  endfor
+
+  am = a1 + mod (a2 - a1, 360) / 2;
+  t = mkent ('TEXT', e, V + (e.radius + 0.5 * hgt) * [cosd(am), sind(am)]);
+  t.text = e.text;
+  t.height = hgt;
+  t.rotation = 0;
+  parts(end+1) = t;
+
+endfunction
+
+## A centre mark: the small cross, with arms reaching a little past a small
+## feature and stopping short of a large one, as the convention has it
+function parts = explodemark (e, scale)
+
+  a = max (min (e.radius / 4, 3 * scale), 0.5 * scale);
+  C = e.pts;
+  parts = mkent ('LINE', e, [C - [a, 0]; C + [a, 0]]);
+  parts(end+1) = mkent ('LINE', e, [C - [0, a]; C + [0, a]]);
+
+endfunction
+
+## A leader: the path, a tick at the feature end, and the note at the tail
+function parts = explodeleader (e, scale)
+
+  tick = 1.25 * scale;
+  hgt = 2.5 * scale;
+  P = e.pts;
+  parts = mkent ('POLYLINE', e, P);
+
+  d = P(2,:) - P(1,:);
+  if (norm (d) > 0)
+    u = d / norm (d);
+    n = [-u(2), u(1)];
+    parts(end+1) = mkent ('LINE', e, [P(1,:); P(1,:) + tick * (u + n / 2)]);
+    parts(end+1) = mkent ('LINE', e, [P(1,:); P(1,:) + tick * (u - n / 2)]);
+  endif
+
+  t = mkent ('TEXT', e, P(end,:) + [0.3 * hgt, 0.3 * hgt]);
+  t.text = e.text;
+  t.height = hgt;
+  t.rotation = 0;
+  parts(end+1) = t;
 
 endfunction
 

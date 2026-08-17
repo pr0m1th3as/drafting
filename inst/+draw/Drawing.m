@@ -1031,6 +1031,217 @@ classdef Drawing
 
     endfunction
 
+
+    ## -*- texinfo -*-
+    ## @deftypefn  {draw.Drawing} {@var{D} =} diam (@var{D}, @var{C}, @var{R})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} diam (@dots{}, @var{ANG}, @var{LABEL})
+    ##
+    ## Append a diameter dimension across a circle.
+    ##
+    ## @var{C} is the centre and @var{R} the radius.  @var{ANG} sets the
+    ## direction the dimension line lies along, in degrees, and defaults to 45,
+    ## which keeps it clear of the centre lines.  @var{LABEL} overrides the
+    ## text, which is otherwise the diameter symbol and the measured figure.
+    ##
+    ## A round feature is dimensioned by its diameter and never by its radius,
+    ## because a diameter is what a bore gauge and a micrometer measure.  A
+    ## radius is used only where the full circle is not there to measure ---
+    ## which is what @code{radius} is for.
+    ##
+    ## @seealso{radius, angdim, centremark, draw.symbol}
+    ## @end deftypefn
+    function this = diam (this, C, R, ANG = 45, LABEL = '')
+
+      if (nargin < 3 || nargin > 5)
+        error ("draw.Drawing.diam: invalid number of input arguments.");
+      endif
+      e = dimcircle (this, 'diam', C, R, ANG, LABEL);
+      if (isempty (e.text))
+        ## Three decimals is a micron in millimetres, finer than anything this
+        ## package's own output is accurate to and past any drawing's need
+        e.text = sprintf ('%%%%c%g', round (2 * R * 1000) / 1000);
+      endif
+      this.Entities(end+1) = e;
+
+    endfunction
+
+    ## -*- texinfo -*-
+    ## @deftypefn  {draw.Drawing} {@var{D} =} radius (@var{D}, @var{C}, @var{R})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} radius (@dots{}, @var{ANG}, @var{LABEL})
+    ##
+    ## Append a radius dimension from a centre out to an arc.
+    ##
+    ## The arguments are those of @code{diam}, and @var{ANG} is the direction
+    ## the leader runs in.  The label is otherwise the letter R and the figure.
+    ##
+    ## Use it for a fillet or any arc that is less than a full circle, where
+    ## there is no diameter to measure across.
+    ##
+    ## @seealso{diam, angdim, centremark}
+    ## @end deftypefn
+    function this = radius (this, C, R, ANG = 45, LABEL = '')
+
+      if (nargin < 3 || nargin > 5)
+        error ("draw.Drawing.radius: invalid number of input arguments.");
+      endif
+      e = dimcircle (this, 'radius', C, R, ANG, LABEL);
+      if (isempty (e.text))
+        e.text = sprintf ('R%g', round (R * 1000) / 1000);
+      endif
+      this.Entities(end+1) = e;
+
+    endfunction
+
+    ## -*- texinfo -*-
+    ## @deftypefn  {draw.Drawing} {@var{D} =} angdim (@var{D}, @var{V}, @var{P1}, @var{P2}, @var{RAD})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} angdim (@dots{}, @var{LABEL})
+    ##
+    ## Append an angular dimension at a vertex.
+    ##
+    ## @var{V} is the vertex, @var{P1} and @var{P2} points along the two arms,
+    ## and @var{RAD} the radius at which the dimension arc is struck.  The label
+    ## is otherwise the measured angle and the degree symbol.
+    ##
+    ## The angle measured is the one from the first arm to the second going
+    ## counter-clockwise, so giving the arms the other way round dimensions the
+    ## explement instead.  That is the choice being offered, not an ambiguity:
+    ## a corner and its outside both get dimensioned on real drawings.
+    ##
+    ## @seealso{diam, radius, draw.symbol}
+    ## @end deftypefn
+    function this = angdim (this, V, P1, P2, RAD, LABEL = '')
+
+      if (nargin < 5 || nargin > 6)
+        error ("draw.Drawing.angdim: invalid number of input arguments.");
+      endif
+      for pr = {{V, 'V'}, {P1, 'P1'}, {P2, 'P2'}}
+        errmsg = checkpt (pr{1}{1});
+        if (! isempty (errmsg))
+          error ("draw.Drawing.angdim: %s %s", pr{1}{2}, errmsg);
+        endif
+      endfor
+      errmsg = checkradius (RAD);
+      if (! isempty (errmsg))
+        error ("draw.Drawing.angdim: RAD %s", errmsg);
+      endif
+      if (! ischar (LABEL) || ! (isrow (LABEL) || isempty (LABEL)))
+        error ("draw.Drawing.angdim: LABEL must be a character vector.");
+      endif
+      if (isequal (P1(:)', V(:)') || isequal (P2(:)', V(:)'))
+        error (strcat ("draw.Drawing.angdim: an arm point must differ from", ...
+                       " the vertex."));
+      endif
+
+      e = makeentity ('angdim', this.Layer, this.Linetype, this.Colour);
+      e.pts = [V(:)'; P1(:)'; P2(:)'];
+      e.radius = RAD;
+      e.text = LABEL;
+      if (isempty (e.text))
+        a1 = atan2 (P1(2) - V(2), P1(1) - V(1));
+        a2 = atan2 (P2(2) - V(2), P2(1) - V(1));
+        ## Two decimals: a drawing states an angle to a hundredth at most, and
+        ## the six significant figures %g would give are measurement noise
+        ## rather than a specification
+        e.text = sprintf ('%g%%%%d', ...
+                          round (mod ((a2 - a1) * 180 / pi, 360) * 100) / 100);
+      endif
+      this.Entities(end+1) = e;
+
+    endfunction
+
+    ## -*- texinfo -*-
+    ## @deftypefn  {draw.Drawing} {@var{D} =} centremark (@var{D}, @var{C}, @var{R})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} centremark (@var{D})
+    ##
+    ## Append the small cross that marks the centre of a round feature.
+    ##
+    ## @code{centremark (@var{D}, @var{C}, @var{R})} marks one centre, sized to
+    ## a feature of radius @var{R}.
+    ##
+    ## @code{centremark (@var{D})} with no centre marks @strong{every} circle
+    ## and arc already in the drawing.  A drawing of a bolt circle or a bore
+    ## pattern carries dozens, and marking them one at a time is how one gets
+    ## missed --- which a checker will notice and a machinist will not.
+    ##
+    ## The marks take the current layer, line type and colour, so the usual
+    ## order is to set @qcode{'CENTER'} and the centre-line layer first and then
+    ## call this once.
+    ##
+    ## @seealso{diam, radius, draw.linetype}
+    ## @end deftypefn
+    function this = centremark (this, C, R)
+
+      if (nargin == 1)
+        marks = [];
+        for ii = 1:numel (this.Entities)
+          e = this.Entities(ii);
+          if (any (strcmp (e.type, {'circle', 'arc'})))
+            marks = [marks; e.pts, e.radius(1)];
+          endif
+        endfor
+        for k = 1:rows (marks)
+          this = centremark (this, marks(k,1:2), marks(k,3));
+        endfor
+        return;
+      endif
+
+      if (nargin != 3)
+        error ("draw.Drawing.centremark: invalid number of input arguments.");
+      endif
+      errmsg = checkpt (C);
+      if (! isempty (errmsg))
+        error ("draw.Drawing.centremark: C %s", errmsg);
+      endif
+      errmsg = checkradius (R);
+      if (! isempty (errmsg))
+        error ("draw.Drawing.centremark: R %s", errmsg);
+      endif
+
+      e = makeentity ('centremark', this.Layer, this.Linetype, this.Colour);
+      e.pts = C(:)';
+      e.radius = R;
+      this.Entities(end+1) = e;
+
+    endfunction
+
+    ## -*- texinfo -*-
+    ## @deftypefn {draw.Drawing} {@var{D} =} leader (@var{D}, @var{P}, @var{TEXT})
+    ##
+    ## Append a leader: an arrow to a feature with a note at its tail.
+    ##
+    ## @var{P} is the path, one point per row, starting at the feature being
+    ## pointed at and ending where the note sits.  Two points make the usual
+    ## straight leader; three make one with a horizontal landing, which is what
+    ## a note of more than a word or two wants.
+    ##
+    ## The note is placed at the last point.  It may carry the codes of
+    ## @code{draw.symbol}, so a thread callout or a tolerance reads properly.
+    ##
+    ## @seealso{diam, radius, draw.symbol}
+    ## @end deftypefn
+    function this = leader (this, P, TEXT)
+
+      if (nargin != 3)
+        error ("draw.Drawing.leader: invalid number of input arguments.");
+      endif
+      errmsg = checkpts (P);
+      if (! isempty (errmsg))
+        error ("draw.Drawing.leader: P %s", errmsg);
+      endif
+      if (rows (P) < 2)
+        error ("draw.Drawing.leader: P must hold at least two points.");
+      endif
+      if (! ischar (TEXT) || ! (isrow (TEXT) || isempty (TEXT)))
+        error ("draw.Drawing.leader: TEXT must be a character vector.");
+      endif
+
+      e = makeentity ('leader', this.Layer, this.Linetype, this.Colour);
+      e.pts = P;
+      e.text = TEXT;
+      this.Entities(end+1) = e;
+
+    endfunction
+
   endmethods
 
   methods (Hidden)
@@ -1080,6 +1291,33 @@ function e = makeentity (type, layer, linetype, colour)
               'radius', [], 'angles', [], 'angle', [], 'text', '', ...
               'height', [], 'offset', [], 'direction', '', 'pattern', '', ...
               'spacing', [], 'block', '', 'scale', [], 'bulge', []);
+
+endfunction
+
+## Shared validation for the two circular dimensions
+function e = dimcircle (this, kind, C, R, ANG, LABEL)
+
+  errmsg = checkpt (C);
+  if (! isempty (errmsg))
+    error ("draw.Drawing.%s: C %s", kind, errmsg);
+  endif
+  errmsg = checkradius (R);
+  if (! isempty (errmsg))
+    error ("draw.Drawing.%s: R %s", kind, errmsg);
+  endif
+  if (! isnumeric (ANG) || ! isreal (ANG) || ! isscalar (ANG) ...
+      || ! isfinite (ANG))
+    error ("draw.Drawing.%s: ANG must be a real finite scalar.", kind);
+  endif
+  if (! ischar (LABEL) || ! (isrow (LABEL) || isempty (LABEL)))
+    error ("draw.Drawing.%s: LABEL must be a character vector.", kind);
+  endif
+
+  e = makeentity (kind, this.Layer, this.Linetype, this.Colour);
+  e.pts = C(:)';
+  e.radius = R;
+  e.angle = ANG;
+  e.text = LABEL;
 
 endfunction
 

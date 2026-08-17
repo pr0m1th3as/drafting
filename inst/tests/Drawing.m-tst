@@ -580,3 +580,95 @@
 %! draw.Drawing ().ellipse ([0, 0], 0, 5)
 %!error<draw.Drawing.ellipse: ROT must be a real finite scalar.> ...
 %! draw.Drawing ().ellipse ([0, 0], 5, 3, Inf)
+
+%!test  # a diameter dimension labels itself with the symbol and the figure
+%! D = draw.Drawing ().diam ([0, 0], 12.5);
+%! assert_equal (D.Entities(1).text, '%%c25');
+%! assert_equal (D.Entities(1).radius, 12.5);
+
+%!test  # a radius dimension labels itself with R and the figure
+%! D = draw.Drawing ().radius ([0, 0], 8);
+%! assert_equal (D.Entities(1).text, 'R8');
+
+%!test  # an explicit label wins over the measurement
+%! D = draw.Drawing ().diam ([0, 0], 5, 45, '%%c10 H7');
+%! assert_equal (D.Entities(1).text, '%%c10 H7');
+
+%!test  # a diameter runs right across the circle, a radius from the centre
+%! Ed = draw.entities (draw.Drawing ().diam ([0, 0], 10, 0));
+%! Er = draw.entities (draw.Drawing ().radius ([0, 0], 10, 0));
+%! assert_equal (Ed(1).pts, [-10, 0; 10, 0], 1e-9);
+%! assert_equal (Er(1).pts, [0, 0; 10, 0], 1e-9);
+
+%!test  # an angular dimension measures counter-clockwise from the first arm
+%! D = draw.Drawing ().angdim ([0, 0], [10, 0], [0, 10], 5);
+%! assert_equal (D.Entities(1).text, '90%%d');
+
+%!test  # and giving the arms the other way round dimensions the explement
+%! D = draw.Drawing ().angdim ([0, 0], [0, 10], [10, 0], 5);
+%! assert_equal (D.Entities(1).text, '270%%d');
+
+%!test  # it lowers to an arc at the stated radius plus ticks and text
+%! E = draw.entities (draw.Drawing ().angdim ([0, 0], [10, 0], [0, 10], 5));
+%! k = strcmp ({E.type}, 'ARC');
+%! assert_equal (sum (k), 1);
+%! assert_equal (E(k).radius, 5);
+
+%!test  # a centre mark is a cross centred on the feature
+%! E = draw.entities (draw.Drawing ().centremark ([7, 3], 10));
+%! assert_equal (numel (E), 2);
+%! assert_equal (mean (vertcat (E.pts)), [7, 3], 1e-12);
+
+%!test  # calling it with no centre marks every circle and arc, and nothing else
+%! D = draw.Drawing ().circle ([0, 0], 5).line ([0, 0], [1, 1]);
+%! D = D.arc ([20, 0], 5, 0, 90).circle ([40, 0], 5);
+%! D = D.centremark ();
+%! assert_equal (sum (strcmp ({D.Entities.type}, 'centremark')), 3);
+
+%!test  # the marks take the current line type, which is how they become
+%!       # centre lines rather than solid crosses
+%! D = draw.Drawing ().circle ([0, 0], 5);
+%! D.Linetype = 'CENTER';
+%! D = D.centremark ();
+%! assert_equal (D.Entities(2).linetype, 'CENTER');
+
+%!test  # a leader carries its path and puts the note at the tail
+%! D = draw.Drawing ().leader ([0, 0; 10, 10; 20, 10], 'M10');
+%! E = draw.entities (D);
+%! t = E(strcmp ({E.type}, 'TEXT'));
+%! assert_equal (t.text, 'M10');
+%! assert_equal (t.pts(1) > 20, true);
+
+%!test  # the symbols survive the whole path to a DXF file
+%! fn = [tempname(), '.dxf'];
+%! unwind_protect
+%!   D = draw.Drawing ().diam ([0, 0], 12.5);
+%!   D = D.angdim ([50, 0], [60, 0], [50, 10], 5);
+%!   dxf.write (fn, draw.entities (D));
+%!   txt = fileread (fn);
+%!   assert_equal (! isempty (strfind (txt, '%%c25')), true);
+%!   assert_equal (! isempty (strfind (txt, '90%%d')), true);
+%! unwind_protect_cleanup
+%!   unlink (fn);
+%! end_unwind_protect
+
+%!error<draw.Drawing.diam: invalid number of input arguments.> ...
+%! draw.Drawing ().diam ([0, 0])
+%!error<draw.Drawing.diam: R must be a real positive finite scalar.> ...
+%! draw.Drawing ().diam ([0, 0], 0)
+%!error<draw.Drawing.angdim: an arm point must differ from the vertex.> ...
+%! draw.Drawing ().angdim ([0, 0], [0, 0], [1, 1], 5)
+%!error<draw.Drawing.leader: P must hold at least two points.> ...
+%! draw.Drawing ().leader ([0, 0], 'x')
+%!error<draw.Drawing.centremark: R must be a real positive finite scalar.> ...
+%! draw.Drawing ().centremark ([0, 0], -1)
+
+%!test  # a measured angle is stated to a hundredth, not to six figures
+%! D = draw.Drawing ().angdim ([0, 0], [40.24, 2.02], [-2.13, 42.23], 30);
+%! assert_equal (numel (strfind (D.Entities(1).text, '.')) <= 1, true);
+%! v = str2double (strrep (D.Entities(1).text, '%%d', ''));
+%! assert_equal (abs (v - round (v * 100) / 100) < 1e-12, true);
+
+%!test  # and a measured length to a micron
+%! D = draw.Drawing ().diam ([0, 0], 6.17283945);
+%! assert_equal (D.Entities(1).text, '%%c12.346');
