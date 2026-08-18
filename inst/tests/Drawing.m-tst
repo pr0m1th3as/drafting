@@ -1739,6 +1739,29 @@
 %!   unlink (fn);
 %! end_unwind_protect
 
+%!test  # a drawing that nearly fills the sheet is not refused at a scale
+%!      # that fits it
+%! fn = [tempname(), '.pdf'];
+%! unwind_protect
+%!   D = draw.Drawing ().polyline ([0, 0; 250, 0; 250, 170; 0, 170], true);
+%!   [P, S] = print (D, fn, 'Paper', 'A4', 'Scale', 1);
+%!   assert_equal ([P, S], [297, 210, 1]);
+%! unwind_protect_cleanup
+%!   unlink (fn);
+%! end_unwind_protect
+
+%!test  # text on the drawing does not shift the scale it is printed at
+%! fn = [tempname(), '.png'];
+%! unwind_protect
+%!   D = draw.Drawing ().polyline ([0, 0; 100, 0; 100, 50; 0, 50], true);
+%!   D = D.text ([0, 55], 'A LONG LABEL ACROSS THE TOP', 5);
+%!   print (D, fn, 'Paper', 'A3', 'Scale', 1, 'Resolution', 300);
+%!   [w, h] = __inkmm__ (fn, 300);
+%!   assert_equal (w, 100, 1);
+%! unwind_protect_cleanup
+%!   unlink (fn);
+%! end_unwind_protect
+
 %!test  # a raster sheet is the paper asked for, at the resolution asked for
 %! fn = [tempname(), '.png'];
 %! unwind_protect

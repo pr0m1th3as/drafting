@@ -2035,36 +2035,34 @@ classdef Drawing
 
         axis (ax, 'equal');
 
-        ## Auto-scaled limits stop at the extreme coordinate, so geometry lying
-        ## on
-        ## it is drawn along the frame and reads as part of the axes.
-        xl = xlim (ax);
-        yl = ylim (ax);
+        ## Measure what was drawn.  Reading the limits back from the axes
+        ## instead takes the auto limits, and under 'equal' Octave has already
+        ## widened those to fill whatever box the figure happens to give it --
+        ## so the frame would follow the figure's shape rather than the
+        ## drawing's, and draw.Drawing.print, which reads its extents from
+        ## here, would fit the sheet against an extent the drawing has not got.
+        [xl, yl] = contentlimits (H);
 
-        ## A TEXT entity contributes only its insertion point to those limits,
-        ## not
-        ## the width of the string it renders, so a label near an edge is cut
-        ## off.
-        ## Widen to the extents the text objects report, which are in data
-        ## units.
-        ## Text is sized in points, so widening shrinks it and the correction
-        ## only
-        ## ever errs towards more room.
-        if (! isempty (H))
-          ht = H(strcmp (get (H, 'type'), 'text'));
-          for k = 1:numel (ht)
-            e = get (ht(k), 'extent');
-            xl = [min(xl(1), e(1)), max(xl(2), e(1) + e(3))];
-            yl = [min(yl(1), e(2)), max(yl(2), e(2) + e(4))];
-          endfor
-        endif
+        if (all (isfinite ([xl, yl])))
+          ## A drawing with no extent in one direction -- a single horizontal
+          ## line, a lone point -- would leave an axes of zero height, so give
+          ## it a little room rather than an impossible box.
+          pad = 0.05 * max (diff (xl), diff (yl));
+          if (pad == 0)
+            pad = 1;
+          endif
+          if (diff (xl) == 0)
+            xl += [-pad, pad];
+          endif
+          if (diff (yl) == 0)
+            yl += [-pad, pad];
+          endif
 
-        if (opt.Margin > 0)
-          m = opt.Margin * max (diff (xl), diff (yl));
-          xl += [-m, m];
-          yl += [-m, m];
-        endif
-        if (diff (xl) > 0 && diff (yl) > 0)
+          if (opt.Margin > 0)
+            m = opt.Margin * max (diff (xl), diff (yl));
+            xl += [-m, m];
+            yl += [-m, m];
+          endif
           xlim (ax, xl);
           ylim (ax, yl);
         endif
@@ -2238,6 +2236,31 @@ classdef Drawing
                          " the sheet at any preferred scale; give a larger", ...
                          " Paper."));
         endif
+
+        ## Redraw with text sized from the model -- at 1:S a model unit is
+        ## 1/S mm on paper, and a point is 25.4/72 mm -- and then measure
+        ## again.  The first pass drew every string at a fixed point size, so
+        ## its extents are not the ones being printed, and placing the sheet
+        ## from them scales the whole drawing by however much the two passes
+        ## disagree.  Sizing the text can in turn widen the drawing past the
+        ## scale that was chosen for it, which is why this is a short loop and
+        ## not a second pass; an explicit Scale is never revised.
+        for pass = 1:3
+          cla (ax);
+          plot (D, 'Axes', ax, 'Margin', 0, ...
+                     'FontScale', 72 / (25.4 * SCALE), ...
+                     'LineWidth', opt.LineWidth * 72 / 25.4);
+          span = [diff(xlim(ax)), diff(ylim(ax))];
+          if (all (span / SCALE <= usable + 1e-9) || ! isempty (opt.Scale))
+            break;
+          endif
+          next = choosescale (span, usable, []);
+          if (isempty (next) || next <= SCALE)
+            break;
+          endif
+          SCALE = next;
+        endfor
+
         if (any (span / SCALE > usable + 1e-9))
           error (strcat ("draw.Drawing.print: the drawing does not fit on", ...
                          " the sheet at 1:%g; it needs %.1f by %.1f mm", ...
@@ -2245,14 +2268,6 @@ classdef Drawing
                          span(1) / SCALE, span(2) / SCALE, usable(1), ...
                          usable(2));
         endif
-
-        ## Redraw with text sized from the model: at 1:S a model unit is 1/S mm
-        ## on
-        ## paper, and a point is 25.4/72 mm.
-        cla (ax);
-        plot (D, 'Axes', ax, 'Margin', 0, ...
-                   'FontScale', 72 / (25.4 * SCALE), ...
-                   'LineWidth', opt.LineWidth * 72 / 25.4);
         xlim (ax, xlim (ax));
         ylim (ax, ylim (ax));
         axis (ax, 'off');
@@ -2661,6 +2676,30 @@ endfunction
 ## is cut into its dashes and each is a separate object, which is what lets all
 ## seven patterns render as themselves rather than collapsing onto the four
 ## styles a figure provides.
+## The extents of what was actually drawn, in data units.  A text object
+## contributes the rectangle it renders into rather than its insertion point,
+## since a string near an edge would otherwise be cut off; text is sized in
+## points, so widening the limits shrinks it and the correction only ever errs
+## towards more room.
+function [xl, yl] = contentlimits (H)
+
+  xl = [Inf, -Inf];
+  yl = [Inf, -Inf];
+  for k = 1:numel (H)
+    if (strcmp (get (H(k), 'type'), 'text'))
+      e = get (H(k), 'extent');
+      x = [e(1), e(1) + e(3)];
+      y = [e(2), e(2) + e(4)];
+    else
+      x = get (H(k), 'xdata')(:)';
+      y = get (H(k), 'ydata')(:)';
+    endif
+    xl = [min([xl(1), x]), max([xl(2), x])];
+    yl = [min([yl(1), y]), max([yl(2), y])];
+  endfor
+
+endfunction
+
 function H = polydraw (ax, P, lt, col, opt)
 
   H = [];
