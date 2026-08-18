@@ -1,8 +1,8 @@
 Summary of important user-visible changes for drafting 0.1.0:
 -------------------------------------------------------------------
 
- ** Initial release.  Thirty public functions across four namespaces plus
-    the `draw.Drawing` class, 729 built-in self-tests and 62 `%!demo`
+ ** Initial release.  Thirty-one public functions across four namespaces plus
+    the `draw.Drawing` class, 812 built-in self-tests and 67 `%!demo`
     blocks.  All geometry is in millimetres.
 
  ** `+geom` -- planar geometry, knowing nothing of file formats or drawings.
@@ -63,6 +63,27 @@ Summary of important user-visible changes for drafting 0.1.0:
     a raster format; `.pdf`, `.eps` and `.svg` are vector and ignore it.  Pen
     width is a paper dimension and text is a model one, reduced by the scale,
     which is the convention `tikz` and CAD both follow.
+
+ ** A DXF file reads back as a drawing, not as a heap of lines.
+    `draw.fromentities` is the inverse of `entities`: it raises an entity list
+    and its block definitions into a `draw.Drawing`, so a file can be
+    transformed, merged, dimensioned further and written out again.  A
+    dimension returns as a dimension and measures its geometry again rather
+    than repeating the number it was written with.  What was lowered on the
+    way out does not return: a hatch comes back as its boundary and fill
+    lines, an ellipse as the polyline it was sampled to, because R12 records
+    no memory of either having been anything else.  Whatever cannot be raised
+    is reported through a second output rather than dropped.
+
+ ** Dimensions are written as true `DIMENSION` entities, with the drawn
+    picture in an anonymous block and a `DIMSTYLE` record naming the
+    conventions, so a CAD application receives a dimension it can edit and
+    re-measure instead of six loose lines stating a number.  All four families
+    go: linear, angular, diameter and radius.  `entities` takes a
+    `'dimensions'` pair to get the old exploded form back.
+
+ ** `draw.Drawing.point` appends a single point, which is what a `POINT`
+    entity in a file becomes on the way in.
 
  ** What R12 cannot carry is recorded, not hidden.  A hatch is generated as
     explicit fill lines, so nothing is lost and the recipient sees the section

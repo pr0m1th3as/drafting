@@ -8,10 +8,10 @@ compute geometry, build a drawing from it, and emit that drawing as a DXF file a
 CAD program or a CNC machine will accept, as a solid for a slicer, as LaTeX for
 a report, or as a figure on screen.
 
-Thirty public functions across four namespaces plus the `draw.Drawing`
-class, 729 built-in self-tests,
-and 62 `%!demo` blocks — nearly all of which end in a `plot` call, so the
-documentation shows what a function does rather than only describing it.
+Thirty-one public functions across four namespaces plus the `draw.Drawing`
+class, 812 built-in self-tests and 67 `%!demo` blocks — nearly all of which
+end in a `plot` call, so the documentation shows what a function does rather
+than only describing it.
 
 ## Layout
 
@@ -68,6 +68,11 @@ plausible but incomplete figure.
 Line-type dash lengths follow one rule everywhere — model units times a scale
 factor, as CAD's `LTSCALE` does — and `dxf.write` states `$LTSCALE` in the
 header, so a written file's dashes no longer depend on the recipient's setting.
+
+`draw.fromentities` is the inverse of `entities`: it raises an entity list read
+from a file, with its block definitions, back into a `Drawing`. Dimensions come
+back as dimensions and measure their geometry again, so a DXF is a round trip
+rather than a one-way door.
 
 Solids come from the same planar model:
 

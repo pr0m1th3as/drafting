@@ -427,6 +427,37 @@ classdef Drawing
     endfunction
 
     ## -*- texinfo -*-
+    ## @deftypefn {draw.Drawing} {@var{D} =} point (@var{D}, @var{P})
+    ##
+    ## Append a single point.
+    ##
+    ## @var{P} is a 1-by-2 vector in millimetres.  A point marks a location
+    ## without drawing anything through it --- a setting-out mark, a hole
+    ## centre, the origin a coordinate table is measured from.
+    ##
+    ## It reaches a DXF file as a @code{POINT} entity, which is also how one
+    ## arrives from a file: without it a drawing read back would lose every
+    ## point it was given.
+    ##
+    ## @end deftypefn
+    function this = point (this, P)
+
+      if (nargin != 2)
+        error ("draw.Drawing.point: invalid number of input arguments.");
+      endif
+      errmsg = checkpt (P);
+      if (! isempty (errmsg))
+        error ("draw.Drawing.point: P %s", errmsg);
+      endif
+
+      e = makeentity ('point', this.Layer, this.Linetype, this.Colour);
+      e.pts = P(:)';
+      this.Entities(end+1) = e;
+
+    endfunction
+
+
+    ## -*- texinfo -*-
     ## @deftypefn  {draw.Drawing} {@var{D} =} polyline (@var{D}, @var{P})
     ## @deftypefnx {draw.Drawing} {@var{D} =} polyline (@var{D}, @var{P}, @var{CLOSED})
     ## @deftypefnx {draw.Drawing} {@var{D} =} polyline (@dots{}, @var{BULGE})
@@ -1588,6 +1619,9 @@ classdef Drawing
             a.radius = e.radius;
             a.angles = e.angles;
             E(end+1) = a;
+
+          case 'point'
+            E(end+1) = mkent ('POINT', e, e.pts);
 
           case 'circle'
             c = mkent ('CIRCLE', e, e.pts);
