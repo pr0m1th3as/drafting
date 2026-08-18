@@ -160,7 +160,7 @@ endfunction
 %!   D = D.text (pts(k,:) + [2, 2], sprintf ('%d', k), 2.5);
 %! endfor
 %! D = D.merge (draw.coordtable (pts, [55, 35], 'Decimals', 2));
-%! draw.plot (D, 'FontSize', 6);
+%! plot (D, 'FontSize', 6);
 %! title ('the table is the dimension; the view is illustrative');
 
 %!test  # a table of three points has a heading row and three more

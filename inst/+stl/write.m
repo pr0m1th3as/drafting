@@ -262,7 +262,7 @@ endfunction
 %! D = D.circle ([0, 0], 8);
 %! D.Colour = 'red';
 %! D = D.circle ([2, 0], 14);
-%! draw.plot (D);
+%! plot (D);
 %! title ('the journal (red) is offset 2 mm from the shaft axis');
 
 %!function [N, V] = readstl (fn)

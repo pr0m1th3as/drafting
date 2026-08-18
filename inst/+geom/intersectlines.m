@@ -108,7 +108,7 @@ endfunction
 %! D = D.line (A(1,:), A(2,:)).line (B(1,:), B(2,:));
 %! D.Colour = 'red';
 %! D = D.circle (P, 2);
-%! draw.plot (D);
+%! plot (D);
 %! title ('the crossing lies beyond both given segments');
 
 %!demo

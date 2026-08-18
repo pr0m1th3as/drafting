@@ -145,7 +145,7 @@ endfunction
 %! for k = 1:rows (Q)
 %!   D = D.circle (Q(k,:), 0.7);
 %! endfor
-%! draw.plot (D);
+%! plot (D);
 %! title ('the points that survive are the ones carrying shape');
 
 %!demo

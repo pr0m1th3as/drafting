@@ -177,7 +177,7 @@ endfunction
 %! for k = 1:rows (Q)
 %!   D = D.circle (Q(k,:), 1);
 %! endfor
-%! draw.plot (D);
+%! plot (D);
 %! title ('24 points spaced equally along the profile');
 
 %!demo
@@ -189,7 +189,7 @@ endfunction
 %! D = draw.Drawing ().polyline (P);
 %! D.Colour = 'red';
 %! D = D.polyline (geom.resample (P, 6));
-%! draw.plot (D);
+%! plot (D);
 %! title ('the corner is cut when the samples straddle it');
 
 %!test  # N points along a straight line are evenly spaced

@@ -274,7 +274,7 @@ function [E, SKIPPED] = parseentities (codes, values, scale)
 
       case 'INSERT'
         ## The block name is carried in .text and the uniform scale in .radius,
-        ## matching what dxf.write emits and draw.entities produced
+        ## matching what dxf.write emits and draw.Drawing.entities produced
         s.pts = [groupnum(codes(body), values(body), 10, 0), ...
                  groupnum(codes(body), values(body), 20, 0)];
         s.text = grouptext (codes(body), values(body), 2, '');
@@ -343,7 +343,7 @@ endfunction
 %! D = D.line ([-25, 0], [25, 0]);
 %!
 %! fn = [tempname(), '.dxf'];
-%! dxf.write (fn, draw.entities (D));
+%! dxf.write (fn, entities (D));
 %! [E, UNITS, SKIPPED] = dxf.read (fn);
 %! printf ('%d entities, units "%s", %d skipped\n', numel (E), UNITS, SKIPPED);
 %! for k = 1:numel (E)
@@ -362,7 +362,7 @@ endfunction
 %!     Q = Q.line (E(k).pts(1,:), E(k).pts(2,:));
 %!   endif
 %! endfor
-%! draw.plot (Q);
+%! plot (Q);
 %! title ('read back from the file and drawn again');
 %! unlink (fn);
 

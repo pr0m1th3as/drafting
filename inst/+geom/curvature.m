@@ -123,7 +123,7 @@ endfunction
 %! D.Colour = 'red';
 %! [~, i] = max (K);
 %! D = D.circle (P(i,:) - R(i) * (P(i,:) / norm (P(i,:))), abs (R(i)));
-%! draw.plot (D);
+%! plot (D);
 %! title ('the osculating circle at the tightest crest');
 
 %!test  # a counter-clockwise unit circle has curvature 1 everywhere

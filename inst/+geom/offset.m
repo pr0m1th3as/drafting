@@ -156,7 +156,7 @@ endfunction
 %! D = D.polyline (geom.offset (P, 5), true);
 %! D.Colour = 'blue';
 %! D = D.polyline (geom.offset (P, -5), true);
-%! draw.plot (D);
+%! plot (D);
 %! title ('an L-shaped outline offset 5 mm in (red) and out (blue)');
 
 %!demo

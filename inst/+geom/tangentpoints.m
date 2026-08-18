@@ -96,7 +96,7 @@ endfunction
 %! ## the radius to each contact, which meets its tangent at a right angle
 %! D.Colour = 'red';
 %! D = D.line (C, P(1,:)).line (C, P(2,:));
-%! draw.plot (D);
+%! plot (D);
 %! title ('tangents from a point, with the radii to their contacts');
 
 %!demo
@@ -112,7 +112,7 @@ endfunction
 %!   u = (T(k,:) - C1) / norm (T(k,:) - C1);
 %!   D = D.line (C1 + R1 * u, C2 + R2 * u);
 %! endfor
-%! draw.plot (D);
+%! plot (D);
 %! title ('an open belt over two pulleys');
 
 %!test  # from a point on the x axis, the contacts are symmetric about it

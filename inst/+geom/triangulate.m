@@ -137,7 +137,7 @@ endfunction
 %! for k = 1:rows (T)
 %!   D = D.polyline (V(T(k,:),:), true);
 %! endfor
-%! draw.plot (D);
+%! plot (D);
 %! title ('an end cap triangulated around its bore and holes');
 
 %!test  # a square becomes two triangles

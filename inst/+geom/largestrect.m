@@ -178,7 +178,7 @@ endfunction
 %! D = draw.Drawing ().polyline (P, true);
 %! D.Colour = 'red';
 %! D = D.polyline (R, true);
-%! draw.plot (D);
+%! plot (D);
 %! title ('the biggest rectangle that fits, after the clearances');
 
 %!test  # a rectangle is its own largest inscribed rectangle

@@ -123,7 +123,7 @@ endfunction
 %!   D = D.line (P(k,:) - [4, 0], P(k,:) + [4, 0]);
 %!   D = D.line (P(k,:) - [0, 4], P(k,:) + [0, 4]);
 %! endfor
-%! draw.plot (D);
+%! plot (D);
 %! title ('a point located from two distances');
 
 %!demo

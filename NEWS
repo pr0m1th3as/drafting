@@ -1,17 +1,70 @@
 Summary of important user-visible changes for drafting 0.1.0:
 -------------------------------------------------------------------
 
- ** Initial development version.  Nothing released yet.
+ ** Initial release.  Thirty public functions across four namespaces plus
+    the `draw.Drawing` class, 729 built-in self-tests and 62 `%!demo`
+    blocks.  All geometry is in millimetres.
 
- ** `+geom` -- signed area, bounding box, centroid, affine transform,
-    rectilinear test, rectilinear polygon offset, and largest inscribed
-    rectangle.
+ ** `+geom` -- planar geometry, knowing nothing of file formats or drawings.
+    Primitives: signed area, bounding box, centroid, affine transform,
+    rectilinear test, rectilinear polygon offset, largest inscribed rectangle
+    and triangulation.  Curve geometry: curvature, sampling, offsetting,
+    self-intersection and arc length.  Construction geometry: line and circle
+    intersections, tangent points from a point, and fillets, which return
+    exactly the arguments `draw.Drawing.arc` takes.  Polylines can be
+    resampled or simplified; `geom.simplify` is Douglas-Peucker and moves no
+    point further than its tolerance, while `geom.resample` cuts corners by
+    construction, so a polygon whose vertices matter wants the former.
 
- ** `+dxf` -- AutoCAD R12 (AC1009) ASCII DXF read and write, covering LINE,
-    POLYLINE, LWPOLYLINE, CIRCLE, ARC, TEXT and POINT.  R12 has no LWPOLYLINE,
-    so an entity of that type is written as a POLYLINE with its geometry, layer
-    and closed flag preserved.
+ ** `+dxf` -- AutoCAD R12 (AC1009) ASCII DXF, read and write, covering LINE,
+    POLYLINE, LWPOLYLINE, CIRCLE, ARC, TEXT, POINT and INSERT, with layers,
+    line types, colours and a BLOCKS section.  R12 has no LWPOLYLINE, so an
+    entity of that type is written as a POLYLINE with its geometry, layer and
+    closed flag preserved.  `dxf.write` states `$LTSCALE` in the header, so a
+    written file's dash lengths no longer depend on the recipient's setting.
 
- ** `+draw` -- `draw.Drawing`, a value class carrying line, polyline, arc,
-    circle, text, hatch and dimension entities on named layers; `draw.entities`
-    converts it for `dxf.write`, and `draw.tikz` emits LaTeX for reports.
+ ** `+stl` -- binary STL from a *section stack*: a struct array of profile,
+    z-range and holes, rather than a single extrusion, which expresses a
+    stepped or eccentric shaft without leaving the planar model.  Each section
+    is written as its own closed shell, so one section is a closed manifold
+    and a stack of several is not -- slicers union it, a tool demanding a
+    single closed surface will not.
+
+ ** `+draw` -- `draw.Drawing`, a value class carrying lines, polylines with
+    per-vertex bulges, arcs, circles, ellipses, text, hatches, blocks and
+    inserts on named layers, with line types and colours.  Dimensions are
+    stored semantically and carry no text of their own by default, so they
+    stay truthful when the geometry changes: linear (`dim`), diameter, radius
+    and angular, plus centre marks and leaders.  `transform` places a drawing
+    and `merge` assembles several into a sheet; `draw.titleblock` frames it
+    and `draw.coordtable` tabulates a profile that cannot be dimensioned.
+
+ ** One lowering, three backends.  `entities` converts a drawing into a flat
+    entity list, and `plot`, `tikz` and `dxf.write` all consume that list
+    rather than walking the drawing themselves, so no backend can silently
+    fail to know an entity type.  The three that take a drawing --- `plot`,
+    `print` and `tikz` --- are methods, so they dispatch as `plot (D)` and
+    leave the core functions of those names alone.  Line-type dash lengths
+    follow one rule everywhere -- model units times a scale factor, as CAD's
+    LTSCALE works -- and each backend defaults that factor to suit its medium.
+
+ ** `draw.Drawing.plot` renders a drawing into a figure at equal aspect ratio,
+    drawing all seven line types as themselves rather than mapping them onto
+    the four styles a figure offers.  It keeps a margin between the geometry
+    and the axes, and widens to hold text that would otherwise be cut at an
+    edge.  It is a method rather than a namespace function, so `plot (D)` and
+    `plot (hax, D)` both reach it while core `plot` is left alone.
+
+ ** `draw.Drawing.print` plots a drawing onto paper at a stated scale, so a
+    distance measured on the sheet times the scale denominator is the
+    model.  The sheet is named (`A0` to `A5`, either orientation) or given in
+    millimetres, and without a `Scale` the largest of the ISO 5455 preferred
+    denominators that fits is chosen and returned.  Resolution is settable for
+    a raster format; `.pdf`, `.eps` and `.svg` are vector and ignore it.  Pen
+    width is a paper dimension and text is a model one, reduced by the scale,
+    which is the convention `tikz` and CAD both follow.
+
+ ** What R12 cannot carry is recorded, not hidden.  A hatch is generated as
+    explicit fill lines, so nothing is lost and the recipient sees the section
+    hatched; an ellipse is sampled to a closed polyline, and that *is* reported
+    as a loss by the second output of `entities`.

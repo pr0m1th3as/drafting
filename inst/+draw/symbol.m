@@ -55,11 +55,11 @@
 ##
 ## @multitable @columnfractions 0.20 0.80
 ## @item @code{dxf.write} @tab writes the code unchanged; CAD renders it
-## @item @code{draw.tikz} @tab translates to LaTeX needing no extra package
-## @item @code{draw.plot} @tab substitutes a character the figure font holds
+## @item @code{tikz} @tab translates to LaTeX needing no extra package
+## @item @code{plot} @tab substitutes a character the figure font holds
 ## @end multitable
 ##
-## @seealso{draw.Drawing, draw.tikz, draw.plot}
+## @seealso{draw.Drawing, draw.Drawing.tikz, draw.Drawing.plot}
 ## @end deftypefn
 
 function OUT = symbol (varargin)
@@ -110,7 +110,7 @@ endfunction
 %! D = D.text ([-20, -25], 'BORE %%c25 %%p0.02', 3.5);
 %! D = D.text ([-20, -32], 'DRAFT ANGLE 3%%d', 3.5);
 %! D = D.text ([-20, -39], 'SHRINKAGE 2%%%', 3.5);
-%! draw.plot (D);
+%! plot (D);
 %! title ('the diameter, plus-minus and degree signs');
 
 %!test  # the codes are AutoCAD's own
@@ -135,7 +135,7 @@ endfunction
 %! fn = [tempname(), '.dxf'];
 %! unwind_protect
 %!   D = draw.Drawing ().text ([0, 0], [draw.symbol('diameter'), '25'], 3);
-%!   dxf.write (fn, draw.entities (D));
+%!   dxf.write (fn, entities (D));
 %!   assert_equal (! isempty (strfind (fileread (fn), '%%c25')), true);
 %! unwind_protect_cleanup
 %!   unlink (fn);

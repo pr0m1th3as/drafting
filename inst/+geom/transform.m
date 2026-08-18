@@ -183,7 +183,7 @@ endfunction
 %! D = D.polyline (geom.transform (P, 'scale', 0.5, [15, 10]), true);
 %! D.Colour = 'magenta';
 %! D = D.polyline (geom.transform (P, 'mirror', 'y'), true);
-%! draw.plot (D);
+%! plot (D);
 %! title ('translate, rotate about a point, scale, mirror');
 
 %!demo

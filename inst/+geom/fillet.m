@@ -170,7 +170,7 @@ endfunction
 %! D = D.line (A(1,:), TA).line (TB, B(2,:)).arc (C, 20, ANG(1), ANG(2));
 %! D.Colour = 'red';
 %! D = D.circle (TA, 1.5).circle (TB, 1.5);
-%! draw.plot (D);
+%! plot (D);
 %! title ('a 20 mm fillet, and the two tangent points it meets');
 
 %!demo
@@ -187,7 +187,7 @@ endfunction
 %!     D = D.line (A(2,:), TA).line (TB, B(2,:)).arc (C, 15, ANG(1), ANG(2));
 %!   endfor
 %! endfor
-%! draw.plot (D);
+%! plot (D);
 %! title ('the same call fillets whichever corner the points face into');
 
 %!test  # a right angle at the origin, filleted with radius 5

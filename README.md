@@ -8,8 +8,9 @@ compute geometry, build a drawing from it, and emit that drawing as a DXF file a
 CAD program or a CNC machine will accept, as a solid for a slicer, as LaTeX for
 a report, or as a figure on screen.
 
-Thirty-three public functions across four namespaces, 714 built-in self-tests,
-and 60 `%!demo` blocks — nearly all of which end in a `draw.plot` call, so the
+Thirty public functions across four namespaces plus the `draw.Drawing`
+class, 729 built-in self-tests,
+and 62 `%!demo` blocks — nearly all of which end in a `plot` call, so the
 documentation shows what a function does rather than only describing it.
 
 ## Layout
@@ -40,7 +41,7 @@ compose: `transform` places one, `merge` assembles several into a sheet, and
 
 ## One lowering, three backends
 
-`draw.entities` lowers a `Drawing` into a flat entity list, and every backend
+`entities` lowers a `Drawing` into a flat entity list, and every backend
 consumes that list rather than walking the drawing itself:
 
 ```
@@ -53,9 +54,9 @@ D.Layer = 'DIMENSIONS';
 D = D.dim ([-40, -40], [40, -40], -12, 'horizontal');
 D = D.diam ([0, 0], 25);
 
-draw.plot (D);                           # on screen
-dxf.write ('plate.dxf', draw.entities (D));   # to CAD
-tex = draw.tikz (D);                     # into a report
+plot (D);                                # on screen
+dxf.write ('plate.dxf', entities (D));   # to CAD
+tex = tikz (D);                          # into a report
 ```
 
 The figure therefore shows the entities the file will contain rather than a

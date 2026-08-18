@@ -8,6 +8,7 @@ Geometry primitives
  geom.offset
  geom.largestrect
  geom.triangulate
+ geom.hatchlines
 Curve geometry
  geom.curvature
  geom.curvesample
@@ -27,9 +28,6 @@ DXF input and output
  dxf.write
 STL output
  stl.write
-Rendering
- draw.plot
- draw.hatchlines
 Sheet composition
  draw.titleblock
  draw.coordtable
@@ -37,7 +35,5 @@ Sheet composition
 Line types and colours
  draw.linetype
  draw.colour
-Drawing model and backends
+Drawing model
  draw.Drawing
- draw.entities
- draw.tikz

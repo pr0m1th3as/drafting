@@ -82,7 +82,7 @@ endfunction
 %! D.Colour = 'red';
 %! D.Linetype = 'CENTER';
 %! D = D.centremark (C, 8);
-%! draw.plot (D);
+%! plot (D);
 %! title ('the centroid of an L-shaped section');
 
 %!test  # unit square

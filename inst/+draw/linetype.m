@@ -61,9 +61,9 @@
 ##
 ## @multitable @columnfractions 0.24 0.24 0.52
 ## @headitem Backend @tab Default @tab
-## @item @code{draw.plot} @tab 1 @tab on screen at 1:1 the pattern is already
+## @item @code{plot} @tab 1 @tab on screen at 1:1 the pattern is already
 ## the right size
-## @item @code{draw.tikz} @tab the drawing scale @tab cancels the reduction, so
+## @item @code{tikz} @tab the drawing scale @tab cancels the reduction, so
 ## dashes reach the page at nominal size
 ## @item @code{dxf.write} @tab 1 @tab written into the file as
 ## @code{$LTSCALE}, so the recipient's CAD does not supply its own
@@ -153,7 +153,7 @@ endfunction
 %! D.Linetype = 'PHANTOM';
 %! D.Colour = 'blue';
 %! D = D.polyline ([0, 36; 60, 36; 60, 60; 0, 60], true);
-%! draw.plot (D);
+%! plot (D);
 %! title ('visible, hidden, centre and phantom');
 
 %!test  # the list names every defined type

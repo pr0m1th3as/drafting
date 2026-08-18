@@ -916,8 +916,9 @@ classdef Drawing
     ##
     ## The result holds no blocks and no inserts, only the entities they stood
     ## for, each transformed to where its reference put it.  This is what a
-    ## backend with no block of its own needs, and what @code{draw.plot} and
-    ## @code{draw.tikz} do before rendering.
+    ## backend with no block of its own needs, and what @code{draw.Drawing.plot}
+    ## and
+    ## @code{draw.Drawing.tikz} do before rendering.
     ##
     ## Blocks may contain inserts of other blocks and are expanded through.  A
     ## block keeps its own definitions and inherits the enclosing drawing's only
@@ -929,7 +930,7 @@ classdef Drawing
     ## backstop against a construction this class does not permit, not a rule a
     ## caller can meet by accident.
     ##
-    ## @seealso{block, insert, draw.entities}
+    ## @seealso{block, insert, draw.Drawing.entities}
     ## @end deftypefn
     function this = expand (this, depth = 0)
 
@@ -995,7 +996,8 @@ classdef Drawing
     ##
     ## @strong{The DXF revision this package writes has no ellipse entity}, so
     ## one reaches a file as a closed polyline sampled to a chordal tolerance,
-    ## and @code{draw.entities} records the substitution.  The shape is right to
+    ## and @code{draw.Drawing.entities} records the substitution.  The shape is
+    ## right to
     ## within that tolerance; what is lost is the ability to edit it as an
     ## ellipse afterwards.
     ##
@@ -1242,6 +1244,1087 @@ classdef Drawing
 
     endfunction
 
+
+    ## -*- texinfo -*-
+    ## @deftypefn  {draw.Drawing} {} plot (@var{D})
+    ## @deftypefnx {draw.Drawing} {} plot (@var{HAX}, @var{D})
+    ## @deftypefnx {draw.Drawing} {} plot (@dots{}, @var{Name}, @var{Value})
+    ## @deftypefnx {draw.Drawing} {@var{H} =} plot (@dots{})
+    ##
+    ## Draw a @code{draw.Drawing} into a figure, to look at it.
+    ##
+    ## @code{draw.Drawing.plot (@var{D})} renders the drawing into the current
+    ## axes at
+    ## equal aspect ratio, honouring each entity's layer, line type and colour.
+    ##
+    ## @code{draw.Drawing.plot (@var{HAX}, @var{D})} draws into the axes
+    ## @var{HAX} instead
+    ## of the current ones, as every plotting function in Octave accepts an axes
+    ## handle ahead of its data. The @qcode{'Axes'} pair below does the same
+    ## thing
+    ## and is equivalent.
+    ##
+    ## @code{@var{H} = draw.Drawing.plot (@dots{})} returns a column of graphics
+    ## handles,
+    ## one per object created, so that a caller can restyle or delete them.
+    ##
+    ## @subheading Name/Value pairs
+    ##
+    ## @multitable @columnfractions 0.16 0.14 0.70
+    ## @headitem Name @tab Default @tab Meaning
+    ## @item @qcode{'Axes'} @tab @code{gca} @tab axes to draw into
+    ## @item @qcode{'LineWidth'} @tab 0.5 @tab width of every line, in points
+    ## @item @qcode{'FontSize'} @tab 8 @tab size of text, in points
+    ## @item @qcode{'Layers'} @tab all @tab cell array of layer names to draw
+    ## @item @qcode{'Arc'} @tab 64 @tab segments per full turn when sampling
+    ## curves
+    ## @item @qcode{'Hatch'} @tab @qcode{'lines'} @tab @qcode{'lines'} to fill a
+    ## hatch, @qcode{'boundary'} for its outline alone
+    ## @item @qcode{'Linetypes'} @tab @qcode{'true'} @tab @qcode{'true'} to draw
+    ## the
+    ## real dash patterns, @qcode{'approximate'} for the figure's own four
+    ## styles
+    ## @item @qcode{'LTScale'} @tab 1 @tab multiplies the dash lengths
+    ## @item @qcode{'Margin'} @tab 0.05 @tab blank space kept between the
+    ## geometry
+    ## and the axes, as a fraction of the drawing's larger side; 0 fits the axes
+    ## tight to the geometry
+    ## @item @qcode{'FontScale'} @tab @code{[]} @tab points per model unit; when
+    ## given, each string is sized from its own entity height instead of from
+    ## @qcode{'FontSize'}
+    ## @end multitable
+    ##
+    ## @subheading Why the axes do not fit tight
+    ##
+    ## Auto-scaled limits stop exactly at the extreme coordinate, so an outline
+    ## lying on it is drawn along the frame and reads as part of the axes rather
+    ## than as geometry --- which is the common case, not a corner one: a plate
+    ## is
+    ## usually dimensioned from its own edges. Both axes are therefore padded by
+    ## the same absolute amount, which keeps the equal aspect ratio the drawing
+    ## depends on, and that amount is @qcode{'Margin'} times the larger of the
+    ## two
+    ## spans.
+    ##
+    ## @subheading What you see is what gets written
+    ##
+    ## The drawing is lowered through @code{draw.Drawing.entities} --- the same
+    ## conversion
+    ## the DXF backend uses --- and the result of that is what is plotted. A
+    ## figure
+    ## therefore shows the entities the file will contain, not a more flattering
+    ## rendering of them.  In particular a hatch appears as its boundary alone,
+    ## because that is what the file will carry; the second output of
+    ## @code{draw.Drawing.entities} says so explicitly.
+    ##
+    ## The alternative, rendering from the drawing model directly, would let the
+    ## screen show something the recipient never receives.  For a package whose
+    ## output is meant to be manufactured, that is the wrong way round.
+    ##
+    ## @subheading Line types are drawn properly, not approximated
+    ##
+    ## A figure offers four line styles and this package defines seven line
+    ## types,
+    ## so setting @code{linestyle} would collapse three of them onto their
+    ## neighbours --- CENTER, DASHDOT and PHANTOM would all come out dash-dot,
+    ## and a
+    ## phantom line would be indistinguishable from a centre line.
+    ##
+    ## Instead each run of geometry is cut into its dashes and the pieces are
+    ## drawn,
+    ## so all seven patterns render as themselves. Dash lengths are in the units
+    ## of
+    ## the drawing, multiplied by @qcode{'LTScale'}, which is the model-space
+    ## convention CAD uses. A drawing spanning tens of millimetres therefore
+    ## needs
+    ## no adjustment; one spanning metres wants an @qcode{'LTScale'} to match.
+    ##
+    ## The cost is one graphics object per dash.  Set @qcode{'Linetypes'} to
+    ## @qcode{'approximate'} on a large drawing to fall back on the figure's
+    ## four
+    ## styles and one object per entity.
+    ##
+    ## @strong{Text is not to scale by default.} A figure sets font size in
+    ## points,
+    ## which does not track the data units the drawing is in, so text cannot
+    ## both
+    ## sit at the right size and stay there when the axes are zoomed. It is
+    ## drawn
+    ## at a fixed point size, positioned correctly.
+    ##
+    ## That is right for a screen and wrong for a sheet, where a string must
+    ## come
+    ## out at the height the model gives it. Pass @qcode{'FontScale'}, in points
+    ## per model unit, and each string is sized from its own entity height
+    ## instead:
+    ## at a plot scale of @math{1:S} that factor is @code{72 / (25.4 *
+    ## @var{S})},
+    ## which is what @code{draw.Drawing.print} supplies. For a rendering where
+    ## text is to
+    ## scale by construction, use @code{draw.Drawing.tikz}.
+    ##
+    ## @seealso{draw.Drawing, draw.Drawing.entities, draw.Drawing.tikz,
+    ## dxf.write}
+    ## @end deftypefn
+
+    function H = plot (varargin)
+
+      ## Input validation
+      if (numel (varargin) < 1)
+        error ("draw.Drawing.plot: invalid number of input arguments.");
+      endif
+
+      ## An axes handle may lead, as it may for every plotting function in
+      ## Octave
+      hax = [];
+      if (! isa (varargin{1}, 'draw.Drawing') && isscalar (varargin{1}) ...
+          && ishandle (varargin{1}))
+        hax = varargin{1};
+        varargin(1) = [];
+      endif
+      if (numel (varargin) < 1)
+        error ("draw.Drawing.plot: invalid number of input arguments.");
+      endif
+      D = varargin{1};
+      varargin(1) = [];
+      if (! isa (D, 'draw.Drawing'))
+        error ("draw.Drawing.plot: D must be a draw.Drawing object.");
+      endif
+      if (mod (numel (varargin), 2) != 0)
+        error ("draw.Drawing.plot: Name/Value arguments must come in pairs.");
+      endif
+
+      opt = struct ('Axes', hax, 'LineWidth', 0.5, 'FontSize', 8, ...
+                    'Layers', {{}}, 'Arc', 64, 'Hatch', 'lines', ...
+                    'Linetypes', 'true', 'LTScale', 1, 'Margin', 0.05, ...
+                    'FontScale', []);
+      known = fieldnames (opt);
+      for k = 1:2:numel (varargin)
+        name = varargin{k};
+        if (! ischar (name) || ! isrow (name) || ! any (strcmp (name, known)))
+          error ("draw.Drawing.plot: unknown parameter.");
+        endif
+        opt.(name) = varargin{k+1};
+      endfor
+      if (! isempty (opt.Layers) && ! iscellstr (opt.Layers))
+        error (strcat ("draw.Drawing.plot: Layers must be a cell array of", ...
+                       " character vectors."));
+      endif
+      for f = {'Hatch', 'Linetypes'}
+        if (! ischar (opt.(f{1})) || ! isrow (opt.(f{1})))
+          error ("draw.Drawing.plot: %s must be a character vector.", f{1});
+        endif
+      endfor
+      if (! any (strcmpi (opt.Hatch, {'lines', 'boundary'})))
+        error ("draw.Drawing.plot: Hatch must be 'lines' or 'boundary'.");
+      endif
+      if (! any (strcmpi (opt.Linetypes, {'true', 'approximate'})))
+        error ("draw.Drawing.plot: Linetypes must be 'true' or 'approximate'.");
+      endif
+      for f = {'LineWidth', 'FontSize', 'Arc', 'LTScale'}
+        v = opt.(f{1});
+        if (! isnumeric (v) || ! isreal (v) || ! isscalar (v) ...
+            || ! isfinite (v) || v <= 0)
+          error (strcat ("draw.Drawing.plot: %s must be a positive real", ...
+                         " finite scalar."), f{1});
+        endif
+      endfor
+      ## Margin admits 0, which fits the axes tight to the geometry.
+      if (! isnumeric (opt.Margin) || ! isreal (opt.Margin) ...
+          || ! isscalar (opt.Margin) || ! isfinite (opt.Margin) ...
+          || opt.Margin < 0)
+        error (strcat ("draw.Drawing.plot: Margin must be a non-negative", ...
+                       " real finite scalar."));
+      endif
+      ## FontScale is empty for the fixed point size, or points per model unit.
+      if (! isempty (opt.FontScale) ...
+          && (! isnumeric (opt.FontScale) || ! isreal (opt.FontScale) ...
+              || ! isscalar (opt.FontScale) || ! isfinite (opt.FontScale) ...
+              || opt.FontScale <= 0))
+        error (strcat ("draw.Drawing.plot: FontScale must be empty or a", ...
+                       " positive real finite scalar."));
+      endif
+
+      if (isempty (opt.Axes))
+        opt.Axes = gca ();
+      elseif (! isscalar (opt.Axes) || ! ishandle (opt.Axes))
+        error ("draw.Drawing.plot: Axes must be a graphics handle.");
+      endif
+
+      ## The same lowering the file backends use, so the figure shows what the
+      ## file will hold rather than a kinder version of it
+      E = entities (D, 'hatch', lower (opt.Hatch), 'bulges', 'flatten');
+      if (! isempty (opt.Layers) && ! isempty (E))
+        E = E(ismember ({E.layer}, opt.Layers));
+      endif
+
+      ax = opt.Axes;
+      held = ishold (ax);
+      hold (ax, 'on');
+      H = [];
+
+      unwind_protect
+        for ii = 1:numel (E)
+          e = E(ii);
+          col = draw.colour (e.colour);
+
+          switch (e.type)
+            case {'LINE', 'POLYLINE', 'LWPOLYLINE'}
+              P = e.pts;
+              if (e.closed)
+                P = [P; P(1,:)];
+              endif
+              H = [H; polydraw(ax, P, e.linetype, col, opt)];
+
+            case {'CIRCLE', 'ARC'}
+              if (strcmp (e.type, 'CIRCLE'))
+                a = linspace (0, 360, opt.Arc + 1);
+              else
+                sweep = mod (e.angles(2) - e.angles(1), 360);
+                if (sweep == 0)
+                  sweep = 360;
+                endif
+                n = max (2, ceil (opt.Arc * sweep / 360));
+                a = linspace (e.angles(1), e.angles(1) + sweep, n + 1);
+              endif
+              P = [e.pts(1) + e.radius * cosd(a)', ...
+                   e.pts(2) + e.radius * sind(a)'];
+              H = [H; polydraw(ax, P, e.linetype, col, opt)];
+
+            case 'TEXT'
+              ## With a FontScale the entity's own height decides the size,
+              ## which
+              ## is what a plotted sheet needs; without one every string is
+              ## drawn
+              ## at the same fixed point size, which is what a screen needs.
+              if (isempty (opt.FontScale))
+                fsize = opt.FontSize;
+              else
+                fsize = e.height * opt.FontScale;
+              endif
+              H(end+1, 1) = text (e.pts(1), e.pts(2), plainsymbols (e.text), ...
+                                  'parent', ax, ...
+                                  'color', col, 'fontsize', fsize, ...
+                                  'rotation', e.rotation, ...
+                                  'horizontalalignment', 'left', ...
+                                  'verticalalignment', 'baseline');
+
+            case 'POINT'
+              H(end+1, 1) = line (ax, e.pts(1), e.pts(2), 'color', col, ...
+                                  'marker', '+', 'linestyle', 'none');
+          endswitch
+        endfor
+
+        axis (ax, 'equal');
+
+        ## Auto-scaled limits stop at the extreme coordinate, so geometry lying
+        ## on
+        ## it is drawn along the frame and reads as part of the axes.
+        xl = xlim (ax);
+        yl = ylim (ax);
+
+        ## A TEXT entity contributes only its insertion point to those limits,
+        ## not
+        ## the width of the string it renders, so a label near an edge is cut
+        ## off.
+        ## Widen to the extents the text objects report, which are in data
+        ## units.
+        ## Text is sized in points, so widening shrinks it and the correction
+        ## only
+        ## ever errs towards more room.
+        if (! isempty (H))
+          ht = H(strcmp (get (H, 'type'), 'text'));
+          for k = 1:numel (ht)
+            e = get (ht(k), 'extent');
+            xl = [min(xl(1), e(1)), max(xl(2), e(1) + e(3))];
+            yl = [min(yl(1), e(2)), max(yl(2), e(2) + e(4))];
+          endfor
+        endif
+
+        if (opt.Margin > 0)
+          m = opt.Margin * max (diff (xl), diff (yl));
+          xl += [-m, m];
+          yl += [-m, m];
+        endif
+        if (diff (xl) > 0 && diff (yl) > 0)
+          xlim (ax, xl);
+          ylim (ax, yl);
+        endif
+      unwind_protect_cleanup
+        if (! held)
+          hold (ax, 'off');
+        endif
+      end_unwind_protect
+
+      if (nargout == 0)
+        clear H;
+      endif
+
+    endfunction
+
+    ## Draw one run of geometry in its line type. With 'true' line types the run
+    ## is cut into its dashes and each is a separate object, which is what lets
+    ## all
+    ## seven patterns render as themselves rather than collapsing onto the four
+    ## styles a figure provides.
+
+    ## -*- texinfo -*-
+    ## @deftypefn  {draw.Drawing} {} print (@var{D}, @var{FILE})
+    ## @deftypefnx {draw.Drawing} {} print (@var{D}, @var{FILE}, @var{NAME}, @var{VALUE}, @dots{})
+    ## @deftypefnx {draw.Drawing} {[@var{PAPER}, @var{SCALE}] =} print (@dots{})
+    ##
+    ## Plot a drawing onto paper at a stated scale.
+    ##
+    ## @code{draw.Drawing.print (@var{D}, @var{FILE})} writes the
+    ## @code{draw.Drawing}
+    ## object @var{D} to @var{FILE} on an A4 landscape sheet, at the largest of
+    ## the
+    ## preferred scales that fits. The output format is taken from the extension
+    ## of @var{FILE}: @file{.pdf}, @file{.eps} and @file{.svg} are vector,
+    ## @file{.png}, @file{.jpg} and @file{.tif} are raster.
+    ##
+    ## @strong{The drawing arrives at its scale, not merely fitted to the page.}
+    ## A
+    ## distance measured on the sheet, multiplied by the scale denominator, is
+    ## the
+    ## distance in the model. That is the difference between a plot and a
+    ## picture,
+    ## and it is what @code{print} on a figure cannot give: it fits the axes to
+    ## the
+    ## paper, so a millimetre on the page means nothing.
+    ##
+    ## @subheading Name/Value pairs
+    ##
+    ## @multitable @columnfractions 0.16 0.16 0.68
+    ## @headitem Name @tab Default @tab Meaning
+    ## @item @qcode{'Paper'} @tab @qcode{'A4'} @tab sheet, named @qcode{'A0'} to
+    ## @qcode{'A5'}, or @code{[@var{width}, @var{height}]} in millimetres
+    ## @item @qcode{'Orientation'} @tab @qcode{'landscape'} @tab or
+    ## @qcode{'portrait'}; ignored when @qcode{'Paper'} is given as a size
+    ## @item @qcode{'Scale'} @tab fitted @tab plot scale denominator: 50 means
+    ## 1:50.  The default picks the largest preferred scale the sheet holds
+    ## @item @qcode{'Margin'} @tab 10 @tab blank border kept around the drawing,
+    ## in
+    ## millimetres of paper
+    ## @item @qcode{'Resolution'} @tab 600 @tab dots per inch, for a raster
+    ## format
+    ## only; a vector format ignores it
+    ## @item @qcode{'LineWidth'} @tab 0.35 @tab pen width in millimetres of
+    ## paper,
+    ## from the ISO 128 set 0.25, 0.35, 0.5, 0.7
+    ## @end multitable
+    ##
+    ## @code{[@var{PAPER}, @var{SCALE}] = draw.Drawing.print (@dots{})} returns
+    ## the sheet
+    ## size actually used, in millimetres, and the scale denominator, which is
+    ## worth having when the scale was fitted rather than given.
+    ##
+    ## @subheading The scale is chosen from the preferred series
+    ##
+    ## When @qcode{'Scale'} is not given, the denominator is the smallest of
+    ## @code{1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000} that leaves
+    ## the
+    ## drawing inside the sheet's margins. Those are the scales ISO 5455 admits,
+    ## so an automatically chosen scale is still one a reader expects to see in
+    ## a
+    ## title block, rather than the 1:37.4 that fitting exactly would give.
+    ##
+    ## An explicit @qcode{'Scale'} is never overridden.  If the drawing does not
+    ## fit at it, that is an error rather than a silent reduction: a sheet at
+    ## the
+    ## wrong scale is worse than no sheet.
+    ##
+    ## @subheading Text is a model dimension, pens are a paper one
+    ##
+    ## Each string is drawn at the height its entity carries, reduced by the
+    ## scale,
+    ## exactly as @code{draw.Drawing.tikz} does and as a CAD application does:
+    ## lettering
+    ## given as 125 mm in the model arrives 2.5 mm tall on a sheet at 1:50.
+    ## Author
+    ## it as the height wanted on paper times the scale denominator. The height
+    ## is
+    ## therefore part of the drawing and survives into the DXF, rather than
+    ## being a
+    ## property of one particular plot.
+    ##
+    ## @qcode{'LineWidth'} is the opposite: a width on the paper, held there at
+    ## every scale, because a 0.35 mm pen is 0.35 mm whatever the sheet shows.
+    ##
+    ## @seealso{draw.Drawing.plot, draw.Drawing.tikz, draw.titleblock,
+    ## dxf.write}
+    ## @end deftypefn
+
+    function [PAPER, SCALE] = print (D, FILE, varargin)
+
+      ## Input validation
+      if (nargin < 2)
+        error ("draw.Drawing.print: invalid number of input arguments.");
+      endif
+      if (! isa (D, 'draw.Drawing'))
+        error ("draw.Drawing.print: D must be a draw.Drawing object.");
+      endif
+      if (! ischar (FILE) || ! isrow (FILE) || isempty (FILE))
+        error (strcat ("draw.Drawing.print: FILE must be a non-empty", ...
+                       " character vector."));
+      endif
+      if (mod (numel (varargin), 2) != 0)
+        error ("draw.Drawing.print: Name/Value arguments must come in pairs.");
+      endif
+
+      opt = struct ('Paper', 'A4', 'Orientation', 'landscape', 'Scale', [], ...
+                    'Margin', 10, 'Resolution', 600, 'LineWidth', 0.35);
+      known = fieldnames (opt);
+      for k = 1:2:numel (varargin)
+        name = varargin{k};
+        if (! ischar (name) || ! isrow (name) || ! any (strcmp (name, known)))
+          error ("draw.Drawing.print: unknown parameter.");
+        endif
+        opt.(name) = varargin{k+1};
+      endfor
+
+      PAPER = papersize (opt.Paper, opt.Orientation);
+      if (! ischar (opt.Orientation) || ! isrow (opt.Orientation) ...
+          || ! any (strcmpi (opt.Orientation, {'landscape', 'portrait'})))
+        error (strcat ("draw.Drawing.print: Orientation must be", ...
+                       " 'landscape' or 'portrait'."));
+      endif
+      for f = {'Margin', 'Resolution', 'LineWidth'}
+        v = opt.(f{1});
+        if (! isnumeric (v) || ! isreal (v) || ! isscalar (v) ...
+            || ! isfinite (v) || v <= 0)
+          error (strcat ("draw.Drawing.print: %s must be a positive real", ...
+                         " finite scalar."), f{1});
+        endif
+      endfor
+      if (! isempty (opt.Scale) && (! isnumeric (opt.Scale) ...
+          || ! isreal (opt.Scale) || ! isscalar (opt.Scale) ...
+          || ! isfinite (opt.Scale) || opt.Scale <= 0))
+        error (strcat ("draw.Drawing.print: Scale must be empty or a", ...
+                       " positive real finite scalar."));
+      endif
+      if (isempty (D) || D.numentities () == 0)
+        error ("draw.Drawing.print: D is empty, so there is nothing to plot.");
+      endif
+      usable = PAPER - 2 * opt.Margin;
+      if (any (usable <= 0))
+        error ("draw.Drawing.print: Margin leaves no room on the sheet.");
+      endif
+
+      ## The extents to place are the ones draw.Drawing.plot settles on, margin
+      ## and text
+      ## included, so the figure is built before the scale can be chosen.
+      fig = figure ('visible', 'off');
+      unwind_protect
+        ax = axes ('parent', fig);
+        plot (D, 'Axes', ax, 'Margin', 0);
+        span = [diff(xlim(ax)), diff(ylim(ax))];
+
+        SCALE = choosescale (span, usable, opt.Scale);
+        if (isempty (SCALE))
+          error (strcat ("draw.Drawing.print: the drawing does not fit on", ...
+                         " the sheet at any preferred scale; give a larger", ...
+                         " Paper."));
+        endif
+        if (any (span / SCALE > usable + 1e-9))
+          error (strcat ("draw.Drawing.print: the drawing does not fit on", ...
+                         " the sheet at 1:%g; it needs %.1f by %.1f mm", ...
+                         " inside a %.1f by %.1f mm area."), SCALE, ...
+                         span(1) / SCALE, span(2) / SCALE, usable(1), ...
+                         usable(2));
+        endif
+
+        ## Redraw with text sized from the model: at 1:S a model unit is 1/S mm
+        ## on
+        ## paper, and a point is 25.4/72 mm.
+        cla (ax);
+        plot (D, 'Axes', ax, 'Margin', 0, ...
+                   'FontScale', 72 / (25.4 * SCALE), ...
+                   'LineWidth', opt.LineWidth * 72 / 25.4);
+        xlim (ax, xlim (ax));
+        ylim (ax, ylim (ax));
+        axis (ax, 'off');
+        set (ax, 'position', [0, 0, 1, 1]);
+
+        ## Place the drawing centred on the sheet, at scale
+        place = span / SCALE;
+        set (fig, 'paperunits', 'centimeters');
+        set (fig, 'papersize', PAPER / 10);
+        set (fig, 'paperposition', [(PAPER - place) / 20, place / 10]);
+
+        args = {};
+        raster = {'png', 'jpg', 'jpeg', 'tif', 'tiff'};
+        if (any (strcmpi (fileext (FILE), raster)))
+          args = {sprintf('-r%d', round (opt.Resolution))};
+        endif
+        print (fig, FILE, args{:});
+      unwind_protect_cleanup
+        close (fig);
+      end_unwind_protect
+
+      if (nargout == 0)
+        clear PAPER SCALE;
+      endif
+
+    endfunction
+
+    ## Sheet size in millimetres, from a name or an explicit [width, height].
+
+    ## -*- texinfo -*-
+    ## @deftypefn  {draw.Drawing} {@var{E} =} entities (@var{D})
+    ## @deftypefnx {draw.Drawing} {@var{E} =} entities (@var{D}, @var{NAME}, @var{VALUE}, @dots{})
+    ## @deftypefnx {draw.Drawing} {[@var{E}, @var{LOST}] =} entities (@dots{})
+    ## @deftypefnx {draw.Drawing} {[@var{E}, @var{LOST}, @var{BLOCKS}] =} entities (@dots{})
+    ##
+    ## Lower a drawing to the flat entity struct array that @code{dxf.write}
+    ## takes.
+    ##
+    ## @code{@var{E} = entities (@var{D})} converts the @code{draw.Drawing}
+    ## object @var{D} into the entity vocabulary of the DXF layer: @code{LINE},
+    ## @code{POLYLINE}, @code{ARC}, @code{CIRCLE} and @code{TEXT}, each on the
+    ## layer it was drawn on.  The result is written with
+    ## @code{dxf.write (@var{FILE}, @var{E})}.
+    ##
+    ## This is the adapter between the two representations and the only place
+    ## that
+    ## knows both.  @code{dxf} deals in a file format and knows nothing of
+    ## dimensions or hatches; @code{draw} models the drawing and knows nothing
+    ## of
+    ## group codes.
+    ##
+    ## @subheading Dimensions are exploded here
+    ##
+    ## A @code{'dim'} entity carries only geometry --- two points, an offset and
+    ## a
+    ## direction.  It becomes six entities: two extension lines, the dimension
+    ## line, two oblique ticks and the text.  Nothing associative is emitted: a
+    ## true @code{DIMENSION} needs a @code{*D} block and a @code{DIMSTYLE}
+    ## record,
+    ## and plots identically.
+    ##
+    ## Ticks are the 45-degree architectural obliques rather than arrowheads.
+    ## R12
+    ## draws a filled arrowhead only as a @code{SOLID}, and at drawing scale the
+    ## tick is the conventional mark in any case.
+    ##
+    ## The text is placed @strong{horizontally whatever the dimension measures}
+    ## --- unidirectional dimensioning, which ISO 129 permits and which keeps
+    ## every
+    ## label on the sheet readable from one side of it.
+    ##
+    ## The label always clears the dimension line, on the far side from the
+    ## geometry being measured.  A dimension across the sheet carries its label
+    ## above or below the line; one up the sheet carries it to the left or
+    ## right,
+    ## since a horizontal label beside a vertical dimension has to clear the
+    ## line
+    ## by its @emph{width}.  Which side is which follows the sign of the offset.
+    ##
+    ## Without a label a dimension is annotated with the distance it measures,
+    ## computed at the moment of conversion, so a dimension cannot fall out of
+    ## step
+    ## with the geometry it spans.
+    ##
+    ## @subheading Ornament size
+    ##
+    ## Dimension ornament --- tick length, text height, the gap between a
+    ## measured
+    ## point and the start of its extension line --- is in millimetres of
+    ## @emph{model space}, so its size on the sheet depends on the plot scale.
+    ## Pass @qcode{'DimScale'} to set it: a drawing to be plotted at @math{1:50}
+    ## wants @code{'DimScale', 50}, which makes a nominally @math{2.5} mm text
+    ## @math{125} mm in the model and therefore @math{2.5} mm on paper.  The
+    ## default is @math{1}.
+    ##
+    ## @subheading What the DXF vocabulary cannot carry
+    ##
+    ## One thing in the model has no R12 equivalent, and it is not dropped
+    ## silently: a @code{'hatch'} becomes its boundary as a closed polyline, so
+    ## the
+    ## region is outlined but not filled, R12 having no @code{HATCH} entity.
+    ##
+    ## Text rotation used to be the second such case and no longer is.
+    ## @code{dxf.write} emits group code 50, so a rotated @code{'text'} arrives
+    ## in
+    ## the CAD file at the angle it was drawn at.
+    ##
+    ## @code{[@var{E}, @var{LOST}] = entities (@dots{})} returns the losses as
+    ## a struct array with fields @code{index}, @code{type} and @code{reason},
+    ## naming the entity of @var{D} that lost something.  Ask for @var{LOST} and
+    ## nothing is printed; omit it and each distinct reason is warned about
+    ## once,
+    ## because a conversion that quietly discards part of a drawing is the one
+    ## failure mode a CAD file will not show you.
+    ##
+    ## @seealso{dxf.write, draw.Drawing}
+    ## @end deftypefn
+
+    function [E, LOST, BLOCKS] = entities (D, varargin)
+
+      ## Input validation
+      if (nargin < 1)
+        error ("draw.Drawing.entities: invalid number of input arguments.");
+      endif
+      if (! isa (D, 'draw.Drawing'))
+        error ("draw.Drawing.entities: D must be a draw.Drawing object.");
+      endif
+      if (mod (numel (varargin), 2) != 0)
+        error (strcat ("draw.Drawing.entities: optional arguments", ...
+               " must come in name-value pairs."));
+      endif
+
+      dimScale = 1;
+      hatchMode = 'lines';
+      blockMode = 'expand';
+      chordTol = 0.01;
+      bulgeMode = 'keep';
+      for ii = 1:2:numel (varargin)
+        name = varargin{ii};
+        if (! ischar (name) || ! isrow (name))
+          error (strcat ("draw.Drawing.entities: option names", ...
+                 " must be character vectors."));
+        endif
+        switch (lower (name))
+          case 'dimscale'
+            dimScale = varargin{ii+1};
+            if (! isnumeric (dimScale) || ! isreal (dimScale) ...
+                || ! isscalar (dimScale) || ! isfinite (dimScale) ...
+                || dimScale <= 0)
+              error (strcat ("draw.Drawing.entities: DimScale must be a", ...
+                             " real positive", ...
+                             " finite scalar."));
+            endif
+            dimScale = double (dimScale);
+          case 'chordtol'
+            chordTol = varargin{ii+1};
+            if (! isnumeric (chordTol) || ! isreal (chordTol) ...
+                  || ! isscalar (chordTol) || ! isfinite (chordTol) ...
+                  || chordTol <= 0)
+              error (strcat ("draw.Drawing.entities: ChordTol must be a", ...
+                             " real positive", ...
+                             " finite scalar."));
+            endif
+          case 'bulges'
+            bulgeMode = varargin{ii+1};
+            if (! ischar (bulgeMode) || ! isrow (bulgeMode) ...
+                || ! any (strcmpi (bulgeMode, {'keep', 'flatten'})))
+              error (strcat ("draw.Drawing.entities: Bulges", ...
+                     " must be 'keep' or 'flatten'."));
+            endif
+            bulgeMode = lower (bulgeMode);
+          case 'blocks'
+            blockMode = varargin{ii+1};
+            if (! ischar (blockMode) || ! isrow (blockMode) ...
+                || ! any (strcmpi (blockMode, {'expand', 'reference'})))
+              error (strcat ("draw.Drawing.entities: Blocks must be", ...
+                             " 'expand' or", ...
+                             " 'reference'."));
+            endif
+            blockMode = lower (blockMode);
+          case 'hatch'
+            hatchMode = varargin{ii+1};
+            if (! ischar (hatchMode) || ! isrow (hatchMode) ...
+                || ! any (strcmpi (hatchMode, {'lines', 'boundary'})))
+              error (strcat ("draw.Drawing.entities: Hatch must be", ...
+                             " 'lines' or", ...
+                             " 'boundary'."));
+            endif
+            hatchMode = lower (hatchMode);
+          otherwise
+            error ("draw.Drawing.entities: unknown option '%s'.", name);
+        endswitch
+      endfor
+
+      E = emptyentity ();
+      LOST = struct ('index', {}, 'type', {}, 'reason', {});
+      BLOCKS = struct ('name', {}, 'entities', {});
+
+      ## An insert is a reference the caller may want kept, but every other
+      ## consumer needs the geometry, so expansion is the default
+      if (strcmp (blockMode, 'expand'))
+        D = D.expand ();
+      else
+        for bb = 1:numel (D.Blocks)
+          BLOCKS(bb).name = D.Blocks(bb).name;
+          BLOCKS(bb).entities = entities (D.Blocks(bb).drawing.expand (), ...
+                                               'dimscale', dimScale, ...
+                                               'hatch', hatchMode);
+        endfor
+      endif
+
+      src = D.Entities;
+      for ii = 1:numel (src)
+
+        e = src(ii);
+
+        switch (e.type)
+
+          case 'line'
+            E(end+1) = mkent ('LINE', e, e.pts);
+
+          case 'polyline'
+            if (! isempty (e.bulge) && strcmp (bulgeMode, 'flatten'))
+              p = mkent ('POLYLINE', e, flattenbulge (e, chordTol));
+              p.closed = e.closed;
+            else
+              p = mkent ('POLYLINE', e, e.pts);
+              p.closed = e.closed;
+              p.bulge = e.bulge;
+            endif
+            E(end+1) = p;
+
+          case 'arc'
+            a = mkent ('ARC', e, e.pts);
+            a.radius = e.radius;
+            a.angles = e.angles;
+            E(end+1) = a;
+
+          case 'circle'
+            c = mkent ('CIRCLE', e, e.pts);
+            c.radius = e.radius;
+            E(end+1) = c;
+
+          case 'text'
+            t = mkent ('TEXT', e, e.pts);
+            t.text = e.text;
+            t.height = e.height;
+            t.rotation = e.angle;
+            E(end+1) = t;
+
+          case 'ellipse'
+            ## R12 has no ELLIPSE, so it goes out as a closed polyline sampled
+            ## to
+            ## the chordal tolerance.  Unlike a hatch, something really is lost:
+            ## the shape survives but the entity does not, and it can no longer
+            ## be
+            ## edited as an ellipse.
+            a = e.radius(1);
+            b = e.radius(2);
+            c = cosd (e.angle);
+            sn = sind (e.angle);
+            f = @(t) e.pts + [a * cos(t) * c - b * sin(t) * sn, ...
+                              a * cos(t) * sn + b * sin(t) * c];
+            pts = geom.curvesample (@(t) ellipsepts (t, e.pts, a, b, c, sn), ...
+                                    [0, 2*pi], chordTol);
+            pts(end,:) = [];
+            q = mkent ('POLYLINE', e, pts);
+            q.closed = true;
+            E(end+1) = q;
+            LOST(end+1) = struct ('index', ii, 'type', 'ellipse', 'reason', ...
+                                  sprintf (strcat ('R12 has no ELLIPSE;', ...
+                                     ' emitted as a closed polyline of', ...
+                                           ' %d points'), rows (pts)));
+
+          case {'diam', 'radius'}
+            parts = explodecirc (e, dimScale);
+            for kk = 1:numel (parts)
+              E(end+1) = parts(kk);
+            endfor
+
+          case 'angdim'
+            parts = explodeang (e, dimScale);
+            for kk = 1:numel (parts)
+              E(end+1) = parts(kk);
+            endfor
+
+          case 'centremark'
+            parts = explodemark (e, dimScale);
+            for kk = 1:numel (parts)
+              E(end+1) = parts(kk);
+            endfor
+
+          case 'leader'
+            parts = explodeleader (e, dimScale);
+            for kk = 1:numel (parts)
+              E(end+1) = parts(kk);
+            endfor
+
+          case 'insert'
+            s = mkent ('INSERT', e, e.pts);
+            s.text = e.block;
+            s.rotation = e.angle;
+            s.radius = e.scale;
+            E(end+1) = s;
+
+          case 'hatch'
+            h = mkent ('POLYLINE', e, e.pts);
+            h.closed = true;
+            E(end+1) = h;
+            if (strcmp (hatchMode, 'lines'))
+              ## R12 has no HATCH entity, so the fill is generated explicitly.
+              ## Emitting the lines is a truer degradation than dropping them:
+              ## the recipient sees the section hatched, not an empty outline.
+              S = geom.hatchlines (e.pts, e.pattern, e.angle, e.spacing);
+              for jj = 1:rows (S)
+                E(end+1) = mkent ('LINE', e, [S(jj,1:2); S(jj,3:4)]);
+              endfor
+              ## Nothing is recorded as lost: R12 has no HATCH entity, but the
+              ## fill it would have carried is present as lines, so the
+              ## recipient
+              ## sees the hatch.  LOST is for what could not be carried at all.
+            else
+              LOST(end+1) = struct ('index', ii, 'type', 'hatch', 'reason', ...
+                              strcat ('fill dropped: R12 has no HATCH,', ...
+                                            ' boundary emitted'));
+            endif
+
+          case 'dim'
+            parts = explodedim (e, dimScale);
+            for jj = 1:numel (parts)
+              E(end+1) = parts(jj);
+            endfor
+
+        endswitch
+
+      endfor
+
+      ## Warn only when the caller has not asked to be told properly.
+      if (nargout < 2 && ! isempty (LOST))
+        reasons = unique ({LOST.reason});
+        for ii = 1:numel (reasons)
+          n = sum (strcmp ({LOST.reason}, reasons{ii}));
+          if (n == 1)
+            warning ("draw.Drawing.entities: 1 entity: %s.", reasons{ii});
+          else
+            warning ("draw.Drawing.entities: %d entities: %s.", n, reasons{ii});
+          endif
+        endfor
+      endif
+
+    endfunction
+
+    ## The empty entity array, in dxf.write's vocabulary.  Field order is fixed
+    ## so
+    ## that the array grows by assignment.
+
+    ## -*- texinfo -*-
+    ## @deftypefn  {draw.Drawing} {@var{S} =} tikz (@var{D})
+    ## @deftypefnx {draw.Drawing} {@var{S} =} tikz (@var{D}, @var{NAME}, @var{VALUE}, @dots{})
+    ##
+    ## Render a drawing as a TikZ picture for inclusion in the LaTeX report.
+    ##
+    ## @code{@var{S} = tikz (@var{D})} returns the TikZ code for the
+    ## @code{draw.Drawing} object @var{D} as a character array, one line per row
+    ## of
+    ## the drawing, ready to be written to a @file{.tex} file and pulled into a
+    ## document with @code{\input}.
+    ##
+    ## The picture is emitted at a stated plot scale, so it arrives on the page
+    ## at
+    ## the size a drawing is meant to be read at rather than at whatever size
+    ## fits.
+    ## Model coordinates are written unchanged, in millimetres, and the scale is
+    ## carried by the @code{x} and @code{y} unit vectors of the
+    ## @code{tikzpicture}: a wall at @math{x = 1600} appears in the output as
+    ## @code{1600} whatever the scale, which is what makes the generated source
+    ## readable against the drawing it came from.
+    ##
+    ## Radii, text sizes and dimension ornament cannot follow that convention,
+    ## since they must come out at a fixed size on paper regardless of scale.
+    ## Those are emitted in absolute millimetres and points, already divided by
+    ## the
+    ## scale.
+    ##
+    ## @subheading Options
+    ##
+    ## @multitable @columnfractions .16 .84
+    ## @item @qcode{'Scale'} @tab Plot scale denominator: @math{50} means
+    ## @math{1:50}, which is a common scale for a general-arrangement plan and
+    ## the
+    ## default.  A drawing at @math{1:1} wants @math{1}.
+    ## @item @qcode{'File'} @tab Also write the result to this file.  The code
+    ## is
+    ## returned either way.
+    ## @item @qcode{'Styles'} @tab Emit a @code{\tikzset} block defining one
+    ## empty
+    ## style per layer, so that the document can restyle a layer by redefining
+    ## it.
+    ## True by default; set it false when the styles are already defined and
+    ## redefining them would undo that.
+    ## @item @qcode{'LTScale'} @tab Multiplies line-type dash lengths.  Patterns
+    ## are model lengths times this factor, exactly as in
+    ## @code{draw.Drawing.plot} and as
+    ## CAD's own @code{LTSCALE} works.  Defaults to the drawing scale, which
+    ## cancels the reduction so dashes reach the page at their nominal size ---
+    ## a
+    ## centre line reads as a centre line whether the view is at 1:1 or 1:50 ---
+    ## while leaving the factor visible and adjustable.
+    ## @end multitable
+    ##
+    ## @subheading Dimensions
+    ##
+    ## Dimensions are rendered here rather than reused from
+    ## @code{draw.Drawing.entities}, which is the point of storing them
+    ## semantically.  A
+    ## TikZ node anchors itself, so the label is positioned by naming the side
+    ## it
+    ## should sit on and letting TikZ measure the text --- where the DXF path
+    ## has
+    ## to estimate the width of a string from its character count.  The same
+    ## drawing therefore gets properly centred labels on the report figure and
+    ## approximately centred ones in the CAD file, from one model and without a
+    ## flag anywhere.
+    ##
+    ## Labels are unidirectional, matching @code{draw.Drawing.entities}, and
+    ## ticks are the
+    ## 45-degree architectural obliques.
+    ##
+    ## @subheading What the document needs
+    ##
+    ## A hatch is emitted as @code{\path[pattern=@dots{}]}, which requires
+    ## @code{\usetikzlibrary@{patterns@}}.  Nothing else in the output needs a
+    ## library beyond TikZ itself.
+    ##
+    ## Text is written through as UTF-8 and LaTeX's special characters are
+    ## escaped.  Greek text needs a Unicode-aware engine --- @code{xelatex} or
+    ## @code{lualatex} --- or @code{babel} configured for Greek; that is a
+    ## property
+    ## of the document, not of this output.
+    ##
+    ## @seealso{draw.Drawing, draw.Drawing.entities}
+    ## @end deftypefn
+
+    function S = tikz (D, varargin)
+
+      ## Input validation
+      if (nargin < 1)
+        error ("draw.Drawing.tikz: invalid number of input arguments.");
+      endif
+      if (! isa (D, 'draw.Drawing'))
+        error ("draw.Drawing.tikz: D must be a draw.Drawing object.");
+      endif
+      if (mod (numel (varargin), 2) != 0)
+        error (strcat ("draw.Drawing.tikz: optional arguments", ...
+               " must come in name-value pairs."));
+      endif
+
+      scale = 50;
+      fname = '';
+      styles = true;
+      ltscale = [];
+      for ii = 1:2:numel (varargin)
+        name = varargin{ii};
+        val = varargin{ii+1};
+        if (! ischar (name) || ! isrow (name))
+          error ("draw.Drawing.tikz: option names must be character vectors.");
+        endif
+        switch (lower (name))
+          case 'scale'
+            if (! isnumeric (val) || ! isreal (val) || ! isscalar (val) ...
+                || ! isfinite (val) || val <= 0)
+              error (strcat ("draw.Drawing.tikz: Scale must be a real", ...
+                             " positive finite", ...
+                             " scalar."));
+            endif
+            scale = double (val);
+          case 'file'
+            if (! ischar (val) || ! isrow (val) || isempty (val))
+              error (strcat ("draw.Drawing.tikz: File must be a non-empty", ...
+                             " character", ...
+                             " vector."));
+            endif
+            fname = val;
+          case 'styles'
+            if (! (islogical (val) || isnumeric (val)) || ! isscalar (val))
+              error ("draw.Drawing.tikz: Styles must be a logical scalar.");
+            endif
+            styles = logical (val);
+          case 'ltscale'
+            if (! isnumeric (val) || ! isreal (val) || ! isscalar (val) ...
+                || ! isfinite (val) || val <= 0)
+              error (strcat ("draw.Drawing.tikz: LTScale must be a real", ...
+                             " positive", ...
+                             " finite scalar."));
+            endif
+            ltscale = double (val);
+          otherwise
+            error ("draw.Drawing.tikz: unknown option '%s'.", name);
+        endswitch
+      endfor
+
+      ## Line-type patterns are model lengths times LTScale, as in CAD and as in
+      ## draw.Drawing.plot.  Defaulting LTScale to the drawing scale cancels the
+      ## reduction,
+      ## so dashes arrive at their nominal size on the page -- which is what a
+      ## report figure wants -- by an explicit factor rather than by a second
+      ## rule.
+      if (isempty (ltscale))
+        ltscale = scale;
+      endif
+
+      ## One model millimetre, in millimetres on the page
+      u = 1 / scale;
+
+      ## Lowered through draw.Drawing.entities, exactly as draw.Drawing.plot is,
+      ## so that the three
+      ## backends agree and none of them can silently fail to know an entity
+      ## type.
+      ## That is not hypothetical: this one did, when the dimensioning entities
+      ## arrived and only this backend still rendered from the drawing model.
+      E = entities (D, 'bulges', 'flatten');
+
+      if (isempty (E))
+        L = {};
+      else
+        L = unique ({E.layer});
+      endif
+      sty = stylenames (L);
+
+      out = {};
+      out{end+1} = '% Generated by the drafting package: draw.Drawing.tikz';
+      out{end+1} = sprintf ('%% Drawing: %s', D.Name);
+      out{end+1} = sprintf (strcat ('%% Plot scale 1:%s. Coordinates are', ...
+                                    ' model', ...
+                                    ' millimetres.'), fmt (scale));
+      if (styles && ! isempty (L))
+        out{end+1} = '\tikzset{';
+        for ii = 1:numel (L)
+          out{end+1} = sprintf ('  %s/.style={}, %% layer ''%s''', ...
+                                  sty{ii}, L{ii});
+        endfor
+        out{end+1} = '}';
+      endif
+
+      out{end+1} = sprintf (strcat ('\\begin{tikzpicture}[x=%smm, y=%smm,', ...
+                                    ' line width=0.18mm]'), fmt (u), fmt (u));
+
+      for ii = 1:numel (L)
+        idx = find (strcmp ({E.layer}, L{ii}));
+        out{end+1} = sprintf ('  %% layer: %s', L{ii});
+        out{end+1} = sprintf ('  \\begin{scope}[%s]', sty{ii});
+        for jj = idx
+          lines = render (E(jj), scale, ltscale);
+          for kk = 1:numel (lines)
+            out{end+1} = ['    ', lines{kk}];
+          endfor
+        endfor
+        out{end+1} = '  \end{scope}';
+      endfor
+
+      out{end+1} = '\end{tikzpicture}';
+
+      S = strjoin (out, "\n");
+
+      if (! isempty (fname))
+        fid = fopen (fname, 'wt');
+        if (fid < 0)
+          error ("draw.Drawing.tikz: cannot open '%s' for writing.", fname);
+        endif
+        unwind_protect
+          fprintf (fid, "%s\n", S);
+        unwind_protect_cleanup
+          fclose (fid);
+        end_unwind_protect
+      endif
+
+    endfunction
+
+    ## A TikZ style name per layer.  Style names have to be alphabetic, and
+    ## layer
+    ## names do not, so anything else is dropped -- which can make two layers
+    ## collide, and a collision would silently merge their styling.
+    ## Disambiguate
+    ## with an index rather than hoping.
   endmethods
 
   methods (Hidden)
@@ -1424,6 +2507,793 @@ function P = arcextent (C, R, A1, A2)
 
 endfunction
 
+
+function H = polydraw (ax, P, lt, col, opt)
+
+  H = [];
+  if (rows (P) < 2)
+    return;
+  endif
+
+  if (strcmpi (opt.Linetypes, 'approximate') || strcmpi (lt, 'CONTINUOUS'))
+    H = line (ax, P(:,1), P(:,2), 'color', col, ...
+              'linestyle', linestyle (lt), 'linewidth', opt.LineWidth);
+    return;
+  endif
+
+  try
+    pat = draw.linetype (lt) * opt.LTScale;
+  catch
+    pat = [];
+  end_try_catch
+  if (isempty (pat))
+    H = line (ax, P(:,1), P(:,2), 'color', col, 'linestyle', '-', ...
+              'linewidth', opt.LineWidth);
+    return;
+  endif
+
+  for seg = dashes(P, pat)'
+    d = seg{1};
+    if (rows (d) == 1)
+      H(end+1, 1) = line (ax, d(1,1), d(1,2), 'color', col, 'marker', '.', ...
+                          'markersize', 2, 'linestyle', 'none');
+    else
+      H(end+1, 1) = line (ax, d(:,1), d(:,2), 'color', col, ...
+                          'linestyle', '-', 'linewidth', opt.LineWidth);
+    endif
+  endfor
+
+endfunction
+
+## Cut a polyline into the drawn pieces of a dash pattern, walking it by arc
+## length.  A zero-length element of the pattern is a dot, returned as a single
+## point for the caller to mark.
+function C = dashes (P, pat)
+
+  seglen = sqrt (sum (diff (P, 1, 1) .^ 2, 2));
+  total = sum (seglen);
+  cum = [0; cumsum(seglen)];
+  C = {};
+  if (total <= 0)
+    return;
+  endif
+
+  at = 0;
+  k = 0;
+  guard = 0;
+  while (at < total && guard < 1e5)
+    guard++;
+    k = mod (k, numel (pat)) + 1;
+    L = abs (pat(k));
+    if (pat(k) < 0)
+      at += max (L, eps);            # a gap
+      continue;
+    endif
+    if (L == 0)
+      C{end+1, 1} = interpat (P, cum, at);
+      at += eps;                     # a dot has no length; the gap follows
+      continue;
+    endif
+    stop = min (at + L, total);
+    C{end+1, 1} = runbetween (P, cum, at, stop);
+    at = stop;
+  endwhile
+
+endfunction
+
+## The point at arc length T along the polyline
+function q = interpat (P, cum, t)
+
+  i = max (1, min (numel (cum) - 1, find (cum <= t, 1, 'last')));
+  span = cum(i+1) - cum(i);
+  if (span <= 0)
+    q = P(i,:);
+  else
+    q = P(i,:) + (t - cum(i)) / span * (P(i+1,:) - P(i,:));
+  endif
+
+endfunction
+
+## The piece of the polyline between two arc lengths, with any original
+## vertices in between kept so that corners are not cut
+function Q = runbetween (P, cum, t0, t1)
+
+  Q = interpat (P, cum, t0);
+  mid = find (cum > t0 & cum < t1);
+  if (! isempty (mid))
+    Q = [Q; P(mid,:)];
+  endif
+  Q = [Q; interpat(P, cum, t1)];
+
+endfunction
+
+## Drawing symbols as characters a figure font is likely to hold.  A capital O
+## with a stroke stands in for the diameter sign, as it does on a great many
+## real drawings; the true glyph is not in every font, and a missing one shows
+## as a box, which is worse than a near miss.
+function t = plainsymbols (t)
+
+  t = strrep (t, '%%%', "\x00PC\x00");
+  for c = {'c', 'C'}
+    t = strrep (t, ['%%', c{1}], "\x00DIA\x00");
+  endfor
+  for c = {'d', 'D'}
+    t = strrep (t, ['%%', c{1}], "\x00DEG\x00");
+  endfor
+  for c = {'p', 'P'}
+    t = strrep (t, ['%%', c{1}], "\x00PM\x00");
+  endfor
+  t = strrep (t, "\x00DIA\x00", 'Ø');
+  t = strrep (t, "\x00DEG\x00", '°');
+  t = strrep (t, "\x00PM\x00", '±');
+  t = strrep (t, "\x00PC\x00", '%');
+
+endfunction
+
+## The nearest of the four line styles a figure offers, for 'approximate'.
+function s = linestyle (lt)
+
+  switch (upper (lt))
+    case {'HIDDEN', 'DASHED'}
+      s = '--';
+    case 'DOT'
+      s = ':';
+    case {'CENTER', 'DASHDOT', 'PHANTOM'}
+      s = '-.';
+    otherwise
+      s = '-';
+  endswitch
+
+endfunction
+
+
+function P = papersize (spec, orient)
+
+  if (isnumeric (spec))
+    if (! isreal (spec) || ! isequal (size (spec), [1, 2]) ...
+        || ! all (isfinite (spec)) || any (spec <= 0))
+      error (strcat ("draw.Drawing.print: Paper must be a name or a", ...
+                     " 1-by-2 vector of positive millimetres."));
+    endif
+    P = double (spec);
+    return;
+  endif
+  if (! ischar (spec) || ! isrow (spec))
+    error (strcat ("draw.Drawing.print: Paper must be a character vector", ...
+                   " or a 1-by-2 vector."));
+  endif
+  ## ISO 216 A series, portrait, in millimetres
+  names = {'A0', 'A1', 'A2', 'A3', 'A4', 'A5'};
+  sizes = [841, 1189; 594, 841; 420, 594; 297, 420; 210, 297; 148, 210];
+  k = find (strcmpi (spec, names));
+  if (isempty (k))
+    error ("draw.Drawing.print: Paper '%s' is not one of A0 to A5.", spec);
+  endif
+  P = sizes(k,:);
+  if (ischar (orient) && isrow (orient) && strcmpi (orient, 'landscape'))
+    P = P([2, 1]);
+  endif
+
+endfunction
+
+## Smallest preferred denominator that fits, or the one given.
+function S = choosescale (span, usable, given)
+
+  if (! isempty (given))
+    S = double (given);
+    return;
+  endif
+  preferred = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000];
+  S = [];
+  for s = preferred
+    if (all (span / s <= usable + 1e-9))
+      S = s;
+      return;
+    endif
+  endfor
+
+endfunction
+
+## Lower-case extension of a file name, without the dot.
+function e = fileext (FILE)
+
+  [~, ~, e] = fileparts (FILE);
+  if (! isempty (e))
+    e = lower (e(2:end));
+  endif
+
+endfunction
+
+
+
+function E = emptyentity ()
+
+  E = struct ('type', {}, 'layer', {}, 'linetype', {}, 'colour', {}, ...
+              'pts', {}, 'closed', {}, ...
+              'radius', {}, 'angles', {}, 'text', {}, 'height', {}, ...
+              'rotation', {}, 'bulge', {});
+
+endfunction
+
+## One entity with the unused fields at their defaults.
+## Build a DXF record from the drawing entity E it came from, so that layer,
+## line type and colour travel with the geometry rather than being reapplied.
+## Exploded parts of a dimension inherit them too: the rule is uniform, and a
+## caller wanting continuous dimension lines sets the line type before
+## dimensioning, which is the natural order anyway.
+function s = mkent (type, e, pts)
+
+  s = struct ('type', type, 'layer', e.layer, ...
+              'linetype', optfield (e, 'linetype', 'CONTINUOUS'), ...
+              'colour', optfield (e, 'colour', 256), ...
+              'pts', pts, 'closed', false, ...
+              'radius', [], 'angles', [], 'text', '', 'height', [], ...
+              'rotation', 0, 'bulge', []);
+
+endfunction
+
+## A diameter or radius dimension: the measuring line, a tick where it meets
+## the feature, and the text.  A diameter runs right across; a radius runs from
+## the centre out, which is why the two share everything but their first point.
+function parts = explodecirc (e, scale)
+
+  tick = 1.25 * scale;
+  hgt = 2.5 * scale;
+  u = [cosd(e.angle), sind(e.angle)];
+  outer = e.pts + e.radius * u;
+  if (strcmp (e.type, 'diam'))
+    inner = e.pts - e.radius * u;
+  else
+    inner = e.pts;
+  endif
+
+  n = [-u(2), u(1)];
+  parts = mkent ('LINE', e, [inner; outer]);
+  parts(end+1) = mkent ('LINE', e, [outer - tick * (u + n) / sqrt(2); ...
+                                    outer + tick * (u + n) / sqrt(2)]);
+  if (strcmp (e.type, 'diam'))
+    parts(end+1) = mkent ('LINE', e, [inner - tick * (u + n) / sqrt(2); ...
+                                      inner + tick * (u + n) / sqrt(2)]);
+  endif
+
+  t = mkent ('TEXT', e, outer + 0.5 * hgt * (u + n));
+  t.text = e.text;
+  t.height = hgt;
+  t.rotation = 0;
+  parts(end+1) = t;
+
+endfunction
+
+## An angular dimension: the arc between the arms, a tick at each end, and the
+## text outside the arc at its middle
+function parts = explodeang (e, scale)
+
+  tick = 1.25 * scale;
+  hgt = 2.5 * scale;
+  V = e.pts(1,:);
+  a1 = atan2 (e.pts(2,2) - V(2), e.pts(2,1) - V(1)) * 180 / pi;
+  a2 = atan2 (e.pts(3,2) - V(2), e.pts(3,1) - V(1)) * 180 / pi;
+
+  arc = mkent ('ARC', e, V);
+  arc.radius = e.radius;
+  arc.angles = [mod(a1, 360), mod(a2, 360)];
+  parts = arc;
+
+  for a = [a1, a2]
+    u = [cosd(a), sind(a)];
+    n = [-u(2), u(1)];
+    p = V + e.radius * u;
+    parts(end+1) = mkent ('LINE', e, [p - tick * n / 2; p + tick * n / 2]);
+  endfor
+
+  am = a1 + mod (a2 - a1, 360) / 2;
+  t = mkent ('TEXT', e, V + (e.radius + 0.5 * hgt) * [cosd(am), sind(am)]);
+  t.text = e.text;
+  t.height = hgt;
+  t.rotation = 0;
+  parts(end+1) = t;
+
+endfunction
+
+## A centre mark: the small cross, with arms reaching a little past a small
+## feature and stopping short of a large one, as the convention has it
+function parts = explodemark (e, scale)
+
+  a = max (min (e.radius / 4, 3 * scale), 0.5 * scale);
+  C = e.pts;
+  parts = mkent ('LINE', e, [C - [a, 0]; C + [a, 0]]);
+  parts(end+1) = mkent ('LINE', e, [C - [0, a]; C + [0, a]]);
+
+endfunction
+
+## A leader: the path, a tick at the feature end, and the note at the tail
+function parts = explodeleader (e, scale)
+
+  tick = 1.25 * scale;
+  hgt = 2.5 * scale;
+  P = e.pts;
+  parts = mkent ('POLYLINE', e, P);
+
+  d = P(2,:) - P(1,:);
+  if (norm (d) > 0)
+    u = d / norm (d);
+    n = [-u(2), u(1)];
+    parts(end+1) = mkent ('LINE', e, [P(1,:); P(1,:) + tick * (u + n / 2)]);
+    parts(end+1) = mkent ('LINE', e, [P(1,:); P(1,:) + tick * (u - n / 2)]);
+  endif
+
+  t = mkent ('TEXT', e, P(end,:) + [0.3 * hgt, 0.3 * hgt]);
+  t.text = e.text;
+  t.height = hgt;
+  t.rotation = 0;
+  parts(end+1) = t;
+
+endfunction
+
+## The ellipse, parameterised for geom.curvesample
+function P = ellipsepts (t, C, a, b, c, s)
+
+  x = a * cos (t);
+  y = b * sin (t);
+  P = [C(1) + x * c - y * s, C(2) + x * s + y * c];
+
+endfunction
+
+## Replace a bulged polyline's vertices with points along its arcs, for a
+## consumer that has no notion of a bulge
+function Q = flattenbulge (e, tol)
+
+  P = e.pts;
+  n = rows (P);
+  if (e.closed)
+    last = n;
+  else
+    last = n - 1;
+  endif
+
+  Q = P(1,:);
+  for k = 1:last
+    j = mod (k, n) + 1;
+    bl = 0;
+    if (numel (e.bulge) >= k)
+      bl = e.bulge(k);
+    endif
+    if (bl == 0)
+      Q(end+1,:) = P(j,:);
+      continue;
+    endif
+    ## bulge is tan of a quarter of the included angle
+    inc = 4 * atan (bl);
+    chord = P(j,:) - P(k,:);
+    L = norm (chord);
+    R = L / (2 * abs (sin (inc / 2)));
+    h = sqrt (max (0, R ^ 2 - (L / 2) ^ 2)) * sign (cos (inc / 2));
+    mid = (P(k,:) + P(j,:)) / 2;
+    nrm = [-chord(2), chord(1)] / L;
+    ctr = mid + sign (bl) * h * nrm;
+    a1 = atan2 (P(k,2) - ctr(2), P(k,1) - ctr(1));
+    steps = max (2, ceil (abs (inc) / (2 * acos (max (-1, 1 - tol / R)))));
+    for m = 1:steps
+      a = a1 + inc * m / steps;
+      Q(end+1,:) = ctr + R * [cos(a), sin(a)];
+    endfor
+  endfor
+  if (e.closed)
+    Q(end,:) = [];
+  endif
+
+endfunction
+
+## A field if the entity carries one, the default otherwise
+function v = optfield (e, name, dflt)
+
+  if (isfield (e, name) && ! isempty (e.(name)))
+    v = e.(name);
+  else
+    v = dflt;
+  endif
+
+endfunction
+
+## Explode a semantic dimension into the six entities that draw it.
+##
+## The construction is the same for all three directions once the measuring
+## direction U is chosen: N is U turned a quarter-turn counter-clockwise, and
+## each measured point is carried onto the dimension line along N.  A
+## horizontal dimension between points at different heights therefore gets
+## extension lines of different lengths, which is exactly right.
+function parts = explodedim (e, scale)
+
+  P1 = e.pts(1,:);
+  P2 = e.pts(2,:);
+  d = P2 - P1;
+
+  switch (e.direction)
+    case 'horizontal'
+      U = [1, 0];
+    case 'vertical'
+      U = [0, 1];
+    otherwise
+      U = d / norm (d);
+  endswitch
+  N = [-U(2), U(1)];
+
+  ## Ornament, in model millimetres
+  tick = 1.25 * scale;      # half-length of the oblique tick
+  gap = 1.0 * scale;        # from the measured point to its extension line
+  over = 1.25 * scale;      # how far the extension line runs past the dim line
+  hgt = 2.5 * scale;        # text cap height
+  tgap = 0.8 * scale;       # from the dimension line up to the text baseline
+
+  ## Carry each measured point onto the dimension line along N
+  A1 = P1 + e.offset * N;
+  A2 = P2 + (e.offset - dot (d, N)) * N;
+
+  ## Extension lines: start clear of the measured point, end past the dim line
+  parts = mkent ('LINE', e, [P1 + gap * unitor(A1 - P1, N); ...
+                                   A1 + over * unitor(A1 - P1, N)]);
+  parts(end+1) = mkent ('LINE', e, [P2 + gap * unitor(A2 - P2, N); ...
+                                          A2 + over * unitor(A2 - P2, N)]);
+
+  ## The dimension line itself
+  parts(end+1) = mkent ('LINE', e, [A1; A2]);
+
+  ## Oblique ticks at 45 degrees to the dimension line, centred on each foot
+  T = (U + N) / sqrt (2);
+  parts(end+1) = mkent ('LINE', e, [A1 - tick * T; A1 + tick * T]);
+  parts(end+1) = mkent ('LINE', e, [A2 - tick * T; A2 + tick * T]);
+
+  ## The label, horizontal whatever the dimension measures
+  if (isempty (e.text))
+    m = abs (dot (d, U));
+    if (abs (m - round (m)) < 1e-9)
+      label = sprintf ('%d', round (m));
+    else
+      label = sprintf ('%.1f', m);
+    endif
+  else
+    label = e.text;
+  endif
+
+  ## Place the label clear of the dimension line, on the far side from the
+  ## geometry being measured.
+  ##
+  ## A DXF TEXT is positioned by the left end of its baseline and grows right
+  ## and up from there, so the insertion point is not where the label appears
+  ## to sit.  Both consequences have to be undone by hand: pushing the text
+  ## down by the gap alone would leave the glyphs growing back up through the
+  ## dimension line, and a label centred on a vertical dimension would straddle
+  ## it.  So the box is placed, and the insertion point derived from it.
+  ##
+  ## Centring needs the width, which needs font metrics we do not have.  Six
+  ## tenths of the cap height per character is close for the stroke fonts a CAD
+  ## application substitutes here, and being slightly out matters far less than
+  ## a label sitting nowhere near the middle.
+  mid = (A1 + A2) / 2;
+  wid = 0.6 * hgt * numel (label);
+  side = sign0 (e.offset) * N;
+
+  if (abs (side(2)) >= abs (side(1)))
+    ## Dimension line lies across the sheet: the label goes above or below it
+    ix = mid(1) - wid / 2;
+    if (side(2) >= 0)
+      iy = mid(2) + tgap;
+    else
+      iy = mid(2) - tgap - hgt;
+    endif
+  else
+    ## Dimension line lies up the sheet: the label goes beside it, and the
+    ## text stays horizontal, so it is the width that must clear the line
+    iy = mid(2) - hgt / 2;
+    if (side(1) >= 0)
+      ix = mid(1) + tgap;
+    else
+      ix = mid(1) - tgap - wid;
+    endif
+  endif
+
+  t = mkent ('TEXT', e, [ix, iy]);
+  t.text = label;
+  t.height = hgt;
+  parts(end+1) = t;
+
+endfunction
+
+## The unit vector along V, falling back to the direction FB when V vanishes.
+## An extension line has zero length when its measured point already lies on
+## the dimension line, which happens whenever the offset is zero.
+function U = unitor (V, FB)
+
+  n = norm (V);
+  if (n > 0)
+    U = V / n;
+  else
+    U = FB;
+  endif
+
+endfunction
+
+## sign(), but never zero: a dimension line drawn through its measured points
+## still has to put its text on one side.
+function s = sign0 (x)
+
+  s = sign (x);
+  if (s == 0)
+    s = 1;
+  endif
+
+endfunction
+
+
+function sty = stylenames (L)
+
+  sty = cell (size (L));
+  for ii = 1:numel (L)
+    keep = isletter (L{ii});
+    sty{ii} = ['dr', L{ii}(keep)];
+    if (numel (sty{ii}) == 2)
+      sty{ii} = sprintf ('dr%d', ii);
+    endif
+  endfor
+
+  ## Compare against the names as they were, not as they are being rewritten:
+  ## renaming the first of a colliding pair would otherwise leave the second
+  ## looking unique.  Sanitised names carry no digits, so an index can never
+  ## collide with one.
+  base = sty;
+  for ii = 1:numel (sty)
+    if (sum (strcmp (base, base{ii})) > 1)
+      sty{ii} = sprintf ('%s%d', base{ii}, ii);
+    endif
+  endfor
+
+endfunction
+
+## Line type and colour as a TikZ option list, empty when both are default.
+##
+## Dash lengths are emitted at their nominal size on the page, not divided by
+## the drawing scale.  A line type is a paper-space property: a centre line
+## should read as a centre line whether the view is at 1:1 or 1:50, and scaling
+## the pattern down with the geometry would make it vanish.
+function o = dopts (e, ltscale, scale)
+
+  parts = {};
+
+  colours = {'', 'red', 'yellow', 'green', 'cyan', 'blue', 'magenta', ...
+             'black', 'gray'};
+  c = optfield (e, 'colour', 256);
+  if (c >= 1 && c <= 8)
+    parts{end+1} = colours{c + 1};
+  endif
+
+  lt = optfield (e, 'linetype', 'CONTINUOUS');
+  if (! strcmpi (lt, 'CONTINUOUS'))
+    try
+      pat = draw.linetype (lt) * ltscale / scale;
+    catch
+      pat = [];
+    end_try_catch
+    if (! isempty (pat))
+      d = '';
+      for k = 1:numel (pat)
+        if (pat(k) >= 0)
+          d = sprintf ('%son %smm ', d, fmt (max (pat(k), 0.1)));
+        else
+          d = sprintf ('%soff %smm ', d, fmt (-pat(k)));
+        endif
+      endfor
+      parts{end+1} = ['dash pattern=', strtrim(d)];
+    endif
+  endif
+
+  if (isempty (parts))
+    o = '';
+  else
+    o = ['[', strjoin(parts, ', '), ']'];
+  endif
+
+endfunction
+
+## A field if present and non-empty, the default otherwise
+## Render one entity as one or more lines of TikZ.
+function lines = render (e, scale, ltscale)
+
+  o = dopts (e, ltscale, scale);
+
+  switch (e.type)
+
+    case 'LINE'
+      lines = {sprintf('\\draw%s %s -- %s;', o, pt (e.pts(1,:)), ...
+                       pt (e.pts(2,:)))};
+
+    case {'POLYLINE', 'LWPOLYLINE'}
+      s = ['\draw', o, ' ', pt(e.pts(1,:))];
+      for ii = 2:rows (e.pts)
+        s = [s, ' -- ', pt(e.pts(ii,:))];
+      endfor
+      if (e.closed)
+        s = [s, ' -- cycle'];
+      endif
+      lines = {[s, ';']};
+
+    case 'CIRCLE'
+      lines = {sprintf('\\draw%s %s circle[radius=%smm];', o, pt (e.pts), ...
+                       fmt (e.radius / scale))};
+
+    case 'ARC'
+      ## TikZ draws an arc from the current point, counter-clockwise when the
+      ## end angle exceeds the start, so the sweep is unrolled rather than
+      ## passed as the two stored angles.
+      sweep = mod (e.angles(2) - e.angles(1), 360);
+      if (sweep == 0)
+        sweep = 360;
+      endif
+      a1 = e.angles(1);
+      start = e.pts + e.radius * [cosd(a1), sind(a1)];
+      tmpl = strcat ('\\draw%s %s arc[start angle=%s, end angle=%s,', ...
+                     ' radius=%smm];');
+      lines = {sprintf(tmpl, o, pt (start), fmt (a1), ...
+                       fmt (a1 + sweep), fmt (e.radius / scale))};
+
+    case 'TEXT'
+      opts = sprintf ('anchor=base west, inner sep=0pt, font=%s', ...
+                      fontfor (e.height, scale));
+      if (e.rotation != 0)
+        opts = sprintf ('%s, rotate=%s', opts, fmt (e.rotation));
+      endif
+      lines = {sprintf('\\node[%s] at %s {%s};', opts, pt (e.pts), ...
+                       texescape (e.text))};
+
+    case 'POINT'
+      lines = {sprintf('\\fill%s %s circle[radius=0.3mm];', o, ...
+                       pt (e.pts))};
+
+    otherwise
+      lines = {};
+
+  endswitch
+
+endfunction
+
+## Render a semantic dimension.  The construction of the dimension line is the
+## same as in draw.Drawing.entities -- it has to be, or the two outputs would
+## disagree
+## about where the dimension sits -- but the label is placed by anchoring a
+## node, so nothing here estimates the width of a string.
+function lines = renderdim (e, scale)
+
+  P1 = e.pts(1,:);
+  P2 = e.pts(2,:);
+  d = P2 - P1;
+
+  switch (e.direction)
+    case 'horizontal'
+      U = [1, 0];
+    case 'vertical'
+      U = [0, 1];
+    otherwise
+      U = d / norm (d);
+  endswitch
+  N = [-U(2), U(1)];
+
+  A1 = P1 + e.offset * N;
+  A2 = P2 + (e.offset - dot (d, N)) * N;
+
+  ## Ornament in model units, so that it comes out at a fixed size on paper
+  gap = 1.0 * scale;
+  over = 1.25 * scale;
+  tick = 1.25 * scale;
+
+  E1 = unitor (A1 - P1, N);
+  E2 = unitor (A2 - P2, N);
+
+  lines = {};
+  lines{end+1} = sprintf ('\\draw %s -- %s;', pt (P1 + gap * E1), ...
+                          pt (A1 + over * E1));
+  lines{end+1} = sprintf ('\\draw %s -- %s;', pt (P2 + gap * E2), ...
+                          pt (A2 + over * E2));
+  lines{end+1} = sprintf ('\\draw %s -- %s;', pt (A1), pt (A2));
+
+  T = (U + N) / sqrt (2);
+  lines{end+1} = sprintf ('\\draw %s -- %s;', pt (A1 - tick * T), ...
+                          pt (A1 + tick * T));
+  lines{end+1} = sprintf ('\\draw %s -- %s;', pt (A2 - tick * T), ...
+                          pt (A2 + tick * T));
+
+  if (isempty (e.text))
+    m = abs (dot (d, U));
+    if (abs (m - round (m)) < 1e-9)
+      label = sprintf ('%d', round (m));
+    else
+      label = sprintf ('%.1f', m);
+    endif
+  else
+    label = e.text;
+  endif
+
+  ## The node anchors itself against the side the dimension line was offset
+  ## to, so TikZ does the centring and the measuring.
+  side = sign0 (e.offset) * N;
+  if (abs (side(2)) >= abs (side(1)))
+    if (side(2) >= 0)
+      anchor = 'south';
+    else
+      anchor = 'north';
+    endif
+  else
+    if (side(1) >= 0)
+      anchor = 'west';
+    else
+      anchor = 'east';
+    endif
+  endif
+
+  mid = (A1 + A2) / 2;
+  lines{end+1} = sprintf (strcat ('\\node[anchor=%s, inner sep=0.8mm,', ...
+                                  ' font=%s] at %s {%s};'), anchor, ...
+                          fontfor (2.5 * scale, scale), pt (mid), ...
+                          texescape (label));
+
+endfunction
+
+## A coordinate, in model millimetres.
+function s = pt (P)
+
+  s = sprintf ('(%s,%s)', fmt (P(1)), fmt (P(2)));
+
+endfunction
+
+## A number, without the trailing noise a plain %f leaves behind.
+function s = fmt (x)
+
+  s = sprintf ('%.6g', x);
+
+endfunction
+
+## A LaTeX font selection giving a cap height of H model millimetres at the
+## stated scale.  TeX points, not the printer's points a CAD application uses.
+function s = fontfor (H, scale)
+
+  pts = (H / scale) * 72.27 / 25.4;
+  s = sprintf ('\\fontsize{%s}{%s}\\selectfont', fmt (pts), fmt (1.2 * pts));
+
+endfunction
+
+## Map a CAD hatch pattern onto a TikZ one.  Only the patterns an engineering
+## drawing actually uses are worth naming; anything else falls back rather than
+## Escape the characters LaTeX would otherwise act on.  The backslash has to go
+## first, or the escapes introduced for everything else get escaped in turn.
+function s = texescape (t)
+
+  ## Drawing symbols first, before the escaping turns their per cent signs into
+  ## literals.  The replacements need no package beyond what any document has.
+  t = strrep (t, '%%%', "\x00PC\x00");
+  t = strrep (t, '%%c', "\x00DIA\x00");
+  t = strrep (t, '%%C', "\x00DIA\x00");
+  t = strrep (t, '%%d', "\x00DEG\x00");
+  t = strrep (t, '%%D', "\x00DEG\x00");
+  t = strrep (t, '%%p', "\x00PM\x00");
+  t = strrep (t, '%%P', "\x00PM\x00");
+
+  s = strrep (t, '\', '\textbackslash');
+  s = strrep (s, '{', '\{');
+  s = strrep (s, '}', '\}');
+  s = strrep (s, '\textbackslash', '\textbackslash{}');
+  for c = {'&', '%', '$', '#', '_'}
+    s = strrep (s, c{1}, ['\', c{1}]);
+  endfor
+  s = strrep (s, '~', '\textasciitilde{}');
+  s = strrep (s, '^', '\textasciicircum{}');
+
+  s = strrep (s, "\x00DIA\x00", '\O{}');
+  s = strrep (s, "\x00DEG\x00", '$^\circ$');
+  s = strrep (s, "\x00PM\x00", '$\pm$');
+  s = strrep (s, "\x00PC\x00", '\%');
+
+endfunction
+
+## The unit vector along V, falling back to FB when V vanishes.
+## sign(), but never zero.
 %!demo
 %! ## A drawing is built by appending entities.  It is a value class, so every
 %! ## method returns a new drawing and the methods chain.
@@ -1432,7 +3302,7 @@ endfunction
 %! D = D.polyline ([0, 0; 80, 0; 80, 50; 0, 50], true).circle ([40, 25], 12);
 %! numentities (D)
 %! [B, W, H] = bbox (D)
-%! draw.plot (D);
+%! plot (D);
 %! title ('a plate with a bore');
 
 %!demo
@@ -1451,7 +3321,7 @@ endfunction
 %! D.Colour = 'red';
 %! D = D.line ([-6, 0], [76, 0]);
 %! D.layers ()
-%! draw.plot (D);
+%! plot (D);
 %! title ('three layers, each with its own line type');
 
 %!demo
@@ -1467,7 +3337,7 @@ endfunction
 %! big = part.transform ('scale', 2);
 %! sheet = sheet.merge (big.transform ('translate', [50, -45]));
 %! numentities (sheet)
-%! draw.plot (sheet);
+%! plot (sheet);
 %! title ('one part, five placements');
 
 %!demo
@@ -1483,7 +3353,7 @@ endfunction
 %! printf ('%d entities referring to %d block\n', ...
 %!         numentities (D), numel (D.Blocks));
 %! printf ('%d once expanded\n', numentities (D.expand ()));
-%! draw.plot (D);
+%! plot (D);
 %! title ('a bolt circle from one block definition');
 
 %!demo
@@ -1501,5 +3371,5 @@ endfunction
 %! D = D.radius ([0, 0], 32, -40);
 %! D = D.angdim ([0, 0], [40, 0], [30, 30], 40);
 %! D = D.leader ([32*cosd(60), 32*sind(60); 50, 45; 62, 45], 'HARDEN %%p2 HRC');
-%! draw.plot (D);
+%! plot (D);
 %! title ('diameter, radius, angle and a leader');

@@ -1,0 +1,22 @@
+%!demo
+%! ## A plate plotted on A4 at a scale the sheet chooses.  What comes back is
+%! ## the sheet actually used and the scale it settled on, which is what a
+%! ## title block has to state.
+%!
+%! D = draw.Drawing ('plate');
+%! D = D.polyline ([0, 0; 200, 0; 200, 120; 0, 120], true);
+%! D = D.circle ([100, 60], 35);
+%! D = D.dim ([0, 0], [200, 0], -20, 'horizontal');
+%!
+%! fn = fullfile (tempdir (), 'plate.pdf');
+%! [paper, scale] = print (D, fn)
+%! delete (fn);
+
+%!demo
+%! ## The same drawing on A5 needs a smaller scale, and the function picks the
+%! ## largest of the ISO 5455 series that still fits rather than an exact fit.
+%!
+%! D = draw.Drawing ().polyline ([0, 0; 200, 0; 200, 120; 0, 120], true);
+%! fn = fullfile (tempdir (), 'plate5.pdf');
+%! [paper, scale] = print (D, fn, 'Paper', 'A5')
+%! delete (fn);

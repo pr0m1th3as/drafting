@@ -1,0 +1,28 @@
+%!demo
+%! ## The LaTeX backend, for a drawing that belongs in a report rather than in
+%! ## a CAD program.  Each layer becomes a TikZ scope with a style of its own,
+%! ## so the document can restyle a layer by redefining it.
+%!
+%! D = draw.Drawing ('bracket');
+%! D.Layer = 'BODY';
+%! D = D.polyline ([0, 0; 40, 0; 40, 25; 0, 25], true).circle ([20, 12.5], 6);
+%! D.Layer = 'AXES';
+%! D.Linetype = 'CENTER';
+%! D.Colour = 'red';
+%! D = D.centremark ();
+%! S = tikz (D, 'scale', 2);
+%! disp (S);
+
+%!demo
+%! ## Dash lengths are model dimensions times a line-type scale, as CAD's
+%! ## LTSCALE works.  Defaulting that factor to the drawing scale brings the
+%! ## dashes to the page at nominal size whatever the view is drawn at.
+%!
+%! D = draw.Drawing ();
+%! D.Linetype = 'DASHED';
+%! D = D.line ([0, 0], [50, 0]);
+%! for sc = [1, 20]
+%!   S = tikz (D, 'scale', sc);
+%!   m = regexp (S, 'dash pattern=[^]]*', 'match');
+%!   printf ('scale 1:%-3d %s\n', sc, m{1});
+%! endfor

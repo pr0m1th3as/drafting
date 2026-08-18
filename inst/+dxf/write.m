@@ -499,7 +499,7 @@ function v = optfield (s, name, dflt)
 endfunction
 
 %!demo
-%! ## Writing a drawing as DXF is one call on what `draw.entities` produced.
+%! ## Writing a drawing as DXF is one call on what `entities` produced.
 %! ## The file carries the layers, line types and colours, and a line-type
 %! ## table with the dash patterns.
 %!
@@ -512,7 +512,7 @@ endfunction
 %! D = D.line ([-5, 20], [65, 20]);
 %!
 %! fn = [tempname(), '.dxf'];
-%! dxf.write (fn, draw.entities (D));
+%! dxf.write (fn, entities (D));
 %! printf ('%d bytes written\n', stat (fn).size);
 %! R = dxf.read (fn);
 %! for k = 1:numel (R)
@@ -533,9 +533,9 @@ endfunction
 %!
 %! f1 = [tempname(), '.dxf'];
 %! f2 = [tempname(), '.dxf'];
-%! [E, LOST, B] = draw.entities (D, 'blocks', 'reference');
+%! [E, LOST, B] = entities (D, 'blocks', 'reference');
 %! dxf.write (f1, E, 'blocks', B);
-%! dxf.write (f2, draw.entities (D));
+%! dxf.write (f2, entities (D));
 %! printf ('25 instances: %d bytes referenced, %d bytes expanded\n', ...
 %!         stat (f1).size, stat (f2).size);
 %! unlink (f1);
@@ -801,7 +801,7 @@ endfunction
 %! for k = 0:24
 %!   D = D.insert ('bore', [10 * k, 0]);
 %! endfor
-%! [E, LOST, B] = draw.entities (D, 'blocks', 'reference');
+%! [E, LOST, B] = entities (D, 'blocks', 'reference');
 %! unwind_protect
 %!   dxf.write (tmpf, E, 'blocks', B);
 %!   txt = fileread (tmpf);
@@ -819,9 +819,9 @@ endfunction
 %! endfor
 %! f2 = [tempname(), '.dxf'];
 %! unwind_protect
-%!   [E, L, B] = draw.entities (D, 'blocks', 'reference');
+%!   [E, L, B] = entities (D, 'blocks', 'reference');
 %!   dxf.write (tmpf, E, 'blocks', B);
-%!   dxf.write (f2, draw.entities (D));
+%!   dxf.write (f2, entities (D));
 %!   assert_equal (stat (tmpf).size < stat (f2).size / 2, true);
 %! unwind_protect_cleanup
 %!   unlink (tmpf);  unlink (f2);

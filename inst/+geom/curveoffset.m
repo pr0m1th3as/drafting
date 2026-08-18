@@ -196,7 +196,7 @@ endfunction
 %! D = D.polyline (geom.curveoffset (P, 4, true), true);
 %! D.Colour = 'blue';
 %! D = D.polyline (geom.curveoffset (P, -4, true), true);
-%! draw.plot (D);
+%! plot (D);
 %! title ('a lobed profile offset 4 mm in (red) and out (blue)');
 
 %!demo

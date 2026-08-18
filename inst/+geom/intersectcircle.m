@@ -116,7 +116,7 @@ endfunction
 %!     D = D.circle (P(k,:), 1.5);
 %!   endfor
 %! endfor
-%! draw.plot (D);
+%! plot (D);
 %! title ('two points, two points, one at tangency, then none');
 
 %!test  # a line through the centre cuts twice, at the ends of a diameter

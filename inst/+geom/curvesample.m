@@ -154,7 +154,7 @@ endfunction
 %! for k = 1:4:rows (P)
 %!   D = D.circle (P(k,:), 0.6);
 %! endfor
-%! draw.plot (D);
+%! plot (D);
 %! title ('adaptive sampling: dense at the ends, sparse along the flanks');
 
 %!demo

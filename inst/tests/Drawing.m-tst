@@ -516,24 +516,24 @@
 
 %!test  # an ellipse with equal axes is a circle, and measures like one
 %! D = draw.Drawing ().ellipse ([0, 0], 10, 10);
-%! E = draw.entities (D);
+%! E = entities (D);
 %! r = sqrt (sum (E(1).pts .^ 2, 2));
 %! assert_equal (r, 10 * ones (rows (E(1).pts), 1), 0.01);
 
 %!test  # its area is that of an ellipse, to the sampling tolerance
 %! D = draw.Drawing ().ellipse ([0, 0], 20, 8);
-%! E = draw.entities (D, 'chordtol', 1e-4);
+%! E = entities (D, 'chordtol', 1e-4);
 %! assert_equal (abs (geom.signedarea (E(1).pts)), pi * 20 * 8, 0.1);
 
 %!test  # rotating an ellipse turns its extent with it
 %! D = draw.Drawing ().ellipse ([0, 0], 20, 5, 90);
 %! [B, W, H] = bbox (D.transform ('translate', [0, 0]));
-%! E = draw.entities (D);
+%! E = entities (D);
 %! assert_equal (max (E(1).pts(:,2)) > max (E(1).pts(:,1)), true);
 
 %!test  # a bulge of one makes a semicircle on the chord it spans
 %! D = draw.Drawing ().polyline ([0, 0; 20, 0], false, [1, 0]);
-%! E = draw.entities (D, 'bulges', 'flatten');
+%! E = entities (D, 'bulges', 'flatten');
 %! r = sqrt (sum ((E(1).pts - [10, 0]) .^ 2, 2));
 %! assert_equal (r, 10 * ones (rows (E(1).pts), 1), 1e-6);
 
@@ -541,8 +541,8 @@
 %!       # RIGHT of the direction of travel; a negative one to the left
 %! Dp = draw.Drawing ().polyline ([0, 0; 20, 0], false, [1, 0]);
 %! Dn = draw.Drawing ().polyline ([0, 0; 20, 0], false, [-1, 0]);
-%! Ep = draw.entities (Dp, 'bulges', 'flatten');
-%! En = draw.entities (Dn, 'bulges', 'flatten');
+%! Ep = entities (Dp, 'bulges', 'flatten');
+%! En = entities (Dn, 'bulges', 'flatten');
 %! assert_equal (min (Ep(1).pts(:,2)) < 0, true);
 %! assert_equal (max (En(1).pts(:,2)) > 0, true);
 
@@ -550,7 +550,7 @@
 %!       # (10,10) counter-clockwise the centre is (0,10), not (10,0)
 %! b = tand (22.5);
 %! D = draw.Drawing ().polyline ([0, 0; 10, 10], false, [b, 0]);
-%! E = draw.entities (D, 'bulges', 'flatten');
+%! E = entities (D, 'bulges', 'flatten');
 %! P = E(1).pts;
 %! d = abs (sqrt (sum ((P - [0, 10]) .^ 2, 2)) - 10);
 %! assert_equal (max (d) < 1e-9, true);
@@ -559,18 +559,18 @@
 
 %!test  # a zero bulge leaves the segment straight
 %! D = draw.Drawing ().polyline ([0, 0; 10, 0; 10, 10], false, [0, 0, 0]);
-%! E = draw.entities (D, 'bulges', 'flatten');
+%! E = entities (D, 'bulges', 'flatten');
 %! assert_equal (E(1).pts, [0, 0; 10, 0; 10, 10], 1e-12);
 
 %!test  # arcs and straight runs mix in one polyline, which is the point
 %! D = draw.Drawing ().polyline ([0, 0; 20, 0; 20, 10], false, [1, 0, 0]);
-%! E = draw.entities (D, 'bulges', 'flatten');
+%! E = entities (D, 'bulges', 'flatten');
 %! assert_equal (rows (E(1).pts) > 4, true);
 %! assert_equal (E(1).pts(end,:), [20, 10], 1e-12);
 
 %!test  # kept rather than flattened, the bulge survives to the entity
 %! D = draw.Drawing ().polyline ([0, 0; 20, 0], false, [1, 0]);
-%! E = draw.entities (D);
+%! E = entities (D);
 %! assert_equal (E(1).bulge, [1, 0]);
 %! assert_equal (rows (E(1).pts), 2);
 
@@ -595,8 +595,8 @@
 %! assert_equal (D.Entities(1).text, '%%c10 H7');
 
 %!test  # a diameter runs right across the circle, a radius from the centre
-%! Ed = draw.entities (draw.Drawing ().diam ([0, 0], 10, 0));
-%! Er = draw.entities (draw.Drawing ().radius ([0, 0], 10, 0));
+%! Ed = entities (draw.Drawing ().diam ([0, 0], 10, 0));
+%! Er = entities (draw.Drawing ().radius ([0, 0], 10, 0));
 %! assert_equal (Ed(1).pts, [-10, 0; 10, 0], 1e-9);
 %! assert_equal (Er(1).pts, [0, 0; 10, 0], 1e-9);
 
@@ -609,13 +609,13 @@
 %! assert_equal (D.Entities(1).text, '270%%d');
 
 %!test  # it lowers to an arc at the stated radius plus ticks and text
-%! E = draw.entities (draw.Drawing ().angdim ([0, 0], [10, 0], [0, 10], 5));
+%! E = entities (draw.Drawing ().angdim ([0, 0], [10, 0], [0, 10], 5));
 %! k = strcmp ({E.type}, 'ARC');
 %! assert_equal (sum (k), 1);
 %! assert_equal (E(k).radius, 5);
 
 %!test  # a centre mark is a cross centred on the feature
-%! E = draw.entities (draw.Drawing ().centremark ([7, 3], 10));
+%! E = entities (draw.Drawing ().centremark ([7, 3], 10));
 %! assert_equal (numel (E), 2);
 %! assert_equal (mean (vertcat (E.pts)), [7, 3], 1e-12);
 
@@ -634,7 +634,7 @@
 
 %!test  # a leader carries its path and puts the note at the tail
 %! D = draw.Drawing ().leader ([0, 0; 10, 10; 20, 10], 'M10');
-%! E = draw.entities (D);
+%! E = entities (D);
 %! t = E(strcmp ({E.type}, 'TEXT'));
 %! assert_equal (t.text, 'M10');
 %! assert_equal (t.pts(1) > 20, true);
@@ -644,7 +644,7 @@
 %! unwind_protect
 %!   D = draw.Drawing ().diam ([0, 0], 12.5);
 %!   D = D.angdim ([50, 0], [60, 0], [50, 10], 5);
-%!   dxf.write (fn, draw.entities (D));
+%!   dxf.write (fn, entities (D));
 %!   txt = fileread (fn);
 %!   assert_equal (! isempty (strfind (txt, '%%c25')), true);
 %!   assert_equal (! isempty (strfind (txt, '90%%d')), true);
@@ -672,3 +672,824 @@
 %!test  # and a measured length to a micron
 %! D = draw.Drawing ().diam ([0, 0], 6.17283945);
 %! assert_equal (D.Entities(1).text, '%%c12.346');
+
+%!test  # a drawing renders one object per entity
+%! f = figure ('visible', 'off');
+%! unwind_protect
+%!   D = draw.Drawing ().line ([0, 0], [1, 0]).circle ([0, 0], 2);
+%!   H = plot (D, 'Axes', axes ('parent', f));
+%!   assert_equal (numel (H), 2);
+%!   assert_equal (all (ishandle (H)), true);
+%! unwind_protect_cleanup
+%!   close (f);
+%! end_unwind_protect
+
+%!test  # the aspect ratio is equal, without which a drawing is a lie
+%! f = figure ('visible', 'off');
+%! unwind_protect
+%!   ax = axes ('parent', f);
+%!   plot (draw.Drawing ().circle ([0, 0], 5), 'Axes', ax);
+%!   r = get (ax, 'dataaspectratio');
+%!   assert_equal (r(1), r(2), 1e-12);
+%! unwind_protect_cleanup
+%!   close (f);
+%! end_unwind_protect
+
+%!test  # the geometry does not touch the frame
+%! f = figure ('visible', 'off');
+%! unwind_protect
+%!   ax = axes ('parent', f);
+%!   plot (draw.Drawing ().line ([10, 10], [80, 10]), 'Axes', ax);
+%!   xl = get (ax, 'xlim');
+%!   assert_equal (xl(1) < 10 && xl(2) > 80, true);
+%! unwind_protect_cleanup
+%!   close (f);
+%! end_unwind_protect
+
+%!test  # the margin is the same absolute pad on both axes, keeping the aspect
+%! f = figure ('visible', 'off');
+%! unwind_protect
+%!   ax = axes ('parent', f);
+%!   plot (draw.Drawing ().line ([10, 10], [80, 60]), 'Axes', ax, ...
+%!              'Margin', 0);
+%!   x0 = get (ax, 'xlim');
+%!   y0 = get (ax, 'ylim');
+%!   cla (ax);
+%!   plot (draw.Drawing ().line ([10, 10], [80, 60]), 'Axes', ax, ...
+%!              'Margin', 0.1);
+%!   x1 = get (ax, 'xlim');
+%!   y1 = get (ax, 'ylim');
+%!   assert_equal (x0(1) - x1(1), y0(1) - y1(1), 1e-9);
+%!   assert_equal (x1(2) - x0(2), 0.1 * max (diff (x0), diff (y0)), 1e-9);
+%! unwind_protect_cleanup
+%!   close (f);
+%! end_unwind_protect
+
+%!test  # Margin 0 fits the axes tight to the geometry
+%! f = figure ('visible', 'off');
+%! unwind_protect
+%!   ax = axes ('parent', f);
+%!   plot (draw.Drawing ().line ([10, 10], [80, 10]), 'Axes', ax, ...
+%!              'Margin', 0);
+%!   assert_equal (get (ax, 'xlim'), [10, 80]);
+%! unwind_protect_cleanup
+%!   close (f);
+%! end_unwind_protect
+
+%!test  # a label near an edge is held by the frame, not cut by it
+%! f = figure ('visible', 'off');
+%! unwind_protect
+%!   ax = axes ('parent', f);
+%!   D = draw.Drawing ().circle ([0, 0], 32);
+%!   D = D.leader ([15, 28; 40, 45; 50, 45], 'HARDEN');
+%!   H = plot (D, 'Axes', ax);
+%!   t = H(strcmp (get (H, 'type'), 'text'));
+%!   e = get (t(1), 'extent');
+%!   xl = get (ax, 'xlim');
+%!   assert_equal (e(1) + e(3) < xl(2), true);
+%! unwind_protect_cleanup
+%!   close (f);
+%! end_unwind_protect
+
+%!error<draw.Drawing.plot: Margin must be a non-negative real finite scalar.> ...
+%! plot (draw.Drawing ().circle ([0, 0], 5), 'Margin', -1)
+%!error<draw.Drawing.plot: Margin must be a non-negative real finite scalar.> ...
+%! plot (draw.Drawing ().circle ([0, 0], 5), 'Margin', [1, 2])
+
+%!test  # colour reaches the plotted object
+%! f = figure ('visible', 'off');
+%! unwind_protect
+%!   D = draw.Drawing ();
+%!   D.Colour = 'red';
+%!   H = plot (D.line ([0, 0], [1, 1]), 'Axes', axes ('parent', f));
+%!   assert_equal (get (H(1), 'color'), [1, 0, 0]);
+%! unwind_protect_cleanup
+%!   close (f);
+%! end_unwind_protect
+
+%!test  # approximate line types use the figure's own four styles
+%! f = figure ('visible', 'off');
+%! unwind_protect
+%!   ax = axes ('parent', f);
+%!   D = draw.Drawing ();
+%!   D.Linetype = 'CENTER';
+%!   D = D.line ([0, 0], [1, 0]);
+%!   D.Linetype = 'HIDDEN';
+%!   D = D.line ([0, 1], [1, 1]);
+%!   H = plot (D, 'Axes', ax, 'Linetypes', 'approximate');
+%!   assert_equal (numel (H), 2);
+%!   assert_equal (get (H(1), 'linestyle'), '-.');
+%!   assert_equal (get (H(2), 'linestyle'), '--');
+%! unwind_protect_cleanup
+%!   close (f);
+%! end_unwind_protect
+
+%!test  # true line types cut the run into dashes, each drawn solid
+%! f = figure ('visible', 'off');
+%! unwind_protect
+%!   D = draw.Drawing ();
+%!   D.Linetype = 'DASHED';
+%!   H = plot (D.line ([0, 0], [20, 0]), 'Axes', axes ('parent', f));
+%!   assert_equal (numel (H) > 1, true);
+%!   assert_equal (all (strcmp (get (H, 'linestyle'), '-')), true);
+%! unwind_protect_cleanup
+%!   close (f);
+%! end_unwind_protect
+
+%!test  # the dashes cover the drawn fraction the pattern calls for
+%! f = figure ('visible', 'off');
+%! unwind_protect
+%!   D = draw.Drawing ();
+%!   D.Linetype = 'DASHED';
+%!   H = plot (D.line ([0, 0], [30, 0]), 'Axes', axes ('parent', f));
+%!   L = 0;
+%!   for h = H'
+%!     x = get (h, 'xdata');
+%!     L += abs (x(end) - x(1));
+%!   endfor
+%!   pat = draw.linetype ('DASHED');
+%!   assert_equal (L / 30, sum (pat(pat > 0)) / sum (abs (pat)), 0.05);
+%! unwind_protect_cleanup
+%!   close (f);
+%! end_unwind_protect
+
+%!test  # patterns that collapse onto one style when approximated stay distinct
+%! f = figure ('visible', 'off');
+%! unwind_protect
+%!   ax = axes ('parent', f);
+%!   n = zeros (1, 3);
+%!   k = 0;
+%!   for lt = {'CENTER', 'DASHDOT', 'PHANTOM'}
+%!     k++;
+%!     D = draw.Drawing ();
+%!     D.Linetype = lt{1};
+%!     n(k) = numel (plot (D.line ([0, 0], [40, 0]), 'Axes', ax));
+%!   endfor
+%!   assert_equal (numel (unique (n)) > 1, true);
+%! unwind_protect_cleanup
+%!   close (f);
+%! end_unwind_protect
+
+%!test  # LTScale stretches the pattern, so fewer dashes cover the same run
+%! f = figure ('visible', 'off');
+%! unwind_protect
+%!   ax = axes ('parent', f);
+%!   D = draw.Drawing ();
+%!   D.Linetype = 'DASHED';
+%!   L = D.line ([0, 0], [40, 0]);
+%!   n1 = numel (plot (L, 'Axes', ax, 'LTScale', 1));
+%!   n4 = numel (plot (L, 'Axes', ax, 'LTScale', 4));
+%!   assert_equal (n4 < n1, true);
+%! unwind_protect_cleanup
+%!   close (f);
+%! end_unwind_protect
+
+%!test  # an axes handle may lead, as it may for any plotting function
+%! f = figure ('visible', 'off');
+%! unwind_protect
+%!   ax = axes ('parent', f);
+%!   H = plot (ax, draw.Drawing ().line ([0, 0], [1, 1]));
+%!   assert_equal (get (H(1), 'parent'), ax);
+%! unwind_protect_cleanup
+%!   close (f);
+%! end_unwind_protect
+
+%!test  # a leading handle and the Axes pair mean the same thing
+%! f = figure ('visible', 'off');
+%! unwind_protect
+%!   ax = axes ('parent', f);
+%!   D = draw.Drawing ().circle ([0, 0], 3);
+%!   H1 = plot (ax, D);
+%!   H2 = plot (D, 'Axes', ax);
+%!   assert_equal (numel (H1), numel (H2));
+%! unwind_protect_cleanup
+%!   close (f);
+%! end_unwind_protect
+
+%!test  # a hatch is filled by default, and outlined when asked
+%! f = figure ('visible', 'off');
+%! unwind_protect
+%!   ax = axes ('parent', f);
+%!   D = draw.Drawing ().hatch ([0, 0; 20, 0; 20, 20; 0, 20]);
+%!   nfill = numel (plot (D, 'Axes', ax));
+%!   nline = numel (plot (D, 'Axes', ax, 'Hatch', 'boundary'));
+%!   assert_equal (nline, 1);
+%!   assert_equal (nfill > 1, true);
+%! unwind_protect_cleanup
+%!   close (f);
+%! end_unwind_protect
+
+%!test  # a closed polyline is closed on screen, not left open
+%! f = figure ('visible', 'off');
+%! unwind_protect
+%!   P = [0, 0; 1, 0; 1, 1];
+%!   H = plot (draw.Drawing ().polyline (P, true), ...
+%!                  'Axes', axes ('parent', f));
+%!   assert_equal (numel (get (H(1), 'xdata')), 4);
+%! unwind_protect_cleanup
+%!   close (f);
+%! end_unwind_protect
+
+%!test  # the Layers filter draws only what was asked for
+%! f = figure ('visible', 'off');
+%! unwind_protect
+%!   D = draw.Drawing ();
+%!   D.Layer = 'A';  D = D.line ([0, 0], [1, 0]);
+%!   D.Layer = 'B';  D = D.line ([0, 1], [1, 1]);
+%!   H = plot (D, 'Axes', axes ('parent', f), 'Layers', {'A'});
+%!   assert_equal (numel (H), 1);
+%! unwind_protect_cleanup
+%!   close (f);
+%! end_unwind_protect
+
+%!test  # a dimension arrives already exploded, as the file will carry it
+%! f = figure ('visible', 'off');
+%! unwind_protect
+%!   D = draw.Drawing ().dim ([0, 0], [100, 0], -20, 'horizontal');
+%!   H = plot (D, 'Axes', axes ('parent', f));
+%!   assert_equal (numel (H) > 1, true);
+%! unwind_protect_cleanup
+%!   close (f);
+%! end_unwind_protect
+
+%!test  # an empty drawing plots nothing and does not raise
+%! f = figure ('visible', 'off');
+%! unwind_protect
+%!   H = plot (draw.Drawing (), 'Axes', axes ('parent', f));
+%!   assert_equal (isempty (H), true);
+%! unwind_protect_cleanup
+%!   close (f);
+%! end_unwind_protect
+
+%!test  # an arc is sampled in proportion to its sweep
+%! f = figure ('visible', 'off');
+%! unwind_protect
+%!   ax = axes ('parent', f);
+%!   Dfull = draw.Drawing ().circle ([0, 0], 1);
+%!   Hfull = plot (Dfull, 'Axes', ax, 'Arc', 64);
+%!   Hhalf = plot (draw.Drawing ().arc ([0, 0], 1, 0, 180), 'Axes', ax, ...
+%!                      'Arc', 64);
+%!   assert_equal (numel (get (Hhalf(1), 'xdata')) ...
+%!                 < numel (get (Hfull(1), 'xdata')), true);
+%! unwind_protect_cleanup
+%!   close (f);
+%! end_unwind_protect
+
+%!test  # hold state is left as it was found
+%! f = figure ('visible', 'off');
+%! unwind_protect
+%!   ax = axes ('parent', f);
+%!   plot (draw.Drawing ().line ([0, 0], [1, 1]), 'Axes', ax);
+%!   assert_equal (ishold (ax), false);
+%! unwind_protect_cleanup
+%!   close (f);
+%! end_unwind_protect
+
+%!error<draw.Drawing.plot: Name/Value arguments must come in pairs.> ...
+%! plot (draw.Drawing (), 'Arc')
+%!error<draw.Drawing.plot: unknown parameter.> ...
+%! plot (draw.Drawing (), 'Colour', 1)
+%!error<draw.Drawing.plot: Arc must be a positive real finite scalar.> ...
+%! plot (draw.Drawing (), 'Arc', 0)
+%!error<draw.Drawing.plot: Layers must be a cell array of character vectors.> ...
+%! plot (draw.Drawing (), 'Layers', 'A')
+%!error<draw.Drawing.plot: Hatch must be 'lines' or 'boundary'.> ...
+%! plot (draw.Drawing (), 'Hatch', 'fill')
+%!error<draw.Drawing.plot: Linetypes must be 'true' or 'approximate'.> ...
+%! plot (draw.Drawing (), 'Linetypes', 'exact')
+%!error<draw.Drawing.plot: LTScale must be a positive real finite scalar.> ...
+%! plot (draw.Drawing (), 'LTScale', -1)
+
+
+%!test  # the sheet is the size asked for, and the scale is reported
+%! fn = tempname ();
+%! D = draw.Drawing ().polyline ([0, 0; 200, 0; 200, 120; 0, 120], true);
+%! unwind_protect
+%!   [P, S] = print (D, [fn, '.pdf'], 'Paper', 'A3');
+%!   assert_equal (P, [420, 297]);
+%!   assert_equal (S, 1);
+%! unwind_protect_cleanup
+%!   unlink ([fn, '.pdf']);
+%! end_unwind_protect
+
+%!test  # portrait swaps the sheet
+%! fn = tempname ();
+%! D = draw.Drawing ().polyline ([0, 0; 100, 0; 100, 100; 0, 100], true);
+%! unwind_protect
+%!   P = print (D, [fn, '.pdf'], 'Paper', 'A4', 'Orientation', 'portrait');
+%!   assert_equal (P, [210, 297]);
+%! unwind_protect_cleanup
+%!   unlink ([fn, '.pdf']);
+%! end_unwind_protect
+
+%!test  # the fitted scale comes from the preferred series
+%! fn = tempname ();
+%! P = [0, 0; 20000, 0; 20000, 12000; 0, 12000];
+%! D = draw.Drawing ().polyline (P, true);
+%! unwind_protect
+%!   [~, S] = print (D, [fn, '.pdf'], 'Paper', 'A4');
+%!   assert_equal (any (S == [1, 2, 5, 10, 20, 50, 100, 200, 500]), true);
+%! unwind_protect_cleanup
+%!   unlink ([fn, '.pdf']);
+%! end_unwind_protect
+
+%!test  # an explicit scale is honoured, not refitted
+%! fn = tempname ();
+%! D = draw.Drawing ().polyline ([0, 0; 200, 0; 200, 120; 0, 120], true);
+%! unwind_protect
+%!   [~, S] = print (D, [fn, '.pdf'], 'Paper', 'A3', 'Scale', 5);
+%!   assert_equal (S, 5);
+%! unwind_protect_cleanup
+%!   unlink ([fn, '.pdf']);
+%! end_unwind_protect
+
+%!test  # a file is actually written
+%! fn = tempname ();
+%! D = draw.Drawing ().circle ([0, 0], 20);
+%! unwind_protect
+%!   print (D, [fn, '.pdf']);
+%!   assert_equal (exist ([fn, '.pdf'], 'file') > 0, true);
+%! unwind_protect_cleanup
+%!   unlink ([fn, '.pdf']);
+%! end_unwind_protect
+
+%!error<draw.Drawing.print: invalid number of input arguments.> ...
+%! print (draw.Drawing ())
+%!error<draw.Drawing.print: FILE must be a non-empty character vector.> ...
+%! print (draw.Drawing ().circle ([0, 0], 5), '')
+%!error<draw.Drawing.print: Name/Value arguments must come in pairs.> ...
+%! print (draw.Drawing ().circle ([0, 0], 5), 'x.pdf', 'Paper')
+%!error<draw.Drawing.print: unknown parameter.> ...
+%! print (draw.Drawing ().circle ([0, 0], 5), 'x.pdf', 'Nope', 1)
+%!error<draw.Drawing.print: Paper 'B3' is not one of A0 to A5.> ...
+%! print (draw.Drawing ().circle ([0, 0], 5), 'x.pdf', 'Paper', 'B3')
+%!error<draw.Drawing.print: Orientation must be 'landscape' or 'portrait'.> ...
+%! print (draw.Drawing ().circle ([0, 0], 5), 'x.pdf', 'Orientation', 'up')
+%!error<draw.Drawing.print: Margin must be a positive real finite scalar.> ...
+%! print (draw.Drawing ().circle ([0, 0], 5), 'x.pdf', 'Margin', -1)
+%!error<draw.Drawing.print: D is empty, so there is nothing to plot.> ...
+%! print (draw.Drawing (), 'x.pdf')
+
+%!test  # a plain drawing lowers entity for entity
+%! D = draw.Drawing ().line ([0, 0], [10, 0]).circle ([5, 5], 2);
+%! E = entities (D);
+%! assert_equal (numel (E), 2);
+%! assert_equal ({E.type}, {'LINE', 'CIRCLE'});
+%! assert_equal (E(1).pts, [0, 0; 10, 0]);
+%! assert_equal (E(2).radius, 2);
+
+%!test  # the layer travels with the entity
+%! D = draw.Drawing ();
+%! D.Layer = 'outline';
+%! D = D.polyline ([0, 0; 1, 0; 1, 1], true);
+%! E = entities (D);
+%! assert_equal (E(1).type, 'POLYLINE');
+%! assert_equal (E(1).layer, 'outline');
+%! assert_equal (E(1).closed, true);
+
+%!test  # the result has exactly the fields dxf.write expects
+%! E = entities (draw.Drawing ().line ([0, 0], [1, 1]));
+%! assert_equal (fieldnames (E), {'type'; 'layer'; 'linetype'; 'colour'; ...
+%!               'pts'; 'closed'; 'radius'; 'angles'; 'text'; 'height'; ...
+%!               'rotation'; 'bulge'});
+
+%!test  # an empty drawing lowers to an empty entity array
+%! E = entities (draw.Drawing ());
+%! assert_equal (isempty (E), true);
+%! assert_equal (fieldnames (E), {'type'; 'layer'; 'linetype'; 'colour'; ...
+%!               'pts'; 'closed'; 'radius'; 'angles'; 'text'; 'height'; ...
+%!               'rotation'; 'bulge'});
+
+%!test  # an arc keeps its radius and both angles
+%! E = entities (draw.Drawing ().arc ([1, 2], 3, 30, 120));
+%! assert_equal (E(1).type, 'ARC');
+%! assert_equal (E(1).radius, 3);
+%! assert_equal (E(1).angles, [30, 120]);
+
+%!test  # a dimension explodes into six entities on its own layer
+%! D = draw.Drawing ();
+%! D.Layer = 'dims';
+%! D = D.dim ([0, 0], [100, 0], -20, 'horizontal');
+%! E = entities (D);
+%! assert_equal (numel (E), 6);
+%! assert_equal ({E.type}, {'LINE', 'LINE', 'LINE', 'LINE', 'LINE', 'TEXT'});
+%! assert_equal (unique ({E.layer}), {'dims'});
+
+%!test  # the dimension line spans the measured points at the offset
+%! D = draw.Drawing ().dim ([0, 0], [100, 0], -20, 'horizontal');
+%! E = entities (D);
+%! assert_equal (E(3).pts, [0, -20; 100, -20], 1e-9);
+
+%!test  # an unlabelled dimension is annotated with what it measures
+%! D = draw.Drawing ().dim ([0, 0], [1600, 0], -50, 'horizontal');
+%! E = entities (D);
+%! assert_equal (E(6).type, 'TEXT');
+%! assert_equal (E(6).text, '1600');
+
+%!test  # a label overrides the measurement
+%! E = entities (draw.Drawing ().dim ([0, 0], [1600, 0], -50, ...
+%!                                         'horizontal', 'MIN. 1600'));
+%! assert_equal (E(6).text, 'MIN. 1600');
+
+%!test  # a horizontal dimension measures x alone, a vertical one y alone
+%! Eh = entities (draw.Drawing ().dim ([0, 0], [300, 400], 50, ...
+%!                                          'horizontal'));
+%! D = draw.Drawing ().dim ([0, 0], [300, 400], 50, 'vertical');
+%! Ev = entities (D);
+%! Ea = entities (draw.Drawing ().dim ([0, 0], [300, 400], 50, 'aligned'));
+%! assert_equal (Eh(6).text, '300');
+%! assert_equal (Ev(6).text, '400');
+%! assert_equal (Ea(6).text, '500');
+
+%!test  # both feet of a horizontal dimension land at the same height
+%! E = entities (draw.Drawing ().dim ([0, 0], [300, 400], -50, ...
+%!                                         'horizontal'));
+%! assert_equal (E(3).pts(1,2), E(3).pts(2,2), 1e-9);
+
+%!test  # both feet of a vertical dimension land at the same x
+%! D = draw.Drawing ().dim ([0, 0], [300, 400], -50, 'vertical');
+%! E = entities (D);
+%! assert_equal (E(3).pts(1,1), E(3).pts(2,1), 1e-9);
+
+%!test  # a non-integral measurement is given to one decimal
+%! E = entities (draw.Drawing ().dim ([0, 0], [10, 10], 5, 'aligned'));
+%! assert_equal (E(6).text, '14.1');
+
+%!test  # DimScale multiplies the ornament without moving the dimension line
+%! D = draw.Drawing ().dim ([0, 0], [100, 0], -20, 'horizontal');
+%! E1 = entities (D);
+%! E50 = entities (D, 'DimScale', 50);
+%! assert_equal (E1(3).pts, E50(3).pts, 1e-9);
+%! assert_equal (E50(6).height, 50 * E1(6).height, 1e-9);
+
+%!test  # the label clears a dimension line drawn below the geometry
+%! E = entities (draw.Drawing ().dim ([0, 0], [100, 0], -20, ...
+%!                                         'horizontal'), 'DimScale', 10);
+%! liney = E(3).pts(1,2);
+%! assert_equal (E(6).pts(2) + E(6).height < liney, true);
+
+%!test  # and one drawn above it
+%! E = entities (draw.Drawing ().dim ([0, 0], [100, 0], 20, ...
+%!                                         'horizontal'), 'DimScale', 10);
+%! liney = E(3).pts(1,2);
+%! assert_equal (E(6).pts(2) > liney, true);
+
+%!test  # a horizontal label beside a vertical dimension clears it by its width
+%! D = draw.Drawing ().dim ([0, 0], [0, 100], 20, 'vertical');
+%! E = entities (D, ...
+%!                    'DimScale', 10);
+%! linex = E(3).pts(1,1);
+%! wid = 0.6 * E(6).height * numel (E(6).text);
+%! assert_equal (E(6).pts(1) + wid < linex, true);
+%! assert_equal (abs (E(6).pts(2) + E(6).height / 2 - 50) < 1e-9, true);
+
+%!test  # the label sits on the far side of the line from what it measures
+%! Eu = entities (draw.Drawing ().dim ([0, 0], [100, 0], 30, ...
+%!                                          'horizontal'), 'DimScale', 10);
+%! Ed = entities (draw.Drawing ().dim ([0, 0], [100, 0], -30, ...
+%!                                          'horizontal'), 'DimScale', 10);
+%! assert_equal (Eu(6).pts(2) > Eu(3).pts(1,2), true);
+%! assert_equal (Ed(6).pts(2) < Ed(3).pts(1,2), true);
+
+%!test  # the label is centred along a dimension across the sheet
+%! E = entities (draw.Drawing ().dim ([0, 0], [1000, 0], -30, ...
+%!                                         'horizontal'), 'DimScale', 10);
+%! wid = 0.6 * E(6).height * numel (E(6).text);
+%! assert_equal (abs (E(6).pts(1) + wid / 2 - 500) < 1e-9, true);
+
+%!test  # a zero offset still produces a drawable dimension
+%! E = entities (draw.Drawing ().dim ([0, 0], [100, 0], 0, 'horizontal'));
+%! assert_equal (numel (E), 6);
+%! assert_equal (all (isfinite ([E(1).pts(:); E(2).pts(:)])), true);
+
+%!test  # a hatch keeps its boundary and gains the fill as explicit lines
+%! D = draw.Drawing ().hatch ([0, 0; 10, 0; 10, 10]);
+%! [E, LOST] = entities (D);
+%! assert_equal (E(1).type, 'POLYLINE');
+%! assert_equal (E(1).closed, true);
+%! assert_equal (numel (E) > 1, true);
+%! assert_equal (all (strcmp ({E(2:end).type}, 'LINE')), true);
+%! assert_equal (isempty (LOST), true);
+
+%!test  # asking for the boundary alone gives what it used to
+%! D = draw.Drawing ().hatch ([0, 0; 10, 0; 10, 10]);
+%! [E, LOST] = entities (D, 'hatch', 'boundary');
+%! assert_equal (numel (E), 1);
+%! assert_equal (E(1).type, 'POLYLINE');
+%! assert_equal (numel (LOST), 1);
+%! assert_equal (LOST(1).type, 'hatch');
+%! assert_equal (! isempty (strfind (LOST(1).reason, 'dropped')), true);
+
+%!test  # the fill lines inherit the hatch's layer, line type and colour
+%! D = draw.Drawing ();
+%! D.Layer = 'SECTION';
+%! D.Colour = 'blue';
+%! E = entities (D.hatch ([0, 0; 10, 0; 10, 10]));
+%! assert_equal (all (strcmp ({E.layer}, 'SECTION')), true);
+%! assert_equal (all ([E.colour] == 5), true);
+
+%!test  # spacing given to the hatch reaches the generated lines
+%! D = draw.Drawing ();
+%! P = [0, 0; 20, 0; 20, 20; 0, 20];
+%! Ewide = entities (D.hatch (P, 'ANSI31', 0, 4));
+%! Efine = entities (D.hatch (P, 'ANSI31', 0, 1));
+%! assert_equal (numel (Efine) > numel (Ewide), true);
+
+%!error<draw.Drawing.entities: Hatch must be 'lines' or 'boundary'.> ...
+%! entities (draw.Drawing (), 'hatch', 'fill')
+
+%!test  # a rotated text keeps its rotation and costs nothing
+%! [E0, L0] = entities (draw.Drawing ().text ([0, 0], 'A'));
+%! [E9, L9] = entities (draw.Drawing ().text ([0, 0], 'A', 2.5, 90));
+%! assert_equal (E0(1).rotation, 0);
+%! assert_equal (E9(1).rotation, 90);
+%! assert_equal (isempty (L0), true);
+%! assert_equal (isempty (L9), true);
+
+%!test  # asking for LOST silences the warning, omitting it does not
+%! D = draw.Drawing ().hatch ([0, 0; 10, 0; 10, 10]);
+%! lastwarn ('');
+%! [E, LOST] = entities (D, 'hatch', 'boundary');
+%! assert_equal (lastwarn (), '');
+%! E = entities (D, 'hatch', 'boundary');
+%! assert_equal (isempty (lastwarn ()), false);
+
+%!test  # a lowered drawing survives a DXF round trip
+%! fn = [tempname(), '.dxf'];
+%! unwind_protect
+%!   D = draw.Drawing ('rt');
+%!   D.Layer = 'outline';
+%!   D = D.polyline ([0, 0; 1600, 0; 1600, 1800; 0, 1800], true);
+%!   D.Layer = 'inner';
+%!   D = D.line ([100, 100], [1500, 100]).circle ([800, 900], 50);
+%!   dxf.write (fn, entities (D));
+%!   R = dxf.read (fn);
+%!   assert_equal (numel (R), 3);
+%!   assert_equal ({R.type}, {'POLYLINE', 'LINE', 'CIRCLE'});
+%!   assert_equal (R(1).pts, [0, 0; 1600, 0; 1600, 1800; 0, 1800], 1e-6);
+%!   assert_equal (R(1).closed, true);
+%!   assert_equal (R(3).radius, 50, 1e-6);
+%! unwind_protect_cleanup
+%!   unlink (fn);
+%! end_unwind_protect
+
+%!error<draw.Drawing.entities: optional arguments must come in name-value pairs.> ...
+%! entities (draw.Drawing (), 'DimScale')
+%!error<draw.Drawing.entities: option names must be character vectors.> ...
+%! entities (draw.Drawing (), 42, 1)
+%!error<draw.Drawing.entities: unknown option 'Colour'.> ...
+%! entities (draw.Drawing (), 'Colour', 'red')
+%!error<draw.Drawing.entities: DimScale must be a real positive finite scalar.> ...
+%! entities (draw.Drawing (), 'DimScale', 0)
+%!error<draw.Drawing.entities: DimScale must be a real positive finite scalar.> ...
+%! entities (draw.Drawing (), 'DimScale', [1, 2])
+
+%!test  # line type and colour travel from the drawing to the DXF record
+%! D = draw.Drawing ();
+%! D.Linetype = 'CENTER';
+%! D.Colour = 'red';
+%! E = entities (D.line ([0, 0], [1, 1]));
+%! assert_equal (E(1).linetype, 'CENTER');
+%! assert_equal (E(1).colour, 1);
+
+%!test  # every exploded part of a dimension inherits them
+%! D = draw.Drawing ();
+%! D.Linetype = 'HIDDEN';
+%! D.Colour = 5;
+%! E = entities (D.dim ([0, 0], [100, 0], -20, 'horizontal'));
+%! assert_equal (all (strcmp ({E.linetype}, 'HIDDEN')), true);
+%! assert_equal (all ([E.colour] == 5), true);
+
+%!test  # the defaults survive translation untouched
+%! E = entities (draw.Drawing ().circle ([0, 0], 5));
+%! assert_equal (E(1).linetype, 'CONTINUOUS');
+%! assert_equal (E(1).colour, 256);
+
+
+%!test  # the picture is opened and closed, and carries the drawing name
+%! S = tikz (draw.Drawing ('katopsi').line ([0, 0], [10, 0]));
+%! assert_equal (! isempty (strfind (S, '\begin{tikzpicture}')), true);
+%! assert_equal (! isempty (strfind (S, '\end{tikzpicture}')), true);
+%! assert_equal (! isempty (strfind (S, 'Drawing: katopsi')), true);
+
+%!test  # the scale reaches the unit vectors, not the coordinates
+%! S = tikz (draw.Drawing ().line ([0, 0], [1600, 0]), 'Scale', 50);
+%! assert_equal (! isempty (strfind (S, 'x=0.02mm, y=0.02mm')), true);
+%! assert_equal (! isempty (strfind (S, '\draw (0,0) -- (1600,0);')), true);
+
+%!test  # a 1:1 drawing has unit vectors of one millimetre
+%! S = tikz (draw.Drawing ().line ([0, 0], [10, 0]), 'Scale', 1);
+%! assert_equal (! isempty (strfind (S, 'x=1mm, y=1mm')), true);
+
+%!test  # an open polyline is not cycled and a closed one is
+%! So = tikz (draw.Drawing ().polyline ([0, 0; 1, 0; 1, 1]));
+%! Sc = tikz (draw.Drawing ().polyline ([0, 0; 1, 0; 1, 1], true));
+%! assert_equal (! isempty (strfind (So, '(0,0) -- (1,0) -- (1,1);')), true);
+%! assert_equal (! isempty (strfind (Sc, '(1,1) -- cycle;')), true);
+
+%!test  # a radius is absolute, already divided by the scale
+%! S = tikz (draw.Drawing ().circle ([0, 0], 500), 'Scale', 50);
+%! assert_equal (! isempty (strfind (S, 'circle[radius=10mm]')), true);
+
+%!test  # an arc is unrolled so that the end angle exceeds the start
+%! S = tikz (draw.Drawing ().arc ([0, 0], 100, 315, 45), 'Scale', 1);
+%! t = 'start angle=315, end angle=405';
+%! assert_equal (! isempty (strfind (S, t)), true);
+
+%!test  # equal arc angles unroll to a full turn
+%! S = tikz (draw.Drawing ().arc ([0, 0], 100, 45, 45));
+%! t = 'start angle=45, end angle=405';
+%! assert_equal (! isempty (strfind (S, t)), true);
+
+%!test  # text is anchored at the baseline, matching the DXF insertion point
+%! S = tikz (draw.Drawing ().text ([1, 2], 'NOTE'));
+%! assert_equal (! isempty (strfind (S, 'anchor=base west')), true);
+%! assert_equal (! isempty (strfind (S, 'at (1,2) {NOTE}')), true);
+
+%!test  # a rotated text keeps its rotation, unlike the DXF path
+%! S = tikz (draw.Drawing ().text ([0, 0], 'A', 2.5, 90));
+%! assert_equal (! isempty (strfind (S, 'rotate=90')), true);
+
+%!test  # text height is emitted in points at the plotted size
+%! S = tikz (draw.Drawing ().text ([0, 0], 'A', 125), 'Scale', 50);
+%! assert_equal (! isempty (strfind (S, '\fontsize{7.11319}')), true);
+
+%!test  # LaTeX special characters are escaped
+%! S = tikz (draw.Drawing ().text ([0, 0], '50% #3_a & b'));
+%! assert_equal (! isempty (strfind (S, '50\% \#3\_a \& b')), true);
+
+%!test  # a backslash escapes without its own escape being re-escaped
+%! S = tikz (draw.Drawing ().text ([0, 0], 'a\b'));
+%! assert_equal (! isempty (strfind (S, 'a\textbackslash{}b')), true);
+
+%!test  # braces are escaped
+%! S = tikz (draw.Drawing ().text ([0, 0], 'a{b}c'));
+%! assert_equal (! isempty (strfind (S, 'a\{b\}c')), true);
+
+%!test  # Greek text passes through untouched
+%! S = tikz (draw.Drawing ().text ([0, 0], 'ΤΟΜΗ'));
+%! assert_equal (! isempty (strfind (S, '{ΤΟΜΗ}')), true);
+
+%!test  # each layer becomes a scope, and a style is defined for it
+%! D = draw.Drawing ();
+%! D.Layer = 'outline';
+%! D = D.line ([0, 0], [1, 0]);
+%! D.Layer = 'inner';
+%! D = D.line ([0, 1], [1, 1]);
+%! S = tikz (D);
+%! assert_equal (! isempty (strfind (S, 'drinner/.style={}')), true);
+%! assert_equal (! isempty (strfind (S, 'droutline/.style={}')), true);
+%! assert_equal (! isempty (strfind (S, '\begin{scope}[drinner]')), true);
+%! assert_equal (! isempty (strfind (S, '% layer: outline')), true);
+
+%!test  # Styles false drops the definitions but keeps the scopes
+%! D = draw.Drawing ().line ([0, 0], [1, 0]);
+%! S = tikz (D, 'Styles', false);
+%! assert_equal (isempty (strfind (S, '\tikzset{')), true);
+%! assert_equal (! isempty (strfind (S, '\begin{scope}[')), true);
+
+%!test  # layer names differing only in punctuation get distinct styles
+%! D = draw.Drawing ();
+%! D.Layer = 'a-b';
+%! D = D.line ([0, 0], [1, 0]);
+%! D.Layer = 'ab';
+%! D = D.line ([0, 1], [1, 1]);
+%! S = tikz (D);
+%! assert_equal (! isempty (strfind (S, 'drab1')), true);
+%! assert_equal (! isempty (strfind (S, 'drab2')), true);
+
+%!test  # a layer with no letters in its name still gets a usable style
+%! S = tikz (draw.Drawing ().line ([0, 0], [1, 0]));
+%! assert_equal (! isempty (strfind (S, 'dr1/.style={}')), true);
+
+%!test  # a hatch arrives as its boundary and the fill lines entities
+%!       # generates, the same ones the DXF file carries.  The native TikZ
+%!       # pattern this replaced stroked no boundary at all and ignored the
+%!       # angle and spacing the hatch was given.
+%! S = tikz (draw.Drawing ().hatch ([0, 0; 10, 0; 10, 10]));
+%! assert_equal (! isempty (strfind (S, '-- cycle;')), true);
+%! assert_equal (numel (strfind (S, '\draw')) > 3, true);
+%! assert_equal (isempty (strfind (S, 'pattern=')), true);
+
+%!test  # a drawing without a hatch does not ask for the patterns library
+%! S = tikz (draw.Drawing ().line ([0, 0], [1, 0]));
+%! assert_equal (isempty (strfind (S, 'usetikzlibrary')), true);
+
+%!test  # a dimension renders as five strokes and one node
+%! S = tikz (draw.Drawing ().dim ([0, 0], [100, 0], -20, 'horizontal'));
+%! assert_equal (numel (strfind (S, '\draw')), 5);
+%! assert_equal (numel (strfind (S, '\node')), 1);
+
+%!test  # the dimension line agrees with the one draw.Drawing.entities emits
+%! D = draw.Drawing ().dim ([0, 0], [300, 400], -50, 'horizontal');
+%! E = entities (D);
+%! S = tikz (D);
+%! expect = sprintf ('\\draw (%g,%g) -- (%g,%g);', E(3).pts(1,1), ...
+%!                   E(3).pts(1,2), E(3).pts(2,1), E(3).pts(2,2));
+%! assert_equal (! isempty (strfind (S, expect)), true);
+
+%!test  # an unlabelled dimension is annotated with what it measures
+%! S = tikz (draw.Drawing ().dim ([0, 0], [1600, 0], -50, 'horizontal'));
+%! assert_equal (! isempty (strfind (S, '{1600}')), true);
+
+%!test  # a label overrides the measurement and is escaped
+%! S = tikz (draw.Drawing ().dim ([0, 0], [1600, 0], -50, 'horizontal', ...
+%!                                     'MIN. 100%'));
+%! assert_equal (! isempty (strfind (S, '{MIN. 100\%}')), true);
+
+%!test  # a dimension arrives already exploded, so the label is placed the same
+%!       # way here as it is in the file
+%! S = tikz (draw.Drawing ().dim ([0, 0], [100, 0], 20, 'horizontal'));
+%! assert_equal (! isempty (strfind (S, '\node')), true);
+%! assert_equal (numel (strfind (S, '\draw')) >= 5, true);
+
+%!test  # every entity type reaches the backend, including the ones added last
+%! D = draw.Drawing ().diam ([0, 0], 10).radius ([40, 0], 5);
+%! D = D.angdim ([80, 0], [90, 0], [80, 10], 6).centremark ([0, 0], 10);
+%! D = D.leader ([10, 10; 20, 20; 30, 20], 'NOTE').ellipse ([120, 0], 20, 8);
+%! S = tikz (D);
+%! assert_equal (numel (strfind (S, '\draw')) > 8, true);
+%! assert_equal (numel (strfind (S, '\node')), 4);
+
+%!test  # an empty drawing still yields a valid, empty picture
+%! S = tikz (draw.Drawing ());
+%! assert_equal (! isempty (strfind (S, '\begin{tikzpicture}')), true);
+%! assert_equal (isempty (strfind (S, '\begin{scope}')), true);
+
+%!test  # File writes the same code that is returned
+%! fn = [tempname(), '.tex'];
+%! unwind_protect
+%!   S = tikz (draw.Drawing ('w').line ([0, 0], [10, 0]), 'File', fn);
+%!   assert_equal (exist (fn, 'file') == 2, true);
+%!   fid = fopen (fn, 'rt');
+%!   txt = fread (fid, Inf, 'char=>char').';
+%!   fclose (fid);
+%!   assert_equal (strtrim (txt), strtrim (S));
+%! unwind_protect_cleanup
+%!   unlink (fn);
+%! end_unwind_protect
+
+%!error<draw.Drawing.tikz: optional arguments must come in name-value pairs.> ...
+%! tikz (draw.Drawing (), 'Scale')
+%!error<draw.Drawing.tikz: option names must be character vectors.> ...
+%! tikz (draw.Drawing (), 42, 1)
+%!error<draw.Drawing.tikz: unknown option 'Colour'.> ...
+%! tikz (draw.Drawing (), 'Colour', 'red')
+%!error<draw.Drawing.tikz: Scale must be a real positive finite scalar.> ...
+%! tikz (draw.Drawing (), 'Scale', 0)
+%!error<draw.Drawing.tikz: Scale must be a real positive finite scalar.> ...
+%! tikz (draw.Drawing (), 'Scale', [1, 2])
+%!error<draw.Drawing.tikz: File must be a non-empty character vector.> ...
+%! tikz (draw.Drawing (), 'File', '')
+%!error<draw.Drawing.tikz: Styles must be a logical scalar.> ...
+%! tikz (draw.Drawing (), 'Styles', 'yes')
+
+%!test  # a styled entity carries colour and dash pattern as draw options
+%! D = draw.Drawing ();
+%! D.Linetype = 'CENTER';
+%! D.Colour = 'red';
+%! S = tikz (D.line ([0, 0], [1, 0]));
+%! assert_equal (! isempty (strfind (S, '\draw[red, dash pattern=on')), true);
+
+%!test  # a default entity carries no options at all
+%! S = tikz (draw.Drawing ().line ([0, 0], [1, 0]));
+%! assert_equal (isempty (strfind (S, '\draw[')), true);
+%! assert_equal (! isempty (strfind (S, '\draw ')), true);
+
+%!test  # by default LTScale follows the drawing scale, so dashes reach the
+%!       # page at nominal size whatever the view is drawn at
+%! D = draw.Drawing ();
+%! D.Linetype = 'DASHED';
+%! L = D.line ([0, 0], [1, 0]);
+%! S1 = tikz (L, 'scale', 1);
+%! S50 = tikz (L, 'scale', 50);
+%! assert_equal (! isempty (strfind (S1, 'on 0.5mm off 0.25mm')), true);
+%! assert_equal (! isempty (strfind (S50, 'on 0.5mm off 0.25mm')), true);
+
+%!test  # an explicit LTScale multiplies the pattern, as CAD's LTSCALE does
+%! D = draw.Drawing ();
+%! D.Linetype = 'DASHED';
+%! S = tikz (D.line ([0, 0], [1, 0]), 'scale', 50, 'ltscale', 100);
+%! assert_equal (! isempty (strfind (S, 'on 1mm off 0.5mm')), true);
+
+%!test  # the rule is one rule: pattern times LTScale over scale
+%! D = draw.Drawing ();
+%! D.Linetype = 'DASHED';
+%! S = tikz (D.line ([0, 0], [1, 0]), 'scale', 10, 'ltscale', 5);
+%! assert_equal (! isempty (strfind (S, 'on 0.25mm off 0.125mm')), true);
+
+%!error<draw.Drawing.tikz: LTScale must be a real positive finite scalar.> ...
+%! tikz (draw.Drawing (), 'ltscale', 0)
+
+%!test  # the spacing given to a hatch reaches the page, which the native
+%!       # pattern it replaced could not carry
+%! P = [0, 0; 40, 0; 40, 40; 0, 40];
+%! Swide = tikz (draw.Drawing ().hatch (P, 'ANSI31', 0, 8));
+%! Sfine = tikz (draw.Drawing ().hatch (P, 'ANSI31', 0, 2));
+%! assert_equal (numel (strfind (Sfine, '\draw')) ...
+%!               > numel (strfind (Swide, '\draw')), true);
+
+%!test  # and a sectioned area is drawn with its outline
+%! P = [0, 0; 40, 0; 40, 40; 0, 40];
+%! S = tikz (draw.Drawing ().hatch (P, 'ANSI31'));
+%! assert_equal (! isempty (strfind (S, '-- cycle;')), true);

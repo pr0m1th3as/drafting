@@ -141,7 +141,7 @@ endfunction
 %!   D = D.text ([x, -5], nm{1}, 3);
 %!   x += 20;
 %! endfor
-%! draw.plot (D);
+%! plot (D);
 %! title ('the named colours');
 
 %!test  # names map to their indices

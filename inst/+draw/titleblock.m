@@ -154,7 +154,7 @@ endfunction
 %! part = part.centremark ();
 %! sheet = sheet.merge (part.transform ('translate', [120, 120]));
 %!
-%! draw.plot (sheet, 'FontSize', 6);
+%! plot (sheet, 'FontSize', 6);
 %! title ('an A4 sheet with its frame, block and part');
 
 %!test  # the sizes are the ISO A series

@@ -69,7 +69,7 @@ endfunction
 %! D.Linetype = 'PHANTOM';
 %! D.Colour = 'red';
 %! D = D.polyline ([B(1), B(2); B(3), B(2); B(3), B(4); B(1), B(4)], true);
-%! draw.plot (D);
+%! plot (D);
 %! title ('a profile and the box that bounds it');
 
 %!test

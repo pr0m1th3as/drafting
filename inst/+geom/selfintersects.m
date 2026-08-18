@@ -148,7 +148,7 @@ endfunction
 %! [TF, IDX] = geom.selfintersects (bowtie, true)
 %!
 %! D = draw.Drawing ().polyline (bowtie, true);
-%! draw.plot (D);
+%! plot (D);
 %! title ('segments 1 and 3 cross');
 
 %!demo
