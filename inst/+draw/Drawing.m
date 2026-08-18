@@ -1477,6 +1477,7 @@ classdef Drawing
       blockMode = 'expand';
       chordTol = 0.01;
       bulgeMode = 'keep';
+      dimMode = 'associative';
       for ii = 1:2:numel (varargin)
         name = varargin{ii};
         if (! ischar (name) || ! isrow (name))
@@ -1503,6 +1504,15 @@ classdef Drawing
                              " real positive", ...
                              " finite scalar."));
             endif
+          case 'dimensions'
+            dimMode = varargin{ii+1};
+            if (! ischar (dimMode) || ! isrow (dimMode) ...
+                || ! any (strcmpi (dimMode, {'associative', 'explode'})))
+              error (strcat ("draw.Drawing.entities: Dimensions must be", ...
+                             " 'associative' or 'explode'."));
+            endif
+            dimMode = lower (dimMode);
+
           case 'bulges'
             bulgeMode = varargin{ii+1};
             if (! ischar (bulgeMode) || ! isrow (bulgeMode) ...
@@ -1537,6 +1547,7 @@ classdef Drawing
       E = emptyentity ();
       LOST = struct ('index', {}, 'type', {}, 'reason', {});
       BLOCKS = struct ('name', {}, 'entities', {});
+      nDim = 0;
 
       ## An insert is a reference the caller may want kept, but every other
       ## consumer needs the geometry, so expansion is the default
@@ -1616,12 +1627,26 @@ classdef Drawing
 
           case {'diam', 'radius'}
             parts = explodecirc (e, dimScale);
-            for kk = 1:numel (parts)
-              E(end+1) = parts(kk);
-            endfor
+            if (strcmp (dimMode, 'associative'))
+              nDim++;
+              bn = sprintf ('*D%d', nDim);
+              BLOCKS(end+1) = struct ('name', bn, 'entities', {parts});
+              E(end+1) = dimrecord (e, bn, e.type);
+            else
+              for kk = 1:numel (parts)
+                E(end+1) = parts(kk);
+              endfor
+            endif
 
           case 'angdim'
             parts = explodeang (e, dimScale);
+            if (strcmp (dimMode, 'associative'))
+              nDim++;
+              bn = sprintf ('*D%d', nDim);
+              BLOCKS(end+1) = struct ('name', bn, 'entities', {parts});
+              E(end+1) = dimrecord (e, bn, 'angdim');
+              continue;
+            endif
             for kk = 1:numel (parts)
               E(end+1) = parts(kk);
             endfor
@@ -1640,7 +1665,7 @@ classdef Drawing
 
           case 'insert'
             s = mkent ('INSERT', e, e.pts);
-            s.text = e.block;
+            s.block = e.block;
             s.rotation = e.angle;
             s.radius = e.scale;
             E(end+1) = s;
@@ -1669,9 +1694,16 @@ classdef Drawing
 
           case 'dim'
             parts = explodedim (e, dimScale);
-            for jj = 1:numel (parts)
-              E(end+1) = parts(jj);
-            endfor
+            if (strcmp (dimMode, 'associative'))
+              nDim++;
+              bn = sprintf ('*D%d', nDim);
+              BLOCKS(end+1) = struct ('name', bn, 'entities', {parts});
+              E(end+1) = dimrecord (e, bn, 'dim');
+            else
+              for jj = 1:numel (parts)
+                E(end+1) = parts(jj);
+              endfor
+            endif
 
         endswitch
 
@@ -1899,7 +1931,10 @@ classdef Drawing
 
       ## The same lowering the file backends use, so the figure shows what the
       ## file will hold rather than a kinder version of it
-      E = entities (D, 'hatch', lower (opt.Hatch), 'bulges', 'flatten');
+      ## A renderer wants the picture, not the semantics: the associative form
+      ## exists for a file, where a reader can re-measure it.
+      E = entities (D, 'hatch', lower (opt.Hatch), 'bulges', 'flatten', ...
+                    'dimensions', 'explode');
       if (! isempty (opt.Layers) && ! isempty (E))
         E = E(ismember ({E.layer}, opt.Layers));
       endif
@@ -2372,7 +2407,7 @@ classdef Drawing
       ## type.
       ## That is not hypothetical: this one did, when the dimensioning entities
       ## arrived and only this backend still rendered from the drawing model.
-      E = entities (D, 'bulges', 'flatten');
+      E = entities (D, 'bulges', 'flatten', 'dimensions', 'explode');
 
       if (isempty (E))
         L = {};
@@ -2782,6 +2817,92 @@ endfunction
 
 
 
+## The DIMENSION record for one semantic dimension, referring to the anonymous
+## block that holds its picture.  The definition points are what makes the
+## dimension associative: a CAD application re-measures from them, which is why
+## the text is emitted as "<>" unless the caller overrode it.
+function d = dimrecord (e, blockname, kind)
+
+  d = mkent ('DIMENSION', e, [0, 0]);
+  d.block = blockname;
+  ## "<>" tells the reader to measure for itself, which is the whole point of
+  ## an associative dimension.  A label the caller gave is emitted literally
+  ## instead -- unless it is exactly what the measurement produces, in which
+  ## case the two are indistinguishable on the sheet and "<>" keeps it live.
+  d.text = '<>';
+  if (isfield (e, 'text') && ! isempty (e.text) ...
+      && ! strcmp (e.text, autolabel (e, kind)))
+    d.text = e.text;
+  endif
+
+  switch (kind)
+    case 'dim'
+      P1 = e.pts(1,:);
+      P2 = e.pts(2,:);
+      switch (e.direction)
+        case 'horizontal'
+          U = [1, 0];
+        case 'vertical'
+          U = [0, 1];
+        otherwise
+          U = (P2 - P1) / norm (P2 - P1);
+      endswitch
+      N = [-U(2), U(1)];
+      d.pts = [P1 + e.offset * N; (P1 + P2) / 2 + e.offset * N; ...
+               P1; P2; 0, 0; 0, 0];
+      d.rotation = atan2d (U(2), U(1));
+      d.angles = 0;
+
+    case 'diam'
+      C = e.pts(1,:);
+      u = [cosd(e.angle), sind(e.angle)];
+      d.pts = [C + e.radius * u; C; 0, 0; 0, 0; C - e.radius * u; 0, 0];
+      d.angles = 3;
+
+    case 'radius'
+      C = e.pts(1,:);
+      u = [cosd(e.angle), sind(e.angle)];
+      d.pts = [C + e.radius * u; C + e.radius * u / 2; ...
+               0, 0; 0, 0; C; 0, 0];
+      d.angles = 4;
+
+    case 'angdim'
+      V = e.pts(1,:);
+      P1 = e.pts(2,:);
+      P2 = e.pts(3,:);
+      am = (atan2d (P1(2) - V(2), P1(1) - V(1)) ...
+            + atan2d (P2(2) - V(2), P2(1) - V(1))) / 2;
+      A = V + e.radius * [cosd(am), sind(am)];
+      d.pts = [A; A; V; P1; V; P2];
+      d.angles = 2;
+
+  endswitch
+
+endfunction
+
+## The label a dimension gives itself from its own measurement, which is what
+## 'diam', 'radius' and 'angdim' store when the caller names none.  Kept
+## beside dimrecord so the two cannot drift apart.
+function t = autolabel (e, kind)
+
+  switch (kind)
+    case 'diam'
+      t = sprintf ('%%%%c%g', round (2 * e.radius * 1000) / 1000);
+    case 'radius'
+      t = sprintf ('R%g', round (e.radius * 1000) / 1000);
+    case 'angdim'
+      V = e.pts(1,:);
+      P1 = e.pts(2,:);
+      P2 = e.pts(3,:);
+      a = mod (atan2d (P2(2) - V(2), P2(1) - V(1)) ...
+               - atan2d (P1(2) - V(2), P1(1) - V(1)), 360);
+      t = sprintf ('%g%%%%d', round (a * 100) / 100);
+    otherwise
+      t = '';
+  endswitch
+
+endfunction
+
 ## The empty entity array, in dxf.write's vocabulary.  Field order is fixed so
 ## that the array grows by assignment.
 function E = emptyentity ()
@@ -2789,7 +2910,7 @@ function E = emptyentity ()
   E = struct ('type', {}, 'layer', {}, 'linetype', {}, 'colour', {}, ...
               'pts', {}, 'closed', {}, ...
               'radius', {}, 'angles', {}, 'text', {}, 'height', {}, ...
-              'rotation', {}, 'bulge', {});
+              'rotation', {}, 'bulge', {}, 'block', {});
 
 endfunction
 
@@ -2806,7 +2927,7 @@ function s = mkent (type, e, pts)
               'colour', optfield (e, 'colour', 256), ...
               'pts', pts, 'closed', false, ...
               'radius', [], 'angles', [], 'text', '', 'height', [], ...
-              'rotation', 0, 'bulge', []);
+              'rotation', 0, 'bulge', [], 'block', '');
 
 endfunction
 

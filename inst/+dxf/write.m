@@ -39,6 +39,10 @@
 ## @code{height}; an optional @code{rotation} in degrees, counter-clockwise,
 ## is written only when it is non-zero
 ## @item @qcode{'POINT'} @tab one point
+## @item @qcode{'DIMENSION'} @tab six definition points, plus @code{block}
+## naming the block that holds its picture, @code{angles} giving the DXF
+## dimension type (0 linear, 2 angular, 3 diameter, 4 radius) and @code{text},
+## where @qcode{'<>'} leaves the reader to measure it
 ## @end multitable
 ##
 ## Layers are collected from the entities and declared in the layer table.  An
@@ -169,6 +173,27 @@ function write (FILE, E, varargin)
       putpair (fid, 6, 'CONTINUOUS');
     endfor
     putpair (fid, 0, 'ENDTAB');
+
+    ## One dimension style, named for the package.  DIMTSZ non-zero is what
+    ## makes a reader draw the 45-degree obliques this package draws itself,
+    ## rather than substituting filled arrowheads.
+    putpair (fid, 0, 'TABLE');
+    putpair (fid, 2, 'DIMSTYLE');
+    putpair (fid, 70, 1);
+    putpair (fid, 0, 'DIMSTYLE');
+    putpair (fid, 2, 'DRAFTING');
+    putpair (fid, 70, 0);
+    putpair (fid, 40, 1);          # DIMSCALE
+    putpair (fid, 41, 2.5);        # DIMASZ, arrow size
+    putpair (fid, 42, 0.625);      # DIMEXO, extension line offset
+    putpair (fid, 44, 1.25);       # DIMEXE, extension beyond the line
+    putpair (fid, 140, 2.5);       # DIMTXT, text height
+    putpair (fid, 141, 2.5);       # DIMCEN, centre mark size
+    putpair (fid, 142, 1.25);      # DIMTSZ, tick size: obliques, not arrows
+    putpair (fid, 147, 0.625);     # DIMGAP
+    putpair (fid, 77, 1);          # DIMTAD, text above the dimension line
+    putpair (fid, 0, 'ENDTAB');
+
     putpair (fid, 0, 'ENDSEC');
 
     ## Blocks, which the INSERT entities refer to by name
@@ -211,7 +236,7 @@ endfunction
 function s = checkentity (e, ii)
 
   known = {'LINE', 'POLYLINE', 'LWPOLYLINE', 'CIRCLE', 'ARC', 'TEXT', ...
-           'POINT', 'INSERT'};
+           'POINT', 'INSERT', 'DIMENSION'};
 
   if (! ischar (e.type) || ! isrow (e.type) ...
       || ! any (strcmpi (e.type, known)))
@@ -320,13 +345,32 @@ function s = checkentity (e, ii)
                        " scalar."), ii);
       endif
 
+    case 'DIMENSION'
+      if (rows (s.pts) != 6)
+        error (strcat ("dxf.write: E(%d) DIMENSION needs six definition", ...
+                       " points."), ii);
+      endif
+      s.block = optfield (e, 'block', '');
+      if (! ischar (s.block) || isempty (s.block))
+        error (strcat ("dxf.write: E(%d) DIMENSION needs the name of the", ...
+                       " block holding its picture in .block."), ii);
+      endif
+      s.angles = optfield (e, 'angles', 0);
+      if (! isnumeric (s.angles) || ! isscalar (s.angles) ...
+          || ! any (s.angles == [0, 2, 3, 4]))
+        error (strcat ("dxf.write: E(%d).angles is the DIMENSION type and", ...
+                       " must be 0, 2, 3 or 4."), ii);
+      endif
+      s.text = optfield (e, 'text', '<>');
+      s.rotation = optfield (e, 'rotation', 0);
+
     case 'INSERT'
       if (rows (s.pts) != 1)
         error ("dxf.write: E(%d) INSERT needs exactly one point.", ii);
       endif
-      s.text = optfield (e, 'text', '');
-      if (! ischar (s.text) || isempty (s.text))
-        error ("dxf.write: E(%d) INSERT needs a block name in .text.", ii);
+      s.block = optfield (e, 'block', '');
+      if (! ischar (s.block) || isempty (s.block))
+        error ("dxf.write: E(%d) INSERT needs a block name in .block.", ii);
       endif
       s.radius = optfield (e, 'radius', 1);
       if (isempty (s.radius))
@@ -446,10 +490,26 @@ function putentity (fid, s)
         putpair (fid, 50, s.rotation);
       endif
 
+    case 'DIMENSION'
+      putpair (fid, 0, 'DIMENSION');
+      putcommon (fid, s);
+      putpair (fid, 2, s.block);
+      putpair (fid, 3, 'DRAFTING');
+      for kk = [10, 11, 13, 14, 15, 16]
+        row = find ([10, 11, 13, 14, 15, 16] == kk);
+        putpair (fid, kk, s.pts(row,1));
+        putpair (fid, kk + 10, s.pts(row,2));
+        putpair (fid, kk + 20, 0);
+      endfor
+      ## Bit 32 marks the picture as an unnamed block, as every writer sets it.
+      putpair (fid, 70, s.angles + 32);
+      putpair (fid, 1, s.text);
+      putpair (fid, 50, s.rotation);
+
     case 'INSERT'
       putpair (fid, 0, 'INSERT');
       putcommon (fid, s);
-      putpair (fid, 2, s.text);
+      putpair (fid, 2, s.block);
       putpair (fid, 10, s.pts(1));
       putpair (fid, 20, s.pts(2));
       putpair (fid, 30, 0);
@@ -828,7 +888,7 @@ endfunction
 %! end_unwind_protect
 
 %!test  # an INSERT round-trips with its block name, position, scale and angle
-%! E = struct ('type', 'INSERT', 'layer', 'A', 'text', 'BORE', ...
+%! E = struct ('type', 'INSERT', 'layer', 'A', 'block', 'BORE', ...
 %!             'pts', [12, 7], 'radius', 2.5, 'rotation', 30);
 %! B = struct ('name', 'BORE', 'entities', ...
 %!             struct ('type', 'CIRCLE', 'pts', [0, 0], 'radius', 3));
@@ -836,7 +896,7 @@ endfunction
 %!   dxf.write (tmpf, E, 'blocks', B);
 %!   R = dxf.read (tmpf);
 %!   assert_equal (R.type, 'INSERT');
-%!   assert_equal (R.text, 'BORE');
+%!   assert_equal (R.block, 'BORE');
 %!   assert_equal (R.pts, [12, 7], 1e-9);
 %!   assert_equal (R.radius, 2.5, 1e-9);
 %!   assert_equal (R.rotation, 30, 1e-9);
@@ -857,3 +917,32 @@ endfunction
 %! unwind_protect_cleanup
 %!   unlink (tmpf);
 %! end_unwind_protect
+
+%!test  # a DIMENSION is written with its style, its block and its type
+%! P = [0, -5; 50, -5; 0, 0; 100, 0; 0, 0; 0, 0];
+%! E = struct ('type', 'DIMENSION', 'pts', P, ...
+%!             'block', '*D1', 'angles', 0, 'text', '<>');
+%! B = struct ('name', '*D1', 'entities', ...
+%!             struct ('type', 'LINE', 'pts', [0, -5; 100, -5]));
+%! unwind_protect
+%!   dxf.write (tmpf, E, 'blocks', B);
+%!   txt = fileread (tmpf);
+%!   assert_equal (! isempty (strfind (txt, 'DIMSTYLE')), true);
+%!   assert_equal (! isempty (strfind (txt, 'DRAFTING')), true);
+%!   assert_equal (! isempty (strfind (txt, 'DIMENSION')), true);
+%! unwind_protect_cleanup
+%!   unlink (tmpf);
+%! end_unwind_protect
+
+%!error<dxf.write: E\(1\) DIMENSION needs six definition points.> ...
+%! dxf.write (tempname (), struct ('type', 'DIMENSION', 'pts', [0, 0], ...
+%!                                 'block', '*D1', 'angles', 0))
+%!error<dxf.write: E\(1\) DIMENSION needs the name of the block holding its picture in .block.> ...
+%! dxf.write (tempname (), struct ('type', 'DIMENSION', ...
+%!                                 'pts', zeros (6, 2), 'angles', 0))
+%!error<dxf.write: E\(1\).angles is the DIMENSION type and must be 0, 2, 3 or 4.> ...
+%! dxf.write (tempname (), struct ('type', 'DIMENSION', ...
+%!                                 'pts', zeros (6, 2), ...
+%!                                 'block', '*D1', 'angles', 9))
+%!error<dxf.write: E\(1\) INSERT needs a block name in .block.> ...
+%! dxf.write (tempname (), struct ('type', 'INSERT', 'pts', [0, 0]))

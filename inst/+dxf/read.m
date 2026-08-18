@@ -19,8 +19,20 @@
 ## @deftypefn  {drafting} {@var{E} =} dxf.read (@var{FILE})
 ## @deftypefnx {drafting} {@var{E} =} dxf.read (@var{FILE}, @var{LAYER})
 ## @deftypefnx {drafting} {[@var{E}, @var{UNITS}, @var{SKIPPED}] =} dxf.read (@dots{})
+## @deftypefnx {drafting} {[@var{E}, @var{UNITS}, @var{SKIPPED}, @var{BLOCKS}] =} dxf.read (@dots{})
 ##
 ## Read geometry from an ASCII DXF file.
+##
+## @code{[@var{E}, @var{UNITS}, @var{SKIPPED}, @var{BLOCKS}] = dxf.read
+## (@dots{})} additionally returns the block definitions, in the shape
+## @code{dxf.write} takes back through its @qcode{'blocks'} pair.  Without it
+## an @code{INSERT} is a reference to geometry the caller never receives.
+##
+## A @code{DIMENSION} is returned with its six definition points in
+## @code{pts}, its DXF type in @code{angles} --- 0 linear, 2 angular, 3
+## diameter, 4 radius --- the name of the block holding its picture in
+## @code{block}, and its text in @code{text}, where @qcode{'<>'} means the
+## dimension measures itself.
 ##
 ## @code{@var{E} = dxf.read (@var{FILE})} parses @var{FILE} and returns its
 ## drawing entities as a struct array with one element per entity and the
@@ -73,7 +85,7 @@
 ## @seealso{dxf.write, geom.isrectilinear}
 ## @end deftypefn
 
-function [E, UNITS, SKIPPED] = read (FILE, LAYER = '')
+function [E, UNITS, SKIPPED, BLOCKS] = read (FILE, LAYER = '')
 
   ## Input validation
   if (nargin < 1)
@@ -114,6 +126,7 @@ function [E, UNITS, SKIPPED] = read (FILE, LAYER = '')
   UNITS = 'unitless';
   scale = 1;
   entities = [];
+  blocks = [];
   starts = find (codes == 0 & strcmpi (values, 'SECTION'));
   stops = find (codes == 0 & strcmpi (values, 'ENDSEC'));
   for ii = 1:numel (starts)
@@ -131,10 +144,13 @@ function [E, UNITS, SKIPPED] = read (FILE, LAYER = '')
         [UNITS, scale] = headerunits (codes(body), values(body));
       case 'ENTITIES'
         entities = body;
+      case 'BLOCKS'
+        blocks = body;
     endswitch
   endfor
 
   [E, SKIPPED] = parseentities (codes(entities), values(entities), scale);
+  BLOCKS = parseblocks (codes(blocks), values(blocks), scale);
 
   ## Restrict to one layer if asked
   if (! isempty (LAYER) && ! isempty (E))
@@ -172,6 +188,48 @@ function [UNITS, scale] = headerunits (codes, values)
 
 endfunction
 
+## Turn the BLOCKS section into a struct array of definitions, in the shape
+## dxf.write takes back through its 'blocks' pair.  A block's own entities are
+## parsed by exactly the same code as the drawing's, so anything readable in
+## the drawing is readable inside a block.
+function B = parseblocks (codes, values, scale)
+
+  B = struct ('name', {}, 'entities', {});
+  if (isempty (codes))
+    return;
+  endif
+  marks = find (codes == 0);
+  starts = marks(strcmpi (values(marks), 'BLOCK'));
+  for ii = 1:numel (starts)
+    at = starts(ii);
+    ends = marks(marks > at);
+    ends = ends(strcmpi (values(ends), 'ENDBLK'));
+    if (isempty (ends))
+      continue;
+    endif
+    to = ends(1);
+    ## The name is the first group 2 of the block header
+    hdr = (at+1):(to-1);
+    nm = grouptext (codes(hdr), values(hdr), 2, '');
+    if (isempty (nm))
+      continue;
+    endif
+    ## Entities are everything from the second 0-marker inside the block
+    inner = marks(marks > at & marks < to);
+    if (isempty (inner))
+      ents = struct ('type', {}, 'layer', {}, 'linetype', {}, 'colour', {}, ...
+                     'pts', {}, 'closed', {}, 'radius', {}, 'angles', {}, ...
+                     'text', {}, 'height', {}, 'rotation', {}, 'bulge', {}, ...
+                     'block', {});
+    else
+      ents = parseentities (codes(inner(1):(to-1)), ...
+                            values(inner(1):(to-1)), scale);
+    endif
+    B(end+1) = struct ('name', nm, 'entities', {ents});
+  endfor
+
+endfunction
+
 ## Turn the ENTITIES block into a struct array, folding the R12 POLYLINE /
 ## VERTEX / SEQEND triple into a single polyline entity.
 function [E, SKIPPED] = parseentities (codes, values, scale)
@@ -184,7 +242,7 @@ function [E, SKIPPED] = parseentities (codes, values, scale)
   endif
 
   known = {'LINE', 'LWPOLYLINE', 'POLYLINE', 'CIRCLE', 'ARC', 'TEXT', ...
-           'POINT', 'INSERT'};
+           'POINT', 'INSERT', 'DIMENSION'};
   marks = find (codes == 0);
   built = {};
   ii = 1;
@@ -272,12 +330,30 @@ function [E, SKIPPED] = parseentities (codes, values, scale)
         ## Group 50 is an angle, so the drawing-unit scale must not touch it
         s.rotation = groupnum (codes(body), values(body), 50, 0);
 
+      case 'DIMENSION'
+        ## The six definition points are what a reader measures from, so they
+        ## are what is returned; the picture lives in the block named by .block
+        ## and is reached through the fourth output.
+        pts = zeros (6, 2);
+        gc = [10, 11, 13, 14, 15, 16];
+        for pp = 1:6
+          x = groupnum (codes(body), values(body), gc(pp), 0);
+          y = groupnum (codes(body), values(body), gc(pp) + 10, 0);
+          pts(pp,:) = scale * [x, y];
+        endfor
+        s.pts = pts;
+        s.block = grouptext (codes(body), values(body), 2, '');
+        s.text = grouptext (codes(body), values(body), 1, '<>');
+        s.angles = mod (groupnum (codes(body), values(body), 70, 0), 32);
+        s.rotation = groupnum (codes(body), values(body), 50, 0);
+
       case 'INSERT'
-        ## The block name is carried in .text and the uniform scale in .radius,
-        ## matching what dxf.write emits and draw.Drawing.entities produced
+        ## The block name is carried in .block and the uniform scale in
+        ## .radius, matching what dxf.write emits and draw.Drawing.entities
+        ## produced
         s.pts = [groupnum(codes(body), values(body), 10, 0), ...
                  groupnum(codes(body), values(body), 20, 0)];
-        s.text = grouptext (codes(body), values(body), 2, '');
+        s.block = grouptext (codes(body), values(body), 2, '');
         s.radius = groupnum (codes(body), values(body), 41, 1);
         s.rotation = groupnum (codes(body), values(body), 50, 0);
 
@@ -330,7 +406,8 @@ function s = blankentity ()
   s = struct ('type', '', 'layer', '0', 'linetype', 'CONTINUOUS', ...
               'colour', 256, 'pts', zeros (0, 2), ...
               'closed', false, 'radius', [], 'angles', [], ...
-              'text', '', 'height', [], 'rotation', [], 'bulge', []);
+              'text', '', 'height', [], 'rotation', [], 'bulge', [], ...
+              'block', '');
 endfunction
 
 %!demo
@@ -542,3 +619,62 @@ endfunction
 %!error<dxf.read: FILE must be a non-empty character vector.> dxf.read ('')
 %!error<dxf.read: cannot find file 'no-such-file.dxf'.> ...
 %! dxf.read ('no-such-file.dxf')
+
+%!test  # a DIMENSION comes back with its type, block and definition points
+%! D = draw.Drawing ().dim ([0, 0], [100, 0], -15, 'horizontal');
+%! [E, ~, BL] = entities (D);
+%! fn = [tempname() '.dxf'];
+%! unwind_protect
+%!   dxf.write (fn, E, 'blocks', BL);
+%!   [R, ~, ~, B] = dxf.read (fn);
+%!   d = R(strcmp ({R.type}, 'DIMENSION'));
+%!   assert_equal (numel (d), 1);
+%!   assert_equal (d.angles, 0);
+%!   assert_equal (d.block, '*D1');
+%!   assert_equal (d.pts(3,:), [0, 0], 1e-9);
+%!   assert_equal (d.pts(4,:), [100, 0], 1e-9);
+%!   assert_equal (numel (B), 1);
+%! unwind_protect_cleanup
+%!   unlink (fn);
+%! end_unwind_protect
+
+%!test  # each dimension family keeps its own DXF type across the round trip
+%! D = draw.Drawing ().dim ([0, 0], [10, 0], -5, 'horizontal');
+%! D = D.angdim ([0, 20], [10, 20], [8, 26], 5);
+%! D = D.diam ([40, 0], 6, 45).radius ([60, 0], 4, 30);
+%! [E, ~, BL] = entities (D);
+%! fn = [tempname() '.dxf'];
+%! unwind_protect
+%!   dxf.write (fn, E, 'blocks', BL);
+%!   R = dxf.read (fn);
+%!   d = R(strcmp ({R.type}, 'DIMENSION'));
+%!   assert_equal (sort ([d.angles]), [0, 2, 3, 4]);
+%! unwind_protect_cleanup
+%!   unlink (fn);
+%! end_unwind_protect
+
+%!test  # the BLOCKS section comes back with its names and its geometry
+%! bore = draw.Drawing ().circle ([0, 0], 3).line ([-4, 0], [4, 0]);
+%! D = draw.Drawing ().block ('BORE', bore).insert ('BORE', [10, 0]);
+%! [E, ~, BL] = entities (D, 'blocks', 'reference');
+%! fn = [tempname() '.dxf'];
+%! unwind_protect
+%!   dxf.write (fn, E, 'blocks', BL);
+%!   [R, ~, ~, B] = dxf.read (fn);
+%!   assert_equal (numel (B), 1);
+%!   assert_equal (B.name, 'BORE');
+%!   assert_equal (sort ({B.entities.type}), {'CIRCLE', 'LINE'});
+%!   assert_equal (R(strcmp ({R.type}, 'INSERT')).block, 'BORE');
+%! unwind_protect_cleanup
+%!   unlink (fn);
+%! end_unwind_protect
+
+%!test  # a file with no BLOCKS section reads back an empty definition array
+%! fn = [tempname() '.dxf'];
+%! unwind_protect
+%!   dxf.write (fn, struct ('type', 'LINE', 'pts', [0, 0; 1, 1]));
+%!   [~, ~, ~, B] = dxf.read (fn);
+%!   assert_equal (isempty (B), true);
+%! unwind_protect_cleanup
+%!   unlink (fn);
+%! end_unwind_protect
