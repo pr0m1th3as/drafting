@@ -1805,6 +1805,9 @@ classdef Drawing
     ## @item @qcode{'FontScale'} @tab @code{[]} @tab points per model unit; when
     ## given, each string is sized from its own entity height instead of from
     ## @qcode{'FontSize'}
+    ## @item @qcode{'DimScale'} @tab 1 @tab multiplies the dimension ornament,
+    ## which is a model dimension: a drawing meant for @math{1:50} wants 50
+    ## here, as it does in @code{entities}
     ## @end multitable
     ##
     ## @subheading Why the axes do not fit tight
@@ -1909,7 +1912,7 @@ classdef Drawing
       opt = struct ('Axes', hax, 'LineWidth', 0.5, 'FontSize', 8, ...
                     'Layers', {{}}, 'Arc', 64, 'Hatch', 'lines', ...
                     'Linetypes', 'true', 'LTScale', 1, 'Margin', 0.05, ...
-                    'FontScale', []);
+                    'FontScale', [], 'DimScale', 1);
       known = fieldnames (opt);
       for k = 1:2:numel (varargin)
         name = varargin{k};
@@ -1933,7 +1936,7 @@ classdef Drawing
       if (! any (strcmpi (opt.Linetypes, {'true', 'approximate'})))
         error ("draw.Drawing.plot: Linetypes must be 'true' or 'approximate'.");
       endif
-      for f = {'LineWidth', 'FontSize', 'Arc', 'LTScale'}
+      for f = {'LineWidth', 'FontSize', 'Arc', 'LTScale', 'DimScale'}
         v = opt.(f{1});
         if (! isnumeric (v) || ! isreal (v) || ! isscalar (v) ...
             || ! isfinite (v) || v <= 0)
@@ -1968,7 +1971,7 @@ classdef Drawing
       ## A renderer wants the picture, not the semantics: the associative form
       ## exists for a file, where a reader can re-measure it.
       E = entities (D, 'hatch', lower (opt.Hatch), 'bulges', 'flatten', ...
-                    'dimensions', 'explode');
+                    'dimensions', 'explode', 'DimScale', opt.DimScale);
       if (! isempty (opt.Layers) && ! isempty (E))
         E = E(ismember ({E.layer}, opt.Layers));
       endif

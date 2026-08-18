@@ -1559,3 +1559,26 @@
 
 %!error<draw.Drawing.entities: Dimensions must be 'associative' or 'explode'.> ...
 %! entities (draw.Drawing ().circle ([0, 0], 5), 'dimensions', 'sometimes')
+
+%!test  # plot passes DimScale through, so ornament can be sized for the plot
+%! f = figure ('visible', 'off');
+%! unwind_protect
+%!   D = draw.Drawing ().dim ([0, 0], [100, 0], -15, 'horizontal');
+%!   ax = axes ('parent', f);
+%!   H = plot (D, 'Axes', ax, 'DimScale', 1);
+%!   L = H(strcmp (get (H, 'type'), 'line'));
+%!   n1 = min (cellfun (@(x, y) hypot (x(end) - x(1), y(end) - y(1)), ...
+%!                      get (L, 'xdata'), get (L, 'ydata')));
+%!   cla (ax);
+%!   H = plot (D, 'Axes', ax, 'DimScale', 5);
+%!   L = H(strcmp (get (H, 'type'), 'line'));
+%!   n5 = min (cellfun (@(x, y) hypot (x(end) - x(1), y(end) - y(1)), ...
+%!                      get (L, 'xdata'), get (L, 'ydata')));
+%!   assert_equal (n5 / n1, 5, 1e-9);
+%! unwind_protect_cleanup
+%!   close (f);
+%! end_unwind_protect
+
+%!error<draw.Drawing.plot: DimScale must be a positive real finite scalar.> ...
+%! plot (draw.Drawing ().circle ([0, 0], 5), 'DimScale', 0)
+
