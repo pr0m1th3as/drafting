@@ -1,0 +1,18 @@
+%!demo
+%! ## A colour is an AutoCAD index, or a name that `draw.colour` resolves to
+%! ## one.  It applies to what is appended after it is set.
+%!
+%! D = draw.Drawing ('colours');
+%! x = 0;
+%! for c = {'red', 'yellow', 'green', 'cyan', 'blue', 'magenta'}
+%!   D.Colour = c{1};
+%!   D = D.circle ([x, 0], 9);
+%!   x += 22;
+%! endfor
+%!
+%! ## 256 is 'byLayer', the default: the entity takes whatever colour its layer
+%! ## carries, which is how a CAD drawing is normally organised.
+%! D.Colour = 256;
+%! D = D.line ([-12, -14], [x - 10, -14]);
+%! plot (D);
+%! title ('six named colours, then byLayer');

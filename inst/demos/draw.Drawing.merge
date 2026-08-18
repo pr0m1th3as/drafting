@@ -1,0 +1,15 @@
+%!demo
+%! ## `transform` and `merge` together are composition: build a part once and
+%! ## place it as often as needed.
+%!
+%! part = draw.Drawing ().circle ([0, 0], 8).line ([-12, 0], [12, 0]) ...
+%!                       .line ([0, -12], [0, 12]);
+%! sheet = draw.Drawing ('assembly');
+%! for k = 0:3
+%!   sheet = sheet.merge (part.transform ('translate', [30 * k, 0]));
+%! endfor
+%! big = part.transform ('scale', 2);
+%! sheet = sheet.merge (big.transform ('translate', [50, -45]));
+%! numentities (sheet)
+%! plot (sheet);
+%! title ('one part, five placements');

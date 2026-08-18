@@ -1,0 +1,18 @@
+%!demo
+%! ## The current line type governs what is appended after it is set.  Here one
+%! ## drawing carries five, and each run of geometry keeps the type it was
+%! ## drawn with.
+%!
+%! ## `LTScale` multiplies the dash lengths, which are model dimensions: on a
+%! ## short line the pattern needs enlarging before it reads as itself.
+%!
+%! D = draw.Drawing ('types');
+%! y = 0;
+%! for lt = {'CONTINUOUS', 'HIDDEN', 'CENTER', 'PHANTOM', 'DASHDOT'}
+%!   D.Linetype = lt{1};
+%!   D = D.line ([0, y], [60, y]);
+%!   D = D.text ([63, y - 1.2], lt{1}, 3.5);
+%!   y -= 7;
+%! endfor
+%! plot (D, 'LTScale', 2);
+%! title ('one drawing, five line types');

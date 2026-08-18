@@ -1,0 +1,16 @@
+%!demo
+%! ## A repeated feature is better held as a block and referred to, which keeps
+%! ## the drawing --- and the file it becomes --- to one definition.
+%!
+%! bore = draw.Drawing ().circle ([0, 0], 5).line ([-8, 0], [8, 0]);
+%! D = draw.Drawing ('flange').circle ([0, 0], 45).block ('bore', bore);
+%! for k = 1:6
+%!   a = 2 * pi * (k - 1) / 6;
+%!   D = D.insert ('bore', 30 * [cos(a), sin(a)]);
+%! endfor
+%! [~, ~, BL] = entities (D, 'blocks', 'reference');
+%! printf ('%d entities referring to %d block\n', ...
+%!         numentities (D), numel (BL));
+%! printf ('%d once expanded\n', numentities (D.expand ()));
+%! plot (D);
+%! title ('a bolt circle from one block definition');

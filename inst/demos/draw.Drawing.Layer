@@ -1,0 +1,18 @@
+%!demo
+%! ## Layer, line type and colour are properties, not arguments: they apply to
+%! ## what is appended after they are set and never to what came before.  That
+%! ## is how a draughtsman works, and how CAD is built.
+%!
+%! D = draw.Drawing ('shaft');
+%! D.Layer = 'BODY';
+%! D = D.polyline ([0, -15; 70, -15; 70, 15; 0, 15], true);
+%! D.Layer = 'HIDDEN';
+%! D.Linetype = 'HIDDEN';
+%! D = D.line ([25, -15], [25, 15]).line ([50, -15], [50, 15]);
+%! D.Layer = 'AXES';
+%! D.Linetype = 'CENTER';
+%! D.Colour = 'red';
+%! D = D.line ([-6, 0], [76, 0]);
+%! D.layers ()
+%! plot (D);
+%! title ('three layers, each with its own line type');

@@ -1,0 +1,10 @@
+%!demo
+%! ## A drawing is built by appending entities.  It is a value class, so every
+%! ## method returns a new drawing and the methods chain.
+%!
+%! D = draw.Drawing ('plate');
+%! D = D.polyline ([0, 0; 80, 0; 80, 50; 0, 50], true).circle ([40, 25], 12);
+%! numentities (D)
+%! [B, W, H] = bbox (D)
+%! plot (D);
+%! title ('a plate with a bore');

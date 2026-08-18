@@ -1,0 +1,13 @@
+%!demo
+%! ## The name travels with the drawing into whatever the output can hold: a
+%! ## DXF file records it, a TikZ picture writes it into a comment.  It never
+%! ## affects the geometry.
+%!
+%! D = draw.Drawing ('bracket');
+%! D = D.polyline ([0, 0; 60, 0; 60, 40; 0, 40], true);
+%! D.Name
+%!
+%! ## Renaming an existing drawing is an ordinary assignment, because the name
+%! ## is a property and not something fixed at construction.
+%! D.Name = 'bracket rev B';
+%! D.Name
