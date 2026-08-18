@@ -101,6 +101,39 @@ the recipient sees the section hatched.
 
 Nothing outside `dxf.write` depends on the choice.
 
+## Documentation
+
+Every function and class method is documented in
+[texinfo](https://www.gnu.org/software/texinfo/), reachable from the Octave
+prompt with `help`. Use dot notation for namespaced functions and for the
+methods and properties of `draw.Drawing`:
+
+```
+help geom.offset
+help draw.Drawing
+help draw.Drawing.print
+help draw.Drawing.Layer
+```
+
+You can also find the entire documentation of the **drafting** package along
+with its function index at
+[https://pr0m1th3as.github.io/drafting/](https://pr0m1th3as.github.io/drafting/).
+Alternatively, you can build the online documentation locally using the
+[`pkg-octave-doc`](https://github.com/gnu-octave/pkg-octave-doc) package.
+Assuming both packages are installed and loaded, browse to any directory of
+your choice with *write* permission and run:
+
+```
+package_texi2html ("drafting")
+```
+
+## Where it is going
+
+[`ROADMAP.md`](ROADMAP.md) sets out what is planned and why, ordered by what
+unblocks what — and, just as usefully, what is deliberately out of scope: no
+CAM, no DWG, no solid-modelling kernel, no constraint solver, each with the
+reason it was ruled out.
+
 ## Install
 
 To install the latest release, you need Octave (>=11.1.0) installed on your
