@@ -1369,7 +1369,6 @@ classdef Drawing
 
   methods (Access = public)
 
-    ## Sheet size in millimetres, from a name or an explicit [width, height].
 
     ## -*- texinfo -*-
     ## @deftypefn  {draw.Drawing} {@var{E} =} entities (@var{D})
@@ -2009,11 +2008,6 @@ classdef Drawing
 
     endfunction
 
-    ## Draw one run of geometry in its line type. With 'true' line types the run
-    ## is cut into its dashes and each is a separate object, which is what lets
-    ## all
-    ## seven patterns render as themselves rather than collapsing onto the four
-    ## styles a figure provides.
 
     ## -*- texinfo -*-
     ## @deftypefn  {draw.Drawing} {} print (@var{D}, @var{FILE})
@@ -2214,9 +2208,6 @@ classdef Drawing
 
     endfunction
 
-    ## The empty entity array, in dxf.write's vocabulary.  Field order is fixed
-    ## so
-    ## that the array grows by assignment.
 
     ## -*- texinfo -*-
     ## @deftypefn  {draw.Drawing} {@var{S} =} tikz (@var{D})
@@ -2588,6 +2579,10 @@ function P = arcextent (C, R, A1, A2)
 endfunction
 
 
+## Draw one run of geometry in its line type.  With 'true' line types the run
+## is cut into its dashes and each is a separate object, which is what lets all
+## seven patterns render as themselves rather than collapsing onto the four
+## styles a figure provides.
 function H = polydraw (ax, P, lt, col, opt)
 
   H = [];
@@ -2727,6 +2722,7 @@ function s = linestyle (lt)
 endfunction
 
 
+## Sheet size in millimetres, from a name or an explicit [width, height].
 function P = papersize (spec, orient)
 
   if (isnumeric (spec))
@@ -2786,6 +2782,8 @@ endfunction
 
 
 
+## The empty entity array, in dxf.write's vocabulary.  Field order is fixed so
+## that the array grows by assignment.
 function E = emptyentity ()
 
   E = struct ('type', {}, 'layer', {}, 'linetype', {}, 'colour', {}, ...
@@ -3105,6 +3103,10 @@ function s = sign0 (x)
 endfunction
 
 
+## A TikZ style name per layer.  Style names have to be alphabetic, and layer
+## names do not, so anything else is dropped -- which can make two layers
+## collide, and a collision would silently merge their styling.  Disambiguate
+## with an index rather than hoping.
 function sty = stylenames (L)
 
   sty = cell (size (L));
