@@ -2256,13 +2256,19 @@ classdef Drawing
         xlim (ax, xlim (ax));
         ylim (ax, ylim (ax));
         axis (ax, 'off');
-        set (ax, 'position', [0, 0, 1, 1]);
 
-        ## Place the drawing centred on the sheet, at scale
+        ## Place the drawing centred on the sheet, at scale.  The printed
+        ## canvas is the whole sheet and the drawing is positioned inside it by
+        ## the axes, rather than the canvas being the drawing: a raster format
+        ## prints the canvas, so the second construction hands back an image
+        ## cropped to the geometry, carrying neither the sheet nor its margin,
+        ## where the same call to a vector format produced a page.
         place = span / SCALE;
+        set (ax, 'position', [(PAPER - place) ./ (2 * PAPER), place ./ PAPER]);
         set (fig, 'paperunits', 'centimeters');
         set (fig, 'papersize', PAPER / 10);
-        set (fig, 'paperposition', [(PAPER - place) / 20, place / 10]);
+        set (fig, 'paperposition', [0, 0, PAPER / 10]);
+        set (fig, 'paperpositionmode', 'manual');
 
         args = {};
         raster = {'png', 'jpg', 'jpeg', 'tif', 'tiff'};

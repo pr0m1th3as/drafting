@@ -1582,3 +1582,214 @@
 %!error<draw.Drawing.plot: DimScale must be a positive real finite scalar.> ...
 %! plot (draw.Drawing ().circle ([0, 0], 5), 'DimScale', 0)
 
+
+## Rendered output.  The suite below asserts the artefact -- the page written,
+## the pixels drawn -- rather than the numbers handed to the renderer.
+
+%!function D = __allentities__ ()
+%!  ## One of every entity type the drawing model can hold.  The test that
+%!  ## checks this list is what makes the backend tests below a gate: a new
+%!  ## entity type fails it until it is added here, and then has to reach
+%!  ## every backend.
+%!  bore = draw.Drawing ().circle ([0, 0], 3);
+%!  D = draw.Drawing ('every entity');
+%!  D = D.line ([0, 0], [100, 0]);
+%!  D = D.polyline ([0, 0; 100, 0; 100, 60; 0, 60], true);
+%!  D = D.arc ([50, 30], 20, 0, 90);
+%!  D = D.circle ([50, 30], 10);
+%!  D = D.ellipse ([20, 45], 8, 4, 30);
+%!  D = D.point ([5, 5]);
+%!  D = D.text ([10, 50], 'TEXT', 3.5);
+%!  D = D.centremark ([50, 30], 12);
+%!  D = D.leader ([70, 40; 90, 55], 'NOTE');
+%!  D = D.hatch ([10, 10; 30, 10; 30, 25; 10, 25], 'ANSI31', 45, 3);
+%!  D = D.block ('BORE', bore).insert ('BORE', [80, 10]);
+%!  D = D.dim ([0, 0], [100, 0], -15, 'horizontal');
+%!  D = D.angdim ([0, 0], [30, 0], [20, 20], 25);
+%!  D = D.diam ([50, 30], 10, 45);
+%!  D = D.radius ([50, 30], 20, 200);
+%!endfunction
+
+%!function mm = __mediabox__ (FILE)
+%!  ## The page size the PDF itself declares, in millimetres.  Read as bytes:
+%!  ## a PDF carries compressed streams, so regexp would reject it as invalid
+%!  ## UTF-8 where strfind does not care.
+%!  fid = fopen (FILE, 'r');
+%!  raw = fread (fid, Inf, 'uint8=>char')';
+%!  fclose (fid);
+%!  k = strfind (raw, '/MediaBox');
+%!  seg = raw(k(1):min (k(1) + 80, numel (raw)));
+%!  lo = strfind (seg, '[');
+%!  hi = strfind (seg, ']');
+%!  b = sscanf (seg(lo(1)+1:hi(1)-1), '%f')';
+%!  mm = [b(3) - b(1), b(4) - b(2)] * 25.4 / 72;
+%!endfunction
+
+%!function [w, h] = __inkmm__ (FILE, DPI)
+%!  ## The size of the drawn area in millimetres of paper.  A low-detail page
+%!  ## comes back from imread as logical rather than uint8, which would make
+%!  ## every white pixel darker than any threshold.
+%!  I = imread (FILE);
+%!  if (islogical (I))
+%!    I = uint8 (I) * 255;
+%!  endif
+%!  ink = min (I, [], 3) < 200;
+%!  [r, c] = find (ink);
+%!  w = (max (c) - min (c) + 1) / DPI * 25.4;
+%!  h = (max (r) - min (r) + 1) / DPI * 25.4;
+%!endfunction
+
+%!test  # the fixture holds one of every entity type the model defines
+%! D = __allentities__ ();
+%! assert_equal (sort (unique ({D.Entities.type})), ...
+%!               {'angdim', 'arc', 'centremark', 'circle', 'diam', 'dim', ...
+%!                'ellipse', 'hatch', 'insert', 'leader', 'line', 'point', ...
+%!                'polyline', 'radius', 'text'});
+
+%!test  # every entity type reaches the DXF backend
+%! D = __allentities__ ();
+%! ws = warning ('off', 'all');
+%! [E, LOST] = entities (D);
+%! warning (ws);
+%! assert_equal (strjoin (sort (unique ({E.type})), ' '), ...
+%!               'ARC CIRCLE DIMENSION LINE POINT POLYLINE TEXT');
+%! assert_equal (numel (LOST), 1);
+%! assert_equal (LOST(1).type, 'ellipse');
+
+%!test  # every entity type reaches the TikZ backend
+%! D = __allentities__ ();
+%! ws = warning ('off', 'all');
+%! S = tikz (D);
+%! warning (ws);
+%! assert_equal (numel (strfind (S, '\draw')) >= numentities (D), true);
+%! assert_equal (numel (strfind (S, '\node')) > 0, true);
+%! assert_equal (numel (strfind (S, '\fill')) > 0, true);
+
+%!test  # every entity type reaches the plot backend
+%! f = figure ('visible', 'off');
+%! unwind_protect
+%!   D = __allentities__ ();
+%!   ws = warning ('off', 'all');
+%!   H = plot (D, 'Axes', axes ('parent', f));
+%!   warning (ws);
+%!   assert_equal (numel (H) >= numentities (D), true);
+%!   assert_equal (all (ishandle (H)), true);
+%!   assert_equal (strjoin (sort (unique (get (H, 'type'))'), ' '), ...
+%!                 'line text');
+%! unwind_protect_cleanup
+%!   close (f);
+%! end_unwind_protect
+
+%!test  # the PDF page is the sheet that was asked for, to within a millimetre
+%! fn = [tempname(), '.pdf'];
+%! unwind_protect
+%!   ws = warning ('off', 'all');
+%!   P = print (__allentities__ (), fn, 'Paper', 'A3');
+%!   warning (ws);
+%!   assert_equal (P, [420, 297]);
+%!   assert_equal (__mediabox__ (fn), [420, 297], 1);
+%! unwind_protect_cleanup
+%!   unlink (fn);
+%! end_unwind_protect
+
+%!test  # portrait swaps the page in the file, not only in the return value
+%! fn = [tempname(), '.pdf'];
+%! unwind_protect
+%!   D = draw.Drawing ().polyline ([0, 0; 100, 0; 100, 150; 0, 150], true);
+%!   print (D, fn, 'Paper', 'A4', 'Orientation', 'portrait');
+%!   assert_equal (__mediabox__ (fn), [210, 297], 1);
+%! unwind_protect_cleanup
+%!   unlink (fn);
+%! end_unwind_protect
+
+%!test  # a printed sheet carries the drawing at size, not a stray mark
+%! fn = [tempname(), '.png'];
+%! unwind_protect
+%!   ws = warning ('off', 'all');
+%!   print (__allentities__ (), fn, 'Paper', 'A3', 'Scale', 1, ...
+%!          'Resolution', 150);
+%!   warning (ws);
+%!   [w, h] = __inkmm__ (fn, 150);
+%!   assert_equal (w > 90 && h > 60, true);
+%! unwind_protect_cleanup
+%!   unlink (fn);
+%! end_unwind_protect
+
+%!test  # a model length arrives on paper at the stated scale
+%! fn = [tempname(), '.png'];
+%! unwind_protect
+%!   D = draw.Drawing ().polyline ([0, 0; 100, 0; 100, 50; 0, 50], true);
+%!   print (D, fn, 'Paper', 'A3', 'Scale', 1, 'Resolution', 300);
+%!   [w, h] = __inkmm__ (fn, 300);
+%!   assert_equal (w, 100, 1);
+%!   assert_equal (h, 50, 1);
+%! unwind_protect_cleanup
+%!   unlink (fn);
+%! end_unwind_protect
+
+%!test  # halving the scale halves the drawing on paper
+%! fn = [tempname(), '.png'];
+%! unwind_protect
+%!   D = draw.Drawing ().polyline ([0, 0; 100, 0; 100, 50; 0, 50], true);
+%!   print (D, fn, 'Paper', 'A3', 'Scale', 2, 'Resolution', 300);
+%!   [w, h] = __inkmm__ (fn, 300);
+%!   assert_equal (w, 50, 1);
+%!   assert_equal (h, 25, 1);
+%! unwind_protect_cleanup
+%!   unlink (fn);
+%! end_unwind_protect
+
+%!test  # a raster sheet is the paper asked for, at the resolution asked for
+%! fn = [tempname(), '.png'];
+%! unwind_protect
+%!   D = draw.Drawing ().polyline ([0, 0; 100, 0; 100, 50; 0, 50], true);
+%!   print (D, fn, 'Paper', 'A3', 'Scale', 1, 'Resolution', 100);
+%!   I = imread (fn);
+%!   assert_equal ([columns(I), rows(I)] / 100 * 25.4, [420, 297], 1);
+%! unwind_protect_cleanup
+%!   unlink (fn);
+%! end_unwind_protect
+
+%!test  # the drawing sits centred on the sheet, clear of the frame
+%! fn = [tempname(), '.png'];
+%! unwind_protect
+%!   D = draw.Drawing ().polyline ([0, 0; 200, 0; 200, 120; 0, 120], true);
+%!   print (D, fn, 'Paper', 'A4', 'Scale', 1, 'Margin', 10, 'Resolution', 150);
+%!   I = imread (fn);
+%!   if (islogical (I))
+%!     I = uint8 (I) * 255;
+%!   endif
+%!   ink = min (I, [], 3) < 200;
+%!   [r, c] = find (ink);
+%!   pad = [min(c) - 1, columns(ink) - max(c), ...
+%!          min(r) - 1, rows(ink) - max(r)] / 150 * 25.4;
+%!   assert_equal (all (pad >= 10), true);
+%!   assert_equal (pad(1), pad(2), 0.2);
+%!   assert_equal (pad(3), pad(4), 0.2);
+%! unwind_protect_cleanup
+%!   unlink (fn);
+%! end_unwind_protect
+
+%!test  # a dimension's text clears its own dimension line, below it
+%! ws = warning ('off', 'all');
+%! [~, ~, BL] = entities (draw.Drawing ().dim ([0, 0], [100, 0], -15, ...
+%!                                             'horizontal'));
+%! warning (ws);
+%! p = BL(1).entities;
+%! L = p(strcmpi ({p.type}, 'LINE'));
+%! T = p(strcmpi ({p.type}, 'TEXT'));
+%! span = cellfun (@(q) abs (q(2,1) - q(1,1)), {L.pts});
+%! dl = L(find (span == max (span), 1));
+%! assert_equal (T.pts(1,2) + T.height < dl.pts(1,2), true);
+
+%!test  # and above it, when the dimension line is on the other side
+%! ws = warning ('off', 'all');
+%! [~, ~, BL] = entities (draw.Drawing ().dim ([0, 0], [100, 0], 15, ...
+%!                                             'horizontal'));
+%! warning (ws);
+%! p = BL(1).entities;
+%! L = p(strcmpi ({p.type}, 'LINE'));
+%! T = p(strcmpi ({p.type}, 'TEXT'));
+%! span = cellfun (@(q) abs (q(2,1) - q(1,1)), {L.pts});
+%! dl = L(find (span == max (span), 1));
+%! assert_equal (T.pts(1,2) > dl.pts(1,2), true);
