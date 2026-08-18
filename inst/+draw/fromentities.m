@@ -365,6 +365,20 @@ function [D, why] = raisedim (D, e)
       endif
       D = D.dim (P1, P2, off, dir, lbl);
 
+    case 1
+      ## An aligned dimension carries no rotation of its own: its dimension
+      ## line runs parallel to the two points it measures, so the direction
+      ## comes from them.  We write our own aligned dimensions as type 0 with a
+      ## rotation, which is why no file of ours has ever held a type 1.
+      U = P2 - P1;
+      if (norm (U) < 1e-12)
+        why = 'an aligned dimension needs two distinct measured points';
+        return;
+      endif
+      U = U / norm (U);
+      N = [-U(2), U(1)];
+      D = D.dim (P1, P2, dot (L - P1, N), 'aligned', lbl);
+
     case 2
       V = P1;
       D = D.angdim (V, P2, e.pts(6,:), norm (L - V), lbl);
@@ -576,6 +590,46 @@ endfunction
 %! [back, LOST] = draw.fromentities (E);
 %! assert_equal (numentities (back), 0);
 %! assert_equal (LOST.reason, 'no drawing entity of this type');
+
+%!test  # the anonymous blocks a real file places are kept, and the layout
+%!      # containers it defines are not
+%! fn = fullfile (fileparts (fileparts (which ('dxf.read'))), 'tests', ...
+%!                'fixtures', 'foreign_dims_R12.dxf');
+%! [E, ~, ~, B] = dxf.read (fn);
+%! [D, LOST] = draw.fromentities (E, B);
+%! assert_equal (numentities (D), 9);
+%! assert_equal (numel (LOST), 0);
+%! assert_equal (strjoin (sort ({D.Blocks.name}), ' '), ...
+%!               '*D1 *D2 *D3 *D4 *D5 *D6 *D7');
+
+%!test  # every dimension a real file carries comes back as a dimension
+%! fn = fullfile (fileparts (fileparts (which ('dxf.read'))), 'tests', ...
+%!                'fixtures', 'foreign_dims_2000.dxf');
+%! [E, ~, ~, B] = dxf.read (fn);
+%! [D, LOST] = draw.fromentities (E, B);
+%! assert_equal (numentities (D), 9);
+%! assert_equal (numel (LOST), 0);
+%! assert_equal (strjoin (sort (unique ({D.Entities.type})), ' '), ...
+%!               'angdim circle diam dim polyline radius');
+
+%!test  # an aligned dimension is DXF type 1, which we never write ourselves
+%! fn = fullfile (fileparts (fileparts (which ('dxf.read'))), 'tests', ...
+%!                'fixtures', 'foreign_dims_2000.dxf');
+%! [E, ~, ~, B] = dxf.read (fn);
+%! D = draw.fromentities (E, B);
+%! d = D.Entities(strcmp ({D.Entities.type}, 'dim'));
+%! a = d(strcmp ({d.direction}, 'aligned'));
+%! assert_equal (numel (a), 1);
+%! assert_equal (norm (a.pts(2,:) - a.pts(1,:)), hypot (100, 60), 1e-9);
+
+%!test  # the linear dimensions measure the rectangle they were drawn on
+%! fn = fullfile (fileparts (fileparts (which ('dxf.read'))), 'tests', ...
+%!                'fixtures', 'foreign_dims_2000.dxf');
+%! [E, ~, ~, B] = dxf.read (fn);
+%! D = draw.fromentities (E, B);
+%! d = D.Entities(strcmp ({D.Entities.type}, 'dim'));
+%! L = cellfun (@(p) norm (p(2,:) - p(1,:)), {d.pts});
+%! assert_equal (sort (L), [60, 100, 100, hypot(100, 60)], 1e-9);
 
 %!error<draw.fromentities: invalid number of input arguments.> ...
 %! draw.fromentities ()

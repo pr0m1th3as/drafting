@@ -23,14 +23,22 @@
 ##
 ## Read geometry from an ASCII DXF file.
 ##
+## The format is R12 (@code{AC1009}), which is what @code{dxf.write} emits.  A
+## file saved to a later version is read as well, the entity records this
+## reader takes having kept the same group codes --- the suite reads a drawing
+## another application saved as R14, 2000 and 2007 --- but nothing past R12 is
+## promised.  A record this reader has no entity for is counted in
+## @var{SKIPPED} rather than dropped in silence.
+##
 ## @code{[@var{E}, @var{UNITS}, @var{SKIPPED}, @var{BLOCKS}] = dxf.read
 ## (@dots{})} additionally returns the block definitions, in the shape
 ## @code{dxf.write} takes back through its @qcode{'blocks'} pair.  Without it
 ## an @code{INSERT} is a reference to geometry the caller never receives.
 ##
 ## A @code{DIMENSION} is returned with its six definition points in
-## @code{pts}, its DXF type in @code{angles} --- 0 linear, 2 angular, 3
-## diameter, 4 radius --- the name of the block holding its picture in
+## @code{pts}, its DXF type in @code{angles} --- 0 rotated, 1 aligned, 2
+## angular, 3 diameter, 4 radius --- the name of the block holding its picture
+## in
 ## @code{block}, and its text in @code{text}, where @qcode{'<>'} means the
 ## dimension measures itself.
 ##
@@ -101,12 +109,16 @@ function [E, UNITS, SKIPPED, BLOCKS] = read (FILE, LAYER = '')
     error ("dxf.read: LAYER must be a character vector.");
   endif
 
-  ## Split into group-code / value pairs, one of each per line
-  lines = strsplit (fileread (FILE), "\n");
+  ## Split into group-code / value pairs, one of each per line.  Consecutive
+  ## delimiters must not be collapsed, which is what strsplit does by default:
+  ## an empty value is legal and writers emit them -- $DIMBLK and $DIMPOST are
+  ## empty in a file LibreCAD writes -- and swallowing the blank line shifts
+  ## every pair after it by one.
+  lines = strsplit (fileread (FILE), "\n", 'CollapseDelimiters', false);
   lines = regexprep (lines, "\r$", '');       # tolerate CRLF
-  while (! isempty (lines) && isempty (lines{end}))
+  if (! isempty (lines) && isempty (lines{end}))
     lines(end) = [];                          # trailing newline is not a pair
-  endwhile
+  endif
   if (isempty (lines))
     error ("dxf.read: '%s' is empty.", FILE);
   endif
@@ -150,7 +162,8 @@ function [E, UNITS, SKIPPED, BLOCKS] = read (FILE, LAYER = '')
   endfor
 
   [E, SKIPPED] = parseentities (codes(entities), values(entities), scale);
-  BLOCKS = parseblocks (codes(blocks), values(blocks), scale);
+  [BLOCKS, bskip] = parseblocks (codes(blocks), values(blocks), scale);
+  SKIPPED = addskipped (SKIPPED, bskip);
 
   ## Restrict to one layer if asked
   if (! isempty (LAYER) && ! isempty (E))
@@ -191,10 +204,13 @@ endfunction
 ## Turn the BLOCKS section into a struct array of definitions, in the shape
 ## dxf.write takes back through its 'blocks' pair.  A block's own entities are
 ## parsed by exactly the same code as the drawing's, so anything readable in
-## the drawing is readable inside a block.
-function B = parseblocks (codes, values, scale)
+## the drawing is readable inside a block -- and anything not readable is
+## counted, since a type this reader has no entity for is no less absent for
+## having been found inside a block than beside one.
+function [B, SKIPPED] = parseblocks (codes, values, scale)
 
   B = struct ('name', {}, 'entities', {});
+  SKIPPED = {};
   if (isempty (codes))
     return;
   endif
@@ -222,8 +238,9 @@ function B = parseblocks (codes, values, scale)
                      'text', {}, 'height', {}, 'rotation', {}, 'bulge', {}, ...
                      'block', {});
     else
-      ents = parseentities (codes(inner(1):(to-1)), ...
-                            values(inner(1):(to-1)), scale);
+      [ents, sk] = parseentities (codes(inner(1):(to-1)), ...
+                                  values(inner(1):(to-1)), scale);
+      SKIPPED = addskipped (SKIPPED, sk);
     endif
     B(end+1) = struct ('name', nm, 'entities', {ents});
   endfor
@@ -369,6 +386,19 @@ function [E, SKIPPED] = parseentities (codes, values, scale)
   if (! isempty (built))
     E = [built{:}];
   endif
+
+endfunction
+
+## Merge a second list of unhandled types into the first, in the order they
+## were met rather than in alphabetical order: which type appeared first is
+## worth more to a reader than which sorts first.
+function S = addskipped (S, more)
+
+  for ii = 1:numel (more)
+    if (! any (strcmp (more{ii}, S)))
+      S{end+1} = more{ii};
+    endif
+  endfor
 
 endfunction
 
@@ -613,6 +643,67 @@ endfunction
 %! unwind_protect_cleanup
 %!   delete (tmpf);
 %! end_unwind_protect
+
+## The fixture below was drawn in LibreCAD and exported as R12, and it reaches
+## what our own output cannot: an empty group value, the layout containers a
+## real file defines, an entity type this reader has no equivalent for, and
+## dimensions that arrive as anonymous blocks rather than as DIMENSION records.
+
+%!test  # a file another application wrote reads, empty group values and all
+%! fn = fullfile (fileparts (fileparts (which ('dxf.read'))), 'tests', ...
+%!                'fixtures', 'foreign_dims_R12.dxf');
+%! [E, ~, ~, B] = dxf.read (fn);
+%! assert_equal (numel (E), 9);
+%! assert_equal (numel (B), 9);
+
+%!test  # and its geometry arrives as it was drawn
+%! fn = fullfile (fileparts (fileparts (which ('dxf.read'))), 'tests', ...
+%!                'fixtures', 'foreign_dims_R12.dxf');
+%! E = dxf.read (fn);
+%! P = E(strcmp ({E.type}, 'POLYLINE'));
+%! assert_equal (P.pts, [0, 0; 100, 0; 100, 60; 0, 60], 1e-9);
+%! assert_equal (logical (P.closed), true);
+%! C = E(strcmp ({E.type}, 'CIRCLE'));
+%! assert_equal ([C.pts, C.radius], [50, 30, 20], 1e-9);
+
+%!test  # a type the reader has no entity for is counted, even inside a block
+%! fn = fullfile (fileparts (fileparts (which ('dxf.read'))), 'tests', ...
+%!                'fixtures', 'foreign_dims_R12.dxf');
+%! [~, ~, SK] = dxf.read (fn);
+%! assert_equal (strjoin (SK, ' '), 'SOLID');
+
+%!test  # LibreCAD writes an R12 dimension as an anonymous block and an INSERT
+%! fn = fullfile (fileparts (fileparts (which ('dxf.read'))), 'tests', ...
+%!                'fixtures', 'foreign_dims_R12.dxf');
+%! [E, ~, ~, B] = dxf.read (fn);
+%! I = E(strcmp ({E.type}, 'INSERT'));
+%! assert_equal (numel (I), 7);
+%! assert_equal (strjoin (sort ({I.block}), ' '), ...
+%!               '*D1 *D2 *D3 *D4 *D5 *D6 *D7');
+%! assert_equal (any (strcmp ({B.name}, '$MODEL_SPACE')), true);
+
+%!test  # a later version reads too, though the reader claims only R12
+%! fn = fullfile (fileparts (fileparts (which ('dxf.read'))), 'tests', ...
+%!                'fixtures', 'foreign_dims_2000.dxf');
+%! [E, U, SK] = dxf.read (fn);
+%! assert_equal (numel (E), 9);
+%! assert_equal (sum (strcmp ({E.type}, 'DIMENSION')), 7);
+%! assert_equal (U, 'mm');
+%! assert_equal (strjoin (SK, ' '), 'SOLID MTEXT');
+
+%!test  # R14 carries the dimensions but not yet a unit declaration
+%! fn = fullfile (fileparts (fileparts (which ('dxf.read'))), 'tests', ...
+%!                'fixtures', 'foreign_dims_R14.dxf');
+%! [E, U] = dxf.read (fn);
+%! assert_equal (U, 'unitless');
+%! assert_equal (sum (strcmp ({E.type}, 'LWPOLYLINE')), 1);
+
+%!test  # and a UTF-8 file, which is what R2007 onwards writes
+%! fn = fullfile (fileparts (fileparts (which ('dxf.read'))), 'tests', ...
+%!                'fixtures', 'foreign_dims_2007.dxf');
+%! E = dxf.read (fn);
+%! assert_equal (numel (E), 9);
+%! assert_equal (sum (strcmp ({E.type}, 'DIMENSION')), 7);
 
 %!error<dxf.read: invalid number of input arguments.> dxf.read ()
 %!error<dxf.read: FILE must be a non-empty character vector.> dxf.read (42)

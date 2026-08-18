@@ -8,9 +8,16 @@ are indicative. Anything here may be reordered by what turns out to be needed.
 
 Version 0.1.0 is feature-complete for a first release: thirty-one public
 functions across `+geom`, `+dxf`, `+stl` and `+draw`, the `draw.Drawing` class
-with its three backends, 814 built-in self-tests, and a `%!demo` block on
+with its three backends, 836 built-in self-tests, and a `%!demo` block on
 nearly every function that ends in a plot, so the documentation shows rather
 than asserts.
+
+The suite asserts the printed artefact and not merely the numbers handed to the
+renderer: the page a PDF declares, the size and resolution of a raster sheet,
+that a model length arrives on paper at the stated scale, and that every entity
+type reaches every backend. Writing it found three defects — a raster print that
+carried no sheet, a fit computed against the figure's shape rather than the
+drawing's, and a printed scale that drifted whenever the drawing carried text.
 
 The file loop is closed in that release. `draw.Drawing.entities` lowers a
 drawing to a flat entity list and `draw.fromentities` raises one back, blocks
@@ -42,21 +49,29 @@ Everything below is checked against those two lines.
 Small, unglamorous work that removes asymmetries in what is already here. Each
 item costs little and each one is noticed the moment it is missing.
 
-**A test that renders.** Nothing in the suite draws a page or prints a figure.
-Every visual defect found so far was caught by eye and by nothing else: geometry
-sitting on the axes and reading as part of them, a fillet demo leaving a stray
-marker in the frame, tangent radii drawn on a centre line type that renders as a
-squiggle over a short span, five line types collapsing into one at figure size.
-Every one of those passed its tests. The standing requirement below asks for a
-demo rendered and looked at, and that discipline has earned its place — but it
-is a habit, and a habit is not a gate.
+**A drawing made by another application.** The output half of this gap is
+closed: the suite reads back the page it printed. The input half is not, and it
+is open for a structural reason rather than an inattentive one. Every DXF the
+tests read was written by this package, and there are shapes our writer cannot
+produce — it flattens a nested block on export, it never emits the layout
+containers a real file defines, and it writes an aligned dimension as a rotated
+one. **No round trip can reach a path that our own output never takes**, which
+is exactly where the two import defects fixed since 0.1.0 were hiding, invisible
+to eight hundred passing tests.
 
-A fixture drawing whose *output* is asserted would make it one: that a printed
-sheet comes out at the paper size and scale asked for, that the geometry falls
-clear of the frame, that a dimension's text clears its own dimension line, that
-every entity type reaches every backend. It costs little, it goes first because
-it protects everything after it, and it is the difference between a package that
-happens to render correctly and one that will notice when it stops.
+The first such drawing is in, under `inst/tests/fixtures/`: one rectangle, one
+circle and seven dimensions, saved by LibreCAD in every version it offers. It
+found three defects in its first minute. The reader could not read **any** file
+containing an empty group value; entity types met inside a block were dropped
+without being counted; and an aligned dimension, which the format gives its own
+type code and which we have never written, was not raised at all.
+
+What remains is the rest of the same idea — blocks with nested inserts, the
+entities R12 cannot store, polyline widths and bulges, an inch file, a layer
+table — each drawn elsewhere, checked in with the values it was drawn to, and
+read by tests that assert them. It goes first for the same reason the render
+test did: it protects everything after it, and it is the difference between a
+reader that happens to work on our files and one that reads DXF.
 
 **Units in the model.** The millimetre loop is closed and correct: `dxf.read`
 converts an inch file to millimetres on the way in — a one-inch line arrives as
