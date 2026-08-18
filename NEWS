@@ -2,13 +2,14 @@ Summary of important user-visible changes for drafting 0.1.0:
 -------------------------------------------------------------------
 
  ** Initial release.  Thirty-one public functions across four namespaces plus
-    the `draw.Drawing` class, 812 built-in self-tests and 67 `%!demo`
+    the `draw.Drawing` class, 814 built-in self-tests and 67 `%!demo`
     blocks.  All geometry is in millimetres.
 
  ** `+geom` -- planar geometry, knowing nothing of file formats or drawings.
     Primitives: signed area, bounding box, centroid, affine transform,
-    rectilinear test, rectilinear polygon offset, largest inscribed rectangle
-    and triangulation.  Curve geometry: curvature, sampling, offsetting,
+    rectilinear test, rectilinear polygon offset, largest inscribed rectangle,
+    triangulation, and hatch fill lines clipped to a boundary by the even-odd
+    rule.  Curve geometry: curvature, sampling, offsetting,
     self-intersection and arc length.  Construction geometry: line and circle
     intersections, tangent points from a point, and fillets, which return
     exactly the arguments `draw.Drawing.arc` takes.  Polylines can be
@@ -17,10 +18,11 @@ Summary of important user-visible changes for drafting 0.1.0:
     construction, so a polygon whose vertices matter wants the former.
 
  ** `+dxf` -- AutoCAD R12 (AC1009) ASCII DXF, read and write, covering LINE,
-    POLYLINE, LWPOLYLINE, CIRCLE, ARC, TEXT, POINT and INSERT, with layers,
-    line types, colours and a BLOCKS section.  R12 has no LWPOLYLINE, so an
-    entity of that type is written as a POLYLINE with its geometry, layer and
-    closed flag preserved.  `dxf.write` states `$LTSCALE` in the header, so a
+    POLYLINE, LWPOLYLINE, CIRCLE, ARC, TEXT, POINT, INSERT and DIMENSION,
+    with layers, line types, colours and a BLOCKS section, all of which read
+    back as well as write.  R12 has no LWPOLYLINE, so an entity of that type
+    is written as a POLYLINE with its geometry, layer and closed flag
+    preserved.  `dxf.write` states `$LTSCALE` in the header, so a
     written file's dash lengths no longer depend on the recipient's setting.
 
  ** `+stl` -- binary STL from a *section stack*: a struct array of profile,
@@ -31,13 +33,19 @@ Summary of important user-visible changes for drafting 0.1.0:
     single closed surface will not.
 
  ** `+draw` -- `draw.Drawing`, a value class carrying lines, polylines with
-    per-vertex bulges, arcs, circles, ellipses, text, hatches, blocks and
-    inserts on named layers, with line types and colours.  Dimensions are
+    per-vertex bulges, arcs, circles, ellipses, text, points, hatches, blocks
+    and inserts on named layers, with line types and colours.  Dimensions are
     stored semantically and carry no text of their own by default, so they
     stay truthful when the geometry changes: linear (`dim`), diameter, radius
     and angular, plus centre marks and leaders.  `transform` places a drawing
     and `merge` assembles several into a sheet; `draw.titleblock` frames it
     and `draw.coordtable` tabulates a profile that cannot be dimensioned.
+
+ ** The drawing symbols -- diameter, degree and plus-minus -- are stored as
+    the codes AutoCAD has always used, so a DXF file carries them verbatim and
+    only the other backends translate: `tikz` renders them with no package
+    beyond a bare document, and `plot` substitutes characters a figure font
+    holds.  `draw.symbol` converts between the two.
 
  ** One lowering, three backends.  `entities` converts a drawing into a flat
     entity list, and `plot`, `tikz` and `dxf.write` all consume that list
