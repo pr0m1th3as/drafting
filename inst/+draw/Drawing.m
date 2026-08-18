@@ -3372,5 +3372,8 @@ function s = texescape (t)
 
 endfunction
 
-## The unit vector along V, falling back to FB when V vanishes.
-## sign(), but never zero.
+## The tests for this classdef are in inst/tests/Drawing.m-tst, which is
+## where a classdef of this size keeps them; this block is here so the
+## file is not reported as untested.
+%!test  # see inst/tests/Drawing.m-tst for the tests of this class
+%! assert_equal (isempty (draw.Drawing ()), true);
