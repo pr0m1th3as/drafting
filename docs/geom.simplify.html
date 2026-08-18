@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Geometry, CAD Input/Output and Technical Drawing: geom.simplify</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" integrity="sha512-1ycn6IcaQQ40/MKBW2W4Rhis/DbILU74C1vSrLJxCq57o941Ym01SwNsOMqvEBFlcgUa6xLiPY/NS5R+E6ztJQ==" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/css/bootstrap.min.css" integrity="sha384-KyZXEAg3QhqLMpG8r+8fhAXLRk2vvoC2f3B09zVXn8CA5QIVfZOJ3BCsw2P0p/We" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-U1DAWAznBHeqEIlVSCgzq+c9gqGAJn5c/t99JyeKa9xxaYpSvHU5awsuZVVFIhvj" crossorigin="anonymous"></script>
+    <script type="text/javascript" async
+      src="https://cdn.jsdelivr.net/npm/mathjax@2/MathJax.js?config=TeX-AMS_CHTML">
+    </script>
+    <script type="text/javascript">
+      window.addEventListener("load", () => {
+        for (let i of document.querySelectorAll(".collapse ul")) {
+          let tog = document.createElement("div");
+          tog.innerHTML = i.previousSibling.textContent;
+          tog.className = "toggle";
+          tog.onclick = () => tog.classList.toggle("show");
+          i.parentElement.removeChild(i.previousSibling);
+          i.parentElement.insertBefore(tog, i);
+        }
+      });
+      // Open the collapsible demo an "#example" link points to, then scroll to
+      // it.  getElementById (not querySelector) matches ids that contain a dot,
+      // e.g. "Class.method-example1".
+      function openHashTarget () {
+        if (! window.location.hash) { return; }
+        let el = document.getElementById (
+          decodeURIComponent (window.location.hash.slice (1)));
+        if (! el) { return; }
+        if (el.classList.contains ("collapse") &&
+            ! el.classList.contains ("show")) {
+          bootstrap.Collapse.getOrCreateInstance (el).show ();
+        }
+        el.scrollIntoView ();
+      }
+      window.addEventListener ("DOMContentLoaded", openHashTarget);
+      window.addEventListener ("hashchange", openHashTarget);
+      // When the collapsible named by the current URL fragment is collapsed,
+      // drop the fragment (replaceState: no scroll, no history entry).  Otherwise
+      // the fragment would still equal this id, so clicking the same #example
+      // link again fires no "hashchange" and the example would not re-expand.
+      document.addEventListener ("hide.bs.collapse", (e) => {
+        if (e.target.id && window.location.hash === "#" + e.target.id) {
+          history.replaceState (null, "",
+            window.location.pathname + window.location.search);
+        }
+      });
+    </script>
+    <style>
+    h5.fs {
+    margin-top: -0.15em;
+    margin-bottom: -0.15em;
+    }
+    h6:hover {
+      color: gray;
+    }
+    code {
+    font-family: Consolas, "Courier New", monospace;
+    border-radius: 0.3em;
+    white-space: nowrap;
+    color: gray;
+    }
+    code.description {
+    font-family: Consolas, "Courier New", monospace;
+    border-radius: 0.3em;
+    white-space: normal;
+    font-size:1.2em;
+    color: gray;
+    }
+    var {
+    font-family: Consolas, "Courier New", monospace;
+    border-radius: 0.3em;
+    font-style: normal;
+    font-weight: bold;
+    color: gray;
+    }
+    td {
+      vertical-align: top;
+    }
+    [id^="togList"],                        /* HIDE CHECKBOX */
+    [id^="togList"] ~ .list,                /* HIDE LIST */
+    [id^="togList"] + label  span + span,   /* HIDE "Collapse" */
+    [id^="togList"]:checked + label span{   /* HIDE "Expand" (IF CHECKED) */
+      display:none;
+    }
+    [id^="togList"]:checked + label span + span{
+      display:inline-block;                 /* SHOW "Collapse" (IF CHECKED) */
+    }
+    [id^="togList"]:checked ~ .list{
+      display:block;                        /* SHOW LIST (IF CHECKED) */
+    }
+    </style>
+  </head>
+  <body>
+    <div class="bg-dark">
+      <div class="container-xl">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+          <div class="container-fluid">
+            <a class="navbar-brand" href=index.html>
+              <img src="assets/drafting.png" alt="drafting" class="d-inline-block align-top" width="25" height="25">
+              Geometry, CAD Input/Output and Technical Drawing
+            </a>
+            <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+              <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+              <ul class="navbar-nav">
+                <li class="nav-item">
+                  <a class="nav-link" href="index.html#Curve geometry">
+                    <i class="fas fa-list-alt"></i>
+                    Curve geometry
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="https://gnu-octave.github.io/packages/">
+                  <img src="assets/octave-logo.svg" alt="GNU Octave logo" class="d-inline-block align-top" width="25" height="25">
+                    Octave Packages
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="https://www.octave.org">
+                    <i class="fas fa-home"></i>
+                    GNU Octave website
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </nav>
+      </div>
+    </div>
+    <div class="container-xl my-4">
+      <div class="row flex-nowrap" style="min-height:0">
+        <div class="col-md-2 bg-light" style="overflow-y: scroll; width: 250px;">
+          <div class="p-2" style="text-align: center;">
+            <h3>Categories &</h3>
+            <h4 style="color: blue">Functions List</h4>
+          </div>
+			<div class="row">
+				<input id="togList1" type="checkbox">
+				<label for="togList1">
+					<span><h6>Geometry primitives</h6></span>
+					<span><h6>Geometry primitives</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="geom.signedarea.html" class="text-decoration-none font-monospace"><small>geom.signedarea</small></a></li>
+					<li><a href="geom.bbox.html" class="text-decoration-none font-monospace"><small>geom.bbox</small></a></li>
+					<li><a href="geom.centroid.html" class="text-decoration-none font-monospace"><small>geom.centroid</small></a></li>
+					<li><a href="geom.transform.html" class="text-decoration-none font-monospace"><small>geom.transform</small></a></li>
+					<li><a href="geom.isrectilinear.html" class="text-decoration-none font-monospace"><small>geom.isrectilinear</small></a></li>
+					<li><a href="geom.offset.html" class="text-decoration-none font-monospace"><small>geom.offset</small></a></li>
+					<li><a href="geom.largestrect.html" class="text-decoration-none font-monospace"><small>geom.largestrect</small></a></li>
+					<li><a href="geom.triangulate.html" class="text-decoration-none font-monospace"><small>geom.triangulate</small></a></li>
+					<li><a href="geom.hatchlines.html" class="text-decoration-none font-monospace"><small>geom.hatchlines</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList2" type="checkbox" checked>
+				<label for="togList2">
+					<span><h6>Curve geometry</h6></span>
+					<span><h6>Curve geometry</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="geom.curvature.html" class="text-decoration-none font-monospace"><small>geom.curvature</small></a></li>
+					<li><a href="geom.curvesample.html" class="text-decoration-none font-monospace"><small>geom.curvesample</small></a></li>
+					<li><a href="geom.curveoffset.html" class="text-decoration-none font-monospace"><small>geom.curveoffset</small></a></li>
+					<li><a href="geom.selfintersects.html" class="text-decoration-none font-monospace"><small>geom.selfintersects</small></a></li>
+					<li><a href="geom.arclength.html" class="text-decoration-none font-monospace"><small>geom.arclength</small></a></li>
+					<li><a href="geom.resample.html" class="text-decoration-none font-monospace"><small>geom.resample</small></a></li>
+					<li><a href="geom.simplify.html" class="text-decoration-none font-monospace fw-bolder"><small>geom.simplify</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList3" type="checkbox">
+				<label for="togList3">
+					<span><h6>Construction geometry</h6></span>
+					<span><h6>Construction geometry</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="geom.intersectlines.html" class="text-decoration-none font-monospace"><small>geom.intersectlines</small></a></li>
+					<li><a href="geom.intersectcircle.html" class="text-decoration-none font-monospace"><small>geom.intersectcircle</small></a></li>
+					<li><a href="geom.intersectcircles.html" class="text-decoration-none font-monospace"><small>geom.intersectcircles</small></a></li>
+					<li><a href="geom.tangentpoints.html" class="text-decoration-none font-monospace"><small>geom.tangentpoints</small></a></li>
+					<li><a href="geom.fillet.html" class="text-decoration-none font-monospace"><small>geom.fillet</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList4" type="checkbox">
+				<label for="togList4">
+					<span><h6>DXF input and output</h6></span>
+					<span><h6>DXF input and output</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="dxf.read.html" class="text-decoration-none font-monospace"><small>dxf.read</small></a></li>
+					<li><a href="dxf.write.html" class="text-decoration-none font-monospace"><small>dxf.write</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList5" type="checkbox">
+				<label for="togList5">
+					<span><h6>STL output</h6></span>
+					<span><h6>STL output</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="stl.write.html" class="text-decoration-none font-monospace"><small>stl.write</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList6" type="checkbox">
+				<label for="togList6">
+					<span><h6>Sheet composition</h6></span>
+					<span><h6>Sheet composition</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="draw.titleblock.html" class="text-decoration-none font-monospace"><small>draw.titleblock</small></a></li>
+					<li><a href="draw.coordtable.html" class="text-decoration-none font-monospace"><small>draw.coordtable</small></a></li>
+					<li><a href="draw.symbol.html" class="text-decoration-none font-monospace"><small>draw.symbol</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList7" type="checkbox">
+				<label for="togList7">
+					<span><h6>Line types and colours</h6></span>
+					<span><h6>Line types and colours</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="draw.linetype.html" class="text-decoration-none font-monospace"><small>draw.linetype</small></a></li>
+					<li><a href="draw.colour.html" class="text-decoration-none font-monospace"><small>draw.colour</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList8" type="checkbox">
+				<label for="togList8">
+					<span><h6>Drawing model</h6></span>
+					<span><h6>Drawing model</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="draw.Drawing.html" class="text-decoration-none font-monospace"><small>draw.Drawing</small></a></li>
+					<li><a href="draw.fromentities.html" class="text-decoration-none font-monospace"><small>draw.fromentities</small></a></li>
+				</ul>
+				</div>
+			</div>
+
+			  </div>
+			  <div class="col-md-10">
+          <div class="card rounded">
+            <div class="card-header card-header-mod">
+              <div class="row d-flex flex-wrap align-items-center">
+                <h3 class="d-inline-block mr-2">
+                Function&nbsp;Reference: <b><code>geom.simplify</code></b>
+                </h3>
+              </div>
+            </div>
+            <div class="card-body">
+<dl>
+<dt><code><h5 class="fs">drafting: <var>Q</var> = <b>geom.simplify</b> (<var>P</var>, <var>TOL</var>)</code></h5></dt>
+<dt><code><h5 class="fs">drafting: [<var>Q</var>, <var>KEPT</var>] = <b>geom.simplify</b> (<var>P</var>, <var>TOL</var>)</code></h5></dt>
+</dl>
+<p> Remove the points of a curve that carry no shape, within a tolerance.
+</p>
+<div class="ms-5">
+<p> <code><var>Q</var> = geom.simplify (<var>P</var>, <var>TOL</var>)</code> returns the polyline
+ <var>P</var> with points dropped wherever doing so moves the curve by no more
+ than <var>TOL</var>.  The first and last points are always kept.
+</p>
+<p> <code>[<var>Q</var>, <var>KEPT</var>] = geom.simplify (&hellip;)</code> also returns the
+ indices of the rows of <var>P</var> that survived, so a caller can carry along
+ anything it had attached to those points.
+</p>
+<a name="What-the-tolerance-guarantees"></a>
+<h3 class="subheading">What the tolerance guarantees</h3>
+
+<p> No point of the original curve ends up further than <var>TOL</var> from the
+ simplified one.  That is a statement about the whole curve, not about the
+ points removed, and it is what makes the tolerance safe to set from a
+ manufacturing figure: simplifying a cut profile to a tenth of the machine&rsquo;s
+ own tolerance cannot move the part outside it.
+</p>
+<p> The algorithm is Douglas and Peucker&rsquo;s: the segment from first point to last
+ is taken, the original point furthest from it found, and if that distance
+ exceeds <var>TOL</var> the curve is split there and each half treated the same
+ way.  Points survive because they carry shape, not because of where they
+ fall in the list.
+</p>
+<a name="Simplifying,-not-resampling"></a>
+<h3 class="subheading">Simplifying, not resampling</h3>
+
+<p> Every point of <var>Q</var> is a point of <var>P</var>; nothing is interpolated and no
+ corner is cut, which is what distinguishes this from <code>geom.resample</code>.
+ A polygon may be simplified without losing its vertices, since a corner is
+ exactly the sort of point the algorithm keeps.
+</p>
+<p> The saving can be large.  A curve sampled to a chordal tolerance far finer
+ than the drawing needs &mdash; as a cycloidal profile at a micron is, for a part
+ made to a hundredth &mdash; carries points that no reader or machine can use, and
+ every one of them reaches the file.
+</p>
+<p> <strong>See also: </strong>
+  <a href="geom.resample.html">geom.resample</a>, 
+  <a href="geom.arclength.html">geom.arclength</a>, 
+  <a href="geom.curvesample.html">geom.curvesample</a>
+</p>
+<p><strong>Source Code: </strong>
+  <a href="https://github.com/pr0m1th3as/drafting/tree/main/inst/+geom/simplify.m">geom.simplify</a>
+</div>
+        <div class="card rounded my-4">
+          <div class="card-header card-header-mod">
+            <div class="row d-flex flex-wrap align-items-center">
+              <div class="col-sm-3 col-md-5 mb-2 mb-sm-0">
+                <button class="btn btn-link fs-4 fw-normal d-inline-block mr-2 p-0 text-reset text-decoration-none"
+                  type="button" data-bs-toggle="collapse"
+                  data-bs-target="#geom_simplify-example1" aria-expanded="true"
+                  aria-controls="geom_simplify-example1">
+                Example: 1
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="collapse show" id="geom_simplify-example1">
+            <div class="card-body">
+                <p>Simplifying removes the points that carry no shape, guaranteeing that no point of the original ends further than the tolerance from the result. Every point kept is a point of the original: nothing is interpolated.</p>
+                <pre style="overflow-x: auto; white-space: pre; padding: 0.6rem 0.8rem; margin: 0.3rem 0; border: 1px solid #cfe0e6; border-left: 4px solid #4a90a4; border-radius: 4px; background-color: #eef5f8;"> t = linspace (0, 2*pi, 721)(1:720)';
+ P = (30 + 4 * cos (8 * t)) .* [cos(t), sin(t)];
+ Q = geom.simplify (P, 0.05);
+ printf ('%d points -&gt; %d, within 0.05 mm\n', rows (P), rows (Q));</pre>
+                <pre style="overflow-x: auto; white-space: pre; padding: 0.6rem 0.8rem; margin: 0.3rem 0 0.8rem 0; border: 1px solid #e2e2e2; border-left: 4px solid #b7b7b7; border-radius: 4px; background-color: #fafafa;">720 points -&gt; 145, within 0.05 mm</pre>
+                <pre style="overflow-x: auto; white-space: pre; padding: 0.6rem 0.8rem; margin: 0.3rem 0; border: 1px solid #cfe0e6; border-left: 4px solid #4a90a4; border-radius: 4px; background-color: #eef5f8;"> D = draw.Drawing ().polyline (P, true);
+ D.Colour = 'red';
+ for k = 1:rows (Q)
+   D = D.circle (Q(k,:), 0.7);
+ endfor
+ plot (D);
+ title ('the points that survive are the ones carrying shape');</pre>
+                <div class="text-center">
+                  <img src="assets/geom.simplify-101.png" class="rounded img-thumbnail" width= "70%" alt="plotted figure">
+                </div><p></p>
+
+            </div>
+          </div>
+        </div>
+
+        <div class="card rounded my-4">
+          <div class="card-header card-header-mod">
+            <div class="row d-flex flex-wrap align-items-center">
+              <div class="col-sm-3 col-md-5 mb-2 mb-sm-0">
+                <button class="btn btn-link fs-4 fw-normal d-inline-block mr-2 p-0 text-reset text-decoration-none"
+                  type="button" data-bs-toggle="collapse"
+                  data-bs-target="#geom_simplify-example2" aria-expanded="true"
+                  aria-controls="geom_simplify-example2">
+                Example: 2
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="collapse show" id="geom_simplify-example2">
+            <div class="card-body">
+                <p>The saving matters: a profile sampled far finer than the drawing needs carries points no reader or machine can use, and every one reaches the file.</p>
+                <pre style="overflow-x: auto; white-space: pre; padding: 0.6rem 0.8rem; margin: 0.3rem 0; border: 1px solid #cfe0e6; border-left: 4px solid #4a90a4; border-radius: 4px; background-color: #eef5f8;"> t = linspace (0, 2*pi, 4001)(1:4000)';
+ P = (30 + 4 * cos (9 * t)) .* [cos(t), sin(t)];
+ for tol = [0.001, 0.01, 0.1]
+   printf ('within %5.3f mm: %5d of %d points kept\n', tol, ...
+           rows (geom.simplify (P, tol)), rows (P));
+ endfor</pre>
+                <pre style="overflow-x: auto; white-space: pre; padding: 0.6rem 0.8rem; margin: 0.3rem 0 0.8rem 0; border: 1px solid #e2e2e2; border-left: 4px solid #b7b7b7; border-radius: 4px; background-color: #fafafa;">within 0.001 mm:  1265 of 4000 points kept
+within 0.010 mm:   393 of 4000 points kept
+within 0.100 mm:   127 of 4000 points kept</pre>
+
+            </div>
+          </div>
+        </div>
+
+
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </body>
+</html>

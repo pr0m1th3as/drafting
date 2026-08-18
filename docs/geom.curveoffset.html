@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Geometry, CAD Input/Output and Technical Drawing: geom.curveoffset</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" integrity="sha512-1ycn6IcaQQ40/MKBW2W4Rhis/DbILU74C1vSrLJxCq57o941Ym01SwNsOMqvEBFlcgUa6xLiPY/NS5R+E6ztJQ==" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/css/bootstrap.min.css" integrity="sha384-KyZXEAg3QhqLMpG8r+8fhAXLRk2vvoC2f3B09zVXn8CA5QIVfZOJ3BCsw2P0p/We" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-U1DAWAznBHeqEIlVSCgzq+c9gqGAJn5c/t99JyeKa9xxaYpSvHU5awsuZVVFIhvj" crossorigin="anonymous"></script>
+    <script type="text/javascript" async
+      src="https://cdn.jsdelivr.net/npm/mathjax@2/MathJax.js?config=TeX-AMS_CHTML">
+    </script>
+    <script type="text/javascript">
+      window.addEventListener("load", () => {
+        for (let i of document.querySelectorAll(".collapse ul")) {
+          let tog = document.createElement("div");
+          tog.innerHTML = i.previousSibling.textContent;
+          tog.className = "toggle";
+          tog.onclick = () => tog.classList.toggle("show");
+          i.parentElement.removeChild(i.previousSibling);
+          i.parentElement.insertBefore(tog, i);
+        }
+      });
+      // Open the collapsible demo an "#example" link points to, then scroll to
+      // it.  getElementById (not querySelector) matches ids that contain a dot,
+      // e.g. "Class.method-example1".
+      function openHashTarget () {
+        if (! window.location.hash) { return; }
+        let el = document.getElementById (
+          decodeURIComponent (window.location.hash.slice (1)));
+        if (! el) { return; }
+        if (el.classList.contains ("collapse") &&
+            ! el.classList.contains ("show")) {
+          bootstrap.Collapse.getOrCreateInstance (el).show ();
+        }
+        el.scrollIntoView ();
+      }
+      window.addEventListener ("DOMContentLoaded", openHashTarget);
+      window.addEventListener ("hashchange", openHashTarget);
+      // When the collapsible named by the current URL fragment is collapsed,
+      // drop the fragment (replaceState: no scroll, no history entry).  Otherwise
+      // the fragment would still equal this id, so clicking the same #example
+      // link again fires no "hashchange" and the example would not re-expand.
+      document.addEventListener ("hide.bs.collapse", (e) => {
+        if (e.target.id && window.location.hash === "#" + e.target.id) {
+          history.replaceState (null, "",
+            window.location.pathname + window.location.search);
+        }
+      });
+    </script>
+    <style>
+    h5.fs {
+    margin-top: -0.15em;
+    margin-bottom: -0.15em;
+    }
+    h6:hover {
+      color: gray;
+    }
+    code {
+    font-family: Consolas, "Courier New", monospace;
+    border-radius: 0.3em;
+    white-space: nowrap;
+    color: gray;
+    }
+    code.description {
+    font-family: Consolas, "Courier New", monospace;
+    border-radius: 0.3em;
+    white-space: normal;
+    font-size:1.2em;
+    color: gray;
+    }
+    var {
+    font-family: Consolas, "Courier New", monospace;
+    border-radius: 0.3em;
+    font-style: normal;
+    font-weight: bold;
+    color: gray;
+    }
+    td {
+      vertical-align: top;
+    }
+    [id^="togList"],                        /* HIDE CHECKBOX */
+    [id^="togList"] ~ .list,                /* HIDE LIST */
+    [id^="togList"] + label  span + span,   /* HIDE "Collapse" */
+    [id^="togList"]:checked + label span{   /* HIDE "Expand" (IF CHECKED) */
+      display:none;
+    }
+    [id^="togList"]:checked + label span + span{
+      display:inline-block;                 /* SHOW "Collapse" (IF CHECKED) */
+    }
+    [id^="togList"]:checked ~ .list{
+      display:block;                        /* SHOW LIST (IF CHECKED) */
+    }
+    </style>
+  </head>
+  <body>
+    <div class="bg-dark">
+      <div class="container-xl">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+          <div class="container-fluid">
+            <a class="navbar-brand" href=index.html>
+              <img src="assets/drafting.png" alt="drafting" class="d-inline-block align-top" width="25" height="25">
+              Geometry, CAD Input/Output and Technical Drawing
+            </a>
+            <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+              <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+              <ul class="navbar-nav">
+                <li class="nav-item">
+                  <a class="nav-link" href="index.html#Curve geometry">
+                    <i class="fas fa-list-alt"></i>
+                    Curve geometry
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="https://gnu-octave.github.io/packages/">
+                  <img src="assets/octave-logo.svg" alt="GNU Octave logo" class="d-inline-block align-top" width="25" height="25">
+                    Octave Packages
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="https://www.octave.org">
+                    <i class="fas fa-home"></i>
+                    GNU Octave website
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </nav>
+      </div>
+    </div>
+    <div class="container-xl my-4">
+      <div class="row flex-nowrap" style="min-height:0">
+        <div class="col-md-2 bg-light" style="overflow-y: scroll; width: 250px;">
+          <div class="p-2" style="text-align: center;">
+            <h3>Categories &</h3>
+            <h4 style="color: blue">Functions List</h4>
+          </div>
+			<div class="row">
+				<input id="togList1" type="checkbox">
+				<label for="togList1">
+					<span><h6>Geometry primitives</h6></span>
+					<span><h6>Geometry primitives</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="geom.signedarea.html" class="text-decoration-none font-monospace"><small>geom.signedarea</small></a></li>
+					<li><a href="geom.bbox.html" class="text-decoration-none font-monospace"><small>geom.bbox</small></a></li>
+					<li><a href="geom.centroid.html" class="text-decoration-none font-monospace"><small>geom.centroid</small></a></li>
+					<li><a href="geom.transform.html" class="text-decoration-none font-monospace"><small>geom.transform</small></a></li>
+					<li><a href="geom.isrectilinear.html" class="text-decoration-none font-monospace"><small>geom.isrectilinear</small></a></li>
+					<li><a href="geom.offset.html" class="text-decoration-none font-monospace"><small>geom.offset</small></a></li>
+					<li><a href="geom.largestrect.html" class="text-decoration-none font-monospace"><small>geom.largestrect</small></a></li>
+					<li><a href="geom.triangulate.html" class="text-decoration-none font-monospace"><small>geom.triangulate</small></a></li>
+					<li><a href="geom.hatchlines.html" class="text-decoration-none font-monospace"><small>geom.hatchlines</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList2" type="checkbox" checked>
+				<label for="togList2">
+					<span><h6>Curve geometry</h6></span>
+					<span><h6>Curve geometry</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="geom.curvature.html" class="text-decoration-none font-monospace"><small>geom.curvature</small></a></li>
+					<li><a href="geom.curvesample.html" class="text-decoration-none font-monospace"><small>geom.curvesample</small></a></li>
+					<li><a href="geom.curveoffset.html" class="text-decoration-none font-monospace fw-bolder"><small>geom.curveoffset</small></a></li>
+					<li><a href="geom.selfintersects.html" class="text-decoration-none font-monospace"><small>geom.selfintersects</small></a></li>
+					<li><a href="geom.arclength.html" class="text-decoration-none font-monospace"><small>geom.arclength</small></a></li>
+					<li><a href="geom.resample.html" class="text-decoration-none font-monospace"><small>geom.resample</small></a></li>
+					<li><a href="geom.simplify.html" class="text-decoration-none font-monospace"><small>geom.simplify</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList3" type="checkbox">
+				<label for="togList3">
+					<span><h6>Construction geometry</h6></span>
+					<span><h6>Construction geometry</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="geom.intersectlines.html" class="text-decoration-none font-monospace"><small>geom.intersectlines</small></a></li>
+					<li><a href="geom.intersectcircle.html" class="text-decoration-none font-monospace"><small>geom.intersectcircle</small></a></li>
+					<li><a href="geom.intersectcircles.html" class="text-decoration-none font-monospace"><small>geom.intersectcircles</small></a></li>
+					<li><a href="geom.tangentpoints.html" class="text-decoration-none font-monospace"><small>geom.tangentpoints</small></a></li>
+					<li><a href="geom.fillet.html" class="text-decoration-none font-monospace"><small>geom.fillet</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList4" type="checkbox">
+				<label for="togList4">
+					<span><h6>DXF input and output</h6></span>
+					<span><h6>DXF input and output</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="dxf.read.html" class="text-decoration-none font-monospace"><small>dxf.read</small></a></li>
+					<li><a href="dxf.write.html" class="text-decoration-none font-monospace"><small>dxf.write</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList5" type="checkbox">
+				<label for="togList5">
+					<span><h6>STL output</h6></span>
+					<span><h6>STL output</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="stl.write.html" class="text-decoration-none font-monospace"><small>stl.write</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList6" type="checkbox">
+				<label for="togList6">
+					<span><h6>Sheet composition</h6></span>
+					<span><h6>Sheet composition</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="draw.titleblock.html" class="text-decoration-none font-monospace"><small>draw.titleblock</small></a></li>
+					<li><a href="draw.coordtable.html" class="text-decoration-none font-monospace"><small>draw.coordtable</small></a></li>
+					<li><a href="draw.symbol.html" class="text-decoration-none font-monospace"><small>draw.symbol</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList7" type="checkbox">
+				<label for="togList7">
+					<span><h6>Line types and colours</h6></span>
+					<span><h6>Line types and colours</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="draw.linetype.html" class="text-decoration-none font-monospace"><small>draw.linetype</small></a></li>
+					<li><a href="draw.colour.html" class="text-decoration-none font-monospace"><small>draw.colour</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList8" type="checkbox">
+				<label for="togList8">
+					<span><h6>Drawing model</h6></span>
+					<span><h6>Drawing model</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="draw.Drawing.html" class="text-decoration-none font-monospace"><small>draw.Drawing</small></a></li>
+					<li><a href="draw.fromentities.html" class="text-decoration-none font-monospace"><small>draw.fromentities</small></a></li>
+				</ul>
+				</div>
+			</div>
+
+			  </div>
+			  <div class="col-md-10">
+          <div class="card rounded">
+            <div class="card-header card-header-mod">
+              <div class="row d-flex flex-wrap align-items-center">
+                <h3 class="d-inline-block mr-2">
+                Function&nbsp;Reference: <b><code>geom.curveoffset</code></b>
+                </h3>
+              </div>
+            </div>
+            <div class="card-body">
+<dl>
+<dt><code><h5 class="fs">drafting: <var>Q</var> = <b>geom.curveoffset</b> (<var>P</var>, <var>D</var>)</code></h5></dt>
+<dt><code><h5 class="fs">drafting: <var>Q</var> = <b>geom.curveoffset</b> (<var>P</var>, <var>D</var>, <var>CLOSED</var>)</code></h5></dt>
+<dt><code><h5 class="fs">drafting: [<var>Q</var>, <var>MARGIN</var>] = <b>geom.curveoffset</b> (&hellip;)</code></h5></dt>
+</dl>
+<p> Equidistant offset of a smooth sampled curve.
+</p>
+<div class="ms-5">
+<p> <code><var>Q</var> = geom.curveoffset (<var>P</var>, <var>D</var>)</code> moves every point of the
+ curve <var>P</var> a distance <var>D</var> along the curve&rsquo;s own normal and returns the
+ result <var>Q</var>, with one point per point of <var>P</var>.  <var>P</var> is an
+ <math>N</math>-by-2 matrix of points and <var>D</var> is a real scalar in the units of
+ <var>P</var>, so millimetres by package convention.
+</p>
+<p> <code><var>Q</var> = geom.curveoffset (<var>P</var>, <var>D</var>, <var>CLOSED</var>)</code> treats the
+ curve as closed when <var>CLOSED</var> is true.  <var>CLOSED</var> defaults to false.
+</p>
+<p> A positive <var>D</var> offsets <strong>inward</strong> on a closed curve, shrinking it,
+ whichever way round its points run; on an open curve, which has no inside, a
+ positive <var>D</var> offsets to the <strong>left</strong> of the direction of travel.  A
+ negative <var>D</var> reverses this, and <code><var>D</var> = 0</code> returns <var>P</var>
+ unchanged.
+</p>
+<p> <code>[<var>Q</var>, <var>MARGIN</var>] = geom.curveoffset (&hellip;)</code> additionally
+ returns how much further the curve could have been offset before the result
+ degenerated.  <var>MARGIN</var> is the smallest radius of curvature on the side
+ being offset towards, less <var>D</var>; it is <code>Inf</code> for a curve that never
+ turns that way.  A design that must not approach the limit can test
+ <var>MARGIN</var> rather than wait for the error.
+</p>
+<p> <strong>Validity is decided by a criterion, not detected afterwards.</strong>
+ Offsetting inward by more than the radius of curvature at a point folds the
+ curve through its own centre of curvature, and the criterion is simply that
+ <var>D</var> must not exceed <code>1 / <var>K</var></code> wherever the curvature <var>K</var> is
+ positive on the offset side.  This is the undercut condition of a cycloidal
+ disc, and of any roller running in a groove.  Violating it raises an error
+ rather than returning a folded curve.
+</p>
+<p> Offsetting <em>exactly</em> to the centre of curvature is admitted: it yields a
+ cusp, which touches rather than folds.  That boundary is tested to a relative
+ tolerance of <math>10^{-9}</math> of the limiting radius, because a three-point
+ curvature estimate loses precision as the sampling tightens and cannot
+ resolve the boundary exactly.  The tolerance is far below any distance a
+ manufactured part could care about, and a real violation exceeds it by orders
+ of magnitude.
+</p>
+<p> <strong>Accuracy, and when not to use this.</strong>  The normal is estimated from
+ each point&rsquo;s two neighbours, weighted by the chord lengths so that the
+ estimate stays second order even where the spacing changes abruptly, as it
+ does at every refinement boundary of an adaptively sampled curve.  On points
+ taken from a circle the offset is exact to rounding at any spacing.  On a
+ curve whose curvature varies sharply the residual is a few microns at a
+ chordal tolerance of <math>10^{-4}</math> mm and falls with the sampling.
+</p>
+<p> Where the offset curve has a closed form &mdash; as a cycloidal disc profile does
+ &mdash; evaluate that instead and keep this function to check it.  A few microns
+ is a fraction of a wire-EDM tolerance, not a comfortable margin inside it.
+</p>
+<p> <strong>A polygon is offset by passing its vertices.</strong>  With one point per
+ corner each normal is the angle bisector, so a closed outline of straight
+ edges &mdash; rectilinear or not &mdash; offsets exactly, giving the mitred result.
+ Do <em>not</em> pass a dense sampling of the same outline: a corner resolved
+ by sampling has a vanishing radius of curvature, and the criterion above
+ rejects it as an undercut for an offset the polygon absorbs without
+ difficulty.  Same shape, different representation, opposite answer.
+</p>
+<p> For a rectilinear outline <code>geom.offset</code> is the better route: it tests
+ exactly whether the outline can absorb the offset at all, which a criterion
+ evaluated point by point cannot do.
+</p>
+<p> <strong>The criterion is local.</strong>  It guarantees that no neighbourhood folds
+ on itself, which is what makes an offset well defined point by point.  It
+ does not guarantee that two distant parts of the curve stay apart: a shape
+ with a narrow neck can pinch closed under an offset that every point accepts.
+ Where that is possible, check the result with <code>geom.selfintersects</code>.
+</p>
+<p> <strong>See also: </strong>
+  <a href="geom.curvature.html">geom.curvature</a>, 
+  <a href="geom.selfintersects.html">geom.selfintersects</a>, 
+  <a href="geom.offset.html">geom.offset</a>
+</p>
+<p><strong>Source Code: </strong>
+  <a href="https://github.com/pr0m1th3as/drafting/tree/main/inst/+geom/curveoffset.m">geom.curveoffset</a>
+</div>
+        <div class="card rounded my-4">
+          <div class="card-header card-header-mod">
+            <div class="row d-flex flex-wrap align-items-center">
+              <div class="col-sm-3 col-md-5 mb-2 mb-sm-0">
+                <button class="btn btn-link fs-4 fw-normal d-inline-block mr-2 p-0 text-reset text-decoration-none"
+                  type="button" data-bs-toggle="collapse"
+                  data-bs-target="#geom_curveoffset-example1" aria-expanded="true"
+                  aria-controls="geom_curveoffset-example1">
+                Example: 1
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="collapse show" id="geom_curveoffset-example1">
+            <div class="card-body">
+                <p>An equidistant offset moves every point along the curve's own normal.  On a closed curve a positive distance goes inward, whichever way round the points happen to run.</p>
+                <pre style="overflow-x: auto; white-space: pre; padding: 0.6rem 0.8rem; margin: 0.3rem 0; border: 1px solid #cfe0e6; border-left: 4px solid #4a90a4; border-radius: 4px; background-color: #eef5f8;"> t = linspace (0, 2*pi, 241)(1:240)';
+ P = (30 + 4 * cos (7 * t)) .* [cos(t), sin(t)];
+ D = draw.Drawing ().polyline (P, true);
+ D.Colour = 'red';
+ D = D.polyline (geom.curveoffset (P, 4, true), true);
+ D.Colour = 'blue';
+ D = D.polyline (geom.curveoffset (P, -4, true), true);
+ plot (D);
+ title ('a lobed profile offset 4 mm in (red) and out (blue)');</pre>
+                <div class="text-center">
+                  <img src="assets/geom.curveoffset-101.png" class="rounded img-thumbnail" width= "70%" alt="plotted figure">
+                </div><p></p>
+
+            </div>
+          </div>
+        </div>
+
+        <div class="card rounded my-4">
+          <div class="card-header card-header-mod">
+            <div class="row d-flex flex-wrap align-items-center">
+              <div class="col-sm-3 col-md-5 mb-2 mb-sm-0">
+                <button class="btn btn-link fs-4 fw-normal d-inline-block mr-2 p-0 text-reset text-decoration-none"
+                  type="button" data-bs-toggle="collapse"
+                  data-bs-target="#geom_curveoffset-example2" aria-expanded="true"
+                  aria-controls="geom_curveoffset-example2">
+                Example: 2
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="collapse show" id="geom_curveoffset-example2">
+            <div class="card-body">
+                <p>The margin says how much further the curve could be offset before it folds through its own centre of curvature.  Exceeding it raises rather than returning a folded curve that looks plausible and cannot be cut.</p>
+                <pre style="overflow-x: auto; white-space: pre; padding: 0.6rem 0.8rem; margin: 0.3rem 0; border: 1px solid #cfe0e6; border-left: 4px solid #4a90a4; border-radius: 4px; background-color: #eef5f8;"> t = linspace (0, 2*pi, 241)(1:240)';
+ P = (30 + 4 * cos (7 * t)) .* [cos(t), sin(t)];
+ [Q, MARGIN] = geom.curveoffset (P, 4, true);
+ printf ('4 mm in, with %.2f mm still in hand\n', MARGIN);</pre>
+                <pre style="overflow-x: auto; white-space: pre; padding: 0.6rem 0.8rem; margin: 0.3rem 0 0.8rem 0; border: 1px solid #e2e2e2; border-left: 4px solid #b7b7b7; border-radius: 4px; background-color: #fafafa;">4 mm in, with 1.06 mm still in hand</pre>
+                <pre style="overflow-x: auto; white-space: pre; padding: 0.6rem 0.8rem; margin: 0.3rem 0; border: 1px solid #cfe0e6; border-left: 4px solid #4a90a4; border-radius: 4px; background-color: #eef5f8;"> try
+   geom.curveoffset (P, 4 + MARGIN + 1, true);
+ catch err
+   disp (err.message);
+ end_try_catch</pre>
+                <pre style="overflow-x: auto; white-space: pre; padding: 0.6rem 0.8rem; margin: 0.3rem 0 0.8rem 0; border: 1px solid #e2e2e2; border-left: 4px solid #b7b7b7; border-radius: 4px; background-color: #fafafa;">geom.curveoffset: D exceeds the radius of curvature by 1; the offset would fold through its own centre of curvature.</pre>
+
+            </div>
+          </div>
+        </div>
+
+
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </body>
+</html>
