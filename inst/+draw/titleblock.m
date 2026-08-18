@@ -180,17 +180,20 @@ endfunction
 
 %!test  # a field given is written, with its caption
 %! D = draw.titleblock ('A4', struct ('drawing', 'ABC-123'));
-%! txt = {D.Entities(strcmp ({D.Entities.type}, 'text')).text};
+%! E = entities (D);
+%! txt = {E(strcmp ({E.type}, 'TEXT')).text};
 %! assert_equal (any (strcmp (txt, 'DRG No ABC-123')), true);
 
 %!test  # a field not given is left blank rather than invented
 %! D = draw.titleblock ('A4', struct ('title', 'X'));
-%! txt = {D.Entities(strcmp ({D.Entities.type}, 'text')).text};
+%! E = entities (D);
+%! txt = {E(strcmp ({E.type}, 'TEXT')).text};
 %! assert_equal (numel (txt), 1);
 
 %!test  # an unknown field is ignored rather than refused
 %! D = draw.titleblock ('A4', struct ('title', 'X', 'nonsense', 'Y'));
-%! txt = {D.Entities(strcmp ({D.Entities.type}, 'text')).text};
+%! E = entities (D);
+%! txt = {E(strcmp ({E.type}, 'TEXT')).text};
 %! assert_equal (numel (txt), 1);
 
 %!test  # the frame merges with the drawing it frames
@@ -201,7 +204,8 @@ endfunction
 
 %!test  # the filing margin is wider than the other three
 %! D = draw.titleblock ('A4');
-%! B = D.Entities(2).pts;
+%! E = entities (D);
+%! B = E(2).pts;
 %! assert_equal (min (B(:,1)), 20, 1e-12);
 %! assert_equal (min (B(:,2)), 10, 1e-12);
 

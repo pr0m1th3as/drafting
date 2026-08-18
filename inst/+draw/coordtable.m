@@ -165,33 +165,39 @@ endfunction
 
 %!test  # a table of three points has a heading row and three more
 %! D = draw.coordtable ([0, 0; 1, 2; 3, 4], [0, 0]);
-%! txt = {D.Entities(strcmp ({D.Entities.type}, 'text')).text};
+%! E = entities (D);
+%! txt = {E(strcmp ({E.type}, 'TEXT')).text};
 %! assert_equal (numel (txt), 12);
 
 %!test  # the headings come first and are the defaults
 %! D = draw.coordtable ([1, 2], [0, 0]);
-%! txt = {D.Entities(strcmp ({D.Entities.type}, 'text')).text};
+%! E = entities (D);
+%! txt = {E(strcmp ({E.type}, 'TEXT')).text};
 %! assert_equal (txt(1:3), {'PT', 'X', 'Y'});
 
 %!test  # coordinates are written to the stated number of places
 %! D = draw.coordtable ([1.5, 2], [0, 0], 'Decimals', 2);
-%! txt = {D.Entities(strcmp ({D.Entities.type}, 'text')).text};
+%! E = entities (D);
+%! txt = {E(strcmp ({E.type}, 'TEXT')).text};
 %! assert_equal (any (strcmp (txt, '1.50')), true);
 %! assert_equal (any (strcmp (txt, '2.00')), true);
 
 %!test  # a trailing zero is kept, so a column reads as a column
 %! D = draw.coordtable ([10, 20], [0, 0], 'Decimals', 3);
-%! txt = {D.Entities(strcmp ({D.Entities.type}, 'text')).text};
+%! E = entities (D);
+%! txt = {E(strcmp ({E.type}, 'TEXT')).text};
 %! assert_equal (any (strcmp (txt, '10.000')), true);
 
 %!test  # rows are numbered unless labels are given
 %! D = draw.coordtable ([0, 0; 1, 1], [0, 0]);
-%! txt = {D.Entities(strcmp ({D.Entities.type}, 'text')).text};
+%! E = entities (D);
+%! txt = {E(strcmp ({E.type}, 'TEXT')).text};
 %! assert_equal (any (strcmp (txt, '1')) && any (strcmp (txt, '2')), true);
 
 %!test  # labels replace the numbers
 %! D = draw.coordtable ([0, 0; 1, 1], [0, 0], 'Labels', {'A', 'B'});
-%! txt = {D.Entities(strcmp ({D.Entities.type}, 'text')).text};
+%! E = entities (D);
+%! txt = {E(strcmp ({E.type}, 'TEXT')).text};
 %! assert_equal (any (strcmp (txt, 'A')) && any (strcmp (txt, 'B')), true);
 
 %!test  # the table sits on its own layer, so it can be moved or dropped

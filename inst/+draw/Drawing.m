@@ -40,73 +40,29 @@
 ## @end group
 ## @end example
 ##
-## New entities are placed on the layer named by the @code{Layer} property,
-## exactly as a CAD application places them on its current layer.  Draw on
-## another layer by assigning to @code{Layer} first; no append method takes a
-## layer argument.
+## New entities take the layer, line type and colour that are current when
+## they are appended, exactly as a CAD application draws on its current layer
+## with its current pen.  Set @code{Layer}, @code{Linetype} or @code{Colour}
+## first and then draw; no append method takes any of the three as an argument.
+## Each governs what follows it and never what came before.
 ##
-## @code{Linetype} and @code{Colour} work the same way and are governed by the
-## same rule: they apply to what is appended after they are set, and never to
-## what came before.  @code{Linetype} is a name --- see @code{draw.linetype} ---
-## and defaults to @qcode{'CONTINUOUS'}.  @code{Colour} is an index, or a name
-## that @code{draw.colour} resolves to one, and defaults to 256, meaning take
-## the layer's colour.
-##
-## Three properties rather than arguments is what lets a caller set a drawing
-## convention once and then draw, which is how a draughtsman works and how CAD
-## is built.  It is also why a dimension's exploded parts inherit all three:
-## the rule has no exceptions.
+## Properties rather than arguments is what lets a caller state a drawing
+## convention once and then draw against it, which is how a draughtsman works
+## and how CAD is built.  It is also why a dimension's exploded parts inherit
+## all three: the rule has no exceptions.
 ##
 ## Dimensions are stored @strong{semantically} --- the two measured points, a
 ## perpendicular offset and a direction --- and are turned into lines,
 ## arrowheads and text by whichever backend renders them.  Nothing about how a
-## dimension looks is decided here.
+## dimension looks is decided here, which is what keeps a dimension truthful
+## when the geometry it measures moves.
 ##
-## @subheading Properties
-##
-## @multitable @columnfractions .18 .82
-## @item @code{Name} @tab Drawing name, a character vector.  Carried through to
-## the output where the format has somewhere to put it.
-## @item @code{Layer} @tab The current layer.  New entities go on it.  Defaults
-## to @qcode{'0'}, which is the DXF default layer.
-## @item @code{Entities} @tab Read-only.  The entity struct array, in the order
-## the entities were appended.
-## @end multitable
-##
-## @subheading Entity record
-##
-## Each element of @code{Entities} is a struct with the same thirteen fields,
-## whatever its type; fields that do not apply to a type are left empty.
-##
-## @multitable @columnfractions .16 .84
-## @item @code{type} @tab One of @qcode{'line'}, @qcode{'polyline'},
-## @qcode{'arc'}, @qcode{'circle'}, @qcode{'text'}, @qcode{'hatch'},
-## @qcode{'dim'}.
-## @item @code{layer} @tab The layer the entity was drawn on.
-## @item @code{pts} @tab @math{N}-by-2 coordinates in millimetres.  Its meaning
-## depends on the type: the two endpoints of a line, the vertices of a
-## polyline, the centre of an arc or circle, the insertion point of a text, the
-## boundary of a hatch, the two measured points of a dimension.
-## @item @code{closed} @tab Logical.  Polylines and hatch boundaries only.
-## @item @code{radius} @tab Arcs and circles, in millimetres.
-## @item @code{angles} @tab Arcs only: @code{[@var{A1}, @var{A2}]} in degrees,
-## counter-clockwise from @var{A1} to @var{A2}.
-## @item @code{angle} @tab A single angle in degrees: text rotation, or hatch
-## pattern direction.
-## @item @code{text} @tab Text entities, and the override string of a
-## dimension.
-## @item @code{height} @tab Text cap height in millimetres.
-## @item @code{offset} @tab Dimensions: perpendicular distance from the
-## measured points to the dimension line, in millimetres.  Signed.
-## @item @code{direction} @tab Dimensions: @qcode{'aligned'},
-## @qcode{'horizontal'} or @qcode{'vertical'}.
-## @item @code{pattern} @tab Hatch pattern name.
-## @item @code{spacing} @tab Hatch line spacing in millimetres.
-## @end multitable
-##
-## A uniform field set costs a few empty fields per entity and buys the thing
-## that matters: a backend is a @code{switch} over @code{type} that can read
-## any field without testing whether it exists.
+## A drawing reports what it holds through @code{numentities}, @code{layers}
+## and @code{bbox}, and hands its contents to a backend through
+## @code{entities}, which lowers them to the primitives a file can carry.  That
+## lowered list is what @code{plot}, @code{print}, @code{tikz} and
+## @code{dxf.write} all consume, so a figure shows the entities the file will
+## contain rather than a more flattering rendering of them.
 ##
 ## @seealso{dxf.write, geom.bbox}
 ## @end deftypefn
@@ -115,30 +71,84 @@ classdef Drawing
 
   properties
 
-    ## Drawing name, carried into the output where the format allows.
+    ## -*- texinfo -*-
+    ## @deftp {draw.Drawing} {property} Name
+    ##
+    ## Drawing name
+    ##
+    ## The name of the drawing, as a character vector.  It is carried into the
+    ## output wherever the format has somewhere to put it: a DXF file records
+    ## it, a TikZ picture writes it into a comment.  It defaults to
+    ## @qcode{'untitled'} and never affects the geometry.
+    ##
+    ## @end deftp
     Name = 'untitled';
 
-    ## The current layer.  New entities are placed on it.
+    ## -*- texinfo -*-
+    ## @deftp {draw.Drawing} {property} Layer
+    ##
+    ## The current layer
+    ##
+    ## The layer that entities are placed on as they are appended, as a
+    ## character vector.  It defaults to @qcode{'0'}, the layer every CAD
+    ## drawing has.
+    ##
+    ## Like @code{Linetype} and @code{Colour}, it applies to what is appended
+    ## @emph{after} it is set and never to what came before, so a drawing is
+    ## built by setting a property and then adding the entities that belong to
+    ## it.  Reading it back says where the next entity will go, not where the
+    ## existing ones are; for that, use @code{layers}.
+    ##
+    ## @end deftp
     Layer = '0';
 
-    ## The current line type.  New entities are drawn with it.
+    ## -*- texinfo -*-
+    ## @deftp {draw.Drawing} {property} Linetype
+    ##
+    ## The current line type
+    ##
+    ## The line type that entities are drawn with as they are appended, named
+    ## as a character vector: one of CONTINUOUS, HIDDEN, CENTER, PHANTOM,
+    ## DASHED, DASHDOT or DOT.  It defaults to @qcode{'CONTINUOUS'}.
+    ##
+    ## It governs what is appended after it is set, never what came before.
+    ## The dash lengths themselves are model dimensions scaled by each
+    ## backend's line-type scale, not a property of the drawing.
+    ##
+    ## @end deftp
     Linetype = 'CONTINUOUS';
 
-    ## The current colour index.  256 takes the layer's colour.
+    ## -*- texinfo -*-
+    ## @deftp {draw.Drawing} {property} Colour
+    ##
+    ## The current colour
+    ##
+    ## The colour that entities are drawn in as they are appended, as an
+    ## AutoCAD colour index from 0 to 256 or as a colour name accepted by
+    ## @code{draw.colour}.  It defaults to 256, which is @qcode{'byLayer'} ---
+    ## the entity takes whatever colour its layer carries, which is how a CAD
+    ## drawing is normally organised.
+    ##
+    ## It governs what is appended after it is set, never what came before.
+    ##
+    ## @end deftp
     Colour = 256;
 
   endproperties
 
-  properties (SetAccess = private)
+  properties (SetAccess = private, Hidden)
 
     ## Block definitions, by name.  Each holds a drawing placed by 'insert'.
+    ## Internal: 'block', 'insert' and 'expand' are the supported way in.
     Blocks = struct ('name', {}, 'drawing', {});
 
   endproperties
 
-  properties (SetAccess = private)
+  properties (SetAccess = private, Hidden)
 
-    ## The entities, in the order they were appended.
+    ## The entities, in the order they were appended.  Internal: the field
+    ## layout is not API.  Use 'entities' for the lowered list a backend sees,
+    ## 'numentities' for the count and 'layers' for the layers in use.
     Entities = struct ('type', {}, 'layer', {}, 'linetype', {}, ...
                        'colour', {}, 'pts', {}, 'closed', {}, ...
                        'radius', {}, 'angles', {}, 'angle', {}, 'text', {}, ...
@@ -148,22 +158,7 @@ classdef Drawing
 
   endproperties
 
-  methods (Access = public)
-
-    ## -*- texinfo -*-
-    ## @deftypefn  {draw.Drawing} {@var{D} =} Drawing ()
-    ## @deftypefnx {draw.Drawing} {@var{D} =} Drawing (@var{NAME})
-    ##
-    ## Create an empty drawing, optionally named.
-    ##
-    ## @end deftypefn
-    function this = Drawing (NAME)
-
-      if (nargin == 1)
-        this.Name = NAME;
-      endif
-
-    endfunction
+  methods (Hidden)
 
     ## Validate on assignment rather than on use, so a bad name is rejected at
     ## the point the mistake was made.
@@ -210,6 +205,194 @@ classdef Drawing
       this.Colour = C;
 
     endfunction
+
+    function disp (this)
+
+      printf ("  draw.Drawing '%s' with %d entities on %d layers\n", ...
+              this.Name, numel (this.Entities), numel (layers (this)));
+      if (! isempty (this.Entities))
+        types = {this.Entities.type};
+        known = {'line', 'polyline', 'arc', 'circle', 'text', 'hatch', 'dim'};
+        for ii = 1:numel (known)
+          n = sum (strcmp (types, known{ii}));
+          if (n > 0)
+            printf ("    %-9s %d\n", known{ii}, n);
+          endif
+        endfor
+      endif
+      printf ("    current layer: '%s'\n", this.Layer);
+
+    endfunction
+
+    function display (this)
+
+      name = inputname (1);
+      if (isempty (name))
+        name = 'ans';
+      endif
+      printf ("%s =\n\n", name);
+      disp (this);
+      printf ("\n");
+
+    endfunction
+
+  endmethods
+
+################################################################################
+##                          ** The drawing object **                          ##
+################################################################################
+##                             Available Methods                              ##
+##                                                                            ##
+## 'Drawing'         'numentities'     'isempty'         'layers'             ##
+## 'bbox'                                                                     ##
+################################################################################
+
+  methods (Access = public)
+
+    ## -*- texinfo -*-
+    ## @deftypefn  {draw.Drawing} {@var{D} =} Drawing ()
+    ## @deftypefnx {draw.Drawing} {@var{D} =} Drawing (@var{NAME})
+    ##
+    ## Create an empty drawing, optionally named.
+    ##
+    ## @code{@var{D} = Drawing ()} returns an empty drawing called
+    ## @qcode{'untitled'}.  @code{@var{D} = Drawing (@var{NAME})} names it
+    ## instead; the name is carried into the output wherever the format has
+    ## somewhere to put it.
+    ##
+    ## @strong{A drawing is a value, not a handle.}  Every method returns a new
+    ## drawing and leaves its input untouched, so the methods chain and a
+    ## drawing can be placed twice without the two copies interfering:
+    ##
+    ## @example
+    ## @group
+    ## D = draw.Drawing ('plate');
+    ## D = D.polyline ([0, 0; 80, 0; 80, 50; 0, 50], true);
+    ## D = D.circle ([40, 25], 12);
+    ## @end group
+    ## @end example
+    ##
+    ## Entities are appended in the order the methods are called, and each takes
+    ## the @code{Layer}, @code{Linetype} and @code{Colour} current at the moment
+    ## it is appended.  Setting one of those properties therefore affects what
+    ## follows and never what came before, which is how a draughtsman works and
+    ## how CAD is built.
+    ##
+    ## All coordinates are in millimetres.
+    ##
+    ## @end deftypefn
+    function this = Drawing (NAME)
+
+      if (nargin == 1)
+        this.Name = NAME;
+      endif
+
+    endfunction
+
+    ## -*- texinfo -*-
+    ## @deftypefn {draw.Drawing} {@var{N} =} numentities (@var{D})
+    ##
+    ## Return the number of entities in the drawing.
+    ##
+    ## @end deftypefn
+    function N = numentities (this)
+
+      N = numel (this.Entities);
+
+    endfunction
+
+    ## -*- texinfo -*-
+    ## @deftypefn {draw.Drawing} {@var{TF} =} isempty (@var{D})
+    ##
+    ## Return true when the drawing holds no entities.
+    ##
+    ## The current layer and the name have no bearing on this: a drawing is
+    ## empty when there is nothing to render.
+    ##
+    ## @end deftypefn
+    function TF = isempty (this)
+
+      TF = isempty (this.Entities);
+
+    endfunction
+
+    ## -*- texinfo -*-
+    ## @deftypefn {draw.Drawing} {@var{L} =} layers (@var{D})
+    ##
+    ## Return the layers the drawing actually uses, as a sorted cellstr.
+    ##
+    ## The current layer appears only if something was drawn on it, so this
+    ## reports the layers a backend has to declare, not the layers that were
+    ## selected along the way.
+    ##
+    ## @end deftypefn
+    function L = layers (this)
+
+      if (isempty (this.Entities))
+        L = {};
+        return;
+      endif
+      L = unique ({this.Entities.layer});
+
+    endfunction
+
+    ## -*- texinfo -*-
+    ## @deftypefn  {draw.Drawing} {@var{B} =} bbox (@var{D})
+    ## @deftypefnx {draw.Drawing} {[@var{B}, @var{W}, @var{H}] =} bbox (@var{D})
+    ##
+    ## Axis-aligned extents of the drawing, as
+    ## @code{[@var{xmin}, @var{ymin}, @var{xmax}, @var{ymax}]} in millimetres.
+    ##
+    ## @code{[@var{B}, @var{W}, @var{H}] = bbox (@var{D})} additionally returns
+    ## the width and height, matching @code{geom.bbox}.
+    ##
+    ## Curved entities contribute their true extent rather than their control
+    ## points: a circle contributes its centre displaced by the radius in each
+    ## of the four cardinal directions, and an arc contributes its two
+    ## endpoints together with whichever of those four points its sweep
+    ## actually passes through.  Taking the centre alone would understate a
+    ## circle by a radius on every side.
+    ##
+    ## Two things are deliberately not accounted for, because the model does
+    ## not know them: the rendered width and height of a text entity, of which
+    ## only the insertion point is counted, and the dimension lines and text a
+    ## backend will place at a dimension's offset, of which only the two
+    ## measured points are counted.  A frame drawn to this box therefore needs
+    ## a margin, which any drawing wants regardless.
+    ##
+    ## An empty drawing has no extent, and returns an empty @var{B}.
+    ##
+    ## @end deftypefn
+    function [B, W, H] = bbox (this)
+
+      if (isempty (this.Entities))
+        B = [];
+        W = [];
+        H = [];
+        return;
+      endif
+
+      P = [];
+      for ii = 1:numel (this.Entities)
+        P = [P; extentpoints(this.Entities(ii))];
+      endfor
+
+      [B, W, H] = geom.bbox (P);
+
+    endfunction
+
+  endmethods
+
+################################################################################
+##                          ** Appending entities **                          ##
+################################################################################
+##                             Available Methods                              ##
+##                                                                            ##
+## 'line'            'polyline'        'arc'             'circle'             ##
+## 'ellipse'         'text'            'hatch'                                ##
+################################################################################
+
+  methods (Access = public)
 
     ## -*- texinfo -*-
     ## @deftypefn {draw.Drawing} {@var{D} =} line (@var{D}, @var{P1}, @var{P2})
@@ -375,6 +558,58 @@ classdef Drawing
     endfunction
 
     ## -*- texinfo -*-
+    ## @deftypefn  {draw.Drawing} {@var{D} =} ellipse (@var{D}, @var{C}, @var{A}, @var{B})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} ellipse (@var{D}, @var{C}, @var{A}, @var{B}, @var{ROT})
+    ##
+    ## Append an ellipse centred at @var{C} with semi-axes @var{A} and @var{B}.
+    ##
+    ## @var{ROT} turns the first axis away from horizontal, in degrees
+    ## counter-clockwise, and defaults to zero.
+    ##
+    ## An ellipse is what a circle becomes when a round feature is seen
+    ## obliquely, which is most of the time on an isometric or an auxiliary
+    ## view, and what a chamfer on a cylinder projects to.
+    ##
+    ## @strong{The DXF revision this package writes has no ellipse entity}, so
+    ## one reaches a file as a closed polyline sampled to a chordal tolerance,
+    ## and @code{draw.Drawing.entities} records the substitution.  The shape is
+    ## right to
+    ## within that tolerance; what is lost is the ability to edit it as an
+    ## ellipse afterwards.
+    ##
+    ## @seealso{circle, arc, polyline}
+    ## @end deftypefn
+    function this = ellipse (this, C, A, B, ROT = 0)
+
+      if (nargin < 4 || nargin > 5)
+        error ("draw.Drawing.ellipse: invalid number of input arguments.");
+      endif
+      errmsg = checkpt (C);
+      if (! isempty (errmsg))
+        error ("draw.Drawing.ellipse: C %s", errmsg);
+      endif
+      errmsg = checkradius (A);
+      if (! isempty (errmsg))
+        error ("draw.Drawing.ellipse: A %s", errmsg);
+      endif
+      errmsg = checkradius (B);
+      if (! isempty (errmsg))
+        error ("draw.Drawing.ellipse: B %s", errmsg);
+      endif
+      if (! isnumeric (ROT) || ! isreal (ROT) || ! isscalar (ROT) ...
+          || ! isfinite (ROT))
+        error ("draw.Drawing.ellipse: ROT must be a real finite scalar.");
+      endif
+
+      e = makeentity ('ellipse', this.Layer, this.Linetype, this.Colour);
+      e.pts = C(:)';
+      e.radius = [A, B];
+      e.angle = ROT;
+      this.Entities(end+1) = e;
+
+    endfunction
+
+    ## -*- texinfo -*-
     ## @deftypefn  {draw.Drawing} {@var{D} =} text (@var{D}, @var{P}, @var{S})
     ## @deftypefnx {draw.Drawing} {@var{D} =} text (@var{D}, @var{P}, @var{S}, @var{H})
     ## @deftypefnx {draw.Drawing} {@var{D} =} text (@var{D}, @var{P}, @var{S}, @var{H}, @var{ROT})
@@ -483,6 +718,19 @@ classdef Drawing
 
     endfunction
 
+  endmethods
+
+################################################################################
+##                        ** Dimensioning and notes **                        ##
+################################################################################
+##                             Available Methods                              ##
+##                                                                            ##
+## 'dim'             'diam'            'radius'          'angdim'             ##
+## 'centremark'      'leader'                                                 ##
+################################################################################
+
+  methods (Access = public)
+
     ## -*- texinfo -*-
     ## @deftypefn  {draw.Drawing} {@var{D} =} dim (@var{D}, @var{P1}, @var{P2}, @var{OFFSET})
     ## @deftypefnx {draw.Drawing} {@var{D} =} dim (@var{D}, @var{P1}, @var{P2}, @var{OFFSET}, @var{DIRECTION})
@@ -563,476 +811,6 @@ classdef Drawing
       this.Entities(end+1) = e;
 
     endfunction
-
-    ## -*- texinfo -*-
-    ## @deftypefn {draw.Drawing} {@var{N} =} numentities (@var{D})
-    ##
-    ## Return the number of entities in the drawing.
-    ##
-    ## @end deftypefn
-    function N = numentities (this)
-
-      N = numel (this.Entities);
-
-    endfunction
-
-    ## -*- texinfo -*-
-    ## @deftypefn {draw.Drawing} {@var{TF} =} isempty (@var{D})
-    ##
-    ## Return true when the drawing holds no entities.
-    ##
-    ## The current layer and the name have no bearing on this: a drawing is
-    ## empty when there is nothing to render.
-    ##
-    ## @end deftypefn
-    function TF = isempty (this)
-
-      TF = isempty (this.Entities);
-
-    endfunction
-
-    ## -*- texinfo -*-
-    ## @deftypefn {draw.Drawing} {@var{L} =} layers (@var{D})
-    ##
-    ## Return the layers the drawing actually uses, as a sorted cellstr.
-    ##
-    ## The current layer appears only if something was drawn on it, so this
-    ## reports the layers a backend has to declare, not the layers that were
-    ## selected along the way.
-    ##
-    ## @end deftypefn
-    function L = layers (this)
-
-      if (isempty (this.Entities))
-        L = {};
-        return;
-      endif
-      L = unique ({this.Entities.layer});
-
-    endfunction
-
-    ## -*- texinfo -*-
-    ## @deftypefn  {draw.Drawing} {@var{B} =} bbox (@var{D})
-    ## @deftypefnx {draw.Drawing} {[@var{B}, @var{W}, @var{H}] =} bbox (@var{D})
-    ##
-    ## Axis-aligned extents of the drawing, as
-    ## @code{[@var{xmin}, @var{ymin}, @var{xmax}, @var{ymax}]} in millimetres.
-    ##
-    ## @code{[@var{B}, @var{W}, @var{H}] = bbox (@var{D})} additionally returns
-    ## the width and height, matching @code{geom.bbox}.
-    ##
-    ## Curved entities contribute their true extent rather than their control
-    ## points: a circle contributes its centre displaced by the radius in each
-    ## of the four cardinal directions, and an arc contributes its two
-    ## endpoints together with whichever of those four points its sweep
-    ## actually passes through.  Taking the centre alone would understate a
-    ## circle by a radius on every side.
-    ##
-    ## Two things are deliberately not accounted for, because the model does
-    ## not know them: the rendered width and height of a text entity, of which
-    ## only the insertion point is counted, and the dimension lines and text a
-    ## backend will place at a dimension's offset, of which only the two
-    ## measured points are counted.  A frame drawn to this box therefore needs
-    ## a margin, which any drawing wants regardless.
-    ##
-    ## An empty drawing has no extent, and returns an empty @var{B}.
-    ##
-    ## @end deftypefn
-    function [B, W, H] = bbox (this)
-
-      if (isempty (this.Entities))
-        B = [];
-        W = [];
-        H = [];
-        return;
-      endif
-
-      P = [];
-      for ii = 1:numel (this.Entities)
-        P = [P; extentpoints(this.Entities(ii))];
-      endfor
-
-      [B, W, H] = geom.bbox (P);
-
-    endfunction
-
-
-    ## -*- texinfo -*-
-    ## @deftypefn  {draw.Drawing} {@var{D} =} transform (@var{D}, @var{T})
-    ## @deftypefnx {draw.Drawing} {@var{D} =} transform (@var{D}, @var{OP}, @var{VAL})
-    ## @deftypefnx {draw.Drawing} {@var{D} =} transform (@var{D}, @var{OP}, @var{VAL}, @var{CENTRE})
-    ##
-    ## Apply a planar transformation to every entity of the drawing.
-    ##
-    ## The arguments after the drawing are those of @code{geom.transform}, and
-    ## mean the same: a 3-by-3 homogeneous matrix, or a named operation
-    ## (@qcode{'translate'}, @qcode{'rotate'}, @qcode{'scale'},
-    ## @qcode{'mirror'}) with its value and an optional centre.
-    ##
-    ## This is what lets a part be drawn once and placed more than once, a view
-    ## be mirrored, or a detail be built at the origin and moved onto a sheet.
-    ##
-    ## @subheading Entities are transformed, not just their points
-    ##
-    ## A circle keeps its centre and scales its radius; an arc rotates its
-    ## angles; text moves, rotates and scales its height; a hatch rotates its
-    ## pattern and scales its spacing.  A dimension carries its measured points
-    ## and scales its offset.
-    ##
-    ## @strong{A reflection reverses the sweep of an arc.}  Arcs run
-    ## counter-clockwise from the first angle to the second, so mirroring one
-    ## and keeping the order would silently give the complementary arc --- the
-    ## piece that was not there before.  The endpoints are exchanged instead.
-    ##
-    ## @subheading What is refused, and why
-    ##
-    ## @strong{A non-uniform scaling that would turn a circle into an ellipse}
-    ## raises.  There is no ellipse entity to put the result in, and quietly
-    ## scaling the radius by one of the two factors would move the geometry off
-    ## the part.  A drawing with no arcs or circles scales anisotropically
-    ## without complaint.
-    ##
-    ## @strong{A rotation that would leave an axis-locked dimension off its
-    ## axis} raises, naming the entity.  A @qcode{'horizontal'} dimension
-    ## measures the horizontal distance between two points; after a rotation of
-    ## thirty degrees it would still measure a horizontal distance, but not the
-    ## one the drawing was dimensioned for, and the number on the sheet would
-    ## change without anyone asking it to.  Rotations by a multiple of a quarter
-    ## turn are fine and exchange horizontal with vertical; so are mirrors about
-    ## either axis.  A dimension made @qcode{'aligned'} rotates freely.
-    ##
-    ## @seealso{geom.transform, merge, bbox}
-    ## @end deftypefn
-    function this = transform (this, varargin)
-
-      if (nargin < 2)
-        error ("draw.Drawing.transform: invalid number of input arguments.");
-      endif
-
-      ## Recover the linear part by transforming the origin and the two unit
-      ## vectors, rather than rebuilding the matrix geom.transform already
-      ## knows how to make
-      B = geom.transform ([0, 0; 1, 0; 0, 1], varargin{:});
-      t = B(1,:);
-      M = [(B(2,:) - t)', (B(3,:) - t)'];
-
-      sx = norm (M(:,1));
-      sy = norm (M(:,2));
-      uniform = (abs (sx - sy) <= 1e-12 * max (sx, sy)) ...
-                && abs (M(:,1)' * M(:,2)) <= 1e-12 * sx * sy;
-      reflected = (det (M) < 0);
-      onaxes = (all (abs (M([2, 3])) <= 1e-12 * max (sx, sy)) ...
-                || all (abs (M([1, 4])) <= 1e-12 * max (sx, sy)));
-
-      for ii = 1:numel (this.Entities)
-        e = this.Entities(ii);
-
-        if (! isempty (e.pts))
-          e.pts = geom.transform (e.pts, varargin{:});
-        endif
-
-        switch (e.type)
-          case {'circle', 'arc'}
-            if (! uniform)
-              error (strcat ("draw.Drawing.transform: entity %d is a %s", ...
-                             " and the scaling is not uniform; the result", ...
-                             " would be an ellipse."), ii, e.type);
-            endif
-            e.radius *= sx;
-            if (strcmp (e.type, 'arc'))
-              a = [dirangle(M, e.angles(1)), dirangle(M, e.angles(2))];
-              if (reflected)
-                a = a([2, 1]);
-              endif
-              e.angles = a;
-            endif
-
-          case 'text'
-            if (! uniform)
-              error (strcat ("draw.Drawing.transform: entity %d is text", ...
-                             " and the scaling is not uniform."), ii);
-            endif
-            e.height *= sx;
-            e.angle = dirangle (M, e.angle);
-
-          case 'hatch'
-            e.angle = dirangle (M, e.angle);
-            e.spacing *= sx;
-
-          case 'dim'
-            if (! any (strcmp (e.direction, {'aligned'})) && ! onaxes)
-              error (strcat ("draw.Drawing.transform: entity %d is a '%s'", ...
-                             " dimension and the transformation would", ...
-                             " leave it off its axis; make it 'aligned'", ...
-                             " first."), ii, e.direction);
-            endif
-            if (onaxes && ! isempty (e.direction) ...
-                && ! strcmp (e.direction, 'aligned'))
-              e.direction = axisafter (M, e.direction);
-            endif
-            e.offset *= sx;
-        endswitch
-
-        this.Entities(ii) = e;
-      endfor
-
-    endfunction
-
-    ## -*- texinfo -*-
-    ## @deftypefn {draw.Drawing} {@var{D} =} merge (@var{D}, @var{D2}, @dots{})
-    ##
-    ## Append the entities of one or more drawings to this one.
-    ##
-    ## @code{@var{D} = merge (@var{D1}, @var{D2})} returns a drawing holding
-    ## every entity of @var{D1} followed by every entity of @var{D2}, each
-    ## keeping the layer, line type and colour it was drawn with.  Any number of
-    ## drawings may be given.
-    ##
-    ## The result takes its name and its current layer, line type and colour
-    ## from the first drawing.  Those are the state a caller would carry on
-    ## drawing with, and the first drawing is the one being added to.
-    ##
-    ## Merging is what turns separately-built parts into an assembly, or
-    ## separately-built views into a sheet.  With @code{transform} it is the
-    ## whole of composition: build once, place as often as needed.
-    ##
-    ## @seealso{transform, numentities, layers}
-    ## @end deftypefn
-    function this = merge (this, varargin)
-
-      for k = 1:numel (varargin)
-        other = varargin{k};
-        if (! isa (other, 'draw.Drawing'))
-          error (strcat ("draw.Drawing.merge: argument %d is not a", ...
-                         " draw.Drawing object."), k);
-        endif
-        for ii = 1:numel (other.Entities)
-          this.Entities(end+1) = other.Entities(ii);
-        endfor
-      endfor
-
-    endfunction
-
-
-    ## -*- texinfo -*-
-    ## @deftypefn {draw.Drawing} {@var{D} =} block (@var{D}, @var{NAME}, @var{B})
-    ##
-    ## Define a named block from another drawing.
-    ##
-    ## A block is a drawing kept once and placed as often as wanted by
-    ## @code{insert}.  Nothing of it appears until it is inserted; defining one
-    ## adds no entity.
-    ##
-    ## Redefining a name replaces the definition, and every insert of it takes
-    ## the new geometry --- which is the point of a block, and the reason a
-    ## drawing that repeats a feature two dozen times should use one.
-    ##
-    ## @seealso{insert, merge, transform}
-    ## @end deftypefn
-    function this = block (this, NAME, B)
-
-      if (nargin != 3)
-        error ("draw.Drawing.block: invalid number of input arguments.");
-      endif
-      if (! ischar (NAME) || ! isrow (NAME) || isempty (NAME))
-        error (strcat ("draw.Drawing.block: NAME must be a non-empty", ...
-                       " character vector."));
-      endif
-      if (! isa (B, 'draw.Drawing'))
-        error ("draw.Drawing.block: B must be a draw.Drawing object.");
-      endif
-
-      k = find (strcmpi (NAME, {this.Blocks.name}), 1);
-      if (isempty (k))
-        k = numel (this.Blocks) + 1;
-      endif
-      this.Blocks(k).name = NAME;
-      this.Blocks(k).drawing = B;
-
-    endfunction
-
-    ## -*- texinfo -*-
-    ## @deftypefn  {draw.Drawing} {@var{D} =} insert (@var{D}, @var{NAME}, @var{POS})
-    ## @deftypefnx {draw.Drawing} {@var{D} =} insert (@dots{}, @var{ROT}, @var{SCALE})
-    ##
-    ## Place a defined block at a point.
-    ##
-    ## @code{@var{D} = insert (@var{D}, @var{NAME}, @var{POS})} places the block
-    ## @var{NAME} with its origin at @var{POS}.  @var{ROT} rotates it, in
-    ## degrees counter-clockwise, and @var{SCALE} scales it; both default to
-    ## leaving it alone.
-    ##
-    ## An insert is a @emph{reference}, not a copy.  Twenty-five identical bores
-    ## are one definition and twenty-five references, which is what a
-    ## draughtsman expects to receive and a fraction of the file that
-    ## twenty-five copies would make.
-    ##
-    ## The block must already be defined; inserting a name that is not raises,
-    ## rather than leaving a reference that resolves to nothing when the file is
-    ## opened.
-    ##
-    ## @seealso{block, merge, transform}
-    ## @end deftypefn
-    function this = insert (this, NAME, POS, ROT = 0, SCALE = 1)
-
-      if (nargin < 3 || nargin > 5)
-        error ("draw.Drawing.insert: invalid number of input arguments.");
-      endif
-      if (! ischar (NAME) || ! isrow (NAME) || isempty (NAME))
-        error (strcat ("draw.Drawing.insert: NAME must be a non-empty", ...
-                       " character vector."));
-      endif
-      if (isempty (this.Blocks) || ! any (strcmpi (NAME, {this.Blocks.name})))
-        error (strcat ("draw.Drawing.insert: no block named '%s' is", ...
-                       " defined; define it with block first."), NAME);
-      endif
-      errmsg = checkpt (POS);
-      if (! isempty (errmsg))
-        error ("draw.Drawing.insert: POS %s", errmsg);
-      endif
-      if (! isnumeric (ROT) || ! isreal (ROT) || ! isscalar (ROT) ...
-          || ! isfinite (ROT))
-        error ("draw.Drawing.insert: ROT must be a real finite scalar.");
-      endif
-      if (! isnumeric (SCALE) || ! isreal (SCALE) || ! isscalar (SCALE) ...
-          || ! isfinite (SCALE) || SCALE <= 0)
-        error (strcat ("draw.Drawing.insert: SCALE must be a positive real", ...
-                       " finite scalar."));
-      endif
-
-      e = makeentity ('insert', this.Layer, this.Linetype, this.Colour);
-      e.pts = POS(:)';
-      e.block = NAME;
-      e.angle = ROT;
-      e.scale = SCALE;
-      this.Entities(end+1) = e;
-
-    endfunction
-
-    ## -*- texinfo -*-
-    ## @deftypefn {draw.Drawing} {@var{D} =} expand (@var{D})
-    ##
-    ## Replace every insert with the geometry it refers to.
-    ##
-    ## The result holds no blocks and no inserts, only the entities they stood
-    ## for, each transformed to where its reference put it.  This is what a
-    ## backend with no block of its own needs, and what @code{draw.Drawing.plot}
-    ## and
-    ## @code{draw.Drawing.tikz} do before rendering.
-    ##
-    ## Blocks may contain inserts of other blocks and are expanded through.  A
-    ## block keeps its own definitions and inherits the enclosing drawing's only
-    ## for names it does not define itself.
-    ##
-    ## A block cannot come to refer to itself: its drawing is captured by value
-    ## when the block is defined, so redefining a name later cannot reach back
-    ## into a definition already taken.  The hundred-level limit is therefore a
-    ## backstop against a construction this class does not permit, not a rule a
-    ## caller can meet by accident.
-    ##
-    ## @seealso{block, insert, draw.Drawing.entities}
-    ## @end deftypefn
-    function this = expand (this, depth = 0)
-
-      if (depth > 100)
-        error (strcat ("draw.Drawing.expand: blocks are nested more than a", ...
-                       " hundred deep, or one of them refers to itself."));
-      endif
-      if (isempty (this.Entities))
-        return;
-      endif
-
-      out = this;
-      out.Entities(:) = [];
-      for ii = 1:numel (this.Entities)
-        e = this.Entities(ii);
-        if (! strcmp (e.type, 'insert'))
-          out.Entities(end+1) = e;
-          continue;
-        endif
-        k = find (strcmpi (e.block, {this.Blocks.name}), 1);
-        if (isempty (k))
-          error (strcat ("draw.Drawing.expand: entity %d inserts block", ...
-                         " '%s', which is not defined."), ii, e.block);
-        endif
-        ## A block keeps its own definitions and inherits the enclosing
-        ## drawing's only for names it does not define itself
-        sub = this.Blocks(k).drawing;
-        for bb = 1:numel (this.Blocks)
-          if (isempty (sub.Blocks) ...
-              || ! any (strcmpi (this.Blocks(bb).name, {sub.Blocks.name})))
-            sub.Blocks(end+1) = this.Blocks(bb);
-          endif
-        endfor
-        sub = expand (sub, depth + 1);
-        if (e.scale != 1)
-          sub = sub.transform ('scale', e.scale);
-        endif
-        if (e.angle != 0)
-          sub = sub.transform ('rotate', e.angle);
-        endif
-        sub = sub.transform ('translate', e.pts);
-        for jj = 1:numel (sub.Entities)
-          out.Entities(end+1) = sub.Entities(jj);
-        endfor
-      endfor
-      this = out;
-
-    endfunction
-
-
-    ## -*- texinfo -*-
-    ## @deftypefn  {draw.Drawing} {@var{D} =} ellipse (@var{D}, @var{C}, @var{A}, @var{B})
-    ## @deftypefnx {draw.Drawing} {@var{D} =} ellipse (@var{D}, @var{C}, @var{A}, @var{B}, @var{ROT})
-    ##
-    ## Append an ellipse centred at @var{C} with semi-axes @var{A} and @var{B}.
-    ##
-    ## @var{ROT} turns the first axis away from horizontal, in degrees
-    ## counter-clockwise, and defaults to zero.
-    ##
-    ## An ellipse is what a circle becomes when a round feature is seen
-    ## obliquely, which is most of the time on an isometric or an auxiliary
-    ## view, and what a chamfer on a cylinder projects to.
-    ##
-    ## @strong{The DXF revision this package writes has no ellipse entity}, so
-    ## one reaches a file as a closed polyline sampled to a chordal tolerance,
-    ## and @code{draw.Drawing.entities} records the substitution.  The shape is
-    ## right to
-    ## within that tolerance; what is lost is the ability to edit it as an
-    ## ellipse afterwards.
-    ##
-    ## @seealso{circle, arc, polyline}
-    ## @end deftypefn
-    function this = ellipse (this, C, A, B, ROT = 0)
-
-      if (nargin < 4 || nargin > 5)
-        error ("draw.Drawing.ellipse: invalid number of input arguments.");
-      endif
-      errmsg = checkpt (C);
-      if (! isempty (errmsg))
-        error ("draw.Drawing.ellipse: C %s", errmsg);
-      endif
-      errmsg = checkradius (A);
-      if (! isempty (errmsg))
-        error ("draw.Drawing.ellipse: A %s", errmsg);
-      endif
-      errmsg = checkradius (B);
-      if (! isempty (errmsg))
-        error ("draw.Drawing.ellipse: B %s", errmsg);
-      endif
-      if (! isnumeric (ROT) || ! isreal (ROT) || ! isscalar (ROT) ...
-          || ! isfinite (ROT))
-        error ("draw.Drawing.ellipse: ROT must be a real finite scalar.");
-      endif
-
-      e = makeentity ('ellipse', this.Layer, this.Linetype, this.Colour);
-      e.pts = C(:)';
-      e.radius = [A, B];
-      e.angle = ROT;
-      this.Entities(end+1) = e;
-
-    endfunction
-
 
     ## -*- texinfo -*-
     ## @deftypefn  {draw.Drawing} {@var{D} =} diam (@var{D}, @var{C}, @var{R})
@@ -1244,6 +1022,676 @@ classdef Drawing
 
     endfunction
 
+  endmethods
+
+################################################################################
+##                             ** Composition **                              ##
+################################################################################
+##                             Available Methods                              ##
+##                                                                            ##
+## 'transform'       'merge'           'block'           'insert'             ##
+## 'expand'                                                                   ##
+################################################################################
+
+  methods (Access = public)
+
+    ## -*- texinfo -*-
+    ## @deftypefn  {draw.Drawing} {@var{D} =} transform (@var{D}, @var{T})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} transform (@var{D}, @var{OP}, @var{VAL})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} transform (@var{D}, @var{OP}, @var{VAL}, @var{CENTRE})
+    ##
+    ## Apply a planar transformation to every entity of the drawing.
+    ##
+    ## The arguments after the drawing are those of @code{geom.transform}, and
+    ## mean the same: a 3-by-3 homogeneous matrix, or a named operation
+    ## (@qcode{'translate'}, @qcode{'rotate'}, @qcode{'scale'},
+    ## @qcode{'mirror'}) with its value and an optional centre.
+    ##
+    ## This is what lets a part be drawn once and placed more than once, a view
+    ## be mirrored, or a detail be built at the origin and moved onto a sheet.
+    ##
+    ## @subheading Entities are transformed, not just their points
+    ##
+    ## A circle keeps its centre and scales its radius; an arc rotates its
+    ## angles; text moves, rotates and scales its height; a hatch rotates its
+    ## pattern and scales its spacing.  A dimension carries its measured points
+    ## and scales its offset.
+    ##
+    ## @strong{A reflection reverses the sweep of an arc.}  Arcs run
+    ## counter-clockwise from the first angle to the second, so mirroring one
+    ## and keeping the order would silently give the complementary arc --- the
+    ## piece that was not there before.  The endpoints are exchanged instead.
+    ##
+    ## @subheading What is refused, and why
+    ##
+    ## @strong{A non-uniform scaling that would turn a circle into an ellipse}
+    ## raises.  There is no ellipse entity to put the result in, and quietly
+    ## scaling the radius by one of the two factors would move the geometry off
+    ## the part.  A drawing with no arcs or circles scales anisotropically
+    ## without complaint.
+    ##
+    ## @strong{A rotation that would leave an axis-locked dimension off its
+    ## axis} raises, naming the entity.  A @qcode{'horizontal'} dimension
+    ## measures the horizontal distance between two points; after a rotation of
+    ## thirty degrees it would still measure a horizontal distance, but not the
+    ## one the drawing was dimensioned for, and the number on the sheet would
+    ## change without anyone asking it to.  Rotations by a multiple of a quarter
+    ## turn are fine and exchange horizontal with vertical; so are mirrors about
+    ## either axis.  A dimension made @qcode{'aligned'} rotates freely.
+    ##
+    ## @seealso{geom.transform, merge, bbox}
+    ## @end deftypefn
+    function this = transform (this, varargin)
+
+      if (nargin < 2)
+        error ("draw.Drawing.transform: invalid number of input arguments.");
+      endif
+
+      ## Recover the linear part by transforming the origin and the two unit
+      ## vectors, rather than rebuilding the matrix geom.transform already
+      ## knows how to make
+      B = geom.transform ([0, 0; 1, 0; 0, 1], varargin{:});
+      t = B(1,:);
+      M = [(B(2,:) - t)', (B(3,:) - t)'];
+
+      sx = norm (M(:,1));
+      sy = norm (M(:,2));
+      uniform = (abs (sx - sy) <= 1e-12 * max (sx, sy)) ...
+                && abs (M(:,1)' * M(:,2)) <= 1e-12 * sx * sy;
+      reflected = (det (M) < 0);
+      onaxes = (all (abs (M([2, 3])) <= 1e-12 * max (sx, sy)) ...
+                || all (abs (M([1, 4])) <= 1e-12 * max (sx, sy)));
+
+      for ii = 1:numel (this.Entities)
+        e = this.Entities(ii);
+
+        if (! isempty (e.pts))
+          e.pts = geom.transform (e.pts, varargin{:});
+        endif
+
+        switch (e.type)
+          case {'circle', 'arc'}
+            if (! uniform)
+              error (strcat ("draw.Drawing.transform: entity %d is a %s", ...
+                             " and the scaling is not uniform; the result", ...
+                             " would be an ellipse."), ii, e.type);
+            endif
+            e.radius *= sx;
+            if (strcmp (e.type, 'arc'))
+              a = [dirangle(M, e.angles(1)), dirangle(M, e.angles(2))];
+              if (reflected)
+                a = a([2, 1]);
+              endif
+              e.angles = a;
+            endif
+
+          case 'text'
+            if (! uniform)
+              error (strcat ("draw.Drawing.transform: entity %d is text", ...
+                             " and the scaling is not uniform."), ii);
+            endif
+            e.height *= sx;
+            e.angle = dirangle (M, e.angle);
+
+          case 'hatch'
+            e.angle = dirangle (M, e.angle);
+            e.spacing *= sx;
+
+          case 'dim'
+            if (! any (strcmp (e.direction, {'aligned'})) && ! onaxes)
+              error (strcat ("draw.Drawing.transform: entity %d is a '%s'", ...
+                             " dimension and the transformation would", ...
+                             " leave it off its axis; make it 'aligned'", ...
+                             " first."), ii, e.direction);
+            endif
+            if (onaxes && ! isempty (e.direction) ...
+                && ! strcmp (e.direction, 'aligned'))
+              e.direction = axisafter (M, e.direction);
+            endif
+            e.offset *= sx;
+        endswitch
+
+        this.Entities(ii) = e;
+      endfor
+
+    endfunction
+
+    ## -*- texinfo -*-
+    ## @deftypefn {draw.Drawing} {@var{D} =} merge (@var{D}, @var{D2}, @dots{})
+    ##
+    ## Append the entities of one or more drawings to this one.
+    ##
+    ## @code{@var{D} = merge (@var{D1}, @var{D2})} returns a drawing holding
+    ## every entity of @var{D1} followed by every entity of @var{D2}, each
+    ## keeping the layer, line type and colour it was drawn with.  Any number of
+    ## drawings may be given.
+    ##
+    ## The result takes its name and its current layer, line type and colour
+    ## from the first drawing.  Those are the state a caller would carry on
+    ## drawing with, and the first drawing is the one being added to.
+    ##
+    ## Merging is what turns separately-built parts into an assembly, or
+    ## separately-built views into a sheet.  With @code{transform} it is the
+    ## whole of composition: build once, place as often as needed.
+    ##
+    ## @seealso{transform, numentities, layers}
+    ## @end deftypefn
+    function this = merge (this, varargin)
+
+      for k = 1:numel (varargin)
+        other = varargin{k};
+        if (! isa (other, 'draw.Drawing'))
+          error (strcat ("draw.Drawing.merge: argument %d is not a", ...
+                         " draw.Drawing object."), k);
+        endif
+        for ii = 1:numel (other.Entities)
+          this.Entities(end+1) = other.Entities(ii);
+        endfor
+      endfor
+
+    endfunction
+
+    ## -*- texinfo -*-
+    ## @deftypefn {draw.Drawing} {@var{D} =} block (@var{D}, @var{NAME}, @var{B})
+    ##
+    ## Define a named block from another drawing.
+    ##
+    ## A block is a drawing kept once and placed as often as wanted by
+    ## @code{insert}.  Nothing of it appears until it is inserted; defining one
+    ## adds no entity.
+    ##
+    ## Redefining a name replaces the definition, and every insert of it takes
+    ## the new geometry --- which is the point of a block, and the reason a
+    ## drawing that repeats a feature two dozen times should use one.
+    ##
+    ## @seealso{insert, merge, transform}
+    ## @end deftypefn
+    function this = block (this, NAME, B)
+
+      if (nargin != 3)
+        error ("draw.Drawing.block: invalid number of input arguments.");
+      endif
+      if (! ischar (NAME) || ! isrow (NAME) || isempty (NAME))
+        error (strcat ("draw.Drawing.block: NAME must be a non-empty", ...
+                       " character vector."));
+      endif
+      if (! isa (B, 'draw.Drawing'))
+        error ("draw.Drawing.block: B must be a draw.Drawing object.");
+      endif
+
+      k = find (strcmpi (NAME, {this.Blocks.name}), 1);
+      if (isempty (k))
+        k = numel (this.Blocks) + 1;
+      endif
+      this.Blocks(k).name = NAME;
+      this.Blocks(k).drawing = B;
+
+    endfunction
+
+    ## -*- texinfo -*-
+    ## @deftypefn  {draw.Drawing} {@var{D} =} insert (@var{D}, @var{NAME}, @var{POS})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} insert (@dots{}, @var{ROT}, @var{SCALE})
+    ##
+    ## Place a defined block at a point.
+    ##
+    ## @code{@var{D} = insert (@var{D}, @var{NAME}, @var{POS})} places the block
+    ## @var{NAME} with its origin at @var{POS}.  @var{ROT} rotates it, in
+    ## degrees counter-clockwise, and @var{SCALE} scales it; both default to
+    ## leaving it alone.
+    ##
+    ## An insert is a @emph{reference}, not a copy.  Twenty-five identical bores
+    ## are one definition and twenty-five references, which is what a
+    ## draughtsman expects to receive and a fraction of the file that
+    ## twenty-five copies would make.
+    ##
+    ## The block must already be defined; inserting a name that is not raises,
+    ## rather than leaving a reference that resolves to nothing when the file is
+    ## opened.
+    ##
+    ## @seealso{block, merge, transform}
+    ## @end deftypefn
+    function this = insert (this, NAME, POS, ROT = 0, SCALE = 1)
+
+      if (nargin < 3 || nargin > 5)
+        error ("draw.Drawing.insert: invalid number of input arguments.");
+      endif
+      if (! ischar (NAME) || ! isrow (NAME) || isempty (NAME))
+        error (strcat ("draw.Drawing.insert: NAME must be a non-empty", ...
+                       " character vector."));
+      endif
+      if (isempty (this.Blocks) || ! any (strcmpi (NAME, {this.Blocks.name})))
+        error (strcat ("draw.Drawing.insert: no block named '%s' is", ...
+                       " defined; define it with block first."), NAME);
+      endif
+      errmsg = checkpt (POS);
+      if (! isempty (errmsg))
+        error ("draw.Drawing.insert: POS %s", errmsg);
+      endif
+      if (! isnumeric (ROT) || ! isreal (ROT) || ! isscalar (ROT) ...
+          || ! isfinite (ROT))
+        error ("draw.Drawing.insert: ROT must be a real finite scalar.");
+      endif
+      if (! isnumeric (SCALE) || ! isreal (SCALE) || ! isscalar (SCALE) ...
+          || ! isfinite (SCALE) || SCALE <= 0)
+        error (strcat ("draw.Drawing.insert: SCALE must be a positive real", ...
+                       " finite scalar."));
+      endif
+
+      e = makeentity ('insert', this.Layer, this.Linetype, this.Colour);
+      e.pts = POS(:)';
+      e.block = NAME;
+      e.angle = ROT;
+      e.scale = SCALE;
+      this.Entities(end+1) = e;
+
+    endfunction
+
+    ## -*- texinfo -*-
+    ## @deftypefn {draw.Drawing} {@var{D} =} expand (@var{D})
+    ##
+    ## Replace every insert with the geometry it refers to.
+    ##
+    ## The result holds no blocks and no inserts, only the entities they stood
+    ## for, each transformed to where its reference put it.  This is what a
+    ## backend with no block of its own needs, and what @code{draw.Drawing.plot}
+    ## and
+    ## @code{draw.Drawing.tikz} do before rendering.
+    ##
+    ## Blocks may contain inserts of other blocks and are expanded through.  A
+    ## block keeps its own definitions and inherits the enclosing drawing's only
+    ## for names it does not define itself.
+    ##
+    ## A block cannot come to refer to itself: its drawing is captured by value
+    ## when the block is defined, so redefining a name later cannot reach back
+    ## into a definition already taken.  The hundred-level limit is therefore a
+    ## backstop against a construction this class does not permit, not a rule a
+    ## caller can meet by accident.
+    ##
+    ## @seealso{block, insert, draw.Drawing.entities}
+    ## @end deftypefn
+    function this = expand (this, depth = 0)
+
+      if (depth > 100)
+        error (strcat ("draw.Drawing.expand: blocks are nested more than a", ...
+                       " hundred deep, or one of them refers to itself."));
+      endif
+      if (isempty (this.Entities))
+        return;
+      endif
+
+      out = this;
+      out.Entities(:) = [];
+      for ii = 1:numel (this.Entities)
+        e = this.Entities(ii);
+        if (! strcmp (e.type, 'insert'))
+          out.Entities(end+1) = e;
+          continue;
+        endif
+        k = find (strcmpi (e.block, {this.Blocks.name}), 1);
+        if (isempty (k))
+          error (strcat ("draw.Drawing.expand: entity %d inserts block", ...
+                         " '%s', which is not defined."), ii, e.block);
+        endif
+        ## A block keeps its own definitions and inherits the enclosing
+        ## drawing's only for names it does not define itself
+        sub = this.Blocks(k).drawing;
+        for bb = 1:numel (this.Blocks)
+          if (isempty (sub.Blocks) ...
+              || ! any (strcmpi (this.Blocks(bb).name, {sub.Blocks.name})))
+            sub.Blocks(end+1) = this.Blocks(bb);
+          endif
+        endfor
+        sub = expand (sub, depth + 1);
+        if (e.scale != 1)
+          sub = sub.transform ('scale', e.scale);
+        endif
+        if (e.angle != 0)
+          sub = sub.transform ('rotate', e.angle);
+        endif
+        sub = sub.transform ('translate', e.pts);
+        for jj = 1:numel (sub.Entities)
+          out.Entities(end+1) = sub.Entities(jj);
+        endfor
+      endfor
+      this = out;
+
+    endfunction
+
+  endmethods
+
+################################################################################
+##                                ** Output **                                ##
+################################################################################
+##                             Available Methods                              ##
+##                                                                            ##
+## 'entities'        'plot'            'print'           'tikz'               ##
+################################################################################
+
+  methods (Access = public)
+
+    ## Sheet size in millimetres, from a name or an explicit [width, height].
+
+    ## -*- texinfo -*-
+    ## @deftypefn  {draw.Drawing} {@var{E} =} entities (@var{D})
+    ## @deftypefnx {draw.Drawing} {@var{E} =} entities (@var{D}, @var{NAME}, @var{VALUE}, @dots{})
+    ## @deftypefnx {draw.Drawing} {[@var{E}, @var{LOST}] =} entities (@dots{})
+    ## @deftypefnx {draw.Drawing} {[@var{E}, @var{LOST}, @var{BLOCKS}] =} entities (@dots{})
+    ##
+    ## Lower a drawing to the flat entity struct array that @code{dxf.write}
+    ## takes.
+    ##
+    ## @code{@var{E} = entities (@var{D})} converts the @code{draw.Drawing}
+    ## object @var{D} into the entity vocabulary of the DXF layer: @code{LINE},
+    ## @code{POLYLINE}, @code{ARC}, @code{CIRCLE} and @code{TEXT}, each on the
+    ## layer it was drawn on.  The result is written with
+    ## @code{dxf.write (@var{FILE}, @var{E})}.
+    ##
+    ## This is the adapter between the two representations and the only place
+    ## that
+    ## knows both.  @code{dxf} deals in a file format and knows nothing of
+    ## dimensions or hatches; @code{draw} models the drawing and knows nothing
+    ## of
+    ## group codes.
+    ##
+    ## @subheading Dimensions are exploded here
+    ##
+    ## A @code{'dim'} entity carries only geometry --- two points, an offset and
+    ## a
+    ## direction.  It becomes six entities: two extension lines, the dimension
+    ## line, two oblique ticks and the text.  Nothing associative is emitted: a
+    ## true @code{DIMENSION} needs a @code{*D} block and a @code{DIMSTYLE}
+    ## record,
+    ## and plots identically.
+    ##
+    ## Ticks are the 45-degree architectural obliques rather than arrowheads.
+    ## R12
+    ## draws a filled arrowhead only as a @code{SOLID}, and at drawing scale the
+    ## tick is the conventional mark in any case.
+    ##
+    ## The text is placed @strong{horizontally whatever the dimension measures}
+    ## --- unidirectional dimensioning, which ISO 129 permits and which keeps
+    ## every
+    ## label on the sheet readable from one side of it.
+    ##
+    ## The label always clears the dimension line, on the far side from the
+    ## geometry being measured.  A dimension across the sheet carries its label
+    ## above or below the line; one up the sheet carries it to the left or
+    ## right,
+    ## since a horizontal label beside a vertical dimension has to clear the
+    ## line
+    ## by its @emph{width}.  Which side is which follows the sign of the offset.
+    ##
+    ## Without a label a dimension is annotated with the distance it measures,
+    ## computed at the moment of conversion, so a dimension cannot fall out of
+    ## step
+    ## with the geometry it spans.
+    ##
+    ## @subheading Ornament size
+    ##
+    ## Dimension ornament --- tick length, text height, the gap between a
+    ## measured
+    ## point and the start of its extension line --- is in millimetres of
+    ## @emph{model space}, so its size on the sheet depends on the plot scale.
+    ## Pass @qcode{'DimScale'} to set it: a drawing to be plotted at @math{1:50}
+    ## wants @code{'DimScale', 50}, which makes a nominally @math{2.5} mm text
+    ## @math{125} mm in the model and therefore @math{2.5} mm on paper.  The
+    ## default is @math{1}.
+    ##
+    ## @subheading What the DXF vocabulary cannot carry
+    ##
+    ## One thing in the model has no R12 equivalent, and it is not dropped
+    ## silently: a @code{'hatch'} becomes its boundary as a closed polyline, so
+    ## the
+    ## region is outlined but not filled, R12 having no @code{HATCH} entity.
+    ##
+    ## Text rotation used to be the second such case and no longer is.
+    ## @code{dxf.write} emits group code 50, so a rotated @code{'text'} arrives
+    ## in
+    ## the CAD file at the angle it was drawn at.
+    ##
+    ## @code{[@var{E}, @var{LOST}] = entities (@dots{})} returns the losses as
+    ## a struct array with fields @code{index}, @code{type} and @code{reason},
+    ## naming the entity of @var{D} that lost something.  Ask for @var{LOST} and
+    ## nothing is printed; omit it and each distinct reason is warned about
+    ## once,
+    ## because a conversion that quietly discards part of a drawing is the one
+    ## failure mode a CAD file will not show you.
+    ##
+    ## @seealso{dxf.write, draw.Drawing}
+    ## @end deftypefn
+    function [E, LOST, BLOCKS] = entities (D, varargin)
+
+      ## Input validation
+      if (nargin < 1)
+        error ("draw.Drawing.entities: invalid number of input arguments.");
+      endif
+      if (! isa (D, 'draw.Drawing'))
+        error ("draw.Drawing.entities: D must be a draw.Drawing object.");
+      endif
+      if (mod (numel (varargin), 2) != 0)
+        error (strcat ("draw.Drawing.entities: optional arguments", ...
+               " must come in name-value pairs."));
+      endif
+
+      dimScale = 1;
+      hatchMode = 'lines';
+      blockMode = 'expand';
+      chordTol = 0.01;
+      bulgeMode = 'keep';
+      for ii = 1:2:numel (varargin)
+        name = varargin{ii};
+        if (! ischar (name) || ! isrow (name))
+          error (strcat ("draw.Drawing.entities: option names", ...
+                 " must be character vectors."));
+        endif
+        switch (lower (name))
+          case 'dimscale'
+            dimScale = varargin{ii+1};
+            if (! isnumeric (dimScale) || ! isreal (dimScale) ...
+                || ! isscalar (dimScale) || ! isfinite (dimScale) ...
+                || dimScale <= 0)
+              error (strcat ("draw.Drawing.entities: DimScale must be a", ...
+                             " real positive", ...
+                             " finite scalar."));
+            endif
+            dimScale = double (dimScale);
+          case 'chordtol'
+            chordTol = varargin{ii+1};
+            if (! isnumeric (chordTol) || ! isreal (chordTol) ...
+                  || ! isscalar (chordTol) || ! isfinite (chordTol) ...
+                  || chordTol <= 0)
+              error (strcat ("draw.Drawing.entities: ChordTol must be a", ...
+                             " real positive", ...
+                             " finite scalar."));
+            endif
+          case 'bulges'
+            bulgeMode = varargin{ii+1};
+            if (! ischar (bulgeMode) || ! isrow (bulgeMode) ...
+                || ! any (strcmpi (bulgeMode, {'keep', 'flatten'})))
+              error (strcat ("draw.Drawing.entities: Bulges", ...
+                     " must be 'keep' or 'flatten'."));
+            endif
+            bulgeMode = lower (bulgeMode);
+          case 'blocks'
+            blockMode = varargin{ii+1};
+            if (! ischar (blockMode) || ! isrow (blockMode) ...
+                || ! any (strcmpi (blockMode, {'expand', 'reference'})))
+              error (strcat ("draw.Drawing.entities: Blocks must be", ...
+                             " 'expand' or", ...
+                             " 'reference'."));
+            endif
+            blockMode = lower (blockMode);
+          case 'hatch'
+            hatchMode = varargin{ii+1};
+            if (! ischar (hatchMode) || ! isrow (hatchMode) ...
+                || ! any (strcmpi (hatchMode, {'lines', 'boundary'})))
+              error (strcat ("draw.Drawing.entities: Hatch must be", ...
+                             " 'lines' or", ...
+                             " 'boundary'."));
+            endif
+            hatchMode = lower (hatchMode);
+          otherwise
+            error ("draw.Drawing.entities: unknown option '%s'.", name);
+        endswitch
+      endfor
+
+      E = emptyentity ();
+      LOST = struct ('index', {}, 'type', {}, 'reason', {});
+      BLOCKS = struct ('name', {}, 'entities', {});
+
+      ## An insert is a reference the caller may want kept, but every other
+      ## consumer needs the geometry, so expansion is the default
+      if (strcmp (blockMode, 'expand'))
+        D = D.expand ();
+      else
+        for bb = 1:numel (D.Blocks)
+          BLOCKS(bb).name = D.Blocks(bb).name;
+          BLOCKS(bb).entities = entities (D.Blocks(bb).drawing.expand (), ...
+                                               'dimscale', dimScale, ...
+                                               'hatch', hatchMode);
+        endfor
+      endif
+
+      src = D.Entities;
+      for ii = 1:numel (src)
+
+        e = src(ii);
+
+        switch (e.type)
+
+          case 'line'
+            E(end+1) = mkent ('LINE', e, e.pts);
+
+          case 'polyline'
+            if (! isempty (e.bulge) && strcmp (bulgeMode, 'flatten'))
+              p = mkent ('POLYLINE', e, flattenbulge (e, chordTol));
+              p.closed = e.closed;
+            else
+              p = mkent ('POLYLINE', e, e.pts);
+              p.closed = e.closed;
+              p.bulge = e.bulge;
+            endif
+            E(end+1) = p;
+
+          case 'arc'
+            a = mkent ('ARC', e, e.pts);
+            a.radius = e.radius;
+            a.angles = e.angles;
+            E(end+1) = a;
+
+          case 'circle'
+            c = mkent ('CIRCLE', e, e.pts);
+            c.radius = e.radius;
+            E(end+1) = c;
+
+          case 'text'
+            t = mkent ('TEXT', e, e.pts);
+            t.text = e.text;
+            t.height = e.height;
+            t.rotation = e.angle;
+            E(end+1) = t;
+
+          case 'ellipse'
+            ## R12 has no ELLIPSE, so it goes out as a closed polyline sampled
+            ## to
+            ## the chordal tolerance.  Unlike a hatch, something really is lost:
+            ## the shape survives but the entity does not, and it can no longer
+            ## be
+            ## edited as an ellipse.
+            a = e.radius(1);
+            b = e.radius(2);
+            c = cosd (e.angle);
+            sn = sind (e.angle);
+            f = @(t) e.pts + [a * cos(t) * c - b * sin(t) * sn, ...
+                              a * cos(t) * sn + b * sin(t) * c];
+            pts = geom.curvesample (@(t) ellipsepts (t, e.pts, a, b, c, sn), ...
+                                    [0, 2*pi], chordTol);
+            pts(end,:) = [];
+            q = mkent ('POLYLINE', e, pts);
+            q.closed = true;
+            E(end+1) = q;
+            LOST(end+1) = struct ('index', ii, 'type', 'ellipse', 'reason', ...
+                                  sprintf (strcat ('R12 has no ELLIPSE;', ...
+                                     ' emitted as a closed polyline of', ...
+                                           ' %d points'), rows (pts)));
+
+          case {'diam', 'radius'}
+            parts = explodecirc (e, dimScale);
+            for kk = 1:numel (parts)
+              E(end+1) = parts(kk);
+            endfor
+
+          case 'angdim'
+            parts = explodeang (e, dimScale);
+            for kk = 1:numel (parts)
+              E(end+1) = parts(kk);
+            endfor
+
+          case 'centremark'
+            parts = explodemark (e, dimScale);
+            for kk = 1:numel (parts)
+              E(end+1) = parts(kk);
+            endfor
+
+          case 'leader'
+            parts = explodeleader (e, dimScale);
+            for kk = 1:numel (parts)
+              E(end+1) = parts(kk);
+            endfor
+
+          case 'insert'
+            s = mkent ('INSERT', e, e.pts);
+            s.text = e.block;
+            s.rotation = e.angle;
+            s.radius = e.scale;
+            E(end+1) = s;
+
+          case 'hatch'
+            h = mkent ('POLYLINE', e, e.pts);
+            h.closed = true;
+            E(end+1) = h;
+            if (strcmp (hatchMode, 'lines'))
+              ## R12 has no HATCH entity, so the fill is generated explicitly.
+              ## Emitting the lines is a truer degradation than dropping them:
+              ## the recipient sees the section hatched, not an empty outline.
+              S = geom.hatchlines (e.pts, e.pattern, e.angle, e.spacing);
+              for jj = 1:rows (S)
+                E(end+1) = mkent ('LINE', e, [S(jj,1:2); S(jj,3:4)]);
+              endfor
+              ## Nothing is recorded as lost: R12 has no HATCH entity, but the
+              ## fill it would have carried is present as lines, so the
+              ## recipient
+              ## sees the hatch.  LOST is for what could not be carried at all.
+            else
+              LOST(end+1) = struct ('index', ii, 'type', 'hatch', 'reason', ...
+                              strcat ('fill dropped: R12 has no HATCH,', ...
+                                            ' boundary emitted'));
+            endif
+
+          case 'dim'
+            parts = explodedim (e, dimScale);
+            for jj = 1:numel (parts)
+              E(end+1) = parts(jj);
+            endfor
+
+        endswitch
+
+      endfor
+
+      ## Warn only when the caller has not asked to be told properly.
+      if (nargout < 2 && ! isempty (LOST))
+        reasons = unique ({LOST.reason});
+        for ii = 1:numel (reasons)
+          n = sum (strcmp ({LOST.reason}, reasons{ii}));
+          if (n == 1)
+            warning ("draw.Drawing.entities: 1 entity: %s.", reasons{ii});
+          else
+            warning ("draw.Drawing.entities: %d entities: %s.", n, reasons{ii});
+          endif
+        endfor
+      endif
+
+    endfunction
 
     ## -*- texinfo -*-
     ## @deftypefn  {draw.Drawing} {} plot (@var{D})
@@ -1366,7 +1814,6 @@ classdef Drawing
     ## @seealso{draw.Drawing, draw.Drawing.entities, draw.Drawing.tikz,
     ## dxf.write}
     ## @end deftypefn
-
     function H = plot (varargin)
 
       ## Input validation
@@ -1654,7 +2101,6 @@ classdef Drawing
     ## @seealso{draw.Drawing.plot, draw.Drawing.tikz, draw.titleblock,
     ## dxf.write}
     ## @end deftypefn
-
     function [PAPER, SCALE] = print (D, FILE, varargin)
 
       ## Input validation
@@ -1768,331 +2214,6 @@ classdef Drawing
 
     endfunction
 
-    ## Sheet size in millimetres, from a name or an explicit [width, height].
-
-    ## -*- texinfo -*-
-    ## @deftypefn  {draw.Drawing} {@var{E} =} entities (@var{D})
-    ## @deftypefnx {draw.Drawing} {@var{E} =} entities (@var{D}, @var{NAME}, @var{VALUE}, @dots{})
-    ## @deftypefnx {draw.Drawing} {[@var{E}, @var{LOST}] =} entities (@dots{})
-    ## @deftypefnx {draw.Drawing} {[@var{E}, @var{LOST}, @var{BLOCKS}] =} entities (@dots{})
-    ##
-    ## Lower a drawing to the flat entity struct array that @code{dxf.write}
-    ## takes.
-    ##
-    ## @code{@var{E} = entities (@var{D})} converts the @code{draw.Drawing}
-    ## object @var{D} into the entity vocabulary of the DXF layer: @code{LINE},
-    ## @code{POLYLINE}, @code{ARC}, @code{CIRCLE} and @code{TEXT}, each on the
-    ## layer it was drawn on.  The result is written with
-    ## @code{dxf.write (@var{FILE}, @var{E})}.
-    ##
-    ## This is the adapter between the two representations and the only place
-    ## that
-    ## knows both.  @code{dxf} deals in a file format and knows nothing of
-    ## dimensions or hatches; @code{draw} models the drawing and knows nothing
-    ## of
-    ## group codes.
-    ##
-    ## @subheading Dimensions are exploded here
-    ##
-    ## A @code{'dim'} entity carries only geometry --- two points, an offset and
-    ## a
-    ## direction.  It becomes six entities: two extension lines, the dimension
-    ## line, two oblique ticks and the text.  Nothing associative is emitted: a
-    ## true @code{DIMENSION} needs a @code{*D} block and a @code{DIMSTYLE}
-    ## record,
-    ## and plots identically.
-    ##
-    ## Ticks are the 45-degree architectural obliques rather than arrowheads.
-    ## R12
-    ## draws a filled arrowhead only as a @code{SOLID}, and at drawing scale the
-    ## tick is the conventional mark in any case.
-    ##
-    ## The text is placed @strong{horizontally whatever the dimension measures}
-    ## --- unidirectional dimensioning, which ISO 129 permits and which keeps
-    ## every
-    ## label on the sheet readable from one side of it.
-    ##
-    ## The label always clears the dimension line, on the far side from the
-    ## geometry being measured.  A dimension across the sheet carries its label
-    ## above or below the line; one up the sheet carries it to the left or
-    ## right,
-    ## since a horizontal label beside a vertical dimension has to clear the
-    ## line
-    ## by its @emph{width}.  Which side is which follows the sign of the offset.
-    ##
-    ## Without a label a dimension is annotated with the distance it measures,
-    ## computed at the moment of conversion, so a dimension cannot fall out of
-    ## step
-    ## with the geometry it spans.
-    ##
-    ## @subheading Ornament size
-    ##
-    ## Dimension ornament --- tick length, text height, the gap between a
-    ## measured
-    ## point and the start of its extension line --- is in millimetres of
-    ## @emph{model space}, so its size on the sheet depends on the plot scale.
-    ## Pass @qcode{'DimScale'} to set it: a drawing to be plotted at @math{1:50}
-    ## wants @code{'DimScale', 50}, which makes a nominally @math{2.5} mm text
-    ## @math{125} mm in the model and therefore @math{2.5} mm on paper.  The
-    ## default is @math{1}.
-    ##
-    ## @subheading What the DXF vocabulary cannot carry
-    ##
-    ## One thing in the model has no R12 equivalent, and it is not dropped
-    ## silently: a @code{'hatch'} becomes its boundary as a closed polyline, so
-    ## the
-    ## region is outlined but not filled, R12 having no @code{HATCH} entity.
-    ##
-    ## Text rotation used to be the second such case and no longer is.
-    ## @code{dxf.write} emits group code 50, so a rotated @code{'text'} arrives
-    ## in
-    ## the CAD file at the angle it was drawn at.
-    ##
-    ## @code{[@var{E}, @var{LOST}] = entities (@dots{})} returns the losses as
-    ## a struct array with fields @code{index}, @code{type} and @code{reason},
-    ## naming the entity of @var{D} that lost something.  Ask for @var{LOST} and
-    ## nothing is printed; omit it and each distinct reason is warned about
-    ## once,
-    ## because a conversion that quietly discards part of a drawing is the one
-    ## failure mode a CAD file will not show you.
-    ##
-    ## @seealso{dxf.write, draw.Drawing}
-    ## @end deftypefn
-
-    function [E, LOST, BLOCKS] = entities (D, varargin)
-
-      ## Input validation
-      if (nargin < 1)
-        error ("draw.Drawing.entities: invalid number of input arguments.");
-      endif
-      if (! isa (D, 'draw.Drawing'))
-        error ("draw.Drawing.entities: D must be a draw.Drawing object.");
-      endif
-      if (mod (numel (varargin), 2) != 0)
-        error (strcat ("draw.Drawing.entities: optional arguments", ...
-               " must come in name-value pairs."));
-      endif
-
-      dimScale = 1;
-      hatchMode = 'lines';
-      blockMode = 'expand';
-      chordTol = 0.01;
-      bulgeMode = 'keep';
-      for ii = 1:2:numel (varargin)
-        name = varargin{ii};
-        if (! ischar (name) || ! isrow (name))
-          error (strcat ("draw.Drawing.entities: option names", ...
-                 " must be character vectors."));
-        endif
-        switch (lower (name))
-          case 'dimscale'
-            dimScale = varargin{ii+1};
-            if (! isnumeric (dimScale) || ! isreal (dimScale) ...
-                || ! isscalar (dimScale) || ! isfinite (dimScale) ...
-                || dimScale <= 0)
-              error (strcat ("draw.Drawing.entities: DimScale must be a", ...
-                             " real positive", ...
-                             " finite scalar."));
-            endif
-            dimScale = double (dimScale);
-          case 'chordtol'
-            chordTol = varargin{ii+1};
-            if (! isnumeric (chordTol) || ! isreal (chordTol) ...
-                  || ! isscalar (chordTol) || ! isfinite (chordTol) ...
-                  || chordTol <= 0)
-              error (strcat ("draw.Drawing.entities: ChordTol must be a", ...
-                             " real positive", ...
-                             " finite scalar."));
-            endif
-          case 'bulges'
-            bulgeMode = varargin{ii+1};
-            if (! ischar (bulgeMode) || ! isrow (bulgeMode) ...
-                || ! any (strcmpi (bulgeMode, {'keep', 'flatten'})))
-              error (strcat ("draw.Drawing.entities: Bulges", ...
-                     " must be 'keep' or 'flatten'."));
-            endif
-            bulgeMode = lower (bulgeMode);
-          case 'blocks'
-            blockMode = varargin{ii+1};
-            if (! ischar (blockMode) || ! isrow (blockMode) ...
-                || ! any (strcmpi (blockMode, {'expand', 'reference'})))
-              error (strcat ("draw.Drawing.entities: Blocks must be", ...
-                             " 'expand' or", ...
-                             " 'reference'."));
-            endif
-            blockMode = lower (blockMode);
-          case 'hatch'
-            hatchMode = varargin{ii+1};
-            if (! ischar (hatchMode) || ! isrow (hatchMode) ...
-                || ! any (strcmpi (hatchMode, {'lines', 'boundary'})))
-              error (strcat ("draw.Drawing.entities: Hatch must be", ...
-                             " 'lines' or", ...
-                             " 'boundary'."));
-            endif
-            hatchMode = lower (hatchMode);
-          otherwise
-            error ("draw.Drawing.entities: unknown option '%s'.", name);
-        endswitch
-      endfor
-
-      E = emptyentity ();
-      LOST = struct ('index', {}, 'type', {}, 'reason', {});
-      BLOCKS = struct ('name', {}, 'entities', {});
-
-      ## An insert is a reference the caller may want kept, but every other
-      ## consumer needs the geometry, so expansion is the default
-      if (strcmp (blockMode, 'expand'))
-        D = D.expand ();
-      else
-        for bb = 1:numel (D.Blocks)
-          BLOCKS(bb).name = D.Blocks(bb).name;
-          BLOCKS(bb).entities = entities (D.Blocks(bb).drawing.expand (), ...
-                                               'dimscale', dimScale, ...
-                                               'hatch', hatchMode);
-        endfor
-      endif
-
-      src = D.Entities;
-      for ii = 1:numel (src)
-
-        e = src(ii);
-
-        switch (e.type)
-
-          case 'line'
-            E(end+1) = mkent ('LINE', e, e.pts);
-
-          case 'polyline'
-            if (! isempty (e.bulge) && strcmp (bulgeMode, 'flatten'))
-              p = mkent ('POLYLINE', e, flattenbulge (e, chordTol));
-              p.closed = e.closed;
-            else
-              p = mkent ('POLYLINE', e, e.pts);
-              p.closed = e.closed;
-              p.bulge = e.bulge;
-            endif
-            E(end+1) = p;
-
-          case 'arc'
-            a = mkent ('ARC', e, e.pts);
-            a.radius = e.radius;
-            a.angles = e.angles;
-            E(end+1) = a;
-
-          case 'circle'
-            c = mkent ('CIRCLE', e, e.pts);
-            c.radius = e.radius;
-            E(end+1) = c;
-
-          case 'text'
-            t = mkent ('TEXT', e, e.pts);
-            t.text = e.text;
-            t.height = e.height;
-            t.rotation = e.angle;
-            E(end+1) = t;
-
-          case 'ellipse'
-            ## R12 has no ELLIPSE, so it goes out as a closed polyline sampled
-            ## to
-            ## the chordal tolerance.  Unlike a hatch, something really is lost:
-            ## the shape survives but the entity does not, and it can no longer
-            ## be
-            ## edited as an ellipse.
-            a = e.radius(1);
-            b = e.radius(2);
-            c = cosd (e.angle);
-            sn = sind (e.angle);
-            f = @(t) e.pts + [a * cos(t) * c - b * sin(t) * sn, ...
-                              a * cos(t) * sn + b * sin(t) * c];
-            pts = geom.curvesample (@(t) ellipsepts (t, e.pts, a, b, c, sn), ...
-                                    [0, 2*pi], chordTol);
-            pts(end,:) = [];
-            q = mkent ('POLYLINE', e, pts);
-            q.closed = true;
-            E(end+1) = q;
-            LOST(end+1) = struct ('index', ii, 'type', 'ellipse', 'reason', ...
-                                  sprintf (strcat ('R12 has no ELLIPSE;', ...
-                                     ' emitted as a closed polyline of', ...
-                                           ' %d points'), rows (pts)));
-
-          case {'diam', 'radius'}
-            parts = explodecirc (e, dimScale);
-            for kk = 1:numel (parts)
-              E(end+1) = parts(kk);
-            endfor
-
-          case 'angdim'
-            parts = explodeang (e, dimScale);
-            for kk = 1:numel (parts)
-              E(end+1) = parts(kk);
-            endfor
-
-          case 'centremark'
-            parts = explodemark (e, dimScale);
-            for kk = 1:numel (parts)
-              E(end+1) = parts(kk);
-            endfor
-
-          case 'leader'
-            parts = explodeleader (e, dimScale);
-            for kk = 1:numel (parts)
-              E(end+1) = parts(kk);
-            endfor
-
-          case 'insert'
-            s = mkent ('INSERT', e, e.pts);
-            s.text = e.block;
-            s.rotation = e.angle;
-            s.radius = e.scale;
-            E(end+1) = s;
-
-          case 'hatch'
-            h = mkent ('POLYLINE', e, e.pts);
-            h.closed = true;
-            E(end+1) = h;
-            if (strcmp (hatchMode, 'lines'))
-              ## R12 has no HATCH entity, so the fill is generated explicitly.
-              ## Emitting the lines is a truer degradation than dropping them:
-              ## the recipient sees the section hatched, not an empty outline.
-              S = geom.hatchlines (e.pts, e.pattern, e.angle, e.spacing);
-              for jj = 1:rows (S)
-                E(end+1) = mkent ('LINE', e, [S(jj,1:2); S(jj,3:4)]);
-              endfor
-              ## Nothing is recorded as lost: R12 has no HATCH entity, but the
-              ## fill it would have carried is present as lines, so the
-              ## recipient
-              ## sees the hatch.  LOST is for what could not be carried at all.
-            else
-              LOST(end+1) = struct ('index', ii, 'type', 'hatch', 'reason', ...
-                              strcat ('fill dropped: R12 has no HATCH,', ...
-                                            ' boundary emitted'));
-            endif
-
-          case 'dim'
-            parts = explodedim (e, dimScale);
-            for jj = 1:numel (parts)
-              E(end+1) = parts(jj);
-            endfor
-
-        endswitch
-
-      endfor
-
-      ## Warn only when the caller has not asked to be told properly.
-      if (nargout < 2 && ! isempty (LOST))
-        reasons = unique ({LOST.reason});
-        for ii = 1:numel (reasons)
-          n = sum (strcmp ({LOST.reason}, reasons{ii}));
-          if (n == 1)
-            warning ("draw.Drawing.entities: 1 entity: %s.", reasons{ii});
-          else
-            warning ("draw.Drawing.entities: %d entities: %s.", n, reasons{ii});
-          endif
-        endfor
-      endif
-
-    endfunction
-
     ## The empty entity array, in dxf.write's vocabulary.  Field order is fixed
     ## so
     ## that the array grows by assignment.
@@ -2183,7 +2304,6 @@ classdef Drawing
     ##
     ## @seealso{draw.Drawing, draw.Drawing.entities}
     ## @end deftypefn
-
     function S = tikz (D, varargin)
 
       ## Input validation
@@ -2316,46 +2436,6 @@ classdef Drawing
           fclose (fid);
         end_unwind_protect
       endif
-
-    endfunction
-
-    ## A TikZ style name per layer.  Style names have to be alphabetic, and
-    ## layer
-    ## names do not, so anything else is dropped -- which can make two layers
-    ## collide, and a collision would silently merge their styling.
-    ## Disambiguate
-    ## with an index rather than hoping.
-  endmethods
-
-  methods (Hidden)
-
-    function disp (this)
-
-      printf ("  draw.Drawing '%s' with %d entities on %d layers\n", ...
-              this.Name, numel (this.Entities), numel (layers (this)));
-      if (! isempty (this.Entities))
-        types = {this.Entities.type};
-        known = {'line', 'polyline', 'arc', 'circle', 'text', 'hatch', 'dim'};
-        for ii = 1:numel (known)
-          n = sum (strcmp (types, known{ii}));
-          if (n > 0)
-            printf ("    %-9s %d\n", known{ii}, n);
-          endif
-        endfor
-      endif
-      printf ("    current layer: '%s'\n", this.Layer);
-
-    endfunction
-
-    function display (this)
-
-      name = inputname (1);
-      if (isempty (name))
-        name = 'ans';
-      endif
-      printf ("%s =\n\n", name);
-      disp (this);
-      printf ("\n");
 
     endfunction
 
@@ -3350,8 +3430,9 @@ endfunction
 %!   a = 2 * pi * (k - 1) / 6;
 %!   D = D.insert ('bore', 30 * [cos(a), sin(a)]);
 %! endfor
+%! [~, ~, BL] = entities (D, 'blocks', 'reference');
 %! printf ('%d entities referring to %d block\n', ...
-%!         numentities (D), numel (D.Blocks));
+%!         numentities (D), numel (BL));
 %! printf ('%d once expanded\n', numentities (D.expand ()));
 %! plot (D);
 %! title ('a bolt circle from one block definition');
