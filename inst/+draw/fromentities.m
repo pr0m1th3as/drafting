@@ -34,6 +34,19 @@
 ## @code{INSERT} naming a block that is not defined is reported rather than
 ## guessed at.
 ##
+## A block that nothing places is dropped if the writer generated it and kept
+## if the draughtsman defined it.  The picture of a dimension lives in a block
+## whose name begins with @qcode{'*'} and to which no @code{INSERT} refers, and
+## the dimension is raised from its definition points, so keeping the picture
+## as well would carry it twice; the layout containers @qcode{'$MODEL_SPACE'}
+## and @qcode{'$PAPER_SPACE'}, which a file defines as bookkeeping, go the same
+## way.  A generated block that @emph{is} placed --- a hatch, or an anonymous
+## block --- is kept, since nothing else holds its geometry.
+##
+## A block may itself place another.  The definitions are raised in dependency
+## order, so a nested @code{INSERT} resolves, and block names are matched
+## without regard to case, as a DXF reader matches them.
+##
 ## This is the inverse of @code{draw.Drawing.entities}, and the pair is what
 ## makes a file a round trip rather than a one-way door.
 ##
@@ -90,6 +103,12 @@ function [D, LOST] = fromentities (E, varargin)
       error (strcat ("draw.fromentities: BLOCKS must have 'name' and", ...
                      " 'entities' fields."));
     endif
+    for ii = 1:numel (BLOCKS)
+      if (! ischar (BLOCKS(ii).name) || ! isrow (BLOCKS(ii).name))
+        error (strcat ("draw.fromentities: each block name must be a", ...
+                       " non-empty character vector."));
+      endif
+    endfor
   endif
   if (mod (numel (varargin), 2) != 0)
     error ("draw.fromentities: Name/Value arguments must come in pairs.");
@@ -111,28 +130,89 @@ function [D, LOST] = fromentities (E, varargin)
   D = draw.Drawing (opt.Name);
   LOST = struct ('index', {}, 'type', {}, 'reason', {});
 
-  ## Blocks first, so that an INSERT has something to refer to.  A name
-  ## beginning with "*" is a block the writer generated rather than one the
-  ## draughtsman defined -- the picture of a dimension, above all -- and the
-  ## dimension itself is raised from its definition points, so keeping the
-  ## picture as well would leave the drawing carrying it twice.
+  ## Which blocks are placed, and by what.  What decides whether a definition
+  ## may be dropped is referential, not lexical: the picture of a dimension
+  ## lives in a block the DIMENSION entity names in its own record and to which
+  ## no INSERT ever refers, and the dimension is raised from its definition
+  ## points, so keeping the picture would carry it twice.  A hatch or an
+  ## anonymous block is named the same way -- with a leading "*" -- but is
+  ## placed by an INSERT, and dropping it takes geometry nothing else holds.
+  placed = insertnames (E);
+  for ii = 1:numel (BLOCKS)
+    more = insertnames (BLOCKS(ii).entities);
+    placed = [placed, more];
+  endfor
+
   keep = true (1, numel (BLOCKS));
   for ii = 1:numel (BLOCKS)
-    keep(ii) = isempty (BLOCKS(ii).name) || BLOCKS(ii).name(1) != '*';
+    nm = BLOCKS(ii).name;
+    if (any (strcmpi (placed, nm)))
+      continue;                # something places it, so something needs it
+    endif
+    keep(ii) = ! (nm(1) == '*' || islayout (nm));
   endfor
   BLOCKS = BLOCKS(keep);
+  names = {BLOCKS.name};
 
-  for ii = 1:numel (BLOCKS)
-    [B, bl] = draw.fromentities (BLOCKS(ii).entities, ...
-                            'Name', BLOCKS(ii).name);
+  ## A block may itself place another, so raise them in dependency order:
+  ## repeatedly take whichever blocks have all their own dependencies raised.
+  ## A cycle -- which DXF forbids but a file may still contain -- stalls the
+  ## sweep, and the remainder is then taken in file order with whatever did
+  ## resolve, so this cannot spin.
+  order = [];
+  pending = 1:numel (BLOCKS);
+  while (! isempty (pending))
+    ready = false (1, numel (pending));
+    for kk = 1:numel (pending)
+      ready(kk) = depsraised (BLOCKS(pending(kk)).entities, names, order);
+    endfor
+    if (! any (ready))
+      order = [order, pending];
+      break;
+    endif
+    order = [order, pending(ready)];
+    pending = pending(! ready);
+  endwhile
+
+  drawings = cell (1, numel (BLOCKS));
+  for ii = order
+    B = draw.Drawing (names{ii});
+    deps = unique (insertnames (BLOCKS(ii).entities));
+    for jj = 1:numel (deps)
+      kk = find (strcmpi (names, deps{jj}), 1);
+      if (! isempty (kk) && ! isempty (drawings{kk}))
+        B = B.block (names{kk}, drawings{kk});
+      endif
+    endfor
+    [drawings{ii}, bl] = replay (B, BLOCKS(ii).entities);
     for jj = 1:numel (bl)
       LOST(end+1) = struct ('index', 0, 'type', bl(jj).type, 'reason', ...
-                            sprintf ('in block %s: %s', BLOCKS(ii).name, ...
+                            sprintf ('in block %s: %s', names{ii}, ...
                                      bl(jj).reason));
     endfor
-    D = D.block (BLOCKS(ii).name, B);
   endfor
-  defined = {BLOCKS.name};
+
+  for ii = 1:numel (BLOCKS)
+    D = D.block (names{ii}, drawings{ii});
+  endfor
+
+  [D, bl] = replay (D, E);
+  for jj = 1:numel (bl)
+    LOST(end+1) = bl(jj);
+  endfor
+
+endfunction
+
+## Append an entity list to a drawing, which is what raising one amounts to.
+## The drawing arrives with its block table already defined, since an INSERT
+## can only be appended to a drawing that holds what it places.
+function [D, LOST] = replay (D, E)
+
+  LOST = struct ('index', {}, 'type', {}, 'reason', {});
+  defined = {};
+  if (! isempty (D.Blocks))
+    defined = {D.Blocks.name};
+  endif
 
   for ii = 1:numel (E)
     e = E(ii);
@@ -171,7 +251,7 @@ function [D, LOST] = fromentities (E, varargin)
 
       case 'INSERT'
         nm = getfield_or (e, 'block', '');
-        if (isempty (nm) || ! any (strcmp (defined, nm)))
+        if (isempty (nm) || ! any (strcmpi (defined, nm)))
           LOST(end+1) = struct ('index', ii, 'type', 'INSERT', 'reason', ...
                                 sprintf ('block ''%s'' is not defined', nm));
           continue;
@@ -203,6 +283,47 @@ function [D, LOST] = fromentities (E, varargin)
   D.Layer = '0';
   D.Linetype = 'CONTINUOUS';
   D.Colour = 256;
+
+endfunction
+
+## The block names an entity list places, so that no definition is dropped out
+## from under a reference.
+function nms = insertnames (E)
+
+  nms = {};
+  for ii = 1:numel (E)
+    if (strcmpi (getfield_or (E(ii), 'type', ''), 'INSERT'))
+      nm = getfield_or (E(ii), 'block', '');
+      if (! isempty (nm))
+        nms{end+1} = nm;
+      endif
+    endif
+  endfor
+
+endfunction
+
+## Whether every block this entity list places, and that the file also defines,
+## has already been raised.  A name the file never defines cannot be waited for.
+function tf = depsraised (E, names, order)
+
+  tf = true;
+  deps = insertnames (E);
+  for ii = 1:numel (deps)
+    kk = find (strcmpi (names, deps{ii}), 1);
+    if (! isempty (kk) && ! any (order == kk))
+      tf = false;
+      return;
+    endif
+  endfor
+
+endfunction
+
+## The layout containers a file defines as a matter of bookkeeping, empty in
+## R12 since their contents are the ENTITIES section itself.  The R13 spelling,
+## "*Model_Space", needs no entry here, being a generated name already.
+function tf = islayout (nm)
+
+  tf = any (strcmpi (nm, {'$MODEL_SPACE', '$PAPER_SPACE'}));
 
 endfunction
 
@@ -382,6 +503,67 @@ endfunction
 %! back = draw.fromentities (E, BL);
 %! assert_equal (isempty (back.Blocks), true);
 
+%!test  # a generated block that is placed is kept: nothing else holds it
+%! fill = draw.Drawing ().line ([0, 0], [5, 5]).line ([2, 0], [7, 5]);
+%! D = draw.Drawing ().block ('*X1', fill).insert ('*X1', [1, 1]);
+%! [E, ~, BL] = entities (D, 'blocks', 'reference');
+%! [back, LOST] = draw.fromentities (E, BL);
+%! assert_equal (numel (back.Blocks), 1);
+%! assert_equal (back.Blocks(1).name, '*X1');
+%! assert_equal (numel (LOST), 0);
+
+%!test  # the layout containers a file defines are not drawing content
+%! none = struct ('type', {}, 'layer', {}, 'pts', {});
+%! BL = struct ('name', {'$MODEL_SPACE', '$PAPER_SPACE'}, ...
+%!              'entities', {none, none});
+%! back = draw.fromentities (struct ('type', 'POINT', 'pts', [0, 0]), BL);
+%! assert_equal (isempty (back.Blocks), true);
+
+%!test  # a nested INSERT resolves against the block table
+%! cir = struct ('type', 'CIRCLE', 'layer', '0', 'pts', [0, 0], ...
+%!               'radius', 2, 'block', '');
+%! lin = struct ('type', 'LINE', 'layer', '0', 'pts', [0, 0; 10, 0], ...
+%!               'radius', [], 'block', '');
+%! ins = struct ('type', 'INSERT', 'layer', '0', 'pts', [5, 0], ...
+%!               'radius', [], 'block', 'HOLE');
+%! BL = struct ('name', {'HOLE', 'PLATE'}, 'entities', {cir, [lin, ins]});
+%! top = struct ('type', 'INSERT', 'layer', '0', 'pts', [0, 0], ...
+%!               'radius', [], 'block', 'PLATE');
+%! [back, LOST] = draw.fromentities (top, BL);
+%! assert_equal (numel (LOST), 0);
+%! k = find (strcmp ({back.Blocks.name}, 'PLATE'), 1);
+%! assert_equal (numentities (back.Blocks(k).drawing), 2);
+
+%!test  # a block defined after the one that places it is still raised first
+%! cir = struct ('type', 'CIRCLE', 'layer', '0', 'pts', [0, 0], ...
+%!               'radius', 2, 'block', '');
+%! ins = struct ('type', 'INSERT', 'layer', '0', 'pts', [5, 0], ...
+%!               'radius', [], 'block', 'HOLE');
+%! BL = struct ('name', {'PLATE', 'HOLE'}, 'entities', {ins, cir});
+%! top = struct ('type', 'INSERT', 'layer', '0', 'pts', [0, 0], ...
+%!               'radius', [], 'block', 'PLATE');
+%! [back, LOST] = draw.fromentities (top, BL);
+%! assert_equal (numel (LOST), 0);
+%! k = find (strcmp ({back.Blocks.name}, 'PLATE'), 1);
+%! assert_equal (numentities (back.Blocks(k).drawing), 1);
+
+%!test  # a block placing itself is broken rather than followed
+%! ins = struct ('type', 'INSERT', 'layer', '0', 'pts', [5, 0], ...
+%!               'radius', [], 'block', 'LOOP');
+%! BL = struct ('name', 'LOOP', 'entities', ins);
+%! [back, LOST] = draw.fromentities (ins, BL);
+%! assert_equal (numentities (back), 1);
+%! assert_equal (numel (LOST), 1);
+%! assert_equal (LOST(1).type, 'INSERT');
+
+%!test  # DXF matches block names without regard to case, and so does this
+%! bore = draw.Drawing ().circle ([0, 0], 3);
+%! D = draw.Drawing ().block ('BORE', bore).insert ('bore', [5, 5]);
+%! [E, ~, BL] = entities (D, 'blocks', 'reference');
+%! [back, LOST] = draw.fromentities (E, BL);
+%! assert_equal (numentities (back), 1);
+%! assert_equal (numel (LOST), 0);
+
 %!test  # an insert of a block that never arrived is reported, not guessed at
 %! E = struct ('type', 'INSERT', 'layer', '0', 'pts', [0, 0], 'block', 'GONE');
 %! [back, LOST] = draw.fromentities (E);
@@ -405,3 +587,6 @@ endfunction
 %! draw.fromentities (struct ('type', 'POINT', 'pts', [0, 0]), 'Nope', 1)
 %!error<draw.fromentities: Name must be a character vector.> ...
 %! draw.fromentities (struct ('type', 'POINT', 'pts', [0, 0]), 'Name', 7)
+%!error<draw.fromentities: each block name must be a non-empty character vector.> ...
+%! draw.fromentities (struct ('type', 'POINT', 'pts', [0, 0]), ...
+%!                    struct ('name', 42, 'entities', []))
