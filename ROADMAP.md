@@ -1,4 +1,4 @@
-# drafting — roadmap
+# drafting roadmap
 
 This is where the package is going and why. It is a statement of intent, not a
 schedule: milestones are ordered by what unblocks what, and the version tags
@@ -6,16 +6,16 @@ are indicative. Anything here may be reordered by what turns out to be needed.
 
 ## Where the package stands
 
-Version 0.1.0 is feature-complete for a first release: thirty-one public
+Version 0.1.0 is feature-complete for a first release: thirty public
 functions across `+geom`, `+dxf`, `+stl` and `+draw`, the `draw.Drawing` class
-with its three backends, 836 built-in self-tests, and a `%!demo` block on
+with its three backends, 847 built-in self-tests, and a `%!demo` block on
 nearly every function that ends in a plot, so the documentation shows rather
 than asserts.
 
 The suite asserts the printed artefact and not merely the numbers handed to the
 renderer: the page a PDF declares, the size and resolution of a raster sheet,
 that a model length arrives on paper at the stated scale, and that every entity
-type reaches every backend. Writing it found three defects — a raster print that
+type reaches every backend. Writing it found three defects: a raster print that
 carried no sheet, a fit computed against the figure's shape rather than the
 drawing's, and a printed scale that drifted whenever the drawing carried text.
 
@@ -23,28 +23,30 @@ The file loop is closed in that release. `draw.Drawing.entities` lowers a
 drawing to a flat entity list and `draw.fromentities` raises one back, blocks
 and all, with dimensions returning as dimensions that measure their geometry
 again. A DXF is a round trip rather than a one-way door, which is what makes
-the ordinary workflow — open an existing drawing, add to it, write it back —
+the ordinary workflow (open an existing drawing, add to it, write it back)
 possible at all.
 
-The geometry half of the package is strong. The drafting half — the part that
-encodes what a technical drawing *means* rather than what shape it is — is
+The geometry half of the package is strong. The drafting half, the part that
+encodes what a technical drawing *means* rather than what shape it is, is
 thinner, and most of this roadmap is about closing that gap.
 
 ## Scope
 
-The package covers **planar geometry, the drawing model built on it, and the
-formats that model is emitted in**. Two boundaries follow from that, and both
-are deliberate:
+The package covers **planar geometry, the drawing model built on it, the
+formats that model is emitted in, and the drawing of solids read from a
+file**. Two boundaries follow from that, and both are deliberate:
 
 - A drawing describes a part. It does not machine one. Toolpath generation,
   cutter compensation, feeds and speeds, and post-processor dialects belong to
   a CAM package that consumes this one.
 - The model is planar. Meshes are produced *from* planar profiles and written
-  out, but the package holds no solid-modelling kernel and no B-rep.
+  out, and a solid read from a STEP file is projected into views, but the
+  package holds no solid-modelling kernel: it never builds, edits or combines
+  a boundary representation, it only reads one.
 
 Everything below is checked against those two lines.
 
-## Milestone 1 — close the package's own shape (0.2.0)
+## Milestone 1: close the package's own shape (0.2.0)
 
 Small, unglamorous work that removes asymmetries in what is already here. Each
 item costs little and each one is noticed the moment it is missing.
@@ -53,7 +55,7 @@ item costs little and each one is noticed the moment it is missing.
 closed: the suite reads back the page it printed. The input half is not, and it
 is open for a structural reason rather than an inattentive one. Every DXF the
 tests read was written by this package, and there are shapes our writer cannot
-produce — it flattens a nested block on export, it never emits the layout
+produce: it flattens a nested block on export, it never emits the layout
 containers a real file defines, and it writes an aligned dimension as a rotated
 one. **No round trip can reach a path that our own output never takes**, which
 is exactly where the two import defects fixed since 0.1.0 were hiding, invisible
@@ -66,23 +68,23 @@ containing an empty group value; entity types met inside a block were dropped
 without being counted; and an aligned dimension, which the format gives its own
 type code and which we have never written, was not raised at all.
 
-What remains is the rest of the same idea — blocks with nested inserts, the
+What remains is the rest of the same idea: blocks with nested inserts, the
 entities R12 cannot store, polyline widths and bulges, an inch file, a layer
-table — each drawn elsewhere, checked in with the values it was drawn to, and
+table, each drawn elsewhere, checked in with the values it was drawn to, and
 read by tests that assert them. It goes first for the same reason the render
 test did: it protects everything after it, and it is the difference between a
 reader that happens to work on our files and one that reads DXF.
 
 **Units in the model.** The millimetre loop is closed and correct: `dxf.read`
-converts an inch file to millimetres on the way in — a one-inch line arrives as
-25.4 — and `dxf.write` declares `$INSUNITS` as millimetres on the way out. So
+converts an inch file to millimetres on the way in (a one-inch line arrives as
+25.4), and `dxf.write` declares `$INSUNITS` as millimetres on the way out. So
 this is not a correctness hole, and nothing is silently mis-scaled.
 
 What is missing is the ability to *work* in anything else. A `Units` property on
 `Drawing`, honoured by `print`, `dxf.write` and `stl.write`, would let a drawing
 be authored in inches and say so in its output, rather than requiring the author
 to convert in their head. Worth having, and an ergonomic feature rather than a
-fix — so it earns its place here on cost, not on urgency.
+fix, so it earns its place here on cost, not on urgency.
 
 **Elementary geometric queries.** The package can offset a polygon and find the
 largest rectangle inside it, but cannot answer where the nearest point on a
@@ -95,14 +97,14 @@ absence forces every downstream package to write them again, worse:
 | `geom.nearestpoint` | the closest point on a curve, and its parameter |
 | `geom.projectpoint` | orthogonal projection onto a line or segment |
 | `geom.convexhull` | the hull of a point set, consistently oriented |
-| `geom.orientedbbox` | minimum-area enclosing rectangle — the circumscribed dual of `largestrect` |
+| `geom.orientedbbox` | minimum-area enclosing rectangle, the circumscribed dual of `largestrect` |
 | `geom.minimumcircle` | smallest enclosing circle |
 
 **`stl.read`.** The `stl` namespace writes and cannot read. Both the ASCII and
 binary forms are an afternoon's work, and a package that emits meshes for other
 tools ought to be able to take them back.
 
-## Milestone 2 — the language of a technical drawing (0.3.0)
+## Milestone 2: the language of a technical drawing (0.3.0)
 
 The difference between a picture of a part and a drawing of a part is that the
 second one is a specification. The package can currently draw a profile
@@ -127,7 +129,7 @@ in. `draw.coordtable` and `draw.titleblock` are the existing members of this
 family and set the pattern the new work should follow: a function that returns
 a `Drawing` to be merged onto the sheet.
 
-## Milestone 3 — sheets and multi-view composition (0.4.0)
+## Milestone 3: sheets and multi-view composition (0.4.0)
 
 `draw.Drawing.print` places one drawing on one sheet at one scale. A real
 drawing is three orthographic views, an isometric and a detail at 2:1, each in
@@ -137,15 +139,101 @@ A `draw.Sheet` object holding placed, independently scaled viewports over a set
 of `Drawing`s would turn the package's primary human-facing output from a
 figure into a drawing. It is also where the section and detail marks of
 milestone 2 acquire something to point at, and it is the natural home for DXF
-paper-space layouts should the format track below be taken up — so the two
+paper-space layouts should the format track below be taken up, so the two
 reinforce each other rather than compete.
 
-`print` already emits true vector PDF — embedded fonts, no image stream — and
+`print` already emits true vector PDF (embedded fonts, no image stream), and
 `Resolution` applies only to the raster formats, as its docstring states. So
 there is nothing to confirm before starting: a sheet composed of viewports will
 print as vector, and the work can be built on that.
 
-## Milestone 4 — analytic curves (0.5.0)
+## Milestone 4: drawings from solids (0.5.0)
+
+A part is designed as a solid, and the drawing that specifies it is a set of
+views of that solid. This milestone reads a solid from a STEP file and composes
+its drawing on a `draw.Sheet`: the orthographic and isometric views, hidden
+lines, sections and details, and the annotation that follows from the geometry
+alone. What is left to the author is the dimensioning that depends on design
+intent, which no model records.
+
+It needs milestone 3's sheet, with a viewport that can be clipped to a circle
+for a detail view, and milestone 2's section and detail marks. Nothing else in
+those two milestones is a prerequisite.
+
+**The input is STEP, analytic surfaces first.** A STEP file (ISO 10303-21,
+written by every mechanical CAD program) carries the exact boundary of a solid:
+each face a plane, cylinder, cone, sphere, torus or B-spline surface, each edge
+a line, circle, ellipse or B-spline. That exactness is what makes the output a
+technical drawing rather than a picture. A circular edge projects to a true
+circle or ellipse, and a cylindrical face can be recognised as a hole or a
+boss, so it can be given a centre line and a callout. A mesh has neither.
+
+The reader takes faces on planes, cylinders, cones, spheres and tori, with
+edges of every curve type, since the meeting of two cylinders is a B-spline
+edge even on a part with no B-spline face. B-spline surfaces follow. Units are
+read from the file and converted to millimetres, as `dxf.read` does for an inch
+drawing.
+
+| Namespace | Function | What it does |
+|---|---|---|
+| `+stp` | `stp.read` | a file's solids, as faces, edge loops, edges and vertices with exact geometry and units resolved |
+| `+views` | `views.project` | the visible and hidden edges of a solid seen from one direction, as a `Drawing` |
+| `+views` | `views.section` | the cut faces of a solid on a plane, hatched, with the material beyond the cut drawn |
+| `+views` | `views.compose` | the standard views of a solid, with sections, details and their annotation, laid out on a `draw.Sheet` |
+
+The namespaces are named so that no function can shadow them. A namespace
+loses to a function of the same name on the path: `view.project` would call
+core Octave's `view`, and `step.read` would call the `control` package's
+`step` whenever it is loaded. `stp` follows `dxf` and `stl` in taking the file
+extension.
+
+**Hidden lines.** Each projected edge is split where it crosses another edge or
+a silhouette, and each piece is tested for occlusion against a triangulation of
+the faces. The edges themselves stay exact; the triangulation decides only
+visibility. Each face is triangulated in its own parameter space with
+`geom.triangulate`, which already takes a polygon with holes. Visible edges are
+drawn continuous and thick, hidden ones dashed and thin, per ISO 128.
+
+Three details decide whether the result reads as a drawing, and each needs a
+test of its own:
+
+- the seam edge of a cylinder or cone is a bookkeeping edge in the file and is
+  never drawn;
+- an edge between tangent faces, such as the boundary of a fillet, is drawn
+  thin or omitted by convention, never as an outline;
+- an edge lying in a visible face is visible, which the occlusion test must not
+  defeat with its own tolerance.
+
+**Annotation from geometry.** Generated, not placed by hand:
+
+- centre lines on every hole and boss seen side-on, centre marks seen end-on;
+- hole callouts, with a count when a pattern repeats (`4 × ⌀8`);
+- overall dimensions of each view;
+- section views with their cutting-plane line and labels, and detail views with
+  their circle, label and scale;
+- first-angle projection by default, per ISO 5456-2, third-angle on request;
+- the title block, through `draw.titleblock`.
+
+The section plane and the detail region are given by the caller. A part with an
+axis of rotation gets the section through that axis by default.
+
+**Taken from later milestones.** `geom.bspline` evaluation moves here from
+milestone 5, because the reader cannot draw a B-spline edge without it; a
+projected B-spline edge is a sampled polyline until milestone 5 adds the spline
+entity. A section through a part with a hole is a region with an island, so
+`geom.hatchlines` and `Drawing.hatch` learn to fill a boundary with holes. That
+is an even-odd scan and needs none of milestone 6's booleans.
+
+**Verifying it.** STEP files written by other programs, checked in under
+`inst/tests/fixtures/` with the values they were modelled to, as the DXF
+fixtures are, and from more than one exporter, since writers differ in how
+they lay out the same solid. The tests assert the drawing that comes out: the
+extent of each view, the centres and radii of projected holes, which edges are
+hidden. FreeCAD's TechDraw workbench draws views from the same files and is a
+useful comparison during development. It is not a gate: what it shows is
+verified once and written into BISTs as literal expectations.
+
+## Milestone 5: analytic curves (0.6.0)
 
 Every curve in the package is a sampled polyline. `curvature`, `curvesample`,
 `curveoffset`, `resample`, `simplify` and `arclength` all take points and
@@ -161,10 +249,11 @@ smooth profiles pay this cost on every part they draw.
 
 The work is a curve representation carried as a first-class entity:
 
-- `geom.bezier`, `geom.bspline` — evaluation, derivatives, arc length
-- `geom.splinefit` — interpolation through, and approximation of, a point set
-- `geom.splitcurve`, `geom.curveintersect` — subdivision and curve/curve meets
-- `draw.Drawing.spline` — the entity, lowered by `entities` for every backend
+- `geom.bezier`, and derivatives and arc length for `geom.bspline`, whose
+  evaluation milestone 4 brings
+- `geom.splinefit`: interpolation through, and approximation of, a point set
+- `geom.splitcurve`, `geom.curveintersect`: subdivision and curve/curve meets
+- `draw.Drawing.spline`: the entity, lowered by `entities` for every backend
 - exact `curveoffset` and `fillet` on the analytic form, with the sampled
   versions kept and unchanged
 
@@ -173,40 +262,40 @@ reason to leave DXF R12, because `geom.hatchlines` already emits hatch as line
 segments and R12 carries those. A spline has no R12 representation at all.
 This milestone is what makes the format work worth doing.
 
-## Milestone 5 — polygon booleans (0.6.0)
+## Milestone 6: polygon booleans (0.7.0)
 
 Union, intersection, difference and exclusive-or on polygons with holes. This
 is the workhorse operation of two-dimensional CAD, and core Octave has nothing
 like it. It unlocks hatch boundaries with islands, clearance and interference
 checks, material-removal work, and profile combination.
 
-It should be entered with clear eyes. Vatti, Greiner–Hormann and
-Martínez–Rueda are each of publishable quality, and every one of them fails on
+It should be entered with clear eyes. Vatti, Greiner-Hormann and
+Martínez-Rueda are each of publishable quality, and every one of them fails on
 degeneracies rather than on the general case: collinear edges, coincident
 vertices, self-touching boundaries, and edges that meet at a point without
 crossing. Getting the happy path working is a week. Making it robust is the
 actual project, and it requires either exact geometric predicates or a
-deliberate, documented and tested tolerance policy — chosen up front, not
+deliberate, documented and tested tolerance policy, chosen up front, not
 discovered.
 
 Because of that risk this milestone stands alone, and nothing else should be
 scheduled to depend on it landing on time.
 
-## Milestone 6 — profiles to solids (0.7.0)
+## Milestone 7: profiles to solids (0.8.0)
 
 A closed planar profile to a triangle mesh, entirely inside the package:
 
-- `geom.extrude` — profile plus depth, with holes carried through as inner
+- `geom.extrude`: profile plus depth, with holes carried through as inner
   loops and the caps triangulated by the existing `geom.triangulate`
-- `geom.revolve` — profile about an axis, with a partial-sweep option
-- `geom.sweep` — profile along a path, once milestone 4 makes the path exact
+- `geom.revolve`: profile about an axis, with a partial-sweep option
+- `geom.sweep`: profile along a path, once milestone 5 makes the path exact
 
 This completes a pipeline the package already half owns: geometry to profile to
 mesh to `stl.write`. Extrude and revolve are markedly easier than they sound
 once triangulation is in hand, and they are what lets a drawing produce a part
 rather than only describe one.
 
-## Format track — runs alongside, blocks nothing
+## Format track: runs alongside, blocks nothing
 
 Two output formats are worth adding, on their own schedule.
 
@@ -233,13 +322,13 @@ and R14 cost the same as R2000 and offer less. The entry fee:
 Call it four to six hundred lines in `dxf.write` and a few focused sessions,
 almost all of it mechanical. Two things make it cheaper than it looks:
 `putpair` is a genuine chokepoint through which every byte passes, and
-`dxf.read` is already version-agnostic — it splits on group `0`, dispatches on
+`dxf.read` is already version-agnostic: it splits on group `0`, dispatches on
 the type name, and looks up fields by code, so handles, subclass markers and
 owner pointers are ignored for free.
 
-Take it up when milestone 4 gives it a reason. When it is taken up, add it as
+Take it up when milestone 5 gives it a reason. When it is taken up, add it as
 `dxf.write (FILE, E, 'Version', 'R2000')` with R12 remaining the default, and
-factor the header, tables and objects into per-version emitters — so R12 stays
+factor the header, tables and objects into per-version emitters, so R12 stays
 under test and the new scaffolding can be validated before any new entity type
 depends on it.
 
@@ -249,7 +338,7 @@ easy to get wrong here (handle uniqueness, owner-pointer validity, dangling
 table references), and it can write files for the reader to be tested against.
 Two cautions. Its ordinary loader silently repairs what it reads, so anything
 inspected after a plain load may be its corrected version rather than what was
-written — the audit result must be asserted, not assumed. And it validates
+written; the audit result must be asserted, not assumed. And it validates
 against its own model of the format, not against AutoCAD; a clean audit is
 necessary and not sufficient, so the manual CAD acceptance stays.
 
@@ -263,9 +352,8 @@ handled. The package's test suite remains `pkg test` and nothing else.
 |---|---|
 | G-code and CAM | a different discipline with a different failure mode; belongs to a package that consumes this one |
 | DWG | proprietary and undocumented; the only routes are a closed converter or an experimental writer |
-| Solid modelling, B-rep | a kernel, not a package |
-| Parametric constraint solving | genuinely valuable and genuinely a research project — degree-of-freedom analysis, conditioning, and useful diagnostics for under- and over-constrained sketches. Its own package if ever |
-| Hidden-line removal from meshes | the one item worth revisiting later: orthographic and isometric views generated from a solid would be a real capability, but doing it robustly on triangle soup is hard |
+| Solid modelling | a kernel, not a package. Milestone 4 reads a solid to draw it and never builds, edits or combines one |
+| Parametric constraint solving | genuinely valuable and genuinely a research project: degree-of-freedom analysis, conditioning, and useful diagnostics for under- and over-constrained sketches. Its own package if ever |
 
 ## Standing requirements
 
@@ -278,8 +366,8 @@ These apply to every milestone and are not restated in them.
 - Texinfo help must explain the function completely without recourse to the
   source.
 - A `%!demo` block that ends in a plot, rendered and looked at. A demo that
-  runs is not a demo that reads. Until the rendering gate of milestone 1 is in
-  place this is enforced by eye alone, which is why it is written down here.
+  runs is not a demo that reads. No test can tell the two apart, so this is
+  enforced by eye alone, which is why it is written down here.
 - Anything new that a backend must draw is added to `draw.Drawing.entities`
   first, and then to *every* backend. A backend that silently ignores an
   entity type produces a plausible and incomplete figure, which is worse than

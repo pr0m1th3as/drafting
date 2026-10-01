@@ -8,15 +8,15 @@ compute geometry, build a drawing from it, and emit that drawing as a DXF file a
 CAD program or a CNC machine will accept, as a solid for a slicer, as LaTeX for
 a report, or as a figure on screen.
 
-Thirty-one public functions across four namespaces plus the `draw.Drawing`
-class, 812 built-in self-tests and 67 `%!demo` blocks — nearly all of which
+Thirty public functions across four namespaces plus the `draw.Drawing` class,
+847 built-in self-tests and 67 `%!demo` blocks, nearly all of which
 end in a `plot` call, so the documentation shows what a function does rather
 than only describing it.
 
 ## Layout
 
 ```
-inst/+geom    planar geometry — no file formats, no drawing semantics
+inst/+geom    planar geometry (no file formats, no drawing semantics)
 inst/+dxf     AutoCAD R12 (AC1009) ASCII DXF, both directions
 inst/+stl     binary STL from a stack of planar sections
 inst/+draw    format-agnostic drawing model, and the backends that render it
@@ -34,8 +34,8 @@ Polylines can be resampled or simplified.
 
 `draw.Drawing` is a value class carrying lines, polylines with per-vertex
 bulges, arcs, circles, ellipses, text, hatches, blocks and inserts, and a full
-set of dimension entities — linear, diameter, radius and angular, plus centre
-marks and leaders — on named layers with line types and colours. Drawings
+set of dimension entities (linear, diameter, radius and angular, plus centre
+marks and leaders) on named layers with line types and colours. Drawings
 compose: `transform` places one, `merge` assembles several into a sheet, and
 `draw.titleblock` frames it.
 
@@ -65,8 +65,8 @@ the backends were unified, `draw.tikz` rendered from the drawing model directly
 and silently ignored five entity types it had never been taught, producing a
 plausible but incomplete figure.
 
-Line-type dash lengths follow one rule everywhere — model units times a scale
-factor, as CAD's `LTSCALE` does — and `dxf.write` states `$LTSCALE` in the
+Line-type dash lengths follow one rule everywhere: model units times a scale
+factor, as CAD's `LTSCALE` does. `dxf.write` states `$LTSCALE` in the
 header, so a written file's dashes no longer depend on the recipient's setting.
 
 `draw.fromentities` is the inverse of `entities`: it raises an entity list read
@@ -83,8 +83,8 @@ stl.write ('plate.stl', [-40, -40; 40, -40; 40, 40; -40, 40], [0, 6]);
 `stl.write` also takes a struct array of sections, each with its own profile,
 `z` range and holes, which expresses a stepped or eccentric shaft without
 leaving the planar model. Each section is written as its own closed shell, so a
-single section is a closed manifold and a stack of several is not — slicers
-union it without complaint, a tool demanding one closed surface will not.
+single section is a closed manifold and a stack of several is not. Slicers
+union it without complaint; a tool demanding one closed surface will not.
 
 All geometry is in millimetres.
 
@@ -96,7 +96,7 @@ known and bounded: R12 has no `SPLINE` and no `LWPOLYLINE`, so polylines are
 written as `POLYLINE` with a vertex list, which is what a manufacturing
 toolpath wants in any case; it has no `ELLIPSE`, so an ellipse is sampled to a
 closed polyline, and `draw.entities` records that as a loss; and it has no
-`HATCH`, so a hatch is generated as explicit fill lines, which loses nothing —
+`HATCH`, so a hatch is generated as explicit fill lines, which loses nothing:
 the recipient sees the section hatched.
 
 Nothing outside `dxf.write` depends on the choice.
@@ -130,9 +130,9 @@ package_texi2html ("drafting")
 ## Where it is going
 
 [`ROADMAP.md`](ROADMAP.md) sets out what is planned and why, ordered by what
-unblocks what — and, just as usefully, what is deliberately out of scope: no
-CAM, no DWG, no solid-modelling kernel, no constraint solver, each with the
-reason it was ruled out.
+unblocks what. Just as usefully, it sets out what is deliberately out of
+scope: no CAM, no DWG, no solid-modelling kernel, no constraint solver, each
+with the reason it was ruled out.
 
 ## Install
 
@@ -154,7 +154,7 @@ If you need to install a specific release, for example `0.1.0`, type:
 After installation, type:
 - `pkg load drafting` to load the **drafting** package.
 - `news drafting` to review all the user visible changes since last version.
-- `pkg test drafting` to run a test suite for all 33 functions and class
+- `pkg test drafting` to run a test suite for all 31 functions and class
   definitions currently available and ensure that they work properly on your
   system.
 
