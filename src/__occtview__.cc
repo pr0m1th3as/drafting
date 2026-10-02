@@ -25,6 +25,9 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 //   shape N        followed by N bytes of a shape in Open CASCADE's binary
 //                  format; replaces the shape shown, keeping the camera, or
 //                  clears the view when N is zero
+//   mesh NV NF     followed by NV vertices, three doubles each, and NF
+//                  triangles, three 0-based uint32 indices each; replaces the
+//                  shape shown with the triangle mesh, flat shaded
 //   pick KIND      KIND is edge, face or any: clicks toggle a selection until
 //                  Enter, which replies with "edge K" and "face K" lines and
 //                  then "done", or Escape, which replies "cancel"
@@ -33,7 +36,11 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 //                  "point X Y Z SNAP", the point snapped to a vertex, the
 //                  centre of a circular edge, the midpoint of another edge or
 //                  a point on a face, SNAP naming which, and marks it; Enter
-//                  replies "skip" and Escape "cancel"
+//                  replies "skip" and Escape "cancel".  On a mesh a face is
+//                  "facet NX NY NZ X Y Z", the normal of the triangle clicked
+//                  and the point on it, and a point snaps to a corner of the
+//                  triangle or the midpoint of one of its sides, near enough
+//                  on the screen, or else lies on it
 //   enter          during a pickone, as the Enter key: replies "skip"
 //   prompt TEXT    shows TEXT at the foot of the view, a backslash and n
 //                  starting a new line; no TEXT clears it
@@ -57,6 +64,8 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 // exits when stdin closes, so it never outlives Octave.  With --hidden the
 // window is never shown, which is how it is tested.
 
+#include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <set>
@@ -75,6 +84,7 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <BRepAdaptor_Curve.hxx>
 #include <BRepBndLib.hxx>
 #include <BRepMesh_IncrementalMesh.hxx>
+#include <BRep_Builder.hxx>
 #include <Bnd_Box.hxx>
 #include <BRep_Tool.hxx>
 #include <Geom_CartesianPoint.hxx>
@@ -310,7 +320,19 @@ public:
     in >> cmd;
     if (cmd == "shape")
     {
-      setshape (data);
+      TopoDS_Shape s;
+      if (! data.empty ())
+      {
+        istringstream is (data);
+        BinTools::Read (s, is);
+      }
+      setshape (s, false);
+    }
+    else if (cmd == "mesh")
+    {
+      size_t nv, nf;
+      in >> nv >> nf;
+      setshape (meshface (data, nv, nf), true);
     }
     else if (cmd == "pick")
     {
@@ -532,6 +554,110 @@ protected:
 
 private:
 
+  // The face of a triangle mesh: the mesh's vertices DATA, NV of them, and
+  // its NF triangles.  Each triangle has corners of its own carrying its own
+  // normal, so that the mesh is shaded flat, facet by facet, and the K-th
+  // triangle keeps the corners 3 K + 1 to 3 K + 3.
+  static TopoDS_Face meshface (const string& data, size_t nv, size_t nf)
+  {
+    const double *v = reinterpret_cast<const double *> (data.data ());
+    const uint32_t *f = reinterpret_cast<const uint32_t *>
+                          (data.data () + 24 * nv);
+    Handle (Poly_Triangulation) tri
+      = new Poly_Triangulation (3 * nf, nf, Standard_False, Standard_True);
+    for (size_t t = 0; t < nf; t++)
+    {
+      gp_Pnt c[3];
+      for (int k = 0; k < 3; k++)
+      {
+        const double *p = v + 3 * static_cast<size_t> (f[3 * t + k]);
+        c[k] = gp_Pnt (p[0], p[1], p[2]);
+        tri->SetNode (3 * t + k + 1, c[k]);
+      }
+      gp_Vec n = gp_Vec (c[0], c[1]).Crossed (gp_Vec (c[0], c[2]));
+      const gp_Dir d = (n.Magnitude () > 0) ? gp_Dir (n) : gp_Dir (0, 0, 1);
+      for (int k = 1; k <= 3; k++)
+      {
+        tri->SetNormal (3 * t + k, d);
+      }
+      tri->SetTriangle (t + 1, Poly_Triangle (3 * t + 1, 3 * t + 2,
+                                              3 * t + 3));
+    }
+    TopoDS_Face face;
+    BRep_Builder ().MakeFace (face, tri);
+    return face;
+  }
+
+  // The corners of the triangle of a mesh that the last detection found
+  bool facet (gp_Pnt c[3]) const
+  {
+    Handle (Select3D_SensitiveTriangulation) e
+      = Handle (Select3D_SensitiveTriangulation)::DownCast
+          (m_context->MainSelector ()->PickedEntity (1));
+    Poly_Triangle t;
+    return ! e.IsNull () && e->LastDetectedTriangle (t, c);
+  }
+
+  // A pickone on a mesh: the triangle at the pixel PX, PY, as its normal and
+  // the point clicked, or a point snapped to a corner of it, else to the
+  // middle of a side, within 12 pixels on the screen
+  void meshpick (int px, int py)
+  {
+    gp_Pnt c[3];
+    if (! facet (c))
+    {
+      return;
+    }
+    const gp_Pnt hit = m_context->MainSelector ()->PickedPoint (1);
+    m_context->ClearDetected (Standard_False);
+    if (m_one == 2)
+    {
+      gp_Vec n = gp_Vec (c[0], c[1]).Crossed (gp_Vec (c[0], c[2]));
+      if (n.Magnitude () == 0)
+      {
+        return;
+      }
+      n.Normalize ();
+      reply ("facet" + num (gp_Pnt (n.XYZ ())) + num (hit));
+      endone ("");
+      return;
+    }
+    auto near = [&] (const gp_Pnt& p)
+    {
+      Standard_Integer qx, qy;
+      m_view->Convert (p.X (), p.Y (), p.Z (), qx, qy);
+      return std::hypot (qx - px, qy - py);
+    };
+    gp_Pnt p = hit;
+    string snap = "face";
+    double best = 12;
+    for (int k = 0; k < 3; k++)
+    {
+      if (near (c[k]) <= best)
+      {
+        best = near (c[k]);
+        p = c[k];
+        snap = "vertex";
+      }
+    }
+    if (snap == "face")
+    {
+      for (int k = 0; k < 3; k++)
+      {
+        const gp_Pnt m ((c[k].XYZ () + c[(k + 1) % 3].XYZ ()) / 2);
+        if (near (m) <= best)
+        {
+          best = near (m);
+          p = m;
+          snap = "midpoint";
+        }
+      }
+    }
+    mark (p);
+    reply ("point" + num (p) + " " + snap);
+    endone ("");
+  }
+
   // What lies at a pixel during a pickone: replies and marks it, or does
   // nothing when the click found nothing
   void onepick (int px, int py)
@@ -539,6 +665,11 @@ private:
     m_context->MoveTo (px, py, m_view, Standard_False);
     if (! m_context->HasDetected ())
     {
+      return;
+    }
+    if (m_mesh)
+    {
+      meshpick (px, py);
       return;
     }
     Handle (StdSelect_BRepOwner) o = Handle (StdSelect_BRepOwner)::DownCast
@@ -634,7 +765,8 @@ private:
     m_view->FitAll (0.05, Standard_False);
   }
 
-  void setshape (const string& data)
+  // Show the shape S, or the face of a triangle mesh when MESH is true
+  void setshape (const TopoDS_Shape& s, bool mesh)
   {
     if (m_pick != 0)
     {
@@ -644,12 +776,7 @@ private:
     {
       endone ("cancel");
     }
-    TopoDS_Shape s;
-    if (! data.empty ())
-    {
-      istringstream is (data);
-      BinTools::Read (s, is);
-    }
+    m_mesh = mesh;
 
     m_edges.Clear ();
     m_faces.Clear ();
@@ -716,14 +843,22 @@ private:
     }
     // Mesh every face to the same fine tolerance, set by the size of the
     // whole shape, before it is shown.  Left to itself the viewer can mesh a
-    // face cut from a long tool so coarsely that a click on it misses it.
-    Bnd_Box b;
-    BRepBndLib::Add (s, b);
-    const double size = sqrt (b.SquareExtent ());
-    BRepMesh_IncrementalMesh (s, 1e-3 * size, Standard_False, 0.25,
-                              Standard_True);
+    // face cut from a long tool so coarsely that a click on it misses it.  A
+    // triangle mesh is shown as its own triangles, never meshed again.
+    if (! mesh)
+    {
+      Bnd_Box b;
+      BRepBndLib::Add (s, b);
+      const double size = sqrt (b.SquareExtent ());
+      BRepMesh_IncrementalMesh (s, 1e-3 * size, Standard_False, 0.25,
+                                Standard_True);
+    }
 
     m_shape = new pickshape (s);
+    if (mesh)
+    {
+      m_shape->Attributes ()->SetAutoTriangulation (Standard_False);
+    }
     m_shape->SetColor (Quantity_Color (0.72, 0.74, 0.78, Quantity_TOC_sRGB));
     m_shape->SetMaterial (Graphic3d_NameOfMaterial_Plastified);
     // Displayed selectable, which no later activation can make it if it is
@@ -738,12 +873,17 @@ private:
     }
   }
 
-  // Make edges, faces or both selectable, or nothing when not picking
+  // Make edges, faces or both selectable, or nothing when not picking; a
+  // mesh has its triangles only
   void activate (int kind)
   {
     if (m_shape.IsNull ())
     {
       return;
+    }
+    if (m_mesh && kind != 0)
+    {
+      kind = 2;
     }
     const int edge = AIS_Shape::SelectionMode (TopAbs_EDGE);
     const int face = AIS_Shape::SelectionMode (TopAbs_FACE);
@@ -853,6 +993,7 @@ private:
   vector<Handle (AIS_Point)> m_marks;
   int m_pick = 0;
   int m_one = 0;
+  bool m_mesh = false;
   bool m_quit = false;
 };
 
@@ -874,7 +1015,7 @@ main (int argc, char **argv)
   }
   reply ("ready");
 
-  // Commands arrive as lines; a shape's bytes follow its line
+  // Commands arrive as lines; a shape's or a mesh's bytes follow its line
   string pending;
   char buf[65536];
   bool open = true;
@@ -913,6 +1054,12 @@ main (int argc, char **argv)
       if (line.compare (0, 6, "shape ") == 0)
       {
         need = strtoul (line.c_str () + 6, nullptr, 10);
+      }
+      else if (line.compare (0, 5, "mesh ") == 0)
+      {
+        char *q;
+        const size_t nv = strtoul (line.c_str () + 5, &q, 10);
+        need = 24 * nv + 12 * strtoul (q, nullptr, 10);
       }
       if (pending.size () < eol + 1 + need)
       {

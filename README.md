@@ -11,7 +11,7 @@ exchanged as STEP, come through Open CASCADE when the package is built with it.
 
 Forty-six public functions across five namespaces plus the `draw.Drawing`,
 `geom.Polyline`, `geom.Spline`, `geom.Region`, `geom.Path`, `geom.UCS`,
-`solid.Shape` and `solid.Viewer` classes, 1511 built-in self-tests and 67 `%!demo` blocks, nearly all of which
+`solid.Shape` and `solid.Viewer` classes, 1516 built-in self-tests and 67 `%!demo` blocks, nearly all of which
 end in a `plot` call, so the documentation shows what a function does rather
 than only describing it.
 
@@ -163,6 +163,17 @@ its own. Every polyline and region lies in one, and assigning a region another
 moves it there, so a profile drawn in the xy plane is laid on any face of a
 part. It is made from a normal and points, or picked with the mouse as above,
 and the pick prints the line that makes it again from coordinates.
+
+The viewer shows a triangle mesh from `stl.read` as well, millions of
+triangles shaded facet by facet, and a UCS picked on it, from a facet or three
+points snapped to corners and the middles of sides, is the plane to cut it
+with:
+
+```
+M = stl.read ('bracket.stl');
+V = solid.show (M);
+R = stl.section (M, pickucs (V));
+```
 
 Open CASCADE is optional: a package built without it works as before, and
 every `solid` function raises an error saying so.

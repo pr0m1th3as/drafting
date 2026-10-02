@@ -18,9 +18,10 @@
 
 ## -*- texinfo -*-
 ## @deftypefn  {drafting} {} solid.show (@var{S})
-## @deftypefnx {drafting} {@var{V} =} solid.show (@var{S})
+## @deftypefnx {drafting} {} solid.show (@var{M})
+## @deftypefnx {drafting} {@var{V} =} solid.show (@dots{})
 ##
-## Show a solid in a viewer of its own, redrawing in place.
+## Show a solid or a mesh in a viewer of its own, redrawing in place.
 ##
 ## @code{solid.show (@var{S})} shows the @code{solid.Shape} @var{S} in a
 ## viewer, a window drawn by Open CASCADE in a process of its own.  Every
@@ -53,6 +54,21 @@
 ## @end group
 ## @end example
 ##
+## @code{solid.show (@var{M})} shows the triangle mesh @var{M}, a struct
+## with the fields @code{vertices} and @code{faces} as @code{stl.read} returns
+## it, in the same way, shaded facet by facet.  A coordinate system picked on
+## it with @code{solid.Viewer.pickucs} is the plane to cut it with
+## @code{stl.section}:
+##
+## @example
+## @group
+## M = stl.read ('bracket.stl');
+## V = solid.show (M);
+## U = pickucs (V);          # click a facet, then two points
+## R = stl.section (M, U);
+## @end group
+## @end example
+##
 ## Calling @code{solid.show (@var{S})} is the same as assigning @var{S} to the
 ## @code{Shape} of the variable's viewer.  Nothing else redraws it: changing
 ## the variable that was shown does not, until it is shown again.
@@ -60,7 +76,7 @@
 ## The viewer is built with the package when Open CASCADE and X11 are found,
 ## and needs a display to run.  It runs on Linux.
 ##
-## @seealso{solid.Viewer, solid.Viewer.pick}
+## @seealso{solid.Viewer, solid.Viewer.pick, stl.read, stl.section}
 ## @end deftypefn
 
 function V = show (S)
@@ -69,8 +85,11 @@ function V = show (S)
   if (nargin != 1)
     error ("solid.show: invalid number of input arguments.");
   endif
-  if (! isa (S, 'solid.Shape') || ! isscalar (S))
-    error ("solid.show: S must be a solid.Shape object.");
+  ismesh = isstruct (S) && isscalar (S) && isfield (S, 'vertices') ...
+           && isfield (S, 'faces') && solid.Viewer.__ismesh__ (S);
+  if (! ismesh && (! isa (S, 'solid.Shape') || ! isscalar (S)))
+    error (strcat ("solid.show: S must be a solid.Shape object or a mesh", ...
+                   " struct with vertices and faces."));
   endif
 
   ## A viewer for each variable name, and one for shapes without a name, kept
@@ -143,8 +162,26 @@ endfunction
 %!   setappdata (0, 'drafting_solid_show', old);
 %! end_unwind_protect
 
+%!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
+%! ## A mesh is shown in its variable's window like a solid
+%! old = getappdata (0, 'drafting_solid_show');
+%! VM = solid.Viewer ('Hidden', true);
+%! setappdata (0, 'drafting_solid_show', struct ('v_mesh', VM.Id));
+%! unwind_protect
+%!   mesh = struct ('vertices', [0, 0, 0; 1, 0, 0; 0, 1, 0; 0, 0, 1], ...
+%!                  'faces', [1, 3, 2; 1, 2, 4; 2, 3, 4; 3, 1, 4]);
+%!   solid.show (mesh);
+%!   assert_equal (VM.Shape, mesh);
+%!   assert_equal (VM.__title__ (), 'mesh (drafting)');
+%! unwind_protect_cleanup
+%!   close (VM);
+%!   setappdata (0, 'drafting_solid_show', old);
+%! end_unwind_protect
+
 %!error<solid.show: invalid number of input arguments.> solid.show ()
-%!error<solid.show: S must be a solid.Shape object.> solid.show (1)
-%!error<solid.show: S must be a solid.Shape object.> solid.show ('part.m')
-%!error<solid.show: S must be a solid.Shape object.> ...
+%!error<solid.show: S must be a solid.Shape object or a mesh struct with vertices and faces.> solid.show (1)
+%!error<solid.show: S must be a solid.Shape object or a mesh struct with vertices and faces.> ...
+%! solid.show (struct ('vertices', [0, 0, 0], 'faces', [1, 2, 3]))
+%!error<solid.show: S must be a solid.Shape object or a mesh struct with vertices and faces.> solid.show ('part.m')
+%!error<solid.show: S must be a solid.Shape object or a mesh struct with vertices and faces.> ...
 %! solid.show ([solid.Shape(), solid.Shape()])
