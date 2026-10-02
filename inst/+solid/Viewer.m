@@ -24,7 +24,8 @@
 ##
 ## @code{@var{V} = solid.Viewer ()} returns a viewer that shows nothing yet.
 ## Assigning a @code{solid.Shape} to @code{@var{V}.Shape} opens its window,
-## or redraws it in place, keeping the camera where it was:
+## even for the empty shape, or redraws it in place, keeping the camera where
+## it was:
 ##
 ## @example
 ## @group
@@ -71,7 +72,8 @@ classdef Viewer < handle
     ## The @code{solid.Shape} shown.
     ##
     ## Assigning a shape opens the window if it is not open and redraws it in
-    ## place if it is.  Assigning the empty shape clears it.
+    ## place if it is.  The empty shape opens the window empty, or clears it
+    ## if it is open; the first shape shown after it is fitted to the window.
     ##
     ## @end deftypefn
     Shape
@@ -251,9 +253,6 @@ classdef Viewer < handle
       st.data = S.Data;
       setstate (this, st);
       if (! isopen (this))
-        if (isempty (S))
-          return;
-        endif
         launch (this);
       endif
       send (this, sprintf ("shape %d", numel (S.Data)), S.Data);
@@ -617,6 +616,20 @@ endfunction
 %!   assert_equal (V.__title__ (), 'plate (drafting)');
 %!   V.Name = 'bracket';
 %!   assert_equal (V.__title__ (), 'bracket (drafting)');
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
+%! ## The empty shape opens the window empty
+%! V = solid.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Shape = solid.Shape ();
+%!   assert_equal (isopen (V), true);
+%!   assert_equal (V.__pickat__ ('any', [450, 350]), 'none');
+%!   V.Shape = solid.box (10, 20, 30);
+%!   assert_equal (V.__pickat__ ('face', V.__project__ ([5, 10, 30]))(1:4), ...
+%!                 'face');
 %! unwind_protect_cleanup
 %!   close (V);
 %! end_unwind_protect

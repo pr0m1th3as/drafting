@@ -37,7 +37,8 @@
 ## the wheel to zoom; @kbd{F} fits the part to the window and @kbd{0},
 ## @kbd{1}, @kbd{2} and @kbd{3} turn it to the isometric, front, top and right
 ## views.  Closing a window ends its viewer, and the next
-## @code{solid.show} of that variable opens a new one.
+## @code{solid.show} of that variable opens a new one.  Showing the empty
+## shape opens a variable's window before there is anything to draw in it.
 ##
 ## @code{@var{V} = solid.show (@var{S})} also returns the viewer, a
 ## @code{solid.Viewer}.  Assigning to @code{@var{V}.Shape} redraws it at once,
