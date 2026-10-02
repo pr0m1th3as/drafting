@@ -54,11 +54,12 @@ classdef Shape
   ## @end example
   ##
   ## Features are worked on a shape by methods: @code{hole} drills plain,
-  ## counterbored, countersunk and tapping holes, @code{fillet} and
-  ## @code{chamfer} round or bevel edges, and @code{shell} hollows the shape.
-  ## The edges and faces they act on are chosen by @code{edges} and
-  ## @code{faces}, by the kind of curve or surface, by direction and by
-  ## position.
+  ## counterbored, countersunk and tapping holes, @code{pocket} cuts a region
+  ## into it, @code{fillet} and @code{chamfer} round or bevel edges, and
+  ## @code{shell} hollows the shape.  The edges and faces they act on are
+  ## chosen by @code{edges} and @code{faces}, by the kind of curve or surface,
+  ## by direction and by position.  @code{section} cuts a shape with a plane
+  ## into regions, which the @code{solid} functions build from again.
   ##
   ## The class is a @emph{value} class.  Every operation returns a new shape
   ## and leaves its operands unchanged, and a copy is independent of the
@@ -1285,9 +1286,96 @@ classdef Shape
 
     endfunction
 
+    ## -*- texinfo -*-
+    ## @deftypefn {solid.Shape} {@var{R} =} section (@var{S}, @var{U})
+    ##
+    ## Cut a shape with a plane.
+    ##
+    ## @code{@var{R} = section (@var{S}, @var{U})} cuts the shape @var{S} with
+    ## the plane of the @code{geom.UCS} @var{U} and returns the cut as a
+    ## 1-by-@math{N} cell array of @code{geom.Region} objects in @var{U}, one
+    ## for each separate piece of it, largest first.  A piece is an outline
+    ## with the holes in it; a piece standing in a hole of another is a piece
+    ## of its own.  A face of @var{S} lying in the plane is part of the cut, so
+    ## a box cut in the plane of its base gives its base.  Where the plane
+    ## only touches @var{S}, along an edge or at a point, or misses it, the cut
+    ## has no area and @var{R} is the empty @code{cell (1, 0)}.
+    ##
+    ## The cut is exact enough to build from again.  Straight edges are
+    ## straight segments and circles are arcs, a whole circle two half arcs.
+    ## An ellipse or another conic, as a plane cuts from a cylinder or a cone at
+    ## a slant, is a rational @code{geom.Spline} that follows it exactly; any
+    ## other curve, as from a torus or a spline surface, is the B-spline Open
+    ## CASCADE computes for it.
+    ##
+    ## @example
+    ## @group
+    ## ## A plate with a bore, cut through the middle and made again
+    ## S = solid.extrude (geom.Region ([0, 0; 60, 0; 60, 40; 0, 40], ...
+    ##                                 @{[20, 20, 1; 40, 20, 1]@}), 8);
+    ## R = section (S, geom.UCS ([0, 0, 1], [0, 0, 4]));
+    ## T = solid.extrude (R@{1@}, 2);
+    ## @end group
+    ## @end example
+    ##
+    ## @seealso{geom.Region, geom.UCS, solid.extrude}
+    ## @end deftypefn
+    function R = section (this, U)
+
+      ## Input validation
+      if (nargin != 2)
+        error ("solid.Shape.section: invalid number of input arguments.");
+      endif
+      if (! isa (U, 'geom.UCS') || ! isscalar (U))
+        error ("solid.Shape.section: U must be a geom.UCS object.");
+      endif
+
+      R = cell (1, 0);
+      if (isempty (this.Data))
+        return;
+      endif
+      F = occt ('solid.Shape.section', 'section', this.Data, ...
+                [U.Origin; U.XAxis; U.YAxis; U.Normal]);
+      A = zeros (1, numel (F));
+      for k = 1:numel (F)
+        H = cellfun (@toloop, F{k}.holes, 'UniformOutput', false);
+        R{k} = geom.Region (toloop (F{k}.outline), H);
+        R{k}.UCS = U;
+        A(k) = __area__ (R{k}.Outline) + sum (cellfun (@__area__, R{k}.Holes));
+      endfor
+      [~, i] = sort (A, 'descend');
+      R = R(i);
+
+    endfunction
+
   endmethods
 
 endclassdef
+
+## A closed loop of a cut, as a geom.Path, from its pieces in turn: lines,
+## arcs through three points and B-splines
+function P = toloop (pieces)
+
+  Q = cell (1, numel (pieces));
+  for i = 1:numel (pieces)
+    c = pieces{i};
+    switch (c.type)
+      case 'line'
+        Q{i} = geom.Path (c.points);
+      case 'arc'
+        Q{i} = geom.Path.arc (c.points(1,:), c.points(2,:), c.points(3,:));
+      otherwise
+        Q{i} = geom.Spline.nurbs (c.points, repelem (c.knots', c.mults'), ...
+                                  c.weights);
+    endswitch
+  endfor
+  if (numel (Q) == 1)
+    P = geom.Path (Q{1});
+  else
+    P = join (Q{:}, 'Tangent', false);
+  endif
+
+endfunction
 
 ## Run an Open CASCADE operation on behalf of CALLER, which names any error
 function out = occt (caller, cmd, varargin)
@@ -2046,3 +2134,73 @@ endfunction
 %! pocket (solid.Shape (), geom.Region ([0, 0; 1, 0; 1, 1]), 1, 'Draft', 2)
 %!error<solid.Shape.pocket: Taper must be an angle in the range \(-90, 90\) degrees.> ...
 %! pocket (solid.Shape (), geom.Region ([0, 0; 1, 0; 1, 1]), 1, 'Taper', 90)
+
+%!testif ; exist ('__occt__') == 3  # a box cut through the middle
+%! U = geom.UCS ([0, 0, 1], [0, 0, 15]);
+%! R = section (solid.box (10, 20, 30), U);
+%! assert_equal (numel (R), 1);
+%! assert_equal (R{1}.UCS, U);
+%! assert_equal (__area__ (R{1}.Outline), 200, 1e-9);
+
+%!testif ; exist ('__occt__') == 3  # a face in the plane is the cut
+%! R = section (solid.box (10, 20, 30), geom.UCS ([0, 0, 1], [0, 0, 0]));
+%! assert_equal (__area__ (R{1}.Outline), 200, 1e-9);
+%! R = section (solid.box (10, 20, 30), geom.UCS ([0, 0, 1], [0, 0, 30]));
+%! assert_equal (numel (R), 1);
+
+%!testif ; exist ('__occt__') == 3  # a face in the plane and a cut, one piece
+%! S = solid.extrude (geom.Region ([0, 0; 30, 0; 30, 5; 5, 5; 5, 20; ...
+%!                                  0, 20]), 10);
+%! R = section (S, geom.UCS ([0, 1, 0], [0, 5, 0]));
+%! assert_equal (numel (R), 1);
+%! assert_equal (abs (__area__ (R{1}.Outline)), 300, 1e-9);
+
+%!testif ; exist ('__occt__') == 3  # missed, or touched along an edge
+%! S = solid.box (10, 20, 30);
+%! assert_equal (section (S, geom.UCS ([0, 0, 1], [0, 0, 31])), cell (1, 0));
+%! assert_equal (section (S, geom.UCS ([1, 1, 0], [0, 0, 0])), cell (1, 0));
+%! assert_equal (section (solid.Shape (), geom.UCS ()), cell (1, 0));
+
+%!testif ; exist ('__occt__') == 3  # a bore: two half arcs, made again
+%! S = solid.extrude (geom.Region ([0, 0; 60, 0; 60, 40; 0, 40], ...
+%!                                 {[20, 20, 1; 40, 20, 1]}), 8);
+%! R = section (S, geom.UCS ([0, 0, 1], [0, 0, 4]));
+%! H = R{1}.Holes{1};
+%! assert_equal (rows (H.Vertices), 2);
+%! assert_equal (all (! isnan (H.Midpoints(:,1))), true);
+%! assert_equal (volume (solid.extrude (R{1}, 2)), 2 * (2400 - 100 * pi), ...
+%!               -1e-9);
+
+%!testif ; exist ('__occt__') == 3  # a cylinder cut at a slant, an ellipse
+%! R = section (solid.cylinder (5, 40), ...
+%!              geom.UCS ([0, sind(30), cosd(30)], [0, 0, 20]));
+%! SP = R{1}.Outline.Splines{1};
+%! assert_equal (SP.Closed, true);
+%! assert_equal (any (SP.Weights != 1), true);
+%! assert_equal (__area__ (R{1}.Outline), 25 * pi / cosd (30), -1e-12);
+
+%!testif ; exist ('__occt__') == 3  # separate pieces, largest first
+%! S = solid.extrude (geom.Region ([0, 0; 30, 0; 30, 20; 25, 20; 25, 5; ...
+%!                                  10, 5; 10, 20; 0, 20]), 10);
+%! R = section (S, geom.UCS ([0, 1, 0], [0, 10, 0]));
+%! assert_equal (numel (R), 2);
+%! assert_equal (abs ([__area__(R{1}.Outline), __area__(R{2}.Outline)]), ...
+%!               [100, 50], 1e-9);
+
+%!testif ; exist ('__occt__') == 3  # a torus, across and through its axis
+%! S = solid.torus (10, 2);
+%! R = section (S, geom.UCS ([0, 0, 1], [0, 0, 0]));
+%! assert_equal (__area__ (R{1}.Outline) + __area__ (R{1}.Holes{1}), ...
+%!               80 * pi, 1e-9);
+%! assert_equal (numel (section (S, geom.UCS ([0, 1, 0], [0, 0, 0]))), 2);
+
+%!testif ; exist ('__occt__') == 3  # a spline outline made again from its cut
+%! H = geom.Spline ([20, 15; 35, 12; 40, 25; 28, 35; 18, 28], 'Closed', true);
+%! Q = geom.Region ([0, 0; 80, 0; 80, 50; 0, 50], {H});
+%! R = section (solid.extrude (Q, 6), geom.UCS ([0, 0, 1], [0, 0, 3]));
+%! assert_equal (__area__ (R{1}.Holes{1}), __area__ (Q.Holes{1}), -1e-9);
+
+%!error<solid.Shape.section: invalid number of input arguments.> ...
+%! section (solid.Shape ())
+%!error<solid.Shape.section: U must be a geom.UCS object.> ...
+%! section (solid.Shape (), [0, 0, 1])

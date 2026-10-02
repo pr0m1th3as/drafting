@@ -88,8 +88,13 @@ turn about the plane's own y axis through its origin, local x the radius, so a
 region in the default xy plane turns about the model's y axis; `loft` takes
 each section where its plane lies, sections need not be parallel, and all have
 the same number of holes; `sweep` sweeps the region from where it lies along a
-`geom.Path` (below). A pocket, a recess of limited
-depth, is an operation on a solid, not part of a region.
+`geom.Path` (below). A pocket, a recess of limited depth, is an operation on a
+solid, not part of a region.
+
+`solid.Shape.section` cuts a solid with the plane of a UCS and returns the cut
+as regions in that UCS, one for each separate piece, largest first, exact
+enough to build from again: lines, arcs, conics as rational splines and Open
+CASCADE's own B-splines. A face lying in the plane is part of the cut.
 
 ## User coordinate systems and paths
 

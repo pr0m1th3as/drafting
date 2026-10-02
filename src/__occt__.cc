@@ -43,6 +43,7 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <BRepGProp.hxx>
 #include <BRepLProp_SLProps.hxx>
 #include <BRepTools.hxx>
+#include <BRepTools_WireExplorer.hxx>
 #include <BRepTools_ReShape.hxx>
 #include <BRepLib.hxx>
 #include <BRepMesh_IncrementalMesh.hxx>
@@ -62,6 +63,8 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <BinTools.hxx>
 #include <Bnd_Box.hxx>
 #include <GC_MakeArcOfCircle.hxx>
+#include <GeomConvert.hxx>
+#include <GeomConvert_ApproxCurve.hxx>
 #include <Geom_BSplineCurve.hxx>
 #include <GeomLib_IsPlanarSurface.hxx>
 #include <Geom2d_Line.hxx>
@@ -551,6 +554,139 @@ area (const TopoDS_Shape& s)
     a += p.Mass ();
   }
   return a;
+}
+
+// A point with z = 0, for a section cut in the plane z = 0
+static RowVector
+flat (const gp_Pnt& p)
+{
+  RowVector r (3);
+  r(0) = p.X ();
+  r(1) = p.Y ();
+  r(2) = 0;
+  return r;
+}
+
+// One piece of a section loop as Octave builds a path from it: a line from
+// its first point to its last; an arc through its first, middle and last
+// point; or a B-spline by its control points, weights, distinct knots and
+// their multiplicities and degree
+static octave_scalar_map
+sectionpiece (const char *type, const Matrix& points)
+{
+  octave_scalar_map m;
+  m.assign ("type", type);
+  m.assign ("points", points);
+  return m;
+}
+
+// The edge E of a section loop, run the way the loop runs, as pieces: a line
+// stays a line and a circle an arc, a whole circle two half arcs; any other
+// curve is a B-spline, exact for a conic, its ends set on the edge's vertices
+static void
+sectionedge (const TopoDS_Edge& e, vector<octave_value>& out)
+{
+  const gp_Pnt p0 = BRep_Tool::Pnt (TopExp::FirstVertex (e, Standard_True));
+  const gp_Pnt p1 = BRep_Tool::Pnt (TopExp::LastVertex (e, Standard_True));
+  double a, b;
+  const Handle (Geom_Curve) c = BRep_Tool::Curve (e, a, b);
+  const bool rev = (e.Orientation () == TopAbs_REVERSED);
+  const double s0 = rev ? b : a;
+  const double s1 = rev ? a : b;
+  const BRepAdaptor_Curve g (e);
+  if (g.GetType () == GeomAbs_Line)
+  {
+    Matrix m (2, 3);
+    m.insert (flat (p0), 0, 0);
+    m.insert (flat (p1), 1, 0);
+    out.push_back (sectionpiece ("line", m));
+  }
+  else if (g.GetType () == GeomAbs_Circle)
+  {
+    if (p0.Distance (p1) < Precision::Confusion ())
+    {
+      const gp_Pnt h = c->Value ((s0 + s1) / 2);
+      Matrix m (3, 3);
+      m.insert (flat (p0), 0, 0);
+      m.insert (flat (c->Value (s0 + (s1 - s0) / 4)), 1, 0);
+      m.insert (flat (h), 2, 0);
+      out.push_back (sectionpiece ("arc", m));
+      m.insert (flat (h), 0, 0);
+      m.insert (flat (c->Value (s0 + 3 * (s1 - s0) / 4)), 1, 0);
+      m.insert (flat (p0), 2, 0);
+      out.push_back (sectionpiece ("arc", m));
+    }
+    else
+    {
+      Matrix m (3, 3);
+      m.insert (flat (p0), 0, 0);
+      m.insert (flat (c->Value ((s0 + s1) / 2)), 1, 0);
+      m.insert (flat (p1), 2, 0);
+      out.push_back (sectionpiece ("arc", m));
+    }
+  }
+  else
+  {
+    const Handle (Geom_TrimmedCurve) t = new Geom_TrimmedCurve (c, a, b);
+    Handle (Geom_BSplineCurve) bs;
+    try
+    {
+      bs = GeomConvert::CurveToBSplineCurve (t);
+    }
+    catch (const Standard_Failure&)
+    {
+      bs = GeomConvert_ApproxCurve (t, 1e-7, GeomAbs_C2, 100, 12).Curve ();
+    }
+    if (bs->IsPeriodic ())
+    {
+      bs->SetNotPeriodic ();
+    }
+    if (rev)
+    {
+      bs->Reverse ();
+    }
+    const int n = bs->NbPoles ();
+    bs->SetPole (1, p0);
+    bs->SetPole (n, p1);
+    Matrix poles (n, 3);
+    ColumnVector w (n);
+    for (int i = 1; i <= n; i++)
+    {
+      poles.insert (flat (bs->Pole (i)), i - 1, 0);
+      w(i-1) = bs->Weight (i);
+    }
+    ColumnVector k (bs->NbKnots ());
+    ColumnVector m (bs->NbKnots ());
+    for (int i = 1; i <= bs->NbKnots (); i++)
+    {
+      k(i-1) = bs->Knot (i);
+      m(i-1) = bs->Multiplicity (i);
+    }
+    octave_scalar_map piece = sectionpiece ("spline", poles);
+    piece.assign ("weights", w);
+    piece.assign ("knots", k);
+    piece.assign ("mults", m);
+    piece.assign ("degree", bs->Degree ());
+    out.push_back (piece);
+  }
+}
+
+// The loop W of the face F as a cell of pieces, in the order and the sense
+// the face runs it
+static Cell
+sectionloop (const TopoDS_Wire& w, const TopoDS_Face& f)
+{
+  vector<octave_value> pieces;
+  for (BRepTools_WireExplorer x (w, f); x.More (); x.Next ())
+  {
+    sectionedge (x.Current (), pieces);
+  }
+  Cell c (1, pieces.size ());
+  for (size_t i = 0; i < pieces.size (); i++)
+  {
+    c(i) = pieces[i];
+  }
+  return c;
 }
 
 // A transformed copy of a shape
@@ -1244,6 +1380,72 @@ function directly. \n\
       gp_Trsf t;
       t.SetScale (topoint (args(4)), args(3).double_value ());
       out = todata (transform (toshape (args(2), caller), t));
+    }
+
+    // The cut through a shape by the plane of a frame, rows origin, x axis,
+    // y axis and normal: the shape is carried into the frame, where the plane
+    // is z = 0, and what it has in common with a face of that plane larger
+    // than the shape is the cut, a face lying in the plane included.  Each
+    // face of it comes back as its outer loop and its inner loops.
+    else if (cmd == "section")
+    {
+      const Matrix f = args(3).matrix_value ();
+      gp_Trsf t;
+      t.SetTransformation (gp_Ax3 (gp_Pnt (f(0,0), f(0,1), f(0,2)),
+                                   gp_Dir (f(3,0), f(3,1), f(3,2)),
+                                   gp_Dir (f(1,0), f(1,1), f(1,2))));
+      const TopoDS_Shape s = transform (toshape (args(2), caller), t);
+      Bnd_Box box;
+      BRepBndLib::Add (s, box);
+      vector<octave_value> faces;
+      double x0, y0, z0, x1, y1, z1;
+      box.Get (x0, y0, z0, x1, y1, z1);
+      const double tol = box.GetGap () + Precision::Confusion ();
+      if (z0 <= tol && z1 >= -tol)
+      {
+        const double r = 1 + (x1 - x0) + (y1 - y0);
+        const TopoDS_Face plane
+          = BRepBuilderAPI_MakeFace (gp_Pln (gp::XOY ()), x0 - r, x1 + r,
+                                     y0 - r, y1 + r).Face ();
+        BRepAlgoAPI_Common op (s, plane);
+        const TopoDS_Shape c = boolean (op, caller, "section");
+        const double scale = (x1 - x0) * (y1 - y0) + 1;
+        for (TopExp_Explorer x (c, TopAbs_FACE); x.More (); x.Next ())
+        {
+          const TopoDS_Face face = TopoDS::Face (x.Current ());
+          GProp_GProps p;
+          BRepGProp::SurfaceProperties (face, p);
+          if (p.Mass () <= 1e-12 * scale)
+          {
+            continue;
+          }
+          const TopoDS_Wire outer = BRepTools::OuterWire (face);
+          vector<octave_value> holes;
+          for (TopExp_Explorer y (face, TopAbs_WIRE); y.More (); y.Next ())
+          {
+            if (! y.Current ().IsSame (outer))
+            {
+              holes.push_back (sectionloop (TopoDS::Wire (y.Current ()),
+                                            face));
+            }
+          }
+          Cell h (1, holes.size ());
+          for (size_t i = 0; i < holes.size (); i++)
+          {
+            h(i) = holes[i];
+          }
+          octave_scalar_map m;
+          m.assign ("outline", sectionloop (outer, face));
+          m.assign ("holes", h);
+          faces.push_back (m);
+        }
+      }
+      Cell out_ (1, faces.size ());
+      for (size_t i = 0; i < faces.size (); i++)
+      {
+        out_(i) = faces[i];
+      }
+      out = out_;
     }
 
     // Queries
