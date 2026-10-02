@@ -191,44 +191,6 @@ todir (const octave_value& v)
   return gp_Dir (a(0), a(1), a(2));
 }
 
-// The closed wire through the rows of V, [x, y, bulge], in the plane through
-// O spanned by U and V.  The bulge of a vertex is that of the segment leaving
-// it, the tangent of a quarter of its included angle, positive anticlockwise.
-// The outline has been validated as a geom.Polyline, so every segment has a
-// length.
-static TopoDS_Wire
-outline (const Matrix& P, const gp_XYZ& o, const gp_XYZ& u, const gp_XYZ& v)
-{
-  const octave_idx_type n = P.rows ();
-  auto at = [&] (double x, double y) { return gp_Pnt (o + u * x + v * y); };
-  BRepBuilderAPI_MakeWire w;
-  for (octave_idx_type i = 0; i < n; i++)
-  {
-    const octave_idx_type j = (i + 1) % n;
-    const gp_Pnt p1 = at (P(i,0), P(i,1));
-    const gp_Pnt p2 = at (P(j,0), P(j,1));
-    if (P(i,2) == 0)
-    {
-      w.Add (BRepBuilderAPI_MakeEdge (p1, p2).Edge ());
-    }
-    else
-    {
-      // The arc's midpoint lies off the middle of the chord by the sagitta,
-      // half the chord times the bulge, to the right of the direction of
-      // travel for a positive bulge
-      const double dx = P(j,0) - P(i,0);
-      const double dy = P(j,1) - P(i,1);
-      const double s = P(i,2) / 2;
-      const gp_Pnt pm = at ((P(i,0) + P(j,0)) / 2 + s * dy,
-                            (P(i,1) + P(j,1)) / 2 - s * dx);
-      const Handle (Geom_TrimmedCurve) arc
-        = GC_MakeArcOfCircle (p1, pm, p2).Value ();
-      w.Add (BRepBuilderAPI_MakeEdge (arc).Edge ());
-    }
-  }
-  return w.Wire ();
-}
-
 // The cubic B-spline made of the Bezier pieces whose control points are the
 // rows of P, end to end, the pieces meeting at the parameters T.  Where they
 // meet smoothly, as a geom.Spline's do, the knot is made simple again.
@@ -257,9 +219,54 @@ bspline (const Matrix& p, const ColumnVector& t)
   return c;
 }
 
-// A geom.Region as Octave hands it over: the outline's vertices, a cell of
-// the holes' vertices, and the frame of its plane, rows origin, x axis, y
-// axis and normal.  The outline runs anticlockwise and the holes clockwise.
+// The wire of a geom.Path as solid.__path__ hands it over, in world
+// coordinates: its vertices; the midpoints of its arcs, NaN for a segment
+// that is not an arc; for each spline segment the control points of its cubic
+// pieces and the parameters where they meet; and whether it is closed, its
+// last segment then running back to the first vertex, or for a path of one
+// vertex its one spline running round to it
+static TopoDS_Wire
+chain (const octave_value& p)
+{
+  const octave_scalar_map s = p.scalar_map_value ();
+  const Matrix v = s.contents ("vertices").matrix_value ();
+  const Matrix m = s.contents ("midpoints").matrix_value ();
+  const Cell sp = s.contents ("splines").cell_value ();
+  const bool closed = s.contents ("closed").bool_value ();
+  const octave_idx_type n = v.rows ();
+  BRepBuilderAPI_MakeWire w;
+  for (octave_idx_type i = 0; i < (closed ? n : n - 1); i++)
+  {
+    const octave_idx_type j = (i + 1) % n;
+    const gp_Pnt a (v(i,0), v(i,1), v(i,2));
+    const gp_Pnt b (v(j,0), v(j,1), v(j,2));
+    if (! sp(i).isempty ())
+    {
+      const octave_scalar_map c = sp(i).scalar_map_value ();
+      w.Add (BRepBuilderAPI_MakeEdge
+               (bspline (c.contents ("poles").matrix_value (),
+                         c.contents ("knots").column_vector_value ()))
+             .Edge ());
+    }
+    else if (octave::math::isnan (m(i,0)))
+    {
+      w.Add (BRepBuilderAPI_MakeEdge (a, b).Edge ());
+    }
+    else
+    {
+      const Handle (Geom_TrimmedCurve) arc
+        = GC_MakeArcOfCircle (a, gp_Pnt (m(i,0), m(i,1), m(i,2)), b)
+          .Value ();
+      w.Add (BRepBuilderAPI_MakeEdge (arc).Edge ());
+    }
+  }
+  return w.Wire ();
+}
+
+// A geom.Region as Octave hands it over: the outline and a cell of the
+// holes, each a path as chain reads it, and the frame of its plane, rows
+// origin, x axis, y axis and normal.  The outline runs anticlockwise and the
+// holes clockwise.
 struct region
 {
   TopoDS_Wire outer;
@@ -281,11 +288,11 @@ toregion (const octave_value& v)
   r.x = gp_Dir (u);
   r.y = gp_Dir (w);
   r.normal = gp_Dir (f(3,0), f(3,1), f(3,2));
-  r.outer = outline (m.contents ("outline").matrix_value (), o, u, w);
+  r.outer = chain (m.contents ("outline"));
   const Cell h = m.contents ("holes").cell_value ();
   for (octave_idx_type i = 0; i < h.numel (); i++)
   {
-    r.holes.push_back (outline (h(i).matrix_value (), o, u, w));
+    r.holes.push_back (chain (h(i)));
   }
   return r;
 }
@@ -931,48 +938,15 @@ function directly. \n\
     }
     else if (cmd == "sweep")
     {
-      // The path's vertices, the midpoints of its arcs, NaN for a straight
-      // segment, whether it is closed, and for each spline segment its
-      // control points and parameters
       const region r = toregion (args(2));
-      const Matrix v = args(3).matrix_value ();
-      const Matrix m = args(4).matrix_value ();
-      const bool closed = args(5).bool_value ();
-      const Cell sp = args(6).cell_value ();
-      const octave_idx_type n = v.rows ();
-      BRepBuilderAPI_MakeWire spine;
-      for (octave_idx_type i = 0; i < (closed ? n : n - 1); i++)
-      {
-        const octave_idx_type j = (i + 1) % n;
-        const gp_Pnt a (v(i,0), v(i,1), v(i,2));
-        const gp_Pnt b (v(j,0), v(j,1), v(j,2));
-        if (! sp(i).isempty ())
-        {
-          const octave_scalar_map s = sp(i).scalar_map_value ();
-          spine.Add (BRepBuilderAPI_MakeEdge
-                       (bspline (s.contents ("poles").matrix_value (),
-                                 s.contents ("knots").column_vector_value ()))
-                     .Edge ());
-        }
-        else if (octave::math::isnan (m(i,0)))
-        {
-          spine.Add (BRepBuilderAPI_MakeEdge (a, b).Edge ());
-        }
-        else
-        {
-          const Handle (Geom_TrimmedCurve) arc
-            = GC_MakeArcOfCircle (a, gp_Pnt (m(i,0), m(i,1), m(i,2)), b)
-              .Value ();
-          spine.Add (BRepBuilderAPI_MakeEdge (arc).Edge ());
-        }
-      }
+      const TopoDS_Wire spine = chain (args(3));
       vector<TopoDS_Shape> holes;
       for (const TopoDS_Wire& h : r.holes)
       {
-        holes.push_back (pipe (spine.Wire (), h, false, caller));
+        holes.push_back (pipe (spine, h, false, caller));
       }
-      out = todata (cutall (pipe (spine.Wire (), r.outer, false, caller),
-                            holes, caller));
+      out = todata (cutall (pipe (spine, r.outer, false, caller), holes,
+                            caller));
     }
 
     // A helix turns a region about its plane's y axis while it rises along

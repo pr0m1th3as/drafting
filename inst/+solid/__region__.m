@@ -20,23 +20,27 @@
 ##
 ## Returns an error message BODY in ERRMSG, empty when R is a scalar
 ## geom.Region; the caller emits the error under its own name, naming the
-## argument NAME.  D is the struct __occt__ reads: the outline's vertices,
-## a cell of the holes' vertices, and the frame of the region's plane, rows
-## origin, x axis, y axis and normal.
+## argument NAME.  D is the struct __occt__ reads: the outline and a cell of
+## the holes, each as solid.__path__ hands a path over, and the frame of the
+## region's plane, rows origin, x axis, y axis and normal.  SPLINES is true
+## when the outline or a hole has a spline in it.
 
-function [errmsg, D] = __region__ (R, NAME)
+function [errmsg, D, SPLINES] = __region__ (R, NAME)
 
   errmsg = '';
   D = [];
+  SPLINES = false;
   if (! isa (R, 'geom.Region') || ! isscalar (R))
     errmsg = sprintf ("%s must be a geom.Region object.", NAME);
     return;
   endif
   U = R.UCS;
-  D = struct ('outline', R.Outline.Vertices, ...
-              'holes', {cellfun(@(h) h.Vertices, R.Holes, ...
+  D = struct ('outline', solid.__path__ (R.Outline), ...
+              'holes', {cellfun(@solid.__path__, R.Holes, ...
                                 'UniformOutput', false)}, ...
               'frame', [U.Origin; U.XAxis; U.YAxis; U.Normal]);
+  SPLINES = any (cellfun (@(P) any (! cellfun (@isempty, P.Splines)), ...
+                          [{R.Outline}, R.Holes]));
 
 endfunction
 
@@ -44,9 +48,17 @@ endfunction
 %! R = geom.Region ([0, 0; 10, 0; 10, 5], {[6, 1; 8, 1; 8, 2]});
 %! [errmsg, D] = solid.__region__ (R, 'R');
 %! assert_equal (errmsg, '');
-%! assert_equal (D.outline, [0, 0, 0; 10, 0, 0; 10, 5, 0]);
-%! assert_equal (D.holes, {[6, 1, 0; 8, 2, 0; 8, 1, 0]});
+%! assert_equal (D.outline.vertices, [0, 0, 0; 10, 0, 0; 10, 5, 0]);
+%! assert_equal (D.outline.closed, true);
+%! assert_equal (D.holes{1}.vertices, [6, 1, 0; 8, 2, 0; 8, 1, 0]);
 %! assert_equal (D.frame, [0, 0, 0; 1, 0, 0; 0, 1, 0; 0, 0, 1]);
+
+%!test  # a hole with a spline
+%! H = geom.Spline ([5, 0.5; 8, 0.8; 7.5, 2.5], 'Closed', true);
+%! [~, D, SPLINES] = solid.__region__ (geom.Region ([0, 0; 10, 0; 10, 5], ...
+%!                                                  {H}), 'R');
+%! assert_equal (SPLINES, true);
+%! assert_equal (D.holes{1}.vertices, [5, 0.5, 0]);
 
 %!test
 %! assert_equal (solid.__region__ ([0, 0; 1, 0; 1, 1], 'R'), ...

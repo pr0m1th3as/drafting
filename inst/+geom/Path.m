@@ -136,6 +136,135 @@ classdef Path
 
     endfunction
 
+    ## The same path run the other way round, a closed one from the same first
+    ## vertex: each segment reversed and moved to the vertex it now leaves
+    function this = __reversed__ (this)
+
+      n = rows (this.Vertices);
+      if (this.Closed)
+        k = [1, n:-1:2];
+        g = k([2:end, 1]);
+      else
+        k = n:-1:1;
+        g = [n-1:-1:1, n];
+      endif
+      M = this.Midpoints(g,:);
+      S = this.Splines(g);
+      if (! this.Closed)
+        M(end,:) = NaN;
+        S{end} = [];
+      endif
+      for i = find (! cellfun (@isempty, S))'
+        S{i} = __reversed__ (S{i});
+      endfor
+      this.Vertices = this.Vertices(k,:);
+      this.Midpoints = M;
+      this.Splines = S;
+
+    endfunction
+
+    ## The same path where it lies, its coordinates given in the UCS U
+    function this = __into__ (this, U)
+
+      [this.Vertices, this.Midpoints, this.Splines] = into (this, U);
+      this.UCS = U;
+
+    endfunction
+
+    ## The path scaled by the factor F about the origin of its UCS
+    function this = __scaled__ (this, F)
+
+      this.Vertices *= F;
+      this.Midpoints *= F;
+      for i = find (! cellfun (@isempty, this.Splines))'
+        this.Splines{i} = __with__ (this.Splines{i}, ...
+                                    this.Splines{i}.Points * F, ...
+                                    this.Splines{i}.Tangents);
+      endfor
+
+    endfunction
+
+    ## Points along the path in its coordinates, arcs every 2 degrees or
+    ## closer and splines as finely, closed paths not repeating the first
+    function Q = __sample__ (this)
+
+      V = this.Vertices;
+      M = this.Midpoints;
+      S = this.Splines;
+      n = rows (V);
+      Q = cell (n, 1);
+      for i = 1:n
+        Q{i} = V(i,:);
+        if (! this.Closed && i == n)
+          break;
+        endif
+        B = V(mod (i, n) + 1,:);
+        if (! isempty (S{i}))
+          [t, m, W] = __hermite__ (S{i});
+          for j = 1:rows (W) - 1
+            a = acos (min (1, dot (m(j,:), m(j+1,:)) ...
+                              / (norm (m(j,:)) * norm (m(j+1,:)))));
+            u = (0:max (16, ceil (a / (pi / 90))))' ...
+                / max (16, ceil (a / (pi / 90)));
+            h = t(j+1) - t(j);
+            P = (2 * u .^ 3 - 3 * u .^ 2 + 1) .* W(j,:) ...
+                + (u .^ 3 - 2 * u .^ 2 + u) .* h .* m(j,:) ...
+                + (-2 * u .^ 3 + 3 * u .^ 2) .* W(j+1,:) ...
+                + (u .^ 3 - u .^ 2) .* h .* m(j+1,:);
+            Q{i} = [Q{i}; P(2:end,:)];
+          endfor
+          Q{i}(end,:) = [];
+        elseif (! isnan (M(i,1)))
+          [C, x, y, th] = circle (V(i,:), M(i,:), B);
+          r = norm (V(i,:) - C);
+          f = (1:ceil (th / (pi / 90)) - 1)' / ceil (th / (pi / 90)) * th;
+          Q{i} = [Q{i}; C + r * (cos (f) * x + sin (f) * y)];
+        endif
+      endfor
+      Q = vertcat (Q{:});
+
+    endfunction
+
+    ## The signed area the closed path encloses in the plane of its UCS,
+    ## positive anticlockwise: from every segment its share of the integral of
+    ## x dy - y dx, exact for straight segments, arcs and splines alike
+    function A = __area__ (this)
+
+      V = this.Vertices;
+      M = this.Midpoints;
+      S = this.Splines;
+      n = rows (V);
+      A = 0;
+      for i = 1:n
+        B = V(mod (i, n) + 1,:);
+        if (! isempty (S{i}))
+          [t, m, W] = __hermite__ (S{i});
+          for j = 1:rows (W) - 1
+            h = t(j+1) - t(j);
+            c = [W(j,:); h * m(j,:); ...
+                 -3 * W(j,:) - 2 * h * m(j,:) + 3 * W(j+1,:) - h * m(j+1,:); ...
+                 2 * W(j,:) + h * m(j,:) - 2 * W(j+1,:) + h * m(j+1,:)];
+            A += (polyint01 (c(:,1), c(:,2)) - polyint01 (c(:,2), c(:,1))) / 2;
+          endfor
+        else
+          A += (V(i,1) * B(2) - B(1) * V(i,2)) / 2;
+          if (! isnan (M(i,1)))
+            ## The circular segment between the chord and the arc, added where
+            ## the arc lies to the right of the chord
+            d = B(1:2) - V(i,1:2);
+            e = M(i,1:2) - V(i,1:2);
+            c = norm (d);
+            sg = norm (M(i,1:2) - (V(i,1:2) + B(1:2)) / 2);
+            th = 4 * atan (2 * sg / c);
+            r = c / (2 * sin (th / 2));
+            A -= sign (d(1) * e(2) - d(2) * e(1)) * r ^ 2 / 2 ...
+                 * (th - sin (th));
+          endif
+        endif
+      endfor
+
+    endfunction
+
   endmethods
 
   methods (Access = public)
@@ -150,7 +279,8 @@ classdef Path
     ##
     ## @code{@var{P} = geom.Path (@var{V})} makes an open path of straight
     ## segments through the points given as rows of @var{V}, an @math{M}-by-3
-    ## matrix in millimetres with at least two rows.
+    ## matrix in millimetres, or an @math{M}-by-2 matrix of points in the plane
+    ## of the UCS, with at least two rows.
     ##
     ## Name/Value pairs:
     ##
@@ -169,8 +299,10 @@ classdef Path
     ## @code{geom.Polyline} @var{PL}, in its UCS, open or closed as @var{PL}
     ## is, with its arcs kept exact.
     ##
-    ## @code{@var{P} = geom.Path (@var{SP})} makes the open path of one
-    ## segment along the @code{geom.Spline} @var{SP}, in its UCS.
+    ## @code{@var{P} = geom.Path (@var{SP})} makes the path of one segment
+    ## along the @code{geom.Spline} @var{SP}, in its UCS.  A closed spline
+    ## makes a closed path of one vertex, its first point, the spline running
+    ## from it round and back.
     ##
     ## @example
     ## @group
@@ -201,16 +333,26 @@ classdef Path
         if (nargin > 1)
           error ("geom.Path: invalid number of input arguments.");
         endif
-        this.Vertices = V.Points([1, end],:);
-        this.Midpoints = NaN (2, 3);
-        this.Splines = {geom.Spline(V.Points, 'Tangents', V.Tangents); []};
+        SP = V;
+        SP.UCS = geom.UCS ();
+        if (SP.Closed)
+          this.Vertices = SP.Points(1,:);
+          this.Midpoints = NaN (1, 3);
+          this.Splines = {SP};
+          this.Closed = true;
+        else
+          this.Vertices = SP.Points([1, end],:);
+          this.Midpoints = NaN (2, 3);
+          this.Splines = {SP; []};
+        endif
         this.UCS = V.UCS;
         return;
       endif
       if (! isnumeric (V) || ! isreal (V) || ! ismatrix (V) ...
-          || columns (V) != 3 || rows (V) < 2 || ! all (isfinite (V(:))))
-        error (strcat ("geom.Path: V must be an M-by-3 real matrix of", ...
-                       " finite values with at least two rows."));
+          || ! any (columns (V) == [2, 3]) || rows (V) < 2 ...
+          || ! all (isfinite (V(:))))
+        error (strcat ("geom.Path: V must be an M-by-2 or M-by-3 real", ...
+                       " matrix of finite values with at least two rows."));
       endif
       if (mod (numel (varargin), 2) != 0)
         error ("geom.Path: Name/Value arguments must come in pairs.");
@@ -233,6 +375,9 @@ classdef Path
       endif
 
       V = double (V);
+      if (columns (V) == 2)
+        V(:,3) = 0;
+      endif
       closed = logical (opt.Closed);
 
       ## Accept an explicitly closed path and drop the repeat
@@ -290,84 +435,122 @@ classdef Path
         error (strcat ("geom.Path.fillet: RADIUS must be a positive and", ...
                        " finite real scalar."));
       endif
-
-      ## The corners, their neighbours and the angle the path turns there
-      V = this.Vertices;
-      M = this.Midpoints;
-      S = this.Splines;
-      n = rows (V);
-      if (this.Closed)
-        prev = [n, 1:n-1];
-        next = [2:n, 1];
-        ends = false (1, n);
-      else
-        prev = [1, 1:n-1];
-        next = [2:n, n];
-        ends = [true, false(1, n - 2), true];
-      endif
-      u = V - V(prev,:);
-      v = V(next,:) - V;
-      lu = sqrt (sum (u .^ 2, 2))';
-      lv = sqrt (sum (v .^ 2, 2))';
-      th = acos (min (max (sum (u .* v, 2)' ./ (lu .* lv), -1), 1));
-      straight = isnan (M(:,1))' & cellfun (@isempty, S)';
-      corner = ! ends & straight(prev) & straight & th > 1e-12;
-      if (isempty (IDX))
-        IDX = find (corner);
-      else
-        if (! isnumeric (IDX) || ! isreal (IDX) || ! isvector (IDX) ...
-            || any (IDX != fix (IDX)) || any (IDX < 1) || any (IDX > n))
-          error (strcat ("geom.Path.fillet: IDX must be a vector of", ...
-                         " vertex indices of P."));
-        endif
-        IDX = unique (double (IDX(:)'));
-        bad = IDX(! corner(IDX));
-        if (! isempty (bad))
-          error (strcat ("geom.Path.fillet: vertex %d is not a corner", ...
-                         " between two straight segments."), bad(1));
-        endif
+      [errmsg, C] = corners (this, IDX);
+      if (! isempty (errmsg))
+        error ("geom.Path.fillet: %s", errmsg);
       endif
 
       ## How far back along each segment the round at either end reaches
-      t = zeros (1, n);
-      t(IDX) = RADIUS * tan (th(IDX) / 2);
-      for i = IDX
-        if (t(i) + t(next(i)) > lv(i) * (1 + 1e-12) ...
-            || t(i) + t(prev(i)) > lu(i) * (1 + 1e-12))
-          error (strcat ("geom.Path.fillet: the round at vertex %d does", ...
-                         " not fit its segments."), i);
-        endif
-      endfor
+      t = zeros (1, rows (this.Vertices));
+      t(C.idx) = RADIUS * tan (C.th(C.idx) / 2);
+      errmsg = fits (C, t, t, "round");
+      if (! isempty (errmsg))
+        error ("geom.Path.fillet: %s", errmsg);
+      endif
 
       ## Each rounded corner becomes the arc between its tangent points, the
       ## middle of the arc on the bisector of the corner
-      W = num2cell (V, 2);
-      N = num2cell (M, 2);
-      C = num2cell (S);
-      for i = IDX
-        a = V(i,:) - t(i) * u(i,:) / lu(i);
-        b = V(i,:) + t(i) * v(i,:) / lv(i);
-        d = v(i,:) / lv(i) - u(i,:) / lu(i);
-        m = V(i,:) + d / norm (d) * RADIUS * (1 / cos (th(i) / 2) - 1);
-        W{i} = [a; b];
-        N{i} = [m; M(i,:)];
-        C{i} = cell (2, 1);
+      Mid = NaN (rows (this.Vertices), 3);
+      for i = C.idx
+        d = C.v(i,:) / C.lv(i) - C.u(i,:) / C.lu(i);
+        Mid(i,:) = this.Vertices(i,:) ...
+                   + d / norm (d) * RADIUS * (1 / cos (C.th(i) / 2) - 1);
       endfor
-      W = vertcat (W{:});
-      N = vertcat (N{:});
-      C = vertcat (C{:});
+      this = cut (this, C, t, t, Mid);
 
-      ## A straight segment that the rounds at its ends used up is dropped
-      k = rows (W);
-      if (this.Closed)
-        L = sqrt (sum ((W([2:k, 1],:) - W) .^ 2, 2));
-      else
-        L = [sqrt(sum (diff (W) .^ 2, 2)); Inf];
+    endfunction
+
+    ## -*- texinfo -*-
+    ## @deftypefn  {geom.Path} {@var{P} =} chamfer (@var{P}, @var{D})
+    ## @deftypefnx {geom.Path} {@var{P} =} chamfer (@var{P}, [@var{D1}, @var{D2}])
+    ## @deftypefnx {geom.Path} {@var{P} =} chamfer (@dots{}, @var{IDX})
+    ## @deftypefnx {geom.Path} {@var{P} =} chamfer (@dots{}, @qcode{'Angle'}, @var{A})
+    ##
+    ## Cut the corners of a path.
+    ##
+    ## @code{@var{P} = chamfer (@var{P}, @var{D})} cuts every corner where two
+    ## straight segments meet with a straight segment from @var{D} millimetres
+    ## back along the segment before the corner to @var{D} along the segment
+    ## after it.  Corners where an arc or a spline meets a segment are left as
+    ## they are, and so are the two ends of an open path.
+    ##
+    ## @code{@var{P} = chamfer (@var{P}, [@var{D1}, @var{D2}])} cuts back
+    ## @var{D1} along the segment before each corner and @var{D2} along the
+    ## segment after it, before and after in the order of the vertices.
+    ##
+    ## @code{@var{P} = chamfer (@var{P}, @var{D}, @qcode{'Angle'}, @var{A})}
+    ## cuts back @var{D} along the segment before each corner, with the cut at
+    ## @var{A} degrees to that segment.
+    ##
+    ## @code{@var{P} = chamfer (@dots{}, @var{IDX})} cuts only the corners at
+    ## the vertices indexed by @var{IDX}, each of which must be a corner
+    ## between two straight segments.
+    ##
+    ## A cut that would run past the end of a segment, or into the cut or round
+    ## of the next corner, or an angle at which the cut misses the segment
+    ## after the corner, is refused.
+    ##
+    ## @seealso{geom.Path.fillet, geom.Polyline.chamfer}
+    ## @end deftypefn
+    function this = chamfer (this, D, varargin)
+
+      ## Input validation
+      if (nargin < 2)
+        error ("geom.Path.chamfer: invalid number of input arguments.");
       endif
-      gone = isnan (N(:,1)) & cellfun (@isempty, C) & L <= 1e-9 * max (lv);
-      this.Vertices = W(! gone,:);
-      this.Midpoints = N(! gone,:);
-      this.Splines = C(! gone);
+      if (! isnumeric (D) || ! isreal (D) || ! isvector (D) ...
+          || numel (D) > 2 || ! all (isfinite (D)) || ! all (D > 0))
+        error (strcat ("geom.Path.chamfer: D must be one positive finite", ...
+                       " distance, or two."));
+      endif
+      IDX = [];
+      if (mod (numel (varargin), 2) == 1)
+        IDX = varargin{1};
+        varargin(1) = [];
+      endif
+      A = [];
+      for k = 1:2:numel (varargin)
+        if (! ischar (varargin{k}) || ! strcmp (varargin{k}, 'Angle'))
+          error ("geom.Path.chamfer: unknown parameter.");
+        endif
+        A = varargin{k+1};
+        if (! isnumeric (A) || ! isreal (A) || ! isscalar (A) ...
+            || ! (A > 0) || ! (A < 180))
+          error (strcat ("geom.Path.chamfer: Angle must be in the range", ...
+                         " (0, 180) degrees."));
+        endif
+      endfor
+      if (! isempty (A) && numel (D) == 2)
+        error ("geom.Path.chamfer: an angle goes with one distance D.");
+      endif
+      [errmsg, C] = corners (this, IDX);
+      if (! isempty (errmsg))
+        error ("geom.Path.chamfer: %s", errmsg);
+      endif
+
+      ## How far back along the segments before and after each corner
+      n = rows (this.Vertices);
+      tin = zeros (1, n);
+      tout = zeros (1, n);
+      tin(C.idx) = D(1);
+      tout(C.idx) = D(end);
+      if (! isempty (A))
+        ## The angle at the corner, and so the triangle the cut makes
+        far = pi - A * pi / 180 - (pi - C.th(C.idx));
+        bad = C.idx(far <= 1e-12);
+        if (! isempty (bad))
+          error (strcat ("geom.Path.chamfer: the chamfer at vertex %d", ...
+                         " misses the segment after it at that angle."), ...
+                 bad(1));
+        endif
+        tout(C.idx) = D * sind (A) ./ sin (far);
+      endif
+      errmsg = fits (C, tin, tout, "chamfer");
+      if (! isempty (errmsg))
+        error ("geom.Path.chamfer: %s", errmsg);
+      endif
+
+      this = cut (this, C, tin, tout, NaN (n, 3));
 
     endfunction
 
@@ -532,6 +715,43 @@ classdef Path
 
   endmethods
 
+  methods (Access = private)
+
+    ## The path P with each corner of C replaced by the points TIN back along
+    ## the segment into it and TOUT along the segment out of it, joined by an
+    ## arc through MID or a straight segment where MID is NaN.  A straight
+    ## segment that the cuts at its ends used up is dropped.
+    function P = cut (P, C, TIN, TOUT, MID)
+
+      V = P.Vertices;
+      W = num2cell (V, 2);
+      N = num2cell (P.Midpoints, 2);
+      S = num2cell (P.Splines);
+      for i = C.idx
+        a = V(i,:) - TIN(i) * C.u(i,:) / C.lu(i);
+        b = V(i,:) + TOUT(i) * C.v(i,:) / C.lv(i);
+        W{i} = [a; b];
+        N{i} = [MID(i,:); NaN, NaN, NaN];
+        S{i} = cell (2, 1);
+      endfor
+      W = vertcat (W{:});
+      N = vertcat (N{:});
+      S = vertcat (S{:});
+      k = rows (W);
+      if (P.Closed)
+        L = sqrt (sum ((W([2:k, 1],:) - W) .^ 2, 2));
+      else
+        L = [sqrt(sum (diff (W) .^ 2, 2)); Inf];
+      endif
+      gone = isnan (N(:,1)) & cellfun (@isempty, S) & L <= 1e-9 * max (C.lv);
+      P.Vertices = W(! gone,:);
+      P.Midpoints = N(! gone,:);
+      P.Splines = S(! gone);
+
+    endfunction
+
+  endmethods
+
   methods (Static)
 
     ## -*- texinfo -*-
@@ -568,12 +788,9 @@ classdef Path
         error ("geom.Path.arc: P1, PM and P2 must not lie on one line.");
       endif
 
-      ## The centre, and the point half way round from P1 to P2 through PM
-      C = PM + cross (dot (a, a) * b - dot (b, b) * a, n) / (2 * dot (n, n));
+      ## The point half way round from P1 to P2 through PM
+      [C, x, y, th] = circle (P1, PM, P2);
       r = norm (P1 - C);
-      x = (P1 - C) / r;
-      y = cross (-n / norm (n), x);
-      th = mod (atan2 (dot (P2 - C, y), dot (P2 - C, x)), 2 * pi);
       this = geom.Path ([P1; P2]);
       this.Midpoints(1,:) = C + r * (cos (th / 2) * x + sin (th / 2) * y);
 
@@ -595,6 +812,92 @@ classdef Path
   endmethods
 
 endclassdef
+
+## The corners of the path P that IDX names, or all of them where two straight
+## segments meet when IDX is empty: their indices, the vectors into and out of
+## every vertex and their lengths, the angle the path turns through there, and
+## its neighbours.  Returns an error message body, empty when IDX names only
+## such corners.
+function [errmsg, C] = corners (P, IDX)
+
+  errmsg = '';
+  V = P.Vertices;
+  n = rows (V);
+  if (P.Closed)
+    prev = [n, 1:n-1];
+    next = [2:n, 1];
+    ends = false (1, n);
+  else
+    prev = [1, 1:n-1];
+    next = [2:n, n];
+    ends = [true, false(1, n - 2), true];
+  endif
+  u = V - V(prev,:);
+  v = V(next,:) - V;
+  lu = sqrt (sum (u .^ 2, 2))';
+  lv = sqrt (sum (v .^ 2, 2))';
+  th = acos (min (max (sum (u .* v, 2)' ./ (lu .* lv), -1), 1));
+  straight = isnan (P.Midpoints(:,1))' & cellfun (@isempty, P.Splines)';
+  corner = ! ends & straight(prev) & straight & th > 1e-12;
+  if (isempty (IDX))
+    IDX = find (corner);
+  elseif (! isnumeric (IDX) || ! isreal (IDX) || ! isvector (IDX) ...
+          || any (IDX != fix (IDX)) || any (IDX < 1) || any (IDX > n))
+    errmsg = "IDX must be a vector of vertex indices of P.";
+  else
+    IDX = unique (double (IDX(:)'));
+    bad = IDX(! corner(IDX));
+    if (! isempty (bad))
+      errmsg = sprintf (strcat ("vertex %d is not a corner between two", ...
+                                " straight segments."), bad(1));
+    endif
+  endif
+  C = struct ('idx', IDX, 'u', u, 'v', v, 'lu', lu, 'lv', lv, 'th', th, ...
+              'prev', prev, 'next', next);
+
+endfunction
+
+## Whether the cuts TIN back along the segment into each corner and TOUT
+## along the segment out of it fit, the cut at one end of a segment clear of
+## the cut at the other.  Returns an error message body naming the first
+## corner, WHAT, that does not fit.
+function errmsg = fits (C, TIN, TOUT, WHAT)
+
+  errmsg = '';
+  for i = C.idx
+    if (TOUT(i) + TIN(C.next(i)) > C.lv(i) * (1 + 1e-12) ...
+        || TIN(i) + TOUT(C.prev(i)) > C.lu(i) * (1 + 1e-12))
+      errmsg = sprintf ("the %s at vertex %d does not fit its segments.", ...
+                        WHAT, i);
+      return;
+    endif
+  endfor
+
+endfunction
+
+## The circle through the points A, M and B in turn: its centre C, the unit
+## vector X from it to A, the unit vector Y square to X in its plane towards
+## the way round from A through M, and the angle TH from A round to B
+function [C, X, Y, TH] = circle (A, M, B)
+
+  a = A - M;
+  b = B - M;
+  n = cross (a, b);
+  C = M + cross (dot (a, a) * b - dot (b, b) * a, n) / (2 * dot (n, n));
+  X = (A - C) / norm (A - C);
+  Y = cross (-n / norm (n), X);
+  TH = mod (atan2 (dot (B - C, Y), dot (B - C, X)), 2 * pi);
+
+endfunction
+
+## The integral from 0 to 1 of a (u) times the derivative of b (u), for the
+## cubics whose coefficients, lowest power first, are A and B
+function v = polyint01 (A, B)
+
+  c = conv (A(:)', B(2:4)' .* [1, 2, 3]);
+  v = sum (c ./ (1:numel (c)));
+
+endfunction
 
 ## The vertices of the polyline PL in its UCS, and the midpoints of its arcs,
 ## a bulge B on the segment from p to q putting the middle of the arc B times
@@ -630,8 +933,8 @@ function [V, M, S] = into (P, U)
     M(arc,:) = tolocal (U, toworld (A, M(arc,:)));
     R = [A.XAxis; A.YAxis; A.Normal] * [U.XAxis; U.YAxis; U.Normal]';
     for i = find (! cellfun (@isempty, S))'
-      S{i} = geom.Spline (tolocal (U, toworld (A, S{i}.Points)), ...
-                          'Tangents', S{i}.Tangents * R);
+      S{i} = __with__ (S{i}, tolocal (U, toworld (A, S{i}.Points)), ...
+                       S{i}.Tangents * R);
     endfor
   endif
 
@@ -816,6 +1119,59 @@ endfunction
 %! assert_equal (rows (Q.Vertices), rows (P.Vertices) + 1);
 %! assert_equal (Q.Splines{4}.Points, P.Splines{3}.Points);
 
+%!test  # points in the plane of the UCS
+%! P = geom.Path ([0, 0; 10, 0; 10, 5]);
+%! assert_equal (P.Vertices, [0, 0, 0; 10, 0, 0; 10, 5, 0]);
+
+%!test  # a closed spline, a closed path of one vertex
+%! SP = geom.Spline ([0, 0; 30, -5; 45, 15; 25, 30; 5, 20], 'Closed', true);
+%! P = geom.Path (SP);
+%! assert_equal (P.Closed, true);
+%! assert_equal (P.Vertices, [0, 0, 0]);
+%! assert_equal (length (P), length (SP), 1e-12);
+%! P = fillet (P, 1);
+%! assert_equal (rows (P.Vertices), 1);
+%! [tin, tout] = __tangents__ (P);
+%! assert_equal (tin, tout, 1e-12);
+
+%!test  # every corner of a closed path cut, two distances
+%! P = geom.Path ([0, 0; 60, 0; 60, 40; 0, 40], 'Closed', true);
+%! Q = chamfer (P, [3, 2]);
+%! assert_equal (Q.Vertices(1:2,:), [0, 3, 0; 2, 0, 0], 1e-12);
+%! assert_equal (rows (Q.Vertices), 8);
+%! assert_equal (all (isnan (Q.Midpoints(:))), true);
+
+%!test  # a corner cut at an angle, out of the xy plane
+%! P = geom.Path ([0, 0, 0; 0, 0, 20; 10, 0, 20]);
+%! Q = chamfer (P, 3, 'Angle', 30);
+%! assert_equal (Q.Vertices(2:3,:), [0, 0, 17; 3 * tand(30), 0, 20], 1e-12);
+
+%!test  # reversed: the same path the other way round
+%! P = join (geom.Path ([0, 0; 10, 0]), ...
+%!           geom.Path.arc ([10, 0, 0], [15, 5, 0], [20, 0, 0]), ...
+%!           geom.Spline ([20, 0; 25, -5; 30, 0]));
+%! R = __reversed__ (P);
+%! assert_equal (R.Vertices, flipud (P.Vertices));
+%! assert_equal (R.Midpoints(2,:), [15, 5, 0], 1e-12);
+%! assert_equal (R.Splines{1}.Points, flipud (P.Splines{3}.Points));
+%! assert_equal (length (R), length (P), 1e-12);
+
+%!test  # area: a square, a disc of two arcs, a closed spline's polygon
+%! assert_equal (__area__ (geom.Path ([0, 0; 4, 0; 4, 3; 0, 3], ...
+%!                                    'Closed', true)), 12);
+%! D = geom.Path (geom.Polyline ([0, 0, 1; 10, 0, 1], 'Closed', true));
+%! assert_equal (__area__ (D), 25 * pi, 1e-12);
+%! assert_equal (__area__ (__reversed__ (D)), -25 * pi, 1e-12);
+%! SP = geom.Spline ([0, 0; 30, -5; 45, 15; 25, 30; 5, 20], 'Closed', true);
+%! Q = points (SP, 20001);
+%! assert_equal (__area__ (geom.Path (SP)), polyarea (Q(:,1), Q(:,2)), -1e-7);
+
+%!test  # sampled: arcs every 2 degrees, a spline finely
+%! D = geom.Path (geom.Polyline ([0, 0, 1; 10, 0, 1], 'Closed', true));
+%! Q = __sample__ (D);
+%! assert_equal (rows (Q), 180);
+%! assert_equal (max (abs (hypot (Q(:,1) - 5, Q(:,2)) - 5)), 0, 1e-12);
+
 %!test  # joined end to start, closed
 %! P = join (geom.Path ([0, 0, 0; 10, 0, 0]), ...
 %!           geom.Path.arc ([10, 0, 0], [5, 5, 0], [0, 0, 0]));
@@ -826,11 +1182,11 @@ endfunction
 %!error<geom.Path: invalid number of input arguments.> geom.Path ()
 %!error<geom.Path: invalid number of input arguments.> ...
 %! geom.Path (geom.Polyline ([0, 0; 1, 0]), 'Closed', true)
-%!error<geom.Path: V must be an M-by-3 real matrix of finite values with at least two rows.> ...
-%! geom.Path ([0, 0; 1, 0])
-%!error<geom.Path: V must be an M-by-3 real matrix of finite values with at least two rows.> ...
+%!error<geom.Path: V must be an M-by-2 or M-by-3 real matrix of finite values with at least two rows.> ...
 %! geom.Path ([0, 0, 0])
-%!error<geom.Path: V must be an M-by-3 real matrix of finite values with at least two rows.> ...
+%!error<geom.Path: V must be an M-by-2 or M-by-3 real matrix of finite values with at least two rows.> ...
+%! geom.Path ([0, 0, 0, 0; 1, 0, 0, 0])
+%!error<geom.Path: V must be an M-by-2 or M-by-3 real matrix of finite values with at least two rows.> ...
 %! geom.Path ([0, 0, 0; 1, 0, Inf])
 %!error<geom.Path: Name/Value arguments must come in pairs.> ...
 %! geom.Path ([0, 0, 0; 1, 0, 0], 'Closed')
@@ -875,6 +1231,24 @@ endfunction
 %!error<geom.Path.join: path 2 is closed.> ...
 %! join (geom.Path ([0, 0, 0; 1, 0, 0]), ...
 %!       geom.Path ([1, 0, 0; 2, 0, 0; 2, 1, 0], 'Closed', true))
+%!error<geom.Path.chamfer: invalid number of input arguments.> ...
+%! chamfer (geom.Path ([0, 0; 1, 0]))
+%!error<geom.Path.chamfer: D must be one positive finite distance, or two.> ...
+%! chamfer (geom.Path ([0, 0; 1, 0; 1, 1]), [1, 2, 3])
+%!error<geom.Path.chamfer: unknown parameter.> ...
+%! chamfer (geom.Path ([0, 0; 1, 0; 1, 1]), 0.1, 'Slope', 30)
+%!error<geom.Path.chamfer: Angle must be in the range \(0, 180\) degrees.> ...
+%! chamfer (geom.Path ([0, 0; 1, 0; 1, 1]), 0.1, 'Angle', 0)
+%!error<geom.Path.chamfer: an angle goes with one distance D.> ...
+%! chamfer (geom.Path ([0, 0; 1, 0; 1, 1]), [0.1, 0.2], 'Angle', 30)
+%!error<geom.Path.chamfer: IDX must be a vector of vertex indices of P.> ...
+%! chamfer (geom.Path ([0, 0; 1, 0; 1, 1]), 0.1, 7)
+%!error<geom.Path.chamfer: vertex 3 is not a corner between two straight segments.> ...
+%! chamfer (geom.Path ([0, 0; 1, 0; 1, 1]), 0.1, 3)
+%!error<geom.Path.chamfer: the chamfer at vertex 2 misses the segment after it at that angle.> ...
+%! chamfer (geom.Path ([0, 0; 1, 0; 1, 1]), 0.1, 'Angle', 95)
+%!error<geom.Path.chamfer: the chamfer at vertex 1 does not fit its segments.> ...
+%! chamfer (geom.Path ([0, 0; 4, 0; 4, 10; 0, 10], 'Closed', true), 3)
 %!error<geom.Path.join: path 2 does not begin where path 1 ends.> ...
 %! join (geom.Path ([0, 0, 0; 1, 0, 0]), geom.Path ([2, 0, 0; 3, 0, 0]))
 %!error<geom.Path.arc: invalid number of input arguments.> ...

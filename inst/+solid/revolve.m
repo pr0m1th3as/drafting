@@ -66,7 +66,7 @@ function S = revolve (R, ANGLE = 360)
   endif
   [errmsg, D] = solid.__region__ (R, 'R');
   if (isempty (errmsg))
-    Q = geom.__sample__ (D.outline);
+    Q = __sample__ (R.Outline);
     if (min (Q(:,1)) < -1e-9 * max (abs (Q(:))))
       errmsg = strcat ("R must lie on one side of its axis: no point of", ...
                        " it may have a negative x.");
@@ -127,6 +127,15 @@ endfunction
 %! R = geom.Region ([8, -2; 12, -2; 12, 2; 8, 2], {[9, 0, 1; 11, 0, 1]});
 %! S = solid.revolve (R);
 %! assert_equal (volume (S), (16 - pi) * 2 * pi * 10, 1e-9);
+%! assert_equal (isvalid (S), true);
+
+%!testif ; exist ('__occt__') == 3  # a closed spline, by Pappus
+%! O = geom.Spline ([10, 0; 20, -5; 30, 5; 22, 15; 12, 10], 'Closed', true);
+%! Q = points (O, 100001);
+%! c = Q(1:end-1,1) .* Q(2:end,2) - Q(2:end,1) .* Q(1:end-1,2);
+%! cx = sum ((Q(1:end-1,1) + Q(2:end,1)) .* c) / (3 * sum (c));
+%! S = solid.revolve (geom.Region (O), 360);
+%! assert_equal (volume (S), 2 * pi * cx * abs (sum (c)) / 2, -1e-3);
 %! assert_equal (isvalid (S), true);
 
 %!error<solid.revolve: invalid number of input arguments.> solid.revolve ()

@@ -67,7 +67,7 @@ function S = helix (R, PITCH, TURNS)
   endif
   [errmsg, D] = solid.__region__ (R, 'R');
   if (isempty (errmsg))
-    Q = geom.__sample__ (D.outline);
+    Q = __sample__ (R.Outline);
     if (min (Q(:,1)) <= 0)
       errmsg = strcat ("R must lie clear of its axis: every point of it", ...
                        " must have a positive x.");
@@ -121,6 +121,13 @@ endfunction
 %! R = geom.Region ([9, 1, 1; 11, 1, 1], {[9.5, 1, 1; 10.5, 1, 1]});
 %! S = solid.helix (R, 4, 1);
 %! assert_equal (volume (S), (pi - pi / 4) * 2 * pi * 10, -5e-6);
+%! assert_equal (isvalid (S), true);
+
+%!testif ; exist ('__occt__') == 3  # a section of a closed spline
+%! R = geom.Region (geom.Spline ([10, 0; 12, 0; 13, 1.5; 11, 2.5; 9.5, 1.2], ...
+%!                               'Closed', true));
+%! S = solid.helix (R, 4, 2);
+%! assert_equal (numsolids (S), 1);
 %! assert_equal (isvalid (S), true);
 
 %!error<solid.helix: invalid number of input arguments.> ...

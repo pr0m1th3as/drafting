@@ -159,6 +159,14 @@ endfunction
 %! assert_equal (isvalid (S), true);
 %! assert_equal (volume (S) > 0, true);
 
+%!testif ; exist ('__occt__') == 3  # between two closed splines
+%! P = [-3, -2; 3, -2; 4, 2; 0, 4; -4, 2];
+%! R = geom.Region (geom.Spline (P, 'Closed', true));
+%! S = solid.loft ({R, at(geom.Spline (P, 'Closed', true), 20)}, ...
+%!                 'Ruled', true);
+%! assert_equal (volume (S), 20 * __area__ (R.Outline), -1e-3);
+%! assert_equal (isvalid (S), true);
+
 %!error<solid.loft: invalid number of input arguments.> solid.loft ()
 %!error<solid.loft: REGIONS must be a cell array of at least two geom.Region objects.> ...
 %! solid.loft (geom.Region ([0, 0; 1, 0; 1, 1]))

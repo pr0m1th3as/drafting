@@ -63,16 +63,20 @@ accept plain matrices. Point sets that carry no arcs, such as the input of
   matrix of points in the coordinates of its `UCS`, parametrised by the
   distance from point to point; either end may be given a direction, and a
   free end is shaped as Octave's `spline` shapes it. Its curve is computed in
-  Octave and handed to Open CASCADE exactly. Paths take it now, as one smooth
-  segment; regions can take it later.
+  Octave and handed to Open CASCADE exactly. It is open, or closed and smooth
+  all round. A path takes it as one smooth segment, and a region as an
+  outline or a hole, or as part of one.
 - **`geom.Region`**: a closed planar area, one outline and any number of holes
-  of any shape, all `geom.Polyline` objects in one plane. It refuses an outline
-  or a hole that is open, crosses or touches itself or encloses no area, a hole
-  not strictly inside the outline, and holes that meet. It normalises the
-  outline anticlockwise and the holes clockwise. An island inside a hole is
-  not supported; a second region unioned onto the solid makes one. Assigning
-  its `UCS` moves it, keeping its shape in its own coordinates: a region drawn
-  in the xy plane is laid on a face by giving it the face's UCS.
+  of any shape, each a closed `geom.Path` in one plane, so of straight
+  segments, arcs and splines; closed polylines and splines are taken and
+  carried into paths. It refuses an outline or a hole that is open, crosses
+  or touches itself or encloses no area, a hole not strictly inside the
+  outline, and holes that meet. It normalises the outline anticlockwise and
+  the holes clockwise. An island inside a hole is not supported; a second
+  region unioned onto the solid makes one. Assigning its `UCS` moves it,
+  keeping its shape in its own coordinates: a region drawn in the xy plane is
+  laid on a face by giving it the face's UCS. A taper is refused on a region
+  with splines if Open CASCADE cannot offset them faithfully.
 
 A region is what a solid is made from (`solid.extrude`, `revolve`, `sweep`,
 `loft`, `helix`), what a section of a solid is, and what a hatch fills, and the

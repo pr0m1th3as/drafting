@@ -86,21 +86,7 @@ function S = sweep (R, P)
   endif
 
 
-  ## The path in world coordinates: its vertices, the midpoints of its arcs,
-  ## and each spline as its control points, its ends on the vertices
-  V = toworld (P.UCS, P.Vertices);
-  M = P.Midpoints;
-  arc = ! isnan (M(:,1));
-  M(arc,:) = toworld (P.UCS, M(arc,:));
-  C = cell (rows (V), 1);
-  for i = find (! cellfun (@isempty, P.Splines))'
-    [B, t] = __bezier__ (P.Splines{i});
-    B = toworld (P.UCS, B);
-    B([1, end],:) = V([i, mod(i, rows (V)) + 1],:);
-    C{i} = struct ('poles', B, 'knots', t);
-  endfor
-
-  S = solid.Shape (__occt__ ('sweep', 'solid.sweep', D, V, M, P.Closed, C));
+  S = solid.Shape (__occt__ ('sweep', 'solid.sweep', D, solid.__path__ (P)));
 
 endfunction
 
@@ -193,6 +179,24 @@ endfunction
 %! P = geom.Path (geom.Polyline ([0, 0, -tand(22.5); 10, 10, 0], 'UCS', U));
 %! S = solid.sweep (geom.Region ([1, 0, 1; -1, 0, 1]), P);
 %! assert_equal (volume (S), pi * 5 * pi, -1e-6);
+
+%!testif ; exist ('__occt__') == 3  # a section of a closed spline
+%! R = geom.Region (geom.Spline ([-3, -2; 3, -2; 4, 2; 0, 4; -4, 2], ...
+%!                               'Closed', true));
+%! P = fillet (geom.Path ([0, 0, 0; 0, 0, 30; 30, 0, 30]), 10);
+%! S = solid.sweep (R, P);
+%! assert_equal (volume (S), __area__ (R.Outline) * length (P), -1e-3);
+%! assert_equal (isvalid (S), true);
+
+%!testif ; exist ('__occt__') == 3  # round a closed spline path, a ring
+%! P = geom.Path (geom.Spline ([0, 0; 40, -5; 50, 20; 20, 30; -5, 15], ...
+%!                             'Closed', true));
+%! tin = __tangents__ (P);
+%! R = geom.Region ([1, 0, 1; -1, 0, 1]);
+%! R.UCS = geom.UCS (tin(1,:), [0, 0, 0], [0, 0, 1]);
+%! S = solid.sweep (R, P);
+%! assert_equal (volume (S), pi * length (P), -1e-3);
+%! assert_equal (isvalid (S), true);
 
 %!error<solid.sweep: invalid number of input arguments.> ...
 %! solid.sweep (geom.Region ([0, 0; 1, 0; 1, 1]))

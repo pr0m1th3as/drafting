@@ -1213,7 +1213,8 @@ classdef Shape
     ## @code{@var{S} = pocket (@dots{}, @qcode{'Taper'}, @var{A})} leans the
     ## pocket's walls in by @var{A} degrees as they go deeper, the draft of a
     ## moulded recess, as @code{solid.extrude} tapers a wall; the islands
-    ## widen to match.  @var{A} is in the range @math{(-90, 90)}.
+    ## widen to match.  @var{A} is in the range @math{(-90, 90)}.  A region
+    ## with splines takes no taper, as for @code{solid.extrude}.
     ##
     ## Pocketing the empty shape leaves it empty.
     ##
@@ -1274,7 +1275,7 @@ classdef Shape
                               'Taper', [0, double(opt.Taper)]);
       catch err
         error ("solid.Shape.pocket: %s", ...
-               regexprep (err.message, '^solid\\.extrude: ', ''));
+               regexprep (err.message, '^solid\.extrude: ', ''));
       end_try_catch
       this = subtract (this, tool);
 
@@ -1815,6 +1816,18 @@ endfunction
 %! Am = (20 - d) * (10 - d);
 %! assert_equal (volume (S), 38400 - 4 / 6 * (200 + A2 + 4 * Am), 1e-9);
 %! assert_equal (isvalid (S), true);
+
+%!testif ; exist ('__occt__') == 3  # a smooth pocket, a closed spline
+%! R = geom.Region (geom.Spline ([20, 10; 50, 8; 60, 25; 35, 32; 18, 25], ...
+%!                               'Closed', true));
+%! R.UCS = geom.UCS ([0, 0, 1], [0, 0, 12]);
+%! S = pocket (solid.box (80, 40, 12), R, 4);
+%! assert_equal (volume (S), 38400 - 4 * __area__ (R.Outline), -1e-4);
+%! assert_equal (isvalid (S), true);
+
+%!error<solid.Shape.pocket: Taper cannot be applied to a region with splines.> ...
+%! R = geom.Region (geom.Spline ([20, 10; 50, 8; 35, 32], 'Closed', true));
+%! pocket (solid.box (80, 40, 12), R, 4, 'Taper', 5);
 
 %!testif ; exist ('__occt__') == 3  # in a sloping face, clean all round
 %! W = geom.Region ([0, 0; 80, 0; 80, 20; 0, 40]);

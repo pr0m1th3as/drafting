@@ -56,6 +56,8 @@
 ## outline closes in.  Corners stay sharp and walls stay flat or conical, as a
 ## drafted wall is; a taper that closes a hole or the outline before the full
 ## height cannot be built.  The heights are true heights, square to the plane.
+## A region with splines takes no taper: Open CASCADE cannot offset a spline
+## faithfully.
 ##
 ## @item @qcode{'Twist'}
 ## The angle in degrees the region turns about the normal through its
@@ -94,7 +96,7 @@ function S = extrude (R, H, varargin)
   if (nargin < 2)
     error ("solid.extrude: invalid number of input arguments.");
   endif
-  [errmsg, D] = solid.__region__ (R, 'R');
+  [errmsg, D, splines] = solid.__region__ (R, 'R');
   if (! isempty (errmsg))
     error ("solid.extrude: %s", errmsg);
   endif
@@ -125,6 +127,9 @@ function S = extrude (R, H, varargin)
   if (numel (A) == 2 && numel (H) == 1)
     error (strcat ("solid.extrude: Taper takes two angles only for an", ...
                    " extrusion to both sides."));
+  endif
+  if (splines && any (A != 0))
+    error ("solid.extrude: Taper cannot be applied to a region with splines.");
   endif
   if (! isnumeric (opt.Twist) || ! isreal (opt.Twist) ...
       || ! isscalar (opt.Twist) || ! isfinite (opt.Twist))
@@ -170,17 +175,13 @@ function S = twist (R, H, TW, SC)
 
   U = R.UCS;
   n = max (4, ceil (abs (TW) / 10)) * (TW != 0) + (TW == 0);
-  O = R.Outline.Vertices;
-  P = cellfun (@(h) h.Vertices, R.Holes, 'UniformOutput', false);
   sections = cell (1, n + 1);
   for k = 0:n
     f = k / n;
-    s = 1 + (SC - 1) * f;
     t = TW * f;
     X = U.XAxis * cosd (t) + U.YAxis * sind (t);
     o = U.Origin + H * f * U.Normal;
-    sc = @(V) [V(:,1:2) * s, V(:,3)];
-    Rk = geom.Region (sc (O), cellfun (sc, P, 'UniformOutput', false));
+    Rk = __scaled__ (R, 1 + (SC - 1) * f);
     Rk.UCS = geom.UCS (U.Normal, o, o + X);
     sections{k+1} = Rk;
   endfor
@@ -219,6 +220,21 @@ endfunction
 %! R = geom.Region ([0, 0, 0; 20, 0, 0; 20, 20, -1; 0, 20, 0]);
 %! S = solid.extrude (R, 1);
 %! assert_equal (volume (S), 400 - 50 * pi, 1e-9);
+%! assert_equal (isvalid (S), true);
+
+%!testif ; exist ('__occt__') == 3  # a smooth hole, a closed spline
+%! H = geom.Spline ([20, 15; 35, 12; 40, 25; 28, 35; 18, 28], 'Closed', true);
+%! R = geom.Region ([0, 0; 80, 0; 80, 50; 0, 50], {H});
+%! S = solid.extrude (R, 6);
+%! assert_equal (volume (S), 6 * (4000 + __area__ (R.Holes{1})), -1e-5);
+%! assert_equal (numfaces (S), 7);
+%! assert_equal (isvalid (S), true);
+
+%!testif ; exist ('__occt__') == 3  # a spline region scaled along the height
+%! R = geom.Region (geom.Spline ([-3, -2; 3, -2; 4, 2; 0, 4; -4, 2], ...
+%!                               'Closed', true));
+%! S = solid.extrude (R, 6, 'Scale', 0.5);
+%! assert_equal (volume (S), 6 * __area__ (R.Outline) * 1.75 / 3, -1e-3);
 %! assert_equal (isvalid (S), true);
 
 %!testif ; exist ('__occt__') == 3  # holes of any shape go right through
@@ -321,5 +337,8 @@ endfunction
 %! solid.extrude (geom.Region ([0, 0; 1, 0; 1, 1]), 1, 'Scale', 0)
 %!error<solid.extrude: Twist and Scale apply to an extrusion to one side.> ...
 %! solid.extrude (geom.Region ([0, 0; 1, 0; 1, 1]), [1, 1], 'Twist', 30)
+%!error<solid.extrude: Taper cannot be applied to a region with splines.> ...
+%! solid.extrude (geom.Region (geom.Spline ([0, 0; 5, 0; 3, 4], ...
+%!                                         'Closed', true)), 1, 'Taper', 2)
 %!error<solid.extrude: Taper cannot be combined with Twist or Scale.> ...
 %! solid.extrude (geom.Region ([0, 0; 1, 0; 1, 1]), 1, 'Taper', 3, 'Scale', 2)

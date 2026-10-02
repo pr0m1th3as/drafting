@@ -21,14 +21,17 @@ classdef Spline
   ##
   ## A smooth curve through points.
   ##
-  ## A @code{geom.Spline} is an open cubic spline that passes through each of
-  ## its points in turn, smooth all along: its direction and its curvature
-  ## change without a jump.  It is the curve of a grip, a curved rib or a
+  ## A @code{geom.Spline} is a cubic spline that passes through each of its
+  ## points in turn, smooth all along: its direction and its curvature change
+  ## without a jump.  It is open, or closed and smooth all round, back from
+  ## its last point to its first.  It is the curve of a grip, a curved rib or a
   ## channel that follows a surface, and @code{solid.sweep} carries a section
-  ## along it as one segment of a @code{geom.Path}.
+  ## along it as one segment of a @code{geom.Path}.  A closed spline is a
+  ## smooth outline or hole of a @code{geom.Region}.
   ##
   ## The curve is parametrised by the distance from point to point.  Either
-  ## end may be given a direction; an end left free is shaped as Octave's
+  ## end of an open spline may be given a direction; an end left free is
+  ## shaped as Octave's
   ## @code{spline} shapes it, the first and last two pieces each one cubic,
   ## so a spline through points of a parabola is that parabola.  When a
   ## spline is joined into a path, its free ends take the direction of what
@@ -41,7 +44,7 @@ classdef Spline
   ##
   ## A @code{geom.Spline} is a value: every change makes a new one.
   ##
-  ## @seealso{geom.Path, geom.Polyline, solid.sweep, spline}
+  ## @seealso{geom.Path, geom.Region, geom.Polyline, solid.sweep, spline}
   ## @end deftp
 
   properties (SetAccess = private)
@@ -64,10 +67,22 @@ classdef Spline
     ## Directions at the ends
     ##
     ## A 2-by-3 matrix whose rows are the unit directions of the spline at its
-    ## first and its last point, or @code{NaN} for an end left free.
+    ## first and its last point, or @code{NaN} for an end left free, as both
+    ## are for a closed spline.
     ##
     ## @end deftp
     Tangents = NaN (2, 3);
+
+    ## -*- texinfo -*-
+    ## @deftp {geom.Spline} {property} Closed
+    ##
+    ## Closed flag
+    ##
+    ## @code{true} when the spline runs on from its last point back to its
+    ## first, smooth there as everywhere.
+    ##
+    ## @end deftp
+    Closed = false;
 
   endproperties
 
@@ -91,24 +106,47 @@ classdef Spline
 
     function disp (this)
 
-      free = {"given", "free"};
-      printf ("  geom.Spline: %d points, start %s, end %s\n", ...
-              rows (this.Points), free{isnan (this.Tangents(1,1)) + 1}, ...
-              free{isnan (this.Tangents(2,1)) + 1});
+      if (this.Closed)
+        printf ("  geom.Spline: closed, %d points\n", rows (this.Points));
+      else
+        free = {"given", "free"};
+        printf ("  geom.Spline: %d points, start %s, end %s\n", ...
+                rows (this.Points), free{isnan (this.Tangents(1,1)) + 1}, ...
+                free{isnan (this.Tangents(2,1)) + 1});
+      endif
 
     endfunction
 
-    ## The parameter of each point, the distance from point to point, and the
-    ## derivative of the curve there with respect to it
-    function [t, m] = __hermite__ (this)
+    ## The points the pieces of the spline run between, the first again at the
+    ## end of a closed spline; the parameter of each, the distance from point
+    ## to point; and the derivative of the curve there with respect to it
+    function [t, m, V] = __hermite__ (this)
 
       V = this.Points;
+      if (this.Closed)
+        V(end+1,:) = V(1,:);
+      endif
       T = this.Tangents;
       n = rows (V);
       h = sqrt (sum (diff (V) .^ 2, 2));
       t = [0; cumsum(h)];
       d = diff (V) ./ h;
       free = isnan (T(:,1));
+      if (this.Closed)
+        ## The second derivative continuous at every point, round and round
+        k = n - 1;
+        A = zeros (k);
+        b = zeros (k, 3);
+        for i = 1:k
+          p = mod (i - 2, k) + 1;
+          q = mod (i, k) + 1;
+          A(i,[p, i, q]) += [h(i), 2 * (h(p) + h(i)), h(p)];
+          b(i,:) = 3 * (h(i) * d(p,:) + h(p) * d(i,:));
+        endfor
+        m = A \ b;
+        m(end+1,:) = m(1,:);
+        return;
+      endif
       if (n == 2)
         m = [d; d];
         if (! free(1) && ! free(2))
@@ -161,8 +199,7 @@ classdef Spline
     ## and the parameters where the pieces meet
     function [P, t] = __bezier__ (this)
 
-      V = this.Points;
-      [t, m] = __hermite__ (this);
+      [t, m, V] = __hermite__ (this);
       h = diff (t);
       n = rows (V);
       P = zeros (3 * (n - 1) + 1, 3);
@@ -175,6 +212,35 @@ classdef Spline
   endmethods
 
   methods (Access = public)
+
+    ## The same spline with the points V and end directions T, open or closed
+    ## as it is, for a spline moved, scaled or reversed
+    function this = __with__ (this, V, T)
+
+      if (this.Closed)
+        this = geom.Spline (V, 'Closed', true);
+      else
+        this = geom.Spline (V, 'Tangents', T);
+      endif
+
+    endfunction
+
+    ## The same curve run the other way round, a closed one from the same
+    ## first point
+    function this = __reversed__ (this)
+
+      V = this.Points;
+      if (this.Closed)
+        V = V([1, end:-1:2],:);
+      else
+        V = flipud (V);
+      endif
+      R = geom.Spline (V, 'Tangents', -flipud (this.Tangents), ...
+                       'Closed', this.Closed);
+      R.UCS = this.UCS;
+      this = R;
+
+    endfunction
 
     ## -*- texinfo -*-
     ## @deftypefn  {geom.Spline} {@var{SP} =} geom.Spline (@var{V})
@@ -191,6 +257,13 @@ classdef Spline
     ## Name/Value pairs:
     ##
     ## @table @asis
+    ## @item @qcode{'Closed'}
+    ## @code{true} for a spline that runs on from the last point back to the
+    ## first, smooth there as everywhere, @code{false} by default.  A closed
+    ## spline needs at least three points and has no ends to give directions
+    ## to.  It must @strong{not} repeat its first point at the end; a repeat is
+    ## accepted and dropped.
+    ##
     ## @item @qcode{'Tangents'}
     ## A 2-by-3 matrix @code{[@var{T1}; @var{T2}]} of the directions at the
     ## first and the last point, of any nonzero length; a row of @code{NaN}
@@ -206,6 +279,10 @@ classdef Spline
     ## ## The centre line of a grip, leaving straight up and arriving level
     ## SP = geom.Spline ([0, 0, 0; 10, 0, 30; 40, 0, 50; 80, 0, 50], ...
     ##                   'Tangents', [0, 0, 1; 1, 0, 0]);
+    ##
+    ## ## A smooth closed outline through five points
+    ## SP = geom.Spline ([0, 0; 30, -5; 45, 15; 25, 30; 5, 20], ...
+    ##                   'Closed', true);
     ## @end group
     ## @end example
     ##
@@ -225,7 +302,8 @@ classdef Spline
       if (mod (numel (varargin), 2) != 0)
         error ("geom.Spline: Name/Value arguments must come in pairs.");
       endif
-      opt = struct ('Tangents', NaN (2, 3), 'UCS', geom.UCS ());
+      opt = struct ('Tangents', NaN (2, 3), 'Closed', false, ...
+                    'UCS', geom.UCS ());
       for k = 1:2:numel (varargin)
         name = varargin{k};
         if (! ischar (name) || ! isrow (name) ...
@@ -249,6 +327,14 @@ classdef Spline
         error (strcat ("geom.Spline: Tangents must be a 2-by-3 real", ...
                        " matrix, each row a nonzero direction or NaN."));
       endif
+      if (! (islogical (opt.Closed) || isnumeric (opt.Closed)) ...
+          || ! isscalar (opt.Closed) || ! any (opt.Closed == [0, 1]))
+        error ("geom.Spline: Closed must be a logical scalar.");
+      endif
+      closed = logical (opt.Closed);
+      if (closed && ! all (isnan (T(:))))
+        error ("geom.Spline: a closed spline has no ends to give Tangents.");
+      endif
       if (! isa (opt.UCS, 'geom.UCS') || ! isscalar (opt.UCS))
         error ("geom.Spline: UCS must be a geom.UCS object.");
       endif
@@ -257,12 +343,26 @@ classdef Spline
       if (columns (V) == 2)
         V(:,3) = 0;
       endif
-      if (any (all (diff (V) == 0, 2)))
+
+      ## Accept an explicitly closed spline and drop the repeat
+      if (closed && rows (V) > 3 && isequal (V(1,:), V(end,:)))
+        V(end,:) = [];
+      endif
+      if (closed && rows (V) < 3)
+        error ("geom.Spline: a closed spline needs at least three points.");
+      endif
+      if (closed)
+        D = V([2:end, 1],:) - V;
+      else
+        D = diff (V);
+      endif
+      if (any (all (D == 0, 2)))
         error ("geom.Spline: V must not repeat a point consecutively.");
       endif
 
       this.Points = V;
       this.Tangents = T ./ sqrt (sum (T .^ 2, 2));
+      this.Closed = closed;
       this.UCS = opt.UCS;
 
     endfunction
@@ -278,8 +378,7 @@ classdef Spline
     ## @end deftypefn
     function L = length (this)
 
-      [t, m] = __hermite__ (this);
-      V = this.Points;
+      [t, m, V] = __hermite__ (this);
       L = 0;
       for i = 1:rows (V) - 1
         L += integral (@(s) speed (V(i:i+1,:), m(i:i+1,:), t(i+1) - t(i), ...
@@ -295,8 +394,9 @@ classdef Spline
     ## Points along a spline.
     ##
     ## @code{@var{P} = points (@var{SP}, @var{N})} returns @var{N} points
-    ## along the spline @var{SP}, from its first point to its last, as an
-    ## @var{N}-by-3 matrix of coordinates in its UCS.  They are spaced evenly
+    ## along the spline @var{SP}, from its first point to its last, or round
+    ## a closed spline from its first point back to it, as an @var{N}-by-3
+    ## matrix of coordinates in its UCS.  They are spaced evenly
     ## in the spline's parameter, the distance from point to point, so they
     ## include every point the spline passes through only when @var{N} falls
     ## on them.  Convert them to world coordinates with
@@ -314,8 +414,7 @@ classdef Spline
         error ("geom.Spline.points: N must be an integer of at least 2.");
       endif
 
-      [t, m] = __hermite__ (this);
-      V = this.Points;
+      [t, m, V] = __hermite__ (this);
       s = linspace (0, t(end), double (N))';
       i = min (max (lookup (t, s), 1), rows (V) - 1);
       h = t(i+1) - t(i);
@@ -431,6 +530,36 @@ endfunction
 %! SP.UCS = geom.UCS ();
 %! assert_equal (SP.Points, [0, 0, 0; 10, 5, 0; 20, 0, 0]);
 
+%!test  # closed: smooth round a circle, the repeat of the first point dropped
+%! a = (0:11)' * pi / 6;
+%! V = [10 * cos(a), 10 * sin(a)];
+%! SP = geom.Spline ([V; V(1,:)], 'Closed', true);
+%! assert_equal (rows (SP.Points), 12);
+%! assert_equal (SP.Closed, true);
+%! assert_equal (length (SP), 20 * pi, -2e-4);
+%! P = points (SP, 361);
+%! assert_equal (sqrt (sum (P .^ 2, 2)), 10 * ones (361, 1), 3e-3);
+%! assert_equal (P(end,:), P(1,:), 1e-12);
+%! [~, m] = __hermite__ (SP);
+%! assert_equal (m(end,:), m(1,:));
+
+%!test  # closed: a periodic spline, the same whichever point it starts at
+%! V = [0, 0; 30, -5; 45, 15; 25, 30; 5, 20];
+%! P = points (geom.Spline (V, 'Closed', true), 1001);
+%! Q = points (geom.Spline (V([3:5, 1:2],:), 'Closed', true), 1001);
+%! d = min (sqrt ((P(:,1) - Q(:,1)') .^ 2 + (P(:,2) - Q(:,2)') .^ 2), [], 2);
+%! assert_equal (max (d) < 0.05, true);
+
+%!test  # reversed: the same curve the other way round
+%! SP = geom.Spline ([0, 0; 10, 5; 20, 0; 30, 5], ...
+%!                   'Tangents', [1, 0, 0; NaN, NaN, NaN]);
+%! R = __reversed__ (SP);
+%! assert_equal (R.Points, flipud (SP.Points));
+%! assert_equal (R.Tangents, [NaN, NaN, NaN; -1, 0, 0]);
+%! assert_equal (points (R, 11), flipud (points (SP, 11)), 1e-10);
+%! C = __reversed__ (geom.Spline ([0, 0; 10, 0; 5, 8], 'Closed', true));
+%! assert_equal (C.Points, [0, 0, 0; 5, 8, 0; 10, 0, 0]);
+
 %!test  # directions kept as unit vectors
 %! SP = geom.Spline ([0, 0; 1, 0], 'Tangents', [3, 4, 0; NaN, NaN, NaN]);
 %! assert_equal (SP.Tangents, [0.6, 0.8, 0; NaN, NaN, NaN]);
@@ -451,7 +580,16 @@ endfunction
 %!error<geom.Spline: Name/Value arguments must come in pairs.> ...
 %! geom.Spline ([0, 0; 1, 0], 'Tangents')
 %!error<geom.Spline: unknown parameter.> ...
+%! geom.Spline ([0, 0; 1, 0], 'Periodic', true)
+%!error<geom.Spline: Closed must be a logical scalar.> ...
+%! geom.Spline ([0, 0; 1, 0; 1, 1], 'Closed', 'yes')
+%!error<geom.Spline: a closed spline has no ends to give Tangents.> ...
+%! geom.Spline ([0, 0; 1, 0; 1, 1], 'Closed', true, ...
+%!              'Tangents', [1, 0, 0; NaN, NaN, NaN])
+%!error<geom.Spline: a closed spline needs at least three points.> ...
 %! geom.Spline ([0, 0; 1, 0], 'Closed', true)
+%!error<geom.Spline: V must not repeat a point consecutively.> ...
+%! geom.Spline ([0, 0; 1, 0; 0, 0], 'Closed', true)
 %!error<geom.Spline: Tangents must be a 2-by-3 real matrix, each row a nonzero direction or NaN.> ...
 %! geom.Spline ([0, 0; 1, 0], 'Tangents', [1, 0, 0])
 %!error<geom.Spline: Tangents must be a 2-by-3 real matrix, each row a nonzero direction or NaN.> ...
