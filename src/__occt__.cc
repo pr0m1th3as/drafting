@@ -964,7 +964,22 @@ function directly. \n\
       {
         BRepFilletAPI_MakeChamfer op (s);
         const NDArray d = args(4).array_value ();
-        if (d.numel () == 2)
+        if (args.length () > 6 && args(6).double_value () > 0)
+        {
+          // D is set back along the face given, and the chamfer meets that
+          // face at the angle given
+          TopTools_IndexedMapOfShape fmap;
+          TopExp::MapShapes (s, TopAbs_FACE, fmap);
+          const TopoDS_Face f = TopoDS::Face
+                                  (fmap (static_cast<int> (args(5)
+                                                           .double_value ())));
+          const double a = args(6).double_value () * M_PI / 180;
+          for (const TopoDS_Shape& e : edges)
+          {
+            op.AddDA (d(0), a, TopoDS::Edge (e), f);
+          }
+        }
+        else if (d.numel () == 2)
         {
           // D1 is set back along the face given, D2 along the other
           TopTools_IndexedMapOfShape fmap;

@@ -780,6 +780,7 @@ classdef Shape
     ## -*- texinfo -*-
     ## @deftypefn  {solid.Shape} {@var{S} =} chamfer (@var{S}, @var{E}, @var{D})
     ## @deftypefnx {solid.Shape} {@var{S} =} chamfer (@var{S}, @var{E}, [@var{D1}, @var{D2}], @var{F})
+    ## @deftypefnx {solid.Shape} {@var{S} =} chamfer (@var{S}, @var{E}, @var{D}, @var{F}, @qcode{'Angle'}, @var{A})
     ##
     ## Bevel edges of a shape.
     ##
@@ -794,29 +795,60 @@ classdef Shape
     ## other face of the edge.  Every edge must bound @var{F}, as the edges
     ## round a face do: @code{edges (@var{S}, 'Face', @var{F})}.
     ##
+    ## @code{@var{S} = chamfer (@var{S}, @var{E}, @var{D}, @var{F},
+    ## @qcode{'Angle'}, @var{A})} cuts each edge back by @var{D} along the face
+    ## @var{F}, with the chamfer face meeting @var{F} at @var{A} degrees, in
+    ## the range @math{(0, 90)}: the chamfer a drawing calls @code{@var{D} x
+    ## @var{A}}.  Along the other face it reaches @code{@var{D} * tand
+    ## (@var{A})}, so 45 degrees is the equal chamfer.
+    ##
     ## A chamfer too large for the faces beside an edge cannot be built and
     ## raises an error, as does an edge that cannot be chamfered at all.
     ##
     ## @seealso{solid.Shape.edges, solid.Shape.fillet}
     ## @end deftypefn
-    function this = chamfer (this, E, D, F)
+    function this = chamfer (this, E, D, varargin)
 
       ## Input validation
-      if (nargin < 3 || nargin > 4)
+      if (nargin < 3)
         error ("solid.Shape.chamfer: invalid number of input arguments.");
+      endif
+      ## The face, if any, then Name/Value pairs
+      F = [];
+      hasF = mod (numel (varargin), 2) == 1;
+      if (hasF)
+        F = varargin{1};
+        varargin(1) = [];
+      endif
+      [errmsg, opt] = options (varargin, struct ('Angle', []));
+      if (! isempty (errmsg))
+        error ("solid.Shape.chamfer: %s", errmsg);
+      endif
+      A = opt.Angle;
+      if (! isempty (A) && (! isnumeric (A) || ! isreal (A) ...
+                            || ! isscalar (A) || ! (A > 0) || ! (A < 90)))
+        error (strcat ("solid.Shape.chamfer: Angle must be in the range", ...
+                       " (0, 90) degrees."));
       endif
       if (! isnumeric (D) || ! isreal (D) || ! isvector (D) ...
           || numel (D) > 2 || ! all (isfinite (D)) || ! all (D > 0))
         error (strcat ("solid.Shape.chamfer: D must be one positive finite", ...
                        " distance, or two with a face F."));
       endif
-      if (numel (D) == 2 && nargin != 4)
+      if (! isempty (A) && numel (D) != 1)
+        error ("solid.Shape.chamfer: an angle goes with one distance D.");
+      endif
+      if (! isempty (A) && ! hasF)
+        error ("solid.Shape.chamfer: an angle needs the face F of D.");
+      endif
+      if (numel (D) == 2 && ! hasF)
         error ("solid.Shape.chamfer: two distances need the face F of D1.");
       endif
-      if (numel (D) == 1 && nargin == 4)
-        error ("solid.Shape.chamfer: a face F goes with two distances.");
+      if (numel (D) == 1 && isempty (A) && hasF)
+        error (strcat ("solid.Shape.chamfer: a face F goes with two", ...
+                       " distances, or with an angle."));
       endif
-      if (nargin == 4 && ! isscalar (F))
+      if (hasF && ! isscalar (F))
         error ("solid.Shape.chamfer: F must be a single face index of S.");
       endif
       errmsg = checkindex (E, numedges (this), 'E', 'edge', false);
@@ -824,7 +856,7 @@ classdef Shape
         error ("solid.Shape.chamfer: %s", errmsg);
       endif
       F0 = 0;
-      if (nargin == 4)
+      if (hasF)
         errmsg = checkindex (F, numfaces (this), 'F', 'face', false);
         if (! isempty (errmsg))
           error ("solid.Shape.chamfer: %s", errmsg);
@@ -836,8 +868,11 @@ classdef Shape
         F0 = double (F);
       endif
 
+      if (isempty (A))
+        A = 0;
+      endif
       this.Data = occt ('solid.Shape.chamfer', 'chamfer', this.Data, ...
-                        unique (double (E)), double (D), F0);
+                        unique (double (E)), double (D), F0, double (A));
 
     endfunction
 
@@ -1545,6 +1580,16 @@ endfunction
 %! assert_equal (numel (faces (S, 'Normal', [0, -2, 5])), 0);
 %! assert_equal (isvalid (S), true);
 
+%!testif ; exist ('__occt__') == 3  # a distance along the face and an angle
+%! B = solid.box (10, 20, 30);
+%! F = faces (B, 'Normal', [0, 0, 1]);
+%! E = edges (B, 'Face', F, 'Direction', [1, 0, 0]);
+%! S = chamfer (B, E, 2, F, 'Angle', 30);
+%! assert_equal (volume (S), 6000 - 2 * (2 * 2 * tand (30) / 2) * 10, 1e-9);
+%! ## The chamfer face meets the top at 30 degrees
+%! assert_equal (numel (faces (S, 'Normal', [0, -sind(30), cosd(30)])), 1);
+%! assert_equal (isvalid (S), true);
+
 %!testif ; exist ('__occt__') == 3  # an edge not on the face is refused
 %! B = solid.box (10, 20, 30);
 %! F = faces (B, 'Normal', [0, 0, 1]);
@@ -1743,8 +1788,16 @@ endfunction
 %! chamfer (solid.Shape (), 1, 0)
 %!error<solid.Shape.chamfer: two distances need the face F of D1.> ...
 %! chamfer (solid.Shape (), 1, [1, 2])
-%!error<solid.Shape.chamfer: a face F goes with two distances.> ...
+%!error<solid.Shape.chamfer: a face F goes with two distances, or with an angle.> ...
 %! chamfer (solid.Shape (), 1, 1, 1)
+%!error<solid.Shape.chamfer: Angle must be in the range \(0, 90\) degrees.> ...
+%! chamfer (solid.Shape (), 1, 1, 1, 'Angle', 90)
+%!error<solid.Shape.chamfer: an angle goes with one distance D.> ...
+%! chamfer (solid.Shape (), 1, [1, 2], 1, 'Angle', 30)
+%!error<solid.Shape.chamfer: an angle needs the face F of D.> ...
+%! chamfer (solid.Shape (), 1, 1, 'Angle', 30)
+%!error<solid.Shape.chamfer: unknown parameter.> ...
+%! chamfer (solid.Shape (), 1, 1, 1, 'Slope', 30)
 %!error<solid.Shape.chamfer: F must be a single face index of S.> ...
 %! chamfer (solid.Shape (), 1, [1, 2], [1, 2])
 %!error<solid.Shape.edges: Face must be a vector of face indices of S.> ...
