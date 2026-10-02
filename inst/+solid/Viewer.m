@@ -28,8 +28,10 @@ classdef Viewer < handle
   ## it yourself.
   ##
   ## The window is drawn by Open CASCADE in a process of its own, so a complex
-  ## model turns smoothly and never holds up the Octave prompt.  The left mouse
-  ## button rotates, the middle one pans and the wheel zooms.  Keys:
+  ## model turns smoothly and never holds up the Octave prompt.  The world
+  ## axes are drawn in the lower right corner, turning with the view, @math{x}
+  ## red, @math{y} green and @math{z} blue.  The left mouse button rotates,
+  ## the middle one pans and the wheel zooms.  Keys:
   ##
   ## @multitable @columnfractions 0.15 0.85
   ## @item @kbd{F} @tab fit the shape to the window
@@ -152,14 +154,20 @@ classdef Viewer < handle
 
     ## The UCS picking behind pickucs.  CLICKS, for tests, replaces the mouse:
     ## a row of pixels per click, NaN for the Enter key and Inf for Escape;
-    ## empty is the mouse.
-    function U = __pickucs__ (this, MODE, CLICKS)
+    ## empty is the mouse.  SHOWN is the prompts shown, in order.  Each
+    ## prompt opens with what the click before it took, so that a click that
+    ## took something unintended shows at once.
+    function [U, SHOWN] = __pickucs__ (this, MODE, CLICKS)
 
       st = state (this);
       while (ischar (fgetl (st.out)))
       endwhile
       fclear (st.out);
       S = this.Shape;
+      B = bbox (S);
+      scale = max (abs (B));
+      SHOWN = {};
+      told = '';
       finished = false;
       unwind_protect
 
@@ -168,7 +176,7 @@ classdef Viewer < handle
           info = __occt__ ('faces', 'solid.Viewer.pickucs', S.Data);
           ask = "Pick a flat face for the plane";
           do
-            [r, CLICKS] = one (this, 'face', ask, CLICKS);
+            [r, CLICKS, SHOWN] = one (this, 'face', ask, CLICKS, SHOWN);
             n = [];
             if (strcmp (r{1}, 'face'))
               k = str2double (r{2});
@@ -177,39 +185,48 @@ classdef Viewer < handle
             endif
             ask = "That face is not flat: pick a flat face for the plane";
           until (! isempty (n) && ! any (isnan (n)))
-          [p1, CLICKS] = point (this, "Pick the start of the x axis", CLICKS);
-          ask = "Pick a point towards +x";
+          told = "Plane: a flat face.\n";
+          ask = [told "Pick the start of the x axis"];
+          [p1, r, CLICKS, SHOWN] = point (this, ask, CLICKS, SHOWN);
+          told = describe ("Start of x", r, scale);
+          ask = [told "Pick a point towards +x"];
           do
-            [p2, CLICKS] = point (this, ask, CLICKS);
+            [p2, r, CLICKS, SHOWN] = point (this, ask, CLICKS, SHOWN);
             A = struct ('normal', n, 'face', f, 'points', [p1; p2]);
             ask = "No direction in the face: pick another point towards +x";
           until (isvalidaxes (A))
+          told = describe ("Towards +x", r, scale);
         else
-          [p1, CLICKS] = point (this, "Pick the start of the x axis", CLICKS);
-          ask = "Pick a point towards +x";
+          ask = "Pick the start of the x axis";
+          [p1, r, CLICKS, SHOWN] = point (this, ask, CLICKS, SHOWN);
+          told = describe ("Start of x", r, scale);
+          ask = [told "Pick a point towards +x"];
           do
-            [p2, CLICKS] = point (this, ask, CLICKS);
+            [p2, r, CLICKS, SHOWN] = point (this, ask, CLICKS, SHOWN);
             ask = "Pick a point away from the first, towards +x";
           until (! isequal (p1, p2))
-          ask = "Pick a point on the +y side";
+          told = describe ("Towards +x", r, scale);
+          ask = [told "Pick a point on the +y side"];
           do
-            [p3, CLICKS] = point (this, ask, CLICKS);
+            [p3, r, CLICKS, SHOWN] = point (this, ask, CLICKS, SHOWN);
             A = struct ('points', [p1; p2; p3]);
             ask = "That point is on the x axis: pick one on the +y side";
           until (isvalidaxes (A))
+          told = describe ("+y side", r, scale);
         endif
 
         ## The origin
         O = zeros (0, 3);
-        [r, CLICKS] = one (this, 'point', strcat ("Pick the origin, or", ...
-                                                   " Enter to keep the", ...
-                                                   " first point"), CLICKS);
+        [r, CLICKS, SHOWN] = one (this, 'point', ...
+                                  [told "Pick the origin, or Enter to keep", ...
+                                   " the start of x"], CLICKS, SHOWN);
         if (strcmp (r{1}, 'point'))
           O = str2double (r(2:4));
-          [r, CLICKS] = one (this, 'point', ...
-                             strcat ("Pick a point to take the origin's y", ...
-                                     " from, or Enter to put it here"), ...
-                             CLICKS);
+          told = describe ("Origin", r, scale);
+          [r, CLICKS, SHOWN] = one (this, 'point', ...
+                                    [told "Pick a point to take the", ...
+                                     " origin's y from, or Enter to put it", ...
+                                     " here"], CLICKS, SHOWN);
           if (strcmp (r{1}, 'point'))
             O(2,:) = str2double (r(2:4));
           endif
@@ -648,13 +665,15 @@ classdef Viewer < handle
 
   methods (Access = private)
 
-    ## One pick of KIND, face or point, prompted with ASK: the viewer's reply
-    ## as words.  A click is taken from CLICKS when it is not empty, so that
-    ## tests need no mouse; a NaN row there is the Enter key and an Inf row
-    ## Escape.  Escape or a closed window ends the whole pick with an error.
-    function [r, CLICKS] = one (V, KIND, ASK, CLICKS)
+    ## One pick of KIND, face or point, prompted with ASK, which SHOWN
+    ## records: the viewer's reply as words.  A click is taken from CLICKS
+    ## when it is not empty, so that tests need no mouse; a NaN row there is
+    ## the Enter key and an Inf row Escape.  Escape or a closed window ends the
+    ## whole pick with an error.
+    function [r, CLICKS, SHOWN] = one (V, KIND, ASK, CLICKS, SHOWN)
 
-      send (V, ["prompt " ASK]);
+      SHOWN{end+1} = ASK;
+      send (V, ["prompt " strrep(ASK, "\n", '\n')]);
       send (V, ["pickone " KIND]);
       if (! isempty (CLICKS))
         if (any (isnan (CLICKS(1,:))))
@@ -674,10 +693,10 @@ classdef Viewer < handle
     endfunction
 
     ## One point, prompted with ASK until a point is picked
-    function [p, CLICKS] = point (V, ASK, CLICKS)
+    function [p, r, CLICKS, SHOWN] = point (V, ASK, CLICKS, SHOWN)
 
       do
-        [r, CLICKS] = one (V, 'point', ASK, CLICKS);
+        [r, CLICKS, SHOWN] = one (V, 'point', ASK, CLICKS, SHOWN);
       until (strcmp (r{1}, 'point'))
       p = str2double (r(2:4));
 
@@ -767,6 +786,22 @@ function T = title (st)
   else
     T = "drafting";
   endif
+
+endfunction
+
+## What a point pick took, for the next prompt: LABEL, what the click snapped
+## to and where, rounded to what the eye can use, residue below the size SCALE
+## of the part shown as zero
+function t = describe (LABEL, r, SCALE)
+
+  what = struct ('vertex', "a vertex", 'centre', "the centre of a circle", ...
+                 'midpoint', "the midpoint of an edge", ...
+                 'face', "a point on a face");
+  p = str2double (r(2:4));
+  p(abs (p) < 1e-9 * max (SCALE, 1)) = 0;
+  c = strjoin (arrayfun (@(x) sprintf ("%.4g", x), p, ...
+                         'UniformOutput', false), ", ");
+  t = sprintf ("%s: %s at (%s).\n", LABEL, what.(r{5}), c);
 
 endfunction
 
@@ -867,13 +902,31 @@ endfunction
 %!   pe = V.__project__ ([5, 0, 30]);
 %!   pf = V.__project__ ([10, 10, 15]);
 %!   V.__pickstart__ ('any');
-%!   assert_equal (any (any (orange (V.__dump__ ()))), false);
+%!   M = orange (V.__dump__ ());
+%!   assert_equal ([near(M, pe), near(M, pf)], [false, false]);
 %!   assert_equal (V.__click__ (pe), 1);
 %!   M = orange (V.__dump__ ());
 %!   assert_equal (near (M, pe), true);
 %!   assert_equal (near (M, pf), false);
 %!   assert_equal (V.__click__ (pf), 2);
 %!   assert_equal (near (orange (V.__dump__ ()), pf), true);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
+%! ## A bore cut by a tool longer than the part is picked where it is, not in
+%! ## the air beside the part (Open CASCADE 7.8 places its analytic cylinder
+%! ## where the untrimmed surface begins)
+%! B = hole (solid.box (80, 40, 12), [20, 20, 12], 8, Inf);
+%! W = sprintf ("face %d", faces (B, 'Type', 'cylinder'));
+%! V = solid.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Shape = B;
+%!   wall = V.__pickat__ ('face', V.__project__ ([17.17, 22.83, 10]));
+%!   air = V.__pickat__ ('face', V.__project__ ([16, 20, 20]));
+%!   assert_equal (wall, W);
+%!   assert_equal (strcmp (air, W), false);
 %! unwind_protect_cleanup
 %!   close (V);
 %! end_unwind_protect
@@ -954,8 +1007,17 @@ endfunction
 %!   px = @(p) V.__project__ (p);
 %!   C = [px([40, 30, 12]); px([0, 0, 12]); px([80, 0, 12]); ...
 %!        px([20, 24, 12]); NaN, NaN];
-%!   evalc ("U = V.__pickucs__ ('face', C);");
+%!   evalc ("[U, SHOWN] = V.__pickucs__ ('face', C);");
 %!   assert_equal (U == geom.UCS ([0, 0, 1], [20, 20, 12], [21, 20, 12]), true);
+%!   ## Each prompt says what the click before it took
+%!   t4 = strcat ("Towards +x: a vertex at (80, 0, 12).\nPick the", ...
+%!                " origin, or Enter to keep the start of x");
+%!   t5 = strcat ("Origin: the centre of a circle at (20, 20, 12).\nPick", ...
+%!                " a point to take the origin's y from, or Enter to put", ...
+%!                " it here");
+%!   t2 = "Plane: a flat face.\nPick the start of the x axis";
+%!   t3 = "Start of x: a vertex at (0, 0, 12).\nPick a point towards +x";
+%!   assert_equal (SHOWN, {"Pick a flat face for the plane", t2, t3, t4, t5});
 %! unwind_protect_cleanup
 %!   close (V);
 %! end_unwind_protect

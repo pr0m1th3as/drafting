@@ -180,7 +180,11 @@ classdef UCS
     ##
     ## Points and directions are 3-element vectors in world coordinates, and
     ## directions need not have unit length.  The @math{y} axis is the normal
-    ## crossed with the @math{x} axis.
+    ## crossed with the @math{x} axis.  What is plainly residue of
+    ## floating-point arithmetic is taken as zero: an axis component below
+    ## 1e-12, and an origin coordinate below 1e-12 of the origin's size, so
+    ## that a corner picked at @code{[0, 0, 40]} is not kept as
+    ## @code{[-3.6e-15, 0, 40]}.
     ##
     ## @example
     ## @group
@@ -243,9 +247,14 @@ classdef UCS
         X /= norm (X);
       endif
 
-      ## No negative zeros, which would show when displayed
-      X(X == 0) = 0;
-      N(N == 0) = 0;
+      ## Residue of floating-point arithmetic is zero: an axis component
+      ## below 1e-12, an origin coordinate below 1e-12 of the origin's size.
+      ## Negative zeros, which would show when displayed, go too.
+      X(abs (X) < 1e-12) = 0;
+      X /= norm (X);
+      N(abs (N) < 1e-12) = 0;
+      N /= norm (N);
+      O(abs (O) < 1e-12 * max (abs (O))) = 0;
       this.Origin = O;
       this.XAxis = X;
       this.Normal = N;
@@ -427,6 +436,12 @@ endfunction
 %! assert_equal (W(1,:), [10, 20, 30], 1e-12);
 %! assert_equal (tolocal (U, W), P, 1e-12);
 %! assert_equal (toworld (U, [1, 2]), W(2,:), 1e-12);
+
+%!test  # residue of arithmetic is zero
+%! U = geom.UCS ([1e-17, 0, 1], [-3.5e-15, 0, 40], [1, 1e-16, 40]);
+%! assert_equal (U.Origin, [0, 0, 40]);
+%! assert_equal (U.Normal, [0, 0, 1]);
+%! assert_equal (U.XAxis, [1, 0, 0]);
 
 %!test  # the same system, and the same plane with another x axis
 %! U = geom.UCS ([0, 0, 1], [0, 0, 5]);

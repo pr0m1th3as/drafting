@@ -11,7 +11,7 @@ exchanged as STEP, come through Open CASCADE when the package is built with it.
 
 Forty-three public functions across five namespaces plus the `draw.Drawing`,
 `geom.Polyline`, `geom.Region`, `geom.UCS`, `solid.Shape` and `solid.Viewer`
-classes, 1199 built-in self-tests and 67 `%!demo` blocks, nearly all of which
+classes, 1202 built-in self-tests and 67 `%!demo` blocks, nearly all of which
 end in a `plot` call, so the documentation shows what a function does rather
 than only describing it.
 

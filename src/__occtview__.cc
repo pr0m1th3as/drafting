@@ -35,7 +35,8 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 //                  a point on a face, SNAP naming which, and marks it; Enter
 //                  replies "skip" and Escape "cancel"
 //   enter          during a pickone, as the Enter key: replies "skip"
-//   prompt TEXT    shows TEXT at the foot of the view; no TEXT clears it
+//   prompt TEXT    shows TEXT at the foot of the view, a backslash and n
+//                  starting a new line; no TEXT clears it
 //   clearmarks     removes the marks of picked points
 //   cancel         ends a pick as Escape does
 //   title TEXT     sets the window's title
@@ -72,6 +73,9 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <AIS_TextLabel.hxx>
 #include <AIS_ViewController.hxx>
 #include <BRepAdaptor_Curve.hxx>
+#include <BRepBndLib.hxx>
+#include <BRepMesh_IncrementalMesh.hxx>
+#include <Bnd_Box.hxx>
 #include <BRep_Tool.hxx>
 #include <Geom_CartesianPoint.hxx>
 #include <BinTools.hxx>
@@ -82,7 +86,12 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <Prs3d_Drawer.hxx>
 #include <Prs3d_LineAspect.hxx>
 #include <Quantity_Color.hxx>
+#include <Poly_Triangulation.hxx>
+#include <Select3D_SensitiveTriangulation.hxx>
 #include <SelectMgr_Filter.hxx>
+#include <SelectMgr_Selection.hxx>
+#include <StdSelect_BRepSelectionTool.hxx>
+#include <TopExp_Explorer.hxx>
 #include <SelectMgr_ViewerSelector.hxx>
 #include <Standard_Failure.hxx>
 #include <StdSelect_BRepOwner.hxx>
@@ -156,6 +165,45 @@ private:
   const set<int>& m_vskip;
 };
 
+// A shape whose faces are picked by their own triangles.  Open CASCADE 7.8
+// picks a cylindrical face with an analytic cylinder that it places where the
+// untrimmed surface begins, not where the face lies: a bore cut by a cylinder
+// longer than the part is then picked in the air beside the part and missed
+// where it is.  Edges and vertices are picked as Open CASCADE does.
+class pickshape : public AIS_Shape
+{
+public:
+
+  pickshape (const TopoDS_Shape& s) : AIS_Shape (s) { }
+
+  void ComputeSelection (const Handle (SelectMgr_Selection)& sel,
+                         const Standard_Integer mode) override
+  {
+    if (mode != AIS_Shape::SelectionMode (TopAbs_FACE))
+    {
+      AIS_Shape::ComputeSelection (sel, mode);
+      return;
+    }
+    for (TopExp_Explorer x (myshape, TopAbs_FACE); x.More (); x.Next ())
+    {
+      const TopoDS_Face& f = TopoDS::Face (x.Current ());
+      TopLoc_Location loc;
+      const Handle (Poly_Triangulation) tri = BRep_Tool::Triangulation (f,
+                                                                        loc);
+      if (tri.IsNull ())
+      {
+        continue;
+      }
+      Handle (StdSelect_BRepOwner) owner
+        = new StdSelect_BRepOwner (f, this,
+                                   StdSelect_BRepSelectionTool::
+                                   GetStandardPriority (f, TopAbs_FACE));
+      sel->Add (new Select3D_SensitiveTriangulation (owner, tri, loc,
+                                                     Standard_True));
+    }
+  }
+};
+
 class viewer : public AIS_ViewController
 {
 public:
@@ -176,6 +224,11 @@ public:
                                                  Quantity_TOC_sRGB),
                                  Aspect_GradientFillMethod_Vertical);
     m_view->SetProj (V3d_XposYnegZpos);
+
+    // The world axes in a corner, turning with the view, clear of the
+    // prompts at the lower left
+    m_view->TriedronDisplay (Aspect_TOTP_RIGHT_LOWER, Quantity_NOC_BLACK, 0.12,
+                             V3d_ZBUFFER);
     if (hidden)
     {
       m_window->SetVirtual (Standard_True);
@@ -302,9 +355,16 @@ public:
     }
     else if (cmd == "prompt")
     {
+      // A backslash and n in the text starts a new line
       string text;
       getline (in, text);
-      label (text.empty () ? text : text.substr (1));
+      text = text.empty () ? text : text.substr (1);
+      for (size_t k = text.find ("\\n"); k != string::npos;
+           k = text.find ("\\n", k + 1))
+      {
+        text.replace (k, 2, "\n");
+      }
+      label (text);
     }
     else if (cmd == "clearmarks")
     {
@@ -654,7 +714,16 @@ private:
     {
       return;
     }
-    m_shape = new AIS_Shape (s);
+    // Mesh every face to the same fine tolerance, set by the size of the
+    // whole shape, before it is shown.  Left to itself the viewer can mesh a
+    // face cut from a long tool so coarsely that a click on it misses it.
+    Bnd_Box b;
+    BRepBndLib::Add (s, b);
+    const double size = sqrt (b.SquareExtent ());
+    BRepMesh_IncrementalMesh (s, 1e-3 * size, Standard_False, 0.25,
+                              Standard_True);
+
+    m_shape = new pickshape (s);
     m_shape->SetColor (Quantity_Color (0.72, 0.74, 0.78, Quantity_TOC_sRGB));
     m_shape->SetMaterial (Graphic3d_NameOfMaterial_Plastified);
     // Displayed selectable, which no later activation can make it if it is
