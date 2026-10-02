@@ -126,6 +126,27 @@ classdef Region
 
     endfunction
 
+    ## The region with every point p of its plane moved to p * M + B, in its
+    ## UCS, for M a 2-by-2 matrix that is not singular; the loops are turned
+    ## back to run as a region's do where M reflects
+    function this = __affine__ (this, M, B)
+
+      ## z = 0 throughout, so z takes the scale of the plane, which keeps a
+      ## similarity of the plane one in space and its arcs arcs
+      A = sqrt (abs (det (M))) * eye (3);
+      A(1:2,1:2) = M;
+      b = [B, 0];
+      this.Outline = __affine__ (this.Outline, A, b);
+      this.Holes = cellfun (@(h) __affine__ (h, A, b), this.Holes, ...
+                            'UniformOutput', false);
+      if (det (M) < 0)
+        this.Outline = __reversed__ (this.Outline);
+        this.Holes = cellfun (@__reversed__, this.Holes, ...
+                              'UniformOutput', false);
+      endif
+
+    endfunction
+
     ## The region scaled by the factor F about the origin of its UCS
     function this = __scaled__ (this, F)
 
@@ -666,6 +687,243 @@ classdef Region
 
     endfunction
 
+    ## -*- texinfo -*-
+    ## @deftypefn  {geom.Region} {@var{R} =} resize (@var{R}, @var{SZ})
+    ## @deftypefnx {geom.Region} {@var{R} =} resize (@var{R}, @var{SZ}, @qcode{'Uniform'}, @var{TF})
+    ##
+    ## Scale a region to a size.
+    ##
+    ## @code{@var{R} = resize (@var{R}, @var{SZ})} scales the region evenly so
+    ## that the box round it is as large as it can be within the sizes
+    ## @code{@var{SZ} = [@var{x}, @var{y}]}, in millimetres along the axes of
+    ## its UCS; a size of 0 leaves that direction free.  @code{resize (@var{R},
+    ## [30, 0])} makes the region 30 wide and keeps its proportions.  The
+    ## corner of the box at the least @math{x} and @math{y} stays where it is,
+    ## and arcs stay arcs.
+    ##
+    ## With @qcode{'Uniform'} set to @code{false} each direction given is
+    ## scaled to its size on its own and a direction left at 0 keeps its
+    ## size, as OpenSCAD's @code{resize} does.  An arc stretched so becomes
+    ## part of an ellipse, kept exactly as a rational @code{geom.Spline}.
+    ##
+    ## @example
+    ## @group
+    ## ## A disc of diameter 10 stretched into an ellipse 40 by 20
+    ## E = resize (geom.Region ([-5, 0, 1; 5, 0, 1]), [40, 20], ...
+    ##             'Uniform', false);
+    ## @end group
+    ## @end example
+    ##
+    ## @seealso{geom.Region.mirror, solid.Shape.resize}
+    ## @end deftypefn
+    function this = resize (this, SZ, varargin)
+
+      ## Input validation
+      if (nargin != 2 && nargin != 4)
+        error ("geom.Region.resize: invalid number of input arguments.");
+      endif
+      if (! isnumeric (SZ) || ! isreal (SZ) || numel (SZ) != 2 ...
+          || ! all (isfinite (SZ)) || any (SZ < 0) || ! any (SZ > 0))
+        error (strcat ("geom.Region.resize: SZ must be a 2-element vector", ...
+                       " of nonnegative finite sizes, not all zero."));
+      endif
+      [errmsg, even] = flag (varargin, 'Uniform', true);
+      if (! isempty (errmsg))
+        error ("geom.Region.resize: %s", errmsg);
+      endif
+
+      B = __box__ (this.Outline)(:,1:2);
+      f = double (SZ(:)') ./ diff (B);
+      given = SZ(:)' > 0;
+      if (even)
+        f(:) = min (f(given));
+      else
+        f(! given) = 1;
+      endif
+      this = __affine__ (this, diag (f), B(1,:) .* (1 - f));
+
+    endfunction
+
+    ## -*- texinfo -*-
+    ## @deftypefn  {geom.Region} {@var{R} =} mirror (@var{R}, @var{N})
+    ## @deftypefnx {geom.Region} {@var{R} =} mirror (@var{R}, @var{N}, @var{P})
+    ##
+    ## Reflect a region in a line of its plane.
+    ##
+    ## @code{@var{R} = mirror (@var{R}, @var{N}, @var{P})} reflects the region
+    ## in the line through the point @var{P}, the origin of its UCS by default,
+    ## square to the nonzero direction @var{N}, both 2-element vectors in its
+    ## UCS.  @code{mirror (@var{R}, [1, 0])} reflects in the @math{y} axis.
+    ## Only the reflection is returned; @code{union (@var{R}, mirror (@var{R},
+    ## @dots{}))} keeps both, as a profile drawn for one side of a symmetric
+    ## part is made whole.
+    ##
+    ## @seealso{geom.Region.union, solid.Shape.mirror}
+    ## @end deftypefn
+    function this = mirror (this, N, P = [0, 0])
+
+      ## Input validation
+      if (nargin < 2 || nargin > 3)
+        error ("geom.Region.mirror: invalid number of input arguments.");
+      endif
+      if (! isnumeric (N) || ! isreal (N) || numel (N) != 2 ...
+          || ! all (isfinite (N)) || ! any (N != 0))
+        error (strcat ("geom.Region.mirror: N must be a nonzero real", ...
+                       " 2-element vector."));
+      endif
+      errmsg = checkpoint (P, 'P');
+      if (! isempty (errmsg))
+        error ("geom.Region.mirror: %s", errmsg);
+      endif
+
+      n = double (N(:)') / norm (double (N));
+      M = eye (2) - 2 * (n' * n);
+      this = __affine__ (this, M, 2 * (double (P(:)') * n') * n);
+
+    endfunction
+
+    ## -*- texinfo -*-
+    ## @deftypefn {geom.Region} {@var{C} =} copy (@var{R}, @var{D})
+    ##
+    ## Copies of a region, united.
+    ##
+    ## @code{@var{C} = copy (@var{R}, @var{D})} places a copy of the region
+    ## moved by each row of @var{D}, an @math{N}-by-2 matrix of offsets in its
+    ## UCS, and returns their union as @code{geom.Region.union} returns it, a
+    ## cell array of regions, largest first.  The region itself is among them
+    ## only where a row of @var{D} is zero.  Copies that overlap become one
+    ## region.
+    ##
+    ## Open CASCADE unites the copies, so the package must be built with it.
+    ##
+    ## @seealso{geom.Region.rectarray, geom.Region.polararray, solid.Shape.copy}
+    ## @end deftypefn
+    function C = copy (this, D)
+
+      ## Input validation
+      if (nargin != 2)
+        error ("geom.Region.copy: invalid number of input arguments.");
+      endif
+      if (! isnumeric (D) || ! isreal (D) || ! ismatrix (D) ...
+          || columns (D) != 2 || rows (D) < 1 || ! all (isfinite (D(:))))
+        error (strcat ("geom.Region.copy: D must be an N-by-2 real matrix", ...
+                       " of finite offsets."));
+      endif
+
+      C = copies (this, double (D), 'geom.Region.copy');
+
+    endfunction
+
+    ## -*- texinfo -*-
+    ## @deftypefn {geom.Region} {@var{C} =} rectarray (@var{R}, @var{COUNT}, @var{SPACING})
+    ##
+    ## Copies of a region in rows and columns, united.
+    ##
+    ## @code{@var{C} = rectarray (@var{R}, @var{COUNT}, @var{SPACING})} places
+    ## @code{@var{COUNT} = [@var{nx}, @var{ny}]} copies of the region along the
+    ## @math{x} and @math{y} axes of its UCS, @code{@var{SPACING} =
+    ## [@var{dx}, @var{dy}]} millimetres apart, the first where the region
+    ## is; a negative spacing runs the other way.  It returns their union as
+    ## @code{geom.Region.copy} does.  This is a grid of holes or slots, drawn
+    ## once and subtracted from a plate in one step.
+    ##
+    ## @example
+    ## @group
+    ## ## A plate with four rows of six holes of diameter 4, 10 apart
+    ## H = rectarray (geom.Region ([8, 10, 1; 12, 10, 1]), [6, 4], [10, 10]);
+    ## P = subtract (geom.Region ([0, 0; 70, 0; 70, 50; 0, 50]), H);
+    ## @end group
+    ## @end example
+    ##
+    ## @seealso{geom.Region.copy, geom.Region.polararray}
+    ## @end deftypefn
+    function C = rectarray (this, COUNT, SPACING)
+
+      ## Input validation
+      if (nargin != 3)
+        error ("geom.Region.rectarray: invalid number of input arguments.");
+      endif
+      [errmsg, D] = geom.__grid__ (COUNT, SPACING, 2);
+      if (! isempty (errmsg))
+        error ("geom.Region.rectarray: %s", errmsg);
+      endif
+
+      C = copies (this, D, 'geom.Region.rectarray');
+
+    endfunction
+
+    ## -*- texinfo -*-
+    ## @deftypefn  {geom.Region} {@var{C} =} polararray (@var{R}, @var{N}, @var{ANGLE})
+    ## @deftypefnx {geom.Region} {@var{C} =} polararray (@var{R}, @var{N}, @var{ANGLE}, @var{P})
+    ## @deftypefnx {geom.Region} {@var{C} =} polararray (@dots{}, @qcode{'Rotate'}, @var{TF})
+    ##
+    ## Copies of a region round a point, united.
+    ##
+    ## @code{@var{C} = polararray (@var{R}, @var{N}, @var{ANGLE}, @var{P})}
+    ## places @var{N} copies of the region round the point @var{P} of its
+    ## plane, the origin of its UCS by default, the first where the region is
+    ## and the rest turned on anticlockwise, clockwise for a negative
+    ## @var{ANGLE}.  A whole turn, @var{ANGLE} of 360, spaces them evenly
+    ## @code{@var{ANGLE} / @var{N}} apart; a part of a turn puts one at each
+    ## end, @code{@var{ANGLE} / (@var{N} - 1)} apart.  It returns their union as
+    ## @code{geom.Region.copy} does.
+    ##
+    ## Each copy is turned as it goes round, as the holes of a bolt circle or
+    ## the spokes of a wheel are.  With @qcode{'Rotate'} set to @code{false}
+    ## each copy keeps the region's own direction, moved as the centre of the
+    ## box round it moves.
+    ##
+    ## @example
+    ## @group
+    ## ## A flange of diameter 60 with a bore of 20 and six bolt holes of 6
+    ## ## on a circle of 40
+    ## H = polararray (geom.Region ([17, 0, 1; 23, 0, 1]), 6, 360);
+    ## F = subtract (geom.Region ([-30, 0, 1; 30, 0, 1], ...
+    ##                           @{[-10, 0, 1; 10, 0, 1]@}), H);
+    ## @end group
+    ## @end example
+    ##
+    ## @seealso{geom.Region.copy, geom.Region.rectarray}
+    ## @end deftypefn
+    function C = polararray (this, N, ANGLE, varargin)
+
+      ## Input validation
+      if (nargin < 3 || nargin > 6)
+        error ("geom.Region.polararray: invalid number of input arguments.");
+      endif
+      P = [0, 0];
+      if (! isempty (varargin) && ! ischar (varargin{1}))
+        P = varargin{1};
+        varargin(1) = [];
+      endif
+      [errmsg, a] = geom.__turns__ (N, ANGLE);
+      if (isempty (errmsg))
+        errmsg = checkpoint (P, 'P');
+      endif
+      if (isempty (errmsg))
+        [errmsg, turning] = flag (varargin, 'Rotate', true);
+      endif
+      if (! isempty (errmsg))
+        error ("geom.Region.polararray: %s", errmsg);
+      endif
+
+      P = double (P(:)');
+      a *= pi / 180;
+      B = __box__ (this.Outline)(:,1:2);
+      c = mean (B, 1);
+      L = cell (1, numel (a));
+      for k = 1:numel (a)
+        M = [cos(a(k)), sin(a(k)); -sin(a(k)), cos(a(k))];
+        if (turning)
+          L{k} = __affine__ (this, M, P - P * M);
+        else
+          L{k} = __affine__ (this, eye (2), (c - P) * M + P - c);
+        endif
+      endfor
+      C = union (L{:});
+
+    endfunction
+
     function this = Region (OUTLINE, HOLES = {})
 
       ## Input validation
@@ -740,6 +998,53 @@ classdef Region
   endmethods
 
 endclassdef
+
+## The union of the copies of the region R moved by the rows of D, for CALLER
+function C = copies (R, D, caller)
+
+  L = cell (1, rows (D));
+  for k = 1:rows (D)
+    L{k} = __affine__ (R, eye (2), D(k,:));
+  endfor
+  C = combine ('union', caller, L);
+
+endfunction
+
+## The value of the option NAME in the Name/Value pairs ARGS, a logical
+## scalar, DEF when not given.  Returns an error message body, empty when ARGS
+## is valid.
+function [errmsg, TF] = flag (ARGS, NAME, DEF)
+
+  errmsg = '';
+  TF = DEF;
+  if (isempty (ARGS))
+    return;
+  endif
+  if (numel (ARGS) != 2)
+    errmsg = "Name/Value arguments must come in pairs.";
+  elseif (! ischar (ARGS{1}) || ! strcmp (ARGS{1}, NAME))
+    errmsg = "unknown parameter.";
+  elseif (! (islogical (ARGS{2}) || isnumeric (ARGS{2})) ...
+          || ! isscalar (ARGS{2}) || ! any (ARGS{2} == [0, 1]))
+    errmsg = sprintf ("%s must be true or false.", NAME);
+  else
+    TF = logical (ARGS{2});
+  endif
+
+endfunction
+
+## Validate a point of the plane.  Returns an error message body, empty when
+## P is valid.
+function errmsg = checkpoint (P, NAME)
+
+  errmsg = '';
+  if (! isnumeric (P) || ! isreal (P) || numel (P) != 2 ...
+      || ! all (isfinite (P)))
+    errmsg = sprintf (strcat ("%s must be a real 2-element vector of", ...
+                              " finite values."), NAME);
+  endif
+
+endfunction
 
 ## A closed loop from ARG, named NAME in errors: a closed geom.Polyline,
 ## geom.Path or geom.Spline, or a matrix of polyline vertices in the plane of
@@ -1484,3 +1789,113 @@ endfunction
 %!error<geom.Region: HOLES\{1\} and HOLES\{2\} must not overlap or touch.> ...
 %! geom.Region ([0, 0; 30, 0; 30, 20; 0, 20], ...
 %!              {[2, 2; 18, 2; 18, 18; 2, 18], [5, 5; 8, 5; 8, 8; 5, 8]})
+
+## The area of the region R, the outline less the holes
+%!function a = regionarea (R)
+%!  a = __area__ (R.Outline) + sum (cellfun (@__area__, R.Holes));
+%!endfunction
+## The box round the region R in its UCS, [xmin, ymin; xmax, ymax]
+%!function B = regionbox (R)
+%!  B = __box__ (R.Outline)(:,1:2);
+%!endfunction
+
+%!test  # resized evenly: arcs stay arcs, the least corner stays
+%! R = geom.Region ([0, 0; 10, 0; 10, 5; 0, 5], {[5, 2.5, 1; 7, 2.5, 1]});
+%! S = resize (R, [0, 20]);
+%! assert_equal (regionbox (S), [0, 0; 40, 20], 1e-12);
+%! assert_equal (regionarea (S), 16 * (50 - pi), -1e-12);
+%! assert_equal (any (! isnan (S.Holes{1}.Midpoints(:,1))), true);
+%! assert_equal (regionbox (resize (R, [30, 30])), [0, 0; 30, 15], 1e-12);
+
+%!test  # resized unevenly: a disc becomes an exact ellipse
+%! E = resize (geom.Region ([-5, 0, 1; 5, 0, 1]), [40, 20], 'Uniform', false);
+%! assert_equal (regionbox (E), [-5, -5; 35, 15], 1e-12);
+%! assert_equal (regionarea (E), 200 * pi, -1e-12);
+%! assert_equal (all (isnan (E.Outline.Midpoints(:,1))), true);
+%! F = resize (geom.Region ([0, 0; 10, 0; 10, 5; 0, 5]), [20, 0], ...
+%!             'Uniform', false);
+%! assert_equal (regionbox (F), [0, 0; 20, 5], 1e-12);
+
+%!test  # an ellipse spline as a region, its box exact
+%! R = geom.Region (geom.Spline.ellipse (20, 10), {[-4, 0, 1; 4, 0, 1]});
+%! assert_equal (regionarea (R), 200 * pi - 16 * pi, -1e-12);
+%! assert_equal (regionbox (resize (R, [10, 0])), [-20, -10; -10, -5], 1e-9);
+
+%!test  # mirrored in a line: the area kept, the loops turned back
+%! R = geom.Region ([0, 0; 10, 0; 0, 5], {[1, 1; 3, 1; 1, 2]});
+%! M = mirror (R, [1, 0], [20, 0]);
+%! assert_equal (regionbox (M), [30, 0; 40, 5], 1e-12);
+%! assert_equal (regionarea (M), 24, -1e-12);
+%! assert_equal (__area__ (M.Holes{1}) < 0, true);
+%! R = geom.Region ([0, 0, 0; 10, 0, 0; 10, 5, 1; 0, 5, 0]);
+%! assert_equal (regionarea (mirror (R, [1, 1])), regionarea (R), -1e-12);
+
+%!testif ; exist ('__occt__') == 3  # copies: overlapping ones united
+%! D = geom.Region ([-5, 0, 1; 5, 0, 1]);
+%! C = copy (D, [0, 0; 20, 0; 8, 0]);
+%! assert_equal (numel (C), 2);
+%! assert_equal (regionarea (C{2}), 25 * pi, -1e-12);
+%! assert_equal (regionbox (C{1}), [-5, -5; 13, 5], 1e-9);
+
+%!testif ; exist ('__occt__') == 3  # a rectangular array of holes
+%! H = rectarray (geom.Region ([8, 10, 1; 12, 10, 1]), [3, 2], [10, 10]);
+%! assert_equal (numel (H), 6);
+%! P = subtract (geom.Region ([0, 0; 40, 0; 40, 30; 0, 30]), H);
+%! assert_equal (regionarea (P{1}), 1200 - 24 * pi, -1e-12);
+
+%!testif ; exist ('__occt__') == 3  # a bolt circle, and a quarter turn
+%! H = polararray (geom.Region ([17, 0, 1; 23, 0, 1]), 6, 360);
+%! c = cell2mat (cellfun (@(r) mean (regionbox (r), 1), H(:), ...
+%!                        'UniformOutput', false));
+%! assert_equal (sortrows (round (c * 1e6) / 1e6), ...
+%!               sortrows (round (20 * [cosd(0:60:300); sind(0:60:300)]' ...
+%!                                * 1e6) / 1e6), 1e-6);
+%! Q = polararray (geom.Region ([15, -1; 25, -1; 25, 1; 15, 1]), 3, 90);
+%! assert_equal (numel (Q), 3);
+%! assert_equal (sum (cellfun (@regionarea, Q)), 60, -1e-12);
+
+%!testif ; exist ('__occt__') == 3  # copies kept as the region faces
+%! Q = polararray (geom.Region ([15, -1; 25, -1; 25, 1; 15, 1]), 2, 90, ...
+%!                 [0, 0], 'Rotate', false);
+%! B = sortrows (cell2mat (cellfun (@(r) regionbox (r)(:)', Q(:), ...
+%!                                  'UniformOutput', false)));
+%! assert_equal (B, [-5, 5, 19, 21; 15, 25, -1, 1], 1e-12);
+
+%!error<geom.Region.resize: invalid number of input arguments.> ...
+%! resize (geom.Region ([0, 0; 1, 0; 0, 1]))
+%!error<geom.Region.resize: SZ must be a 2-element vector of nonnegative finite sizes, not all zero.> ...
+%! resize (geom.Region ([0, 0; 1, 0; 0, 1]), [0, 0])
+%!error<geom.Region.resize: SZ must be a 2-element vector of nonnegative finite sizes, not all zero.> ...
+%! resize (geom.Region ([0, 0; 1, 0; 0, 1]), [1, 1, 1])
+%!error<geom.Region.resize: unknown parameter.> ...
+%! resize (geom.Region ([0, 0; 1, 0; 0, 1]), [1, 1], 'Even', true)
+%!error<geom.Region.resize: Uniform must be true or false.> ...
+%! resize (geom.Region ([0, 0; 1, 0; 0, 1]), [1, 1], 'Uniform', 2)
+%!error<geom.Region.mirror: invalid number of input arguments.> ...
+%! mirror (geom.Region ([0, 0; 1, 0; 0, 1]))
+%!error<geom.Region.mirror: N must be a nonzero real 2-element vector.> ...
+%! mirror (geom.Region ([0, 0; 1, 0; 0, 1]), [0, 0])
+%!error<geom.Region.mirror: P must be a real 2-element vector of finite values.> ...
+%! mirror (geom.Region ([0, 0; 1, 0; 0, 1]), [1, 0], [1, 2, 3])
+%!error<geom.Region.copy: invalid number of input arguments.> ...
+%! copy (geom.Region ([0, 0; 1, 0; 0, 1]))
+%!error<geom.Region.copy: D must be an N-by-2 real matrix of finite offsets.> ...
+%! copy (geom.Region ([0, 0; 1, 0; 0, 1]), [1, 2, 3])
+%!error<geom.Region.rectarray: invalid number of input arguments.> ...
+%! rectarray (geom.Region ([0, 0; 1, 0; 0, 1]), [2, 2])
+%!error<geom.Region.rectarray: COUNT must be a 2-element vector of positive integers.> ...
+%! rectarray (geom.Region ([0, 0; 1, 0; 0, 1]), [2, 0], [5, 5])
+%!error<geom.Region.rectarray: SPACING must be nonzero where COUNT is more than one.> ...
+%! rectarray (geom.Region ([0, 0; 1, 0; 0, 1]), [2, 2], [5, 0])
+%!error<geom.Region.polararray: invalid number of input arguments.> ...
+%! polararray (geom.Region ([0, 0; 1, 0; 0, 1]), 3)
+%!error<geom.Region.polararray: N must be a positive integer.> ...
+%! polararray (geom.Region ([0, 0; 1, 0; 0, 1]), 0, 90)
+%!error<geom.Region.polararray: ANGLE must be a nonzero real scalar of at most 360 degrees.> ...
+%! polararray (geom.Region ([0, 0; 1, 0; 0, 1]), 3, 720)
+%!error<geom.Region.polararray: P must be a real 2-element vector of finite values.> ...
+%! polararray (geom.Region ([0, 0; 1, 0; 0, 1]), 3, 90, [1, 2, 3])
+%!error<geom.Region.polararray: Rotate must be true or false.> ...
+%! polararray (geom.Region ([0, 0; 1, 0; 0, 1]), 3, 90, 'Rotate', 'no')
+%!error<geom.Region.polararray: Name/Value arguments must come in pairs.> ...
+%! polararray (geom.Region ([0, 0; 1, 0; 0, 1]), 3, 90, [0, 0], 'Rotate')

@@ -242,12 +242,19 @@ classdef Spline
     endfunction
 
     ## The spline with every point p moved to p * M + B and every direction d
-    ## turned to d * M, for M a rotation, a reflection or a uniform scale; a
-    ## spline drawn through points is drawn again through its moved points
+    ## turned to d * M.  For M a rotation, a reflection or a uniform scale, a
+    ## spline drawn through points is drawn again through its moved points;
+    ## for any other M, which would draw a different curve through them, the
+    ## control points are moved and the fit data dropped
     function this = __affine__ (this, M, B)
 
       U = this.UCS;
-      if (! isempty (this.FitPoints))
+      G = M * M';
+      if (norm (G - G(1) * eye (3)) > 1e-12 * G(1))
+        this.ControlPoints = this.ControlPoints * M + B;
+        this.FitPoints = zeros (0, 3);
+        this.Tangents = zeros (0, 3);
+      elseif (! isempty (this.FitPoints))
         T = this.Tangents * M;
         T(! isnan (T(:,1)),:) ./= sqrt (sum (T(! isnan (T(:,1)),:) .^ 2, 2));
         if (this.Closed)
@@ -259,6 +266,39 @@ classdef Spline
         this.ControlPoints = this.ControlPoints * M + B;
       endif
       this.UCS = U;
+
+    endfunction
+
+    ## The least and the greatest value of each coordinate along the curve, as
+    ## the rows of B: from points along every piece, the least and greatest
+    ## then found exactly between their neighbours
+    function B = __box__ (this)
+
+      u = unique (this.Knots);
+      t = zeros (0, 1);
+      for j = 1:numel (u) - 1
+        t = [t; u(j) + (u(j+1) - u(j)) * (0:31)' / 32];
+      endfor
+      t(end+1) = u(end);
+      P = curve (this, t);
+      B = [min(P, [], 1); max(P, [], 1)];
+      opt = optimset ('TolX', 1e-12 * (u(end) - u(1)));
+      for d = 1:3
+        for g = [1, -1]
+          [~, i] = min (g * P(:,d));
+          a = t(max (i - 1, 1));
+          b = t(min (i + 1, numel (t)));
+          if (a == b)
+            continue;
+          endif
+          [~, v] = fminbnd (@(s) g * curve (this, s)(d), a, b, opt);
+          if (g > 0)
+            B(1,d) = min (B(1,d), v);
+          else
+            B(2,d) = max (B(2,d), -v);
+          endif
+        endfor
+      endfor
 
     endfunction
 
@@ -609,6 +649,71 @@ classdef Spline
       this.FitPoints = zeros (0, 3);
       this.Tangents = zeros (0, 3);
       this.UCS = U;
+
+    endfunction
+
+    ## -*- texinfo -*-
+    ## @deftypefn  {geom.Spline} {@var{SP} =} geom.Spline.ellipse (@var{A}, @var{B})
+    ## @deftypefnx {geom.Spline} {@var{SP} =} geom.Spline.ellipse (@var{A}, @var{B}, @qcode{'UCS'}, @var{U})
+    ##
+    ## An ellipse, exactly.
+    ##
+    ## @code{@var{SP} = geom.Spline.ellipse (@var{A}, @var{B})} returns the
+    ## closed ellipse centred on the origin with the semi-axis @var{A}
+    ## millimetres along the @math{x} axis and @var{B} along the @math{y}
+    ## axis, a circle when they are equal.  It is a rational spline of degree
+    ## 2, four quarters joined, which follows the ellipse exactly, so its area
+    ## and length are those of the ellipse and a solid made from it has a true
+    ## elliptic face.  As a closed spline it is the outline or a hole of a
+    ## @code{geom.Region}, or a path to sweep along.
+    ##
+    ## The option @qcode{'UCS'} lays it in the @code{geom.UCS} @var{U},
+    ## centred on its origin, @var{A} along its @math{x} axis; the world
+    ## @math{xy} plane by default.  Turning the UCS turns the ellipse.
+    ##
+    ## @example
+    ## @group
+    ## ## An elliptic boss 40 by 20, 5 high, with a bore of 8
+    ## R = geom.Region (geom.Spline.ellipse (20, 10), @{[-4, 0, 1; 4, 0, 1]@});
+    ## S = solid.extrude (R, 5);
+    ## @end group
+    ## @end example
+    ##
+    ## @seealso{geom.Spline.nurbs, geom.Region, solid.ellipsoid}
+    ## @end deftypefn
+    function this = ellipse (A, B, varargin)
+
+      ## Input validation
+      if (nargin != 2 && nargin != 4)
+        error ("geom.Spline.ellipse: invalid number of input arguments.");
+      endif
+      if (! isnumeric (A) || ! isreal (A) || ! isscalar (A) ...
+          || ! isfinite (A) || ! (A > 0))
+        error (strcat ("geom.Spline.ellipse: A must be a positive and", ...
+                       " finite real scalar."));
+      endif
+      if (! isnumeric (B) || ! isreal (B) || ! isscalar (B) ...
+          || ! isfinite (B) || ! (B > 0))
+        error (strcat ("geom.Spline.ellipse: B must be a positive and", ...
+                       " finite real scalar."));
+      endif
+      U = geom.UCS ();
+      if (nargin == 4)
+        if (! ischar (varargin{1}) || ! strcmp (varargin{1}, 'UCS'))
+          error ("geom.Spline.ellipse: unknown parameter.");
+        endif
+        U = varargin{2};
+        if (! isa (U, 'geom.UCS') || ! isscalar (U))
+          error ("geom.Spline.ellipse: UCS must be a geom.UCS object.");
+        endif
+      endif
+
+      ## A circle of four rational quarters, stretched
+      P = [1, 0; 1, 1; 0, 1; -1, 1; -1, 0; -1, -1; 0, -1; 1, -1; 1, 0] ...
+          .* double ([A, B]);
+      w = sqrt (2) / 2;
+      this = geom.Spline.nurbs (P, [0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 4], ...
+                                [1; w; 1; w; 1; w; 1; w; 1], 'UCS', U);
 
     endfunction
 
@@ -977,3 +1082,45 @@ endfunction
 %! geom.Spline.nurbs ([0, 0; 1, 0], [zeros(1, 27), ones(1, 27)])
 %!error<geom.Spline.nurbs: W must be a vector of N positive finite weights.> ...
 %! geom.Spline.nurbs ([0, 0; 1, 0], [0, 0, 1, 1], [1, 0])
+
+%!test  # an ellipse: closed, its area and its length exact
+%! SP = geom.Spline.ellipse (20, 10);
+%! assert_equal (SP.Closed, true);
+%! assert_equal (SP.Degree, 2);
+%! assert_equal (__green__ (SP), 200 * pi, -1e-12);
+%! [~, E] = ellipke (1 - (10 / 20) ^ 2);
+%! assert_equal (length (SP), 80 * E, -1e-10);
+%! assert_equal (__box__ (SP), [-20, -10, 0; 20, 10, 0], 1e-12);
+
+%!test  # an ellipse laid in a UCS; equal semi-axes, a circle
+%! U = geom.UCS ([0, 0, 1], [5, 5, 0], [1, 1, 0]);
+%! SP = geom.Spline.ellipse (4, 4, 'UCS', U);
+%! assert_equal (SP.UCS, U);
+%! P = toworld (U, points (SP, 17));
+%! assert_equal (sqrt (sum ((P - [5, 5, 0]) .^ 2, 2)), 4 * ones (17, 1), 1e-12);
+
+%!test  # stretched unevenly: control points moved, fit data dropped
+%! SP = geom.Spline ([0, 0; 10, 5; 20, 0; 30, 5]);
+%! T = __affine__ (SP, diag ([2, 1, 1]), [1, 0, 0]);
+%! assert_equal (T.ControlPoints, SP.ControlPoints * diag ([2, 1, 1]) ...
+%!               + [1, 0, 0]);
+%! assert_equal (size (T.FitPoints), [0, 3]);
+%! assert_equal (points (T, 7), points (SP, 7) * diag ([2, 1, 1]) ...
+%!               + [1, 0, 0], 1e-12);
+
+%!test  # the box round a spline drawn through points
+%! SP = geom.Spline ([0, 0; 10, 8; 20, 0], 'Tangents', [0, 1, 0; 0, -1, 0]);
+%! B = __box__ (SP);
+%! P = points (SP, 100001);
+%! assert_equal (B, [min(P, [], 1); max(P, [], 1)], 1e-8);
+
+%!error<geom.Spline.ellipse: invalid number of input arguments.> ...
+%! geom.Spline.ellipse (1)
+%!error<geom.Spline.ellipse: A must be a positive and finite real scalar.> ...
+%! geom.Spline.ellipse (0, 1)
+%!error<geom.Spline.ellipse: B must be a positive and finite real scalar.> ...
+%! geom.Spline.ellipse (1, Inf)
+%!error<geom.Spline.ellipse: unknown parameter.> ...
+%! geom.Spline.ellipse (1, 2, 'Centre', [0, 0])
+%!error<geom.Spline.ellipse: UCS must be a geom.UCS object.> ...
+%! geom.Spline.ellipse (1, 2, 'UCS', 3)

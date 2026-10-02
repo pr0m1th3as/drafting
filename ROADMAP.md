@@ -169,13 +169,17 @@ projection (`section`) and STL in and out are here. These are not:
 | `hull ()` of 2-D shapes | the hull of regions, its arcs exact and its lines tangent to them |
 | `text ()` | the outlines of text as regions, from Open CASCADE's font builder |
 | `polyhedron ()`, an STL in a boolean | a closed mesh as a `solid.Shape`, built from the mesh's own vertices, edges and triangles |
-| `multmatrix`, `resize`, `color` | a general affine transform, resizing to a box, colour carried to the viewer and to STEP |
+| `resize` | resizing to a size or into a box, evenly or stretched along each axis, for solids and regions |
+| `mirror` of 2-D shapes | `mirror` on `geom.Region`, about a line in its plane |
+| copies in a `for` loop | `copy`, `rectarray` and `polararray` on `solid.Shape` and `geom.Region`, the copies united |
+| an ellipse, an ellipsoid (`scale` of a circle or a sphere) | `geom.Spline.ellipse` and `solid.ellipsoid`, both exact |
+| `color` | colour carried to the viewer and to STEP |
 | `projection (cut = false)` | the outline of a solid on a plane, which milestone 4's views need as well |
 | `hull ()` of solids | the hull of a solid's points, as a faceted solid |
 
-`minkowski ()` is not planned: its common use, rounding a shape, is `fillet`
-and the offsets, and a Minkowski sum of exact solids has no counterpart in Open
-CASCADE.
+`multmatrix` and `minkowski ()` are not planned. The common use of
+`minkowski`, rounding a shape, is `fillet` and the offsets, and a Minkowski sum
+of exact solids has no counterpart in Open CASCADE.
 
 **The package's own shape.** Three pieces of the drawing side close here.
 

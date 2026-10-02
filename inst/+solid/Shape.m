@@ -1446,6 +1446,229 @@ classdef Shape
 
     endfunction
 
+    ## -*- texinfo -*-
+    ## @deftypefn  {solid.Shape} {@var{S} =} resize (@var{S}, @var{SZ})
+    ## @deftypefnx {solid.Shape} {@var{S} =} resize (@var{S}, @var{SZ}, @qcode{'Uniform'}, @var{TF})
+    ##
+    ## Scale a shape to a size.
+    ##
+    ## @code{@var{S} = resize (@var{S}, @var{SZ})} scales the shape evenly so
+    ## that its bounding box is as large as it can be within the sizes
+    ## @code{@var{SZ} = [@var{x}, @var{y}, @var{z}]} in millimetres; a size of
+    ## 0 leaves that direction free.  @code{resize (@var{S}, [30, 0, 0])}
+    ## makes the shape 30 long in @math{x} and keeps its proportions.  The
+    ## corner of the box at the least @math{x}, @math{y} and @math{z} stays
+    ## where it is, and every face keeps its type: a cylinder stays a
+    ## cylinder.
+    ##
+    ## With @qcode{'Uniform'} set to @code{false} each direction given is
+    ## scaled to its size on its own and a direction left at 0 keeps its
+    ## size, as OpenSCAD's @code{resize} does.  Flat faces stay planes, but a
+    ## curved face stretched so is no longer a cylinder, a cone or a sphere:
+    ## Open CASCADE carries it as the exact B-spline surface it becomes, so
+    ## @code{solid.Shape.faces} finds a stretched cylinder among the faces of
+    ## type @qcode{'bspline'}, not @qcode{'cylinder'}.
+    ##
+    ## @example
+    ## @group
+    ## ## A sphere of diameter 10 stretched into an ellipsoid 40 by 20 by 10
+    ## E = resize (solid.sphere (5), [40, 20, 0], 'Uniform', false);
+    ## @end group
+    ## @end example
+    ##
+    ## @seealso{solid.Shape.scale, solid.ellipsoid, geom.Region.resize}
+    ## @end deftypefn
+    function this = resize (this, SZ, varargin)
+
+      ## Input validation
+      if (nargin != 2 && nargin != 4)
+        error ("solid.Shape.resize: invalid number of input arguments.");
+      endif
+      if (! isnumeric (SZ) || ! isreal (SZ) || numel (SZ) != 3 ...
+          || ! all (isfinite (SZ)) || any (SZ < 0) || ! any (SZ > 0))
+        error (strcat ("solid.Shape.resize: SZ must be a 3-element vector", ...
+                       " of nonnegative finite sizes, not all zero."));
+      endif
+      [errmsg, even] = flag (varargin, 'Uniform', true);
+      if (! isempty (errmsg))
+        error ("solid.Shape.resize: %s", errmsg);
+      endif
+
+      if (isempty (this.Data))
+        return;
+      endif
+      [B, L] = bbox (this);
+      f = double (SZ(:)') ./ L;
+      given = SZ(:)' > 0;
+      if (even)
+        f(:) = min (f(given));
+      else
+        f(! given) = 1;
+      endif
+      if (all (f == f(1)))
+        this.Data = occt ('solid.Shape.resize', 'scale', this.Data, f(1), ...
+                          B(1:3));
+      else
+        this.Data = occt ('solid.Shape.resize', 'gscale', this.Data, f, ...
+                          B(1:3));
+      endif
+
+    endfunction
+
+    ## -*- texinfo -*-
+    ## @deftypefn {solid.Shape} {@var{C} =} copy (@var{S}, @var{D})
+    ##
+    ## Copies of a shape, united.
+    ##
+    ## @code{@var{C} = copy (@var{S}, @var{D})} places a copy of the shape
+    ## moved by each row of @var{D}, an @math{N}-by-3 matrix of offsets in
+    ## millimetres, and returns them as one shape, united as
+    ## @code{solid.Shape.union} unites shapes.  The shape itself is among them
+    ## only where a row of @var{D} is zero.  Copies apart from one another are
+    ## kept side by side, separate solids of the one shape, with no boolean
+    ## to compute; only copies that overlap or touch are fused, so a hundred
+    ## pins standing apart cost little more than one.  This is OpenSCAD's
+    ## @code{for} loop of @code{translate}.
+    ##
+    ## @seealso{solid.Shape.rectarray, solid.Shape.polararray, geom.Region.copy}
+    ## @end deftypefn
+    function C = copy (this, D)
+
+      ## Input validation
+      if (nargin != 2)
+        error ("solid.Shape.copy: invalid number of input arguments.");
+      endif
+      if (! isnumeric (D) || ! isreal (D) || ! ismatrix (D) ...
+          || columns (D) != 3 || rows (D) < 1 || ! all (isfinite (D(:))))
+        error (strcat ("solid.Shape.copy: D must be an N-by-3 real matrix", ...
+                       " of finite offsets."));
+      endif
+
+      C = copies (this, double (D), [], [], [], 'solid.Shape.copy');
+
+    endfunction
+
+    ## -*- texinfo -*-
+    ## @deftypefn {solid.Shape} {@var{C} =} rectarray (@var{S}, @var{COUNT}, @var{SPACING})
+    ##
+    ## Copies of a shape in rows, columns and layers, united.
+    ##
+    ## @code{@var{C} = rectarray (@var{S}, @var{COUNT}, @var{SPACING})} places
+    ## @code{@var{COUNT} = [@var{nx}, @var{ny}, @var{nz}]} copies of the shape
+    ## along the @math{x}, @math{y} and @math{z} axes, @code{@var{SPACING} =
+    ## [@var{dx}, @var{dy}, @var{dz}]} millimetres apart, the first where the
+    ## shape is; a negative spacing runs the other way.  It returns them as one
+    ## shape, as @code{solid.Shape.copy} does.  This is a grid of holes cut
+    ## into a plate in one subtraction, or of ribs, pins or bosses standing on
+    ## it.
+    ##
+    ## @example
+    ## @group
+    ## ## A plate 70 by 50 with four rows of six holes of diameter 4
+    ## H = rectarray (translate (solid.cylinder (2, 5), [10, 10, 0]), ...
+    ##                [6, 4, 1], [10, 10, 0]);
+    ## P = subtract (solid.box (70, 50, 5), H);
+    ## @end group
+    ## @end example
+    ##
+    ## @seealso{solid.Shape.copy, solid.Shape.polararray}
+    ## @end deftypefn
+    function C = rectarray (this, COUNT, SPACING)
+
+      ## Input validation
+      if (nargin != 3)
+        error ("solid.Shape.rectarray: invalid number of input arguments.");
+      endif
+      [errmsg, D] = geom.__grid__ (COUNT, SPACING, 3);
+      if (! isempty (errmsg))
+        error ("solid.Shape.rectarray: %s", errmsg);
+      endif
+
+      C = copies (this, D, [], [], [], 'solid.Shape.rectarray');
+
+    endfunction
+
+    ## -*- texinfo -*-
+    ## @deftypefn  {solid.Shape} {@var{C} =} polararray (@var{S}, @var{N}, @var{ANGLE})
+    ## @deftypefnx {solid.Shape} {@var{C} =} polararray (@var{S}, @var{N}, @var{ANGLE}, @var{AXIS})
+    ## @deftypefnx {solid.Shape} {@var{C} =} polararray (@var{S}, @var{N}, @var{ANGLE}, @var{AXIS}, @var{P})
+    ## @deftypefnx {solid.Shape} {@var{C} =} polararray (@dots{}, @qcode{'Rotate'}, @var{TF})
+    ##
+    ## Copies of a shape round an axis, united.
+    ##
+    ## @code{@var{C} = polararray (@var{S}, @var{N}, @var{ANGLE}, @var{AXIS},
+    ## @var{P})} places @var{N} copies of the shape round the axis through the
+    ## point @var{P} in the direction @var{AXIS}, the @math{z} axis through the
+    ## origin by default, the first where the shape is and the rest turned on
+    ## by the right-hand rule, the other way for a negative @var{ANGLE}.  A
+    ## whole turn, @var{ANGLE} of 360, spaces them evenly @code{@var{ANGLE} /
+    ## @var{N}} apart; a part of a turn puts one at each end, @code{@var{ANGLE}
+    ## / (@var{N} - 1)} apart.  It returns them as one shape, as
+    ## @code{solid.Shape.copy} does.
+    ##
+    ## Each copy is turned as it goes round, as the holes of a bolt circle,
+    ## the teeth of a wheel or the blades of a fan are.  With
+    ## @qcode{'Rotate'} set to @code{false} each copy keeps the shape's own
+    ## direction, moved as the centre of its bounding box moves.
+    ##
+    ## @example
+    ## @group
+    ## ## A flange of diameter 60 with six bolt holes of 6 on a circle of 40
+    ## H = polararray (translate (solid.cylinder (3, 8), [20, 0, 0]), 6, 360);
+    ## F = subtract (solid.cylinder (30, 8), solid.cylinder (10, 8), H);
+    ## @end group
+    ## @end example
+    ##
+    ## @seealso{solid.Shape.copy, solid.Shape.rectarray, solid.Shape.rotate}
+    ## @end deftypefn
+    function C = polararray (this, N, ANGLE, varargin)
+
+      ## Input validation
+      if (nargin < 3 || nargin > 7)
+        error ("solid.Shape.polararray: invalid number of input arguments.");
+      endif
+      AXIS = [0, 0, 1];
+      P = [0, 0, 0];
+      if (! isempty (varargin) && ! ischar (varargin{1}))
+        AXIS = varargin{1};
+        varargin(1) = [];
+        if (! isempty (varargin) && ! ischar (varargin{1}))
+          P = varargin{1};
+          varargin(1) = [];
+        endif
+      endif
+      [errmsg, a] = geom.__turns__ (N, ANGLE);
+      if (isempty (errmsg))
+        errmsg = checkvec (AXIS, 'AXIS', true);
+      endif
+      if (isempty (errmsg))
+        errmsg = checkvec (P, 'P');
+      endif
+      if (isempty (errmsg))
+        [errmsg, turning] = flag (varargin, 'Rotate', true);
+      endif
+      if (! isempty (errmsg))
+        error ("solid.Shape.polararray: %s", errmsg);
+      endif
+
+      k = double (AXIS(:)') / norm (double (AXIS));
+      P = double (P(:)');
+      if (turning || isempty (this.Data))
+        C = copies (this, zeros (numel (a), 3), a, k, P, ...
+                    'solid.Shape.polararray');
+      else
+        ## The centre of the box carried round the axis
+        B = bbox (this);
+        v = (B(1:3) + B(4:6)) / 2 - P;
+        t = a(:) * pi / 180;
+        w = v .* cos (t) + cross (repmat (k, numel (t), 1), ...
+                                  repmat (v, numel (t), 1), 2) .* sin (t) ...
+            + k * (k * v') .* (1 - cos (t));
+        C = copies (this, w - v, [], [], [], 'solid.Shape.polararray');
+      endif
+
+    endfunction
+
   endmethods
 
 endclassdef
@@ -1469,6 +1692,68 @@ function errmsg = checkoperands (S)
   errmsg = '';
   if (! all (cellfun (@(x) isa (x, 'solid.Shape') && isscalar (x), S)))
     errmsg = "every operand must be a solid.Shape object.";
+  endif
+
+endfunction
+
+## The copies of the shape S, each turned A(k) degrees about the unit axis K
+## through P when A is given, then moved by the row k of D, as one shape for
+## CALLER: copies apart are put side by side, and only when the boxes of two
+## meet are they fused
+function C = copies (S, D, A, K, P, caller)
+
+  C = S;
+  if (isempty (S.Data))
+    return;
+  endif
+  n = rows (D);
+  data = cell (1, n);
+  B = zeros (n, 6);
+  for k = 1:n
+    data{k} = S.Data;
+    if (! isempty (A) && A(k) != 0)
+      data{k} = occt (caller, 'rotate', data{k}, A(k), K, P);
+    endif
+    if (any (D(k,:)))
+      data{k} = occt (caller, 'translate', data{k}, D(k,:));
+    endif
+    B(k,:) = occt (caller, 'bbox', data{k});
+  endfor
+  tol = 1e-9 * max ([1, abs(B(:))']);
+  apart = true (n);
+  for j = 1:3
+    apart &= B(:,j+3) < B(:,j)' - tol | B(:,j) > B(:,j+3)' + tol;
+  endfor
+  apart(1:n+1:end) = true;
+  if (n == 1)
+    C = solid.Shape (data{1});
+  elseif (all (apart(:)))
+    C = solid.Shape (occt (caller, 'compound', data{:}));
+  else
+    C = solid.Shape (occt (caller, 'fuse', data{:}));
+  endif
+
+endfunction
+
+## The value of the option NAME in the Name/Value pairs ARGS, a logical
+## scalar, DEF when not given.  Returns an error message body, empty when ARGS
+## is valid.
+function [errmsg, TF] = flag (ARGS, NAME, DEF)
+
+  errmsg = '';
+  TF = DEF;
+  if (isempty (ARGS))
+    return;
+  endif
+  if (numel (ARGS) != 2)
+    errmsg = "Name/Value arguments must come in pairs.";
+  elseif (! ischar (ARGS{1}) || ! strcmp (ARGS{1}, NAME))
+    errmsg = "unknown parameter.";
+  elseif (! (islogical (ARGS{2}) || isnumeric (ARGS{2})) ...
+          || ! isscalar (ARGS{2}) || ! any (ARGS{2} == [0, 1]))
+    errmsg = sprintf ("%s must be true or false.", NAME);
+  else
+    TF = logical (ARGS{2});
   endif
 
 endfunction
@@ -2316,3 +2601,95 @@ endfunction
 %! hull (solid.Shape (), [0, 0, 0; 1, 0, 0; 0, 1, 0])
 %!error<solid.Shape.hull: the hull is flat and encloses no volume.> ...
 %! hull (solid.Shape (), [0, 0, 0; 1, 0, 0; 0, 1, 0; 1, 1, 0])
+
+%!testif ; exist ('__occt__') == 3  # resized evenly, the least corner kept
+%! B = resize (translate (solid.box (10, 20, 5), [1, 2, 3]), [0, 40, 0]);
+%! assert_equal (bbox (B), [1, 2, 3, 21, 42, 13], 1e-12);
+%! C = resize (solid.cylinder (5, 10), [40, 40, 40]);
+%! assert_equal (numel (faces (C, 'Type', 'cylinder')), 1);
+%! assert_equal (volume (C), 16000 * pi, -1e-12);
+%! assert_equal (isempty (resize (solid.Shape (), [1, 1, 1])), true);
+
+%!testif ; exist ('__occt__') == 3  # resized unevenly: planes stay planes
+%! C = resize (solid.cylinder (5, 10), [20, 0, 0], 'Uniform', false);
+%! assert_equal (volume (C), 500 * pi, -1e-9);
+%! assert_equal (isvalid (C), true);
+%! assert_equal (numel (faces (C, 'Type', 'plane')), 2);
+%! assert_equal (numel (faces (C, 'Type', 'bspline')), 1);
+%! assert_equal (numel (faces (C, 'Normal', [0, 0, 1])), 1);
+%! B = resize (subtract (solid.box (10, 10, 10), solid.cylinder (3, 10)), ...
+%!             [20, 10, 0], 'Uniform', false);
+%! assert_equal (volume (B), 2000 - 45 * pi, -1e-9);
+%! assert_equal (isvalid (B), true);
+
+%!testif ; exist ('__occt__') == 3  # copies apart side by side, others fused
+%! A = solid.box (1, 1, 1);
+%! K = copy (A, [0, 0, 0; 3, 0, 0; 0.5, 0, 0]);
+%! assert_equal ([numsolids(K), volume(K)], [2, 2.5], 1e-12);
+%! K = copy (A, [5, 5, 5]);
+%! assert_equal (bbox (K), [5, 5, 5, 6, 6, 6], 1e-12);
+%! assert_equal (isempty (copy (solid.Shape (), [0, 0, 0; 1, 0, 0])), true);
+
+%!testif ; exist ('__occt__') == 3  # a rectangular array of holes cut
+%! H = rectarray (translate (solid.cylinder (2, 5), [10, 10, 0]), ...
+%!                [6, 4, 1], [10, 10, 0]);
+%! assert_equal (numsolids (H), 24);
+%! P = subtract (solid.box (70, 50, 5), H);
+%! assert_equal (volume (P), 17500 - 480 * pi, -1e-12);
+%! assert_equal (bbox (rectarray (solid.box (1, 1, 1), [1, 1, 3], ...
+%!                               [0, 0, -2])), [0, 0, -4, 1, 1, 1], 1e-12);
+
+%!testif ; exist ('__occt__') == 3  # a bolt circle, and a ring of blades fused
+%! F = polararray (translate (solid.cylinder (3, 8), [20, 0, 0]), 6, 360);
+%! assert_equal (numsolids (F), 6);
+%! C = centroid (F);
+%! assert_equal (C, [0, 0, 4], 1e-9);
+%! W = polararray (solid.box (10, 2, 2), 8, 360);
+%! assert_equal ([numsolids(W), isvalid(W)], [1, true]);
+%! Z = polararray (translate (solid.box (10, 2, 2), [15, -1, 0]), 2, 90);
+%! assert_equal (bbox (Z), [-1, -1, 0, 25, 25, 2], 1e-12);
+
+%!testif ; exist ('__occt__') == 3  # about another axis; copies kept facing
+%! Z = polararray (translate (solid.box (2, 2, 2), [10, -1, -1]), 2, 180, ...
+%!                 [0, 1, 0], [0, 0, 0]);
+%! assert_equal (bbox (Z), [-12, -1, -1, 12, 1, 1], 1e-12);
+%! G = polararray (translate (solid.box (10, 2, 2), [15, -1, 0]), 2, 90, ...
+%!                 [0, 0, 1], [0, 0, 0], 'Rotate', false);
+%! assert_equal (bbox (G), [-5, -1, 0, 25, 21, 2], 1e-12);
+
+%!error<solid.Shape.resize: invalid number of input arguments.> ...
+%! resize (solid.Shape ())
+%!error<solid.Shape.resize: SZ must be a 3-element vector of nonnegative finite sizes, not all zero.> ...
+%! resize (solid.Shape (), [0, 0, 0])
+%!error<solid.Shape.resize: SZ must be a 3-element vector of nonnegative finite sizes, not all zero.> ...
+%! resize (solid.Shape (), [1, 1])
+%!error<solid.Shape.resize: unknown parameter.> ...
+%! resize (solid.Shape (), [1, 1, 1], 'Even', true)
+%!error<solid.Shape.resize: Uniform must be true or false.> ...
+%! resize (solid.Shape (), [1, 1, 1], 'Uniform', 'yes')
+%!error<solid.Shape.copy: invalid number of input arguments.> ...
+%! copy (solid.Shape ())
+%!error<solid.Shape.copy: D must be an N-by-3 real matrix of finite offsets.> ...
+%! copy (solid.Shape (), [1, 2])
+%!error<solid.Shape.rectarray: invalid number of input arguments.> ...
+%! rectarray (solid.Shape (), [2, 2, 1])
+%!error<solid.Shape.rectarray: COUNT must be a 3-element vector of positive integers.> ...
+%! rectarray (solid.Shape (), [2, 2], [1, 1, 1])
+%!error<solid.Shape.rectarray: SPACING must be a real 3-element vector of finite values.> ...
+%! rectarray (solid.Shape (), [2, 2, 1], [1, 1])
+%!error<solid.Shape.rectarray: SPACING must be nonzero where COUNT is more than one.> ...
+%! rectarray (solid.Shape (), [2, 2, 1], [1, 0, 0])
+%!error<solid.Shape.polararray: invalid number of input arguments.> ...
+%! polararray (solid.Shape (), 3)
+%!error<solid.Shape.polararray: N must be a positive integer.> ...
+%! polararray (solid.Shape (), -1, 90)
+%!error<solid.Shape.polararray: ANGLE must be a nonzero real scalar of at most 360 degrees.> ...
+%! polararray (solid.Shape (), 3, 0)
+%!error<solid.Shape.polararray: AXIS must not be the zero vector.> ...
+%! polararray (solid.Shape (), 3, 90, [0, 0, 0])
+%!error<solid.Shape.polararray: P must be a real 3-element vector of finite values.> ...
+%! polararray (solid.Shape (), 3, 90, [0, 0, 1], [0, 0])
+%!error<solid.Shape.polararray: Rotate must be true or false.> ...
+%! polararray (solid.Shape (), 3, 90, 'Rotate', 2)
+%!error<solid.Shape.polararray: unknown parameter.> ...
+%! polararray (solid.Shape (), 3, 90, 'Turn', true)

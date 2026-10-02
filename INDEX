@@ -53,6 +53,7 @@ Solid modelling
  solid.cylinder
  solid.cone
  solid.sphere
+ solid.ellipsoid
  solid.torus
  solid.polyhedron
  solid.extrude

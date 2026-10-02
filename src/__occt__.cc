@@ -38,6 +38,7 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepBuilderAPI_MakeWire.hxx>
+#include <BRepBuilderAPI_GTransform.hxx>
 #include <BRepBuilderAPI_Transform.hxx>
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepClass3d_SolidClassifier.hxx>
@@ -93,12 +94,16 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <TopTools_IndexedDataMapOfShapeListOfShape.hxx>
 #include <TopTools_IndexedMapOfShape.hxx>
 #include <TopoDS.hxx>
+#include <TopoDS_Compound.hxx>
+#include <TopoDS_Iterator.hxx>
 #include <TopoDS_Edge.hxx>
 #include <TopoDS_Face.hxx>
 #include <TopoDS_Shape.hxx>
 #include <TopoDS_Wire.hxx>
 #include <gp_Ax1.hxx>
 #include <gp_Ax2.hxx>
+#include <gp_GTrsf.hxx>
+#include <gp_Mat.hxx>
 #include <gp_Trsf.hxx>
 
 using namespace std;
@@ -523,7 +528,7 @@ volumeprops (const TopoDS_Shape& s)
 {
   GProp_GProps p;
   if (BRepGProp::VolumePropertiesGK (s, p, 1e-9, Standard_False,
-                                     Standard_False, Standard_True) < 0)
+                                     Standard_True, Standard_True) < 0)
   {
     p = GProp_GProps ();
     BRepGProp::VolumeProperties (s, p);
@@ -1288,16 +1293,13 @@ planarize (const TopoDS_Shape& s)
     {
       continue;
     }
-    // The plane facing as the face does, then the face rebuilt on it
+    // The plane facing as the surface does, then the face rebuilt on it and
+    // turned as the face is
     gp_Pln p = pl.Plan ();
     const double u = (a.FirstUParameter () + a.LastUParameter ()) / 2;
     const double v = (a.FirstVParameter () + a.LastVParameter ()) / 2;
     BRepLProp_SLProps props (BRepAdaptor_Surface (f), u, v, 1, 1e-9);
-    gp_Dir n = props.Normal ();
-    if (f.Orientation () == TopAbs_REVERSED)
-    {
-      n.Reverse ();
-    }
+    const gp_Dir n = props.Normal ();
     if (p.Axis ().Direction ().Dot (n) < 0)
     {
       p = gp_Pln (p.Location (), p.Axis ().Direction ().Reversed ());
@@ -1914,6 +1916,49 @@ function directly. \n\
       gp_Trsf t;
       t.SetScale (topoint (args(4)), args(3).double_value ());
       out = todata (transform (toshape (args(2), caller), t));
+    }
+
+    // A scaling by its own factor along each axis, about a point: the curved
+    // faces become B-spline surfaces, as a stretched circle is no longer a
+    // circle, and the flat ones are made planes again
+    else if (cmd == "gscale")
+    {
+      const RowVector f = args(3).row_vector_value ();
+      const gp_Pnt p = topoint (args(4));
+      gp_GTrsf g;
+      g.SetVectorialPart (gp_Mat (f(0), 0, 0, 0, f(1), 0, 0, 0, f(2)));
+      g.SetTranslationPart (gp_XYZ (p.X () * (1 - f(0)), p.Y () * (1 - f(1)),
+                                    p.Z () * (1 - f(2))));
+      BRepBuilderAPI_GTransform gt (toshape (args(2), caller), g,
+                                    Standard_True);
+      if (! gt.IsDone ())
+      {
+        error ("%s: Open CASCADE could not scale the shape.",
+               caller.c_str ());
+      }
+      out = todata (planarize (gt.Shape ()));
+    }
+
+    // Shapes together in one, as they are, none fused with another
+    else if (cmd == "compound")
+    {
+      BRep_Builder bb;
+      TopoDS_Compound c;
+      bb.MakeCompound (c);
+      for (int i = 2; i < args.length (); i++)
+      {
+        const TopoDS_Shape t = toshape (args(i), caller);
+        if (t.ShapeType () != TopAbs_COMPOUND)
+        {
+          bb.Add (c, t);
+          continue;
+        }
+        for (TopoDS_Iterator it (t); it.More (); it.Next ())
+        {
+          bb.Add (c, it.Value ());
+        }
+      }
+      out = todata (c);
     }
 
     // The cut through a shape by the plane of a frame, rows origin, x axis,

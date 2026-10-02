@@ -9,9 +9,9 @@ CAD program or a CNC machine will accept, as a solid for a slicer, as LaTeX for
 a report, or as a figure on screen. Solids proper, built, combined and
 exchanged as STEP, come through Open CASCADE when the package is built with it.
 
-Forty-eight public functions across five namespaces plus the `draw.Drawing`,
+Forty-nine public functions across five namespaces plus the `draw.Drawing`,
 `geom.Polyline`, `geom.Spline`, `geom.Region`, `geom.Path`, `geom.UCS`,
-`solid.Shape` and `solid.Viewer` classes, 1603 built-in self-tests and 67 `%!demo` blocks, nearly all of which
+`solid.Shape` and `solid.Viewer` classes, 1682 built-in self-tests and 67 `%!demo` blocks, nearly all of which
 end in a `plot` call, so the documentation shows what a function does rather
 than only describing it.
 
@@ -41,7 +41,8 @@ Outlines and curves are value classes. A `geom.Polyline` is a DXF polyline,
 open or closed: vertices `[x, y, bulge]` in a plane of its own, an origin, an x
 axis and a normal, the xy plane unless told otherwise, so a sketch can be laid
 on any face. A `geom.Spline` is a NURBS curve, drawn through points or given
-by its control points, knots and weights, open or closed. A `geom.Region` is a
+by its control points, knots and weights, open or closed, an exact ellipse
+among them. A `geom.Region` is a
 closed area, one outline with holes of any shape in it, straight segments, arcs
 and splines, checked to be valid; it is what a solid is made from. A
 `geom.Path` is a route in 3-D of straight segments, arcs and splines, along
@@ -52,7 +53,8 @@ operations, with arcs exact, computed by Open CASCADE. `hull` wraps regions
 and points as OpenSCAD's `hull` does, its lines truly tangent to the arcs, so
 two circles make a lever and four a rounded plate. `geom.text` gives the
 outlines of text in any installed font as regions, to extrude, engrave or
-emboss. Functions take the
+emboss. A region is resized, evenly or stretched, mirrored in a line, and
+copied, in rows and columns or round a point, the copies united. Functions take the
 classes; only their constructors take plain matrices.
 
 `draw.Drawing` is a value class carrying lines, polylines with per-vertex
@@ -129,10 +131,11 @@ R = fit (R{1}, 'arcs', 'AbsTol', 0.01);
 `+solid` models solids through [Open CASCADE](https://dev.opencascade.org/),
 the kernel FreeCAD is built on, so curved faces stay exact. `solid.Shape` holds
 a solid, with the booleans `union`, `subtract` and `intersect`, translation,
-rotation, mirroring and scaling, the convex hull of shapes and points, and
-volume, area, centroid and bounding box;
-`solid.box`, `solid.wedge`, `solid.cylinder`, `solid.cone`, `solid.sphere` and
-`solid.torus` make the primitives, placed in a `geom.UCS` by a corner, the
+rotation, mirroring and scaling, resizing to a box, evenly or stretched,
+copies in rows, columns and layers or round an axis, the convex hull of shapes
+and points, and volume, area, centroid and bounding box;
+`solid.box`, `solid.wedge`, `solid.cylinder`, `solid.cone`, `solid.sphere`,
+`solid.ellipsoid` and `solid.torus` make the primitives, placed in a `geom.UCS` by a corner, the
 centre of the base or the centroid; `solid.extrude`, `solid.revolve`,
 `solid.loft`, `solid.sweep` and `solid.helix` make a solid from a
 `geom.Region`, where the region's plane puts it, its arcs carried as true arcs

@@ -209,6 +209,59 @@ classdef Path
 
     endfunction
 
+    ## The path with every point p moved to p * M + B in its coordinates.  For
+    ## M a rotation, a reflection or a uniform scale its arcs stay arcs; for
+    ## any other M each arc becomes the rational spline that follows the
+    ## ellipse it is stretched into exactly
+    function this = __affine__ (this, M, B)
+
+      V = this.Vertices;
+      n = rows (V);
+      arc = find (! isnan (this.Midpoints(:,1)))';
+      G = M * M';
+      if (norm (G - G(1) * eye (3)) > 1e-12 * G(1))
+        for i = arc
+          this.Splines{i} = arcspline (V(i,:), this.Midpoints(i,:), ...
+                                       V(mod (i, n) + 1,:));
+          this.Midpoints(i,:) = NaN;
+        endfor
+        arc = [];
+      endif
+      this.Vertices = V * M + B;
+      this.Midpoints(arc,:) = this.Midpoints(arc,:) * M + B;
+      for i = find (! cellfun (@isempty, this.Splines))'
+        this.Splines{i} = __affine__ (this.Splines{i}, M, B);
+      endfor
+
+    endfunction
+
+    ## The least and the greatest value of each coordinate along the path, as
+    ## the rows of B, exact along its arcs and splines
+    function B = __box__ (this)
+
+      V = this.Vertices;
+      M = this.Midpoints;
+      n = rows (V);
+      B = [min(V, [], 1); max(V, [], 1)];
+      for i = find (! isnan (M(:,1)))'
+        ## A coordinate along the arc is c + r * rho * cos (f - phi), greatest
+        ## at f = phi and least half a turn on, where those lie on the arc
+        [C, x, y, th] = circle (V(i,:), M(i,:), V(mod (i, n) + 1,:));
+        r = norm (V(i,:) - C);
+        rho = hypot (x, y);
+        phi = atan2 (y, x);
+        top = mod (phi, 2 * pi) <= th;
+        bot = mod (phi + pi, 2 * pi) <= th;
+        B(2,top) = max (B(2,top), C(top) + r * rho(top));
+        B(1,bot) = min (B(1,bot), C(bot) - r * rho(bot));
+      endfor
+      for i = find (! cellfun (@isempty, this.Splines))'
+        S = __box__ (this.Splines{i});
+        B = [min(B(1,:), S(1,:)); max(B(2,:), S(2,:))];
+      endfor
+
+    endfunction
+
     ## Points along the path in its coordinates, arcs every 2 degrees or
     ## closer and splines as finely, closed paths not repeating the first
     function Q = __sample__ (this)
@@ -944,6 +997,26 @@ function [C, X, Y, TH] = circle (A, M, B)
   X = (A - C) / norm (A - C);
   Y = cross (-n / norm (n), X);
   TH = mod (atan2 (dot (B - C, Y), dot (B - C, X)), 2 * pi);
+
+endfunction
+
+## The arc from A through M to B as a rational spline of degree 2 that
+## follows it exactly, in pieces of at most a quarter turn
+function SP = arcspline (A, M, B)
+
+  [C, x, y, th] = circle (A, M, B);
+  r = norm (A - C);
+  n = ceil (th / (pi / 2) - 1e-9);
+  d = th / n;
+  f = (0:2*n)' * d / 2;
+  P = C + r * (cos (f) .* x + sin (f) .* y);
+  P(2:2:end,:) = C + r / cos (d / 2) * (cos (f(2:2:end)) .* x ...
+                                        + sin (f(2:2:end)) .* y);
+  P([1, end],:) = [A; B];
+  w = ones (2 * n + 1, 1);
+  w(2:2:end) = cos (d / 2);
+  K = [0, repelem(0:n, 2), n];
+  SP = geom.Spline.nurbs (P, K, w);
 
 endfunction
 
