@@ -376,8 +376,8 @@ classdef Shape
     ##
     ## The volume of a shape in cubic millimetres.
     ##
-    ## The volume is computed from the exact surfaces, not from facets.  The
-    ## empty shape has volume zero.
+    ## The volume is computed from the exact surfaces, not from facets, to a
+    ## relative error of about 1e-9.  The empty shape has volume zero.
     ##
     ## @seealso{solid.Shape.area, solid.Shape.centroid}
     ## @end deftypefn
@@ -397,7 +397,10 @@ classdef Shape
     ## The surface area of a shape in square millimetres.
     ##
     ## The area is the sum over every face, computed from the exact surfaces.
-    ## The empty shape has area zero.
+    ## A flat face is measured to a relative error of about 1e-9, whatever its
+    ## edges.  A curved face is measured as Open CASCADE integrates it: exactly
+    ## for a cylinder, a cone, a sphere or a torus, to about 1e-4 for a face
+    ## swept from a spline.  The empty shape has area zero.
     ##
     ## @seealso{solid.Shape.volume}
     ## @end deftypefn
@@ -416,9 +419,10 @@ classdef Shape
     ##
     ## The centre of volume of a shape, as a 1-by-3 vector in millimetres.
     ##
-    ## For a part of uniform density this is its centre of mass.  The empty
-    ## shape has no centroid and returns an empty @var{C}, and a shape that
-    ## encloses no volume returns @code{NaN} in every coordinate.
+    ## For a part of uniform density this is its centre of mass, computed as
+    ## the volume is.  The empty shape has no centroid and returns an empty
+    ## @var{C}, and a shape that encloses no volume returns @code{NaN} in every
+    ## coordinate.
     ##
     ## @seealso{solid.Shape.volume, solid.Shape.bbox}
     ## @end deftypefn
@@ -1574,6 +1578,15 @@ endfunction
 %! assert_equal (B, [0, 0, 0, 10, 20, 30], 1e-9);
 %! assert_equal (L, [10, 20, 30], 1e-9);
 
+%!testif ; exist ('__occt__') == 3  # spline faces: volume, centroid, area
+%! H = geom.Spline ([20, 15; 35, 12; 40, 25; 28, 35; 18, 28], 'Closed', true);
+%! R = geom.Region ([0, 0; 80, 0; 80, 50; 0, 50], {H});
+%! A = 4000 + __area__ (R.Holes{1});
+%! S = solid.extrude (R, 6);
+%! assert_equal (volume (S), 6 * A, -1e-9);
+%! assert_equal (centroid (S)(3), 3, 1e-9);
+%! assert_equal (area (S), 2 * A + 6 * (260 + length (H)), -1e-5);
+
 %!testif ; exist ('__occt__') == 3  # the box of a cylinder is tight
 %! assert_equal (bbox (solid.cylinder (4, 12)), [-4, -4, 0, 4, 4, 12], 1e-9);
 
@@ -1822,7 +1835,7 @@ endfunction
 %!                               'Closed', true));
 %! R.UCS = geom.UCS ([0, 0, 1], [0, 0, 12]);
 %! S = pocket (solid.box (80, 40, 12), R, 4);
-%! assert_equal (volume (S), 38400 - 4 * __area__ (R.Outline), -1e-4);
+%! assert_equal (volume (S), 38400 - 4 * __area__ (R.Outline), -1e-9);
 %! assert_equal (isvalid (S), true);
 
 %!error<solid.Shape.pocket: Taper cannot be applied to a region with splines.> ...

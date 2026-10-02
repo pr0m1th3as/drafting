@@ -226,7 +226,7 @@ endfunction
 %! H = geom.Spline ([20, 15; 35, 12; 40, 25; 28, 35; 18, 28], 'Closed', true);
 %! R = geom.Region ([0, 0; 80, 0; 80, 50; 0, 50], {H});
 %! S = solid.extrude (R, 6);
-%! assert_equal (volume (S), 6 * (4000 + __area__ (R.Holes{1})), -1e-5);
+%! assert_equal (volume (S), 6 * (4000 + __area__ (R.Holes{1})), -1e-9);
 %! assert_equal (numfaces (S), 7);
 %! assert_equal (isvalid (S), true);
 
@@ -234,7 +234,7 @@ endfunction
 %! R = geom.Region (geom.Spline ([-3, -2; 3, -2; 4, 2; 0, 4; -4, 2], ...
 %!                               'Closed', true));
 %! S = solid.extrude (R, 6, 'Scale', 0.5);
-%! assert_equal (volume (S), 6 * __area__ (R.Outline) * 1.75 / 3, -1e-3);
+%! assert_equal (volume (S), 6 * __area__ (R.Outline) * 1.75 / 3, -1e-9);
 %! assert_equal (isvalid (S), true);
 
 %!testif ; exist ('__occt__') == 3  # holes of any shape go right through

@@ -164,7 +164,7 @@ endfunction
 %! R = geom.Region (geom.Spline (P, 'Closed', true));
 %! S = solid.loft ({R, at(geom.Spline (P, 'Closed', true), 20)}, ...
 %!                 'Ruled', true);
-%! assert_equal (volume (S), 20 * __area__ (R.Outline), -1e-3);
+%! assert_equal (volume (S), 20 * __area__ (R.Outline), -1e-9);
 %! assert_equal (isvalid (S), true);
 
 %!error<solid.loft: invalid number of input arguments.> solid.loft ()

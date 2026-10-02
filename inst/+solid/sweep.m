@@ -185,7 +185,7 @@ endfunction
 %!                               'Closed', true));
 %! P = fillet (geom.Path ([0, 0, 0; 0, 0, 30; 30, 0, 30]), 10);
 %! S = solid.sweep (R, P);
-%! assert_equal (volume (S), __area__ (R.Outline) * length (P), -1e-3);
+%! assert_equal (volume (S), __area__ (R.Outline) * length (P), -1e-9);
 %! assert_equal (isvalid (S), true);
 
 %!testif ; exist ('__occt__') == 3  # round a closed spline path, a ring
@@ -195,7 +195,7 @@ endfunction
 %! R = geom.Region ([1, 0, 1; -1, 0, 1]);
 %! R.UCS = geom.UCS (tin(1,:), [0, 0, 0], [0, 0, 1]);
 %! S = solid.sweep (R, P);
-%! assert_equal (volume (S), pi * length (P), -1e-3);
+%! assert_equal (volume (S), pi * length (P), -1e-6);
 %! assert_equal (isvalid (S), true);
 
 %!error<solid.sweep: invalid number of input arguments.> ...

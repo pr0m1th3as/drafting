@@ -135,7 +135,7 @@ endfunction
 %! c = Q(1:end-1,1) .* Q(2:end,2) - Q(2:end,1) .* Q(1:end-1,2);
 %! cx = sum ((Q(1:end-1,1) + Q(2:end,1)) .* c) / (3 * sum (c));
 %! S = solid.revolve (geom.Region (O), 360);
-%! assert_equal (volume (S), 2 * pi * cx * abs (sum (c)) / 2, -1e-3);
+%! assert_equal (volume (S), 2 * pi * cx * abs (sum (c)) / 2, -1e-8);
 %! assert_equal (isvalid (S), true);
 
 %!error<solid.revolve: invalid number of input arguments.> solid.revolve ()

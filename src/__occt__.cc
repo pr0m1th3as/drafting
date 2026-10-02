@@ -507,6 +507,55 @@ faceinfo (const TopoDS_Shape& s)
   return Cell (ovl (type, normal, axis, box));
 }
 
+// The volume and centre of volume of S, integrated adaptively to a relative
+// error of 1e-9 on every face.  The default integration, of fixed order, errs
+// by up to a part in a thousand on spline faces.  The adaptive one computes
+// the centre only when asked to.  Should it fail, the default is taken.
+static GProp_GProps
+volumeprops (const TopoDS_Shape& s)
+{
+  GProp_GProps p;
+  if (BRepGProp::VolumePropertiesGK (s, p, 1e-9, Standard_False,
+                                     Standard_False, Standard_True) < 0)
+  {
+    p = GProp_GProps ();
+    BRepGProp::VolumeProperties (s, p);
+  }
+  return p;
+}
+
+// The area of S, face by face.  A planar face's area is the volume of the
+// prism of unit height on it, which the adaptive volume integration finds
+// exactly however its edges curve; a curved face takes Open CASCADE's surface
+// integration, the only one it has.
+static double
+area (const TopoDS_Shape& s)
+{
+  double a = 0;
+  for (TopExp_Explorer x (s, TopAbs_FACE); x.More (); x.Next ())
+  {
+    const TopoDS_Face f = TopoDS::Face (x.Current ());
+    const BRepAdaptor_Surface g (f, Standard_False);
+    if (g.GetType () == GeomAbs_Plane)
+    {
+      BRepPrimAPI_MakePrism prism (f, gp_Vec (g.Plane ().Axis ().Direction ()));
+      if (prism.IsDone ())
+      {
+        GProp_GProps p;
+        if (BRepGProp::VolumePropertiesGK (prism.Shape (), p, 1e-9) >= 0)
+        {
+          a += std::abs (p.Mass ());
+          continue;
+        }
+      }
+    }
+    GProp_GProps p;
+    BRepGProp::SurfaceProperties (f, p);
+    a += p.Mass ();
+  }
+  return a;
+}
+
 // A transformed copy of a shape
 static TopoDS_Shape
 transform (const TopoDS_Shape& s, const gp_Trsf& t)
@@ -1203,20 +1252,15 @@ function directly. \n\
     // Queries
     else if (cmd == "volume")
     {
-      GProp_GProps p;
-      BRepGProp::VolumeProperties (toshape (args(2), caller), p);
-      out = p.Mass ();
+      out = volumeprops (toshape (args(2), caller)).Mass ();
     }
     else if (cmd == "area")
     {
-      GProp_GProps p;
-      BRepGProp::SurfaceProperties (toshape (args(2), caller), p);
-      out = p.Mass ();
+      out = area (toshape (args(2), caller));
     }
     else if (cmd == "centroid")
     {
-      GProp_GProps p;
-      BRepGProp::VolumeProperties (toshape (args(2), caller), p);
+      const GProp_GProps p = volumeprops (toshape (args(2), caller));
       RowVector c (3, octave_NaN);
       if (p.Mass () > 0)
       {
