@@ -860,8 +860,13 @@ classdef Shape
     ## @math{M}-by-3 matrix @var{P}, each starting at its point and running
     ## down the @math{z} axis, @var{DEPTH} millimetres deep.  An
     ## @code{Inf} @var{DEPTH} drills right through, however thick the part.
-    ## The point is where the hole enters the material, normally on a face of
-    ## the part.  All the holes are cut in one operation.
+    ## The point is where the hole's axis meets the surface of the part, and
+    ## @var{DEPTH} is measured from it, as a drawing dimensions a hole.  The
+    ## drill comes from outside: everything on the axis before the point is
+    ## cleared too, at the widest diameter of the hole, so a hole entering a
+    ## sloping or curved face is clean all round.  A hole started under
+    ## material that its axis passes through first cuts that material as
+    ## well.  All the holes are cut in one operation.
     ##
     ## @var{D} may instead name an ISO metric coarse thread, such as
     ## @qcode{'M6'} or @qcode{'M2.5'}, from M1 to M64: the hole is then drilled
@@ -985,26 +990,33 @@ classdef Shape
         return;
       endif
 
-      ## A through hole runs past the farthest corner of the part
+      ## How far the part reaches from any of the points, which is how far
+      ## a through hole runs and how far back the drill clears
+      B = bbox (this);
+      [X, Y, Z] = ndgrid (B([1, 4]), B([2, 5]), B([3, 6]));
+      C = [X(:), Y(:), Z(:)];
+      reach = 0;
+      for i = 1:rows (P)
+        reach = max (reach, max (sqrt (sum ((C - P(i,:)) .^ 2, 2))));
+      endfor
+      reach += 1;
       if (isinf (DEPTH))
-        B = bbox (this);
-        [X, Y, Z] = ndgrid (B([1, 4]), B([2, 5]), B([3, 6]));
-        C = [X(:), Y(:), Z(:)];
-        DEPTH = 0;
-        for i = 1:rows (P)
-          DEPTH = max (DEPTH, max (sqrt (sum ((C - P(i,:)) .^ 2, 2))));
-        endfor
-        DEPTH += 1;
+        DEPTH = reach;
       endif
 
-      ## The cutters of one hole, running up the z axis from the origin
-      T = {solid.cylinder(D / 2, DEPTH)};
+      ## The cutters of one hole, running up the z axis from the origin.  The
+      ## drill comes from outside, so each also clears the axis back to beyond
+      ## the part, which leaves a hole entering a sloping face clean all round.
+      T = {translate(solid.cylinder (D / 2, reach + DEPTH), [0, 0, -reach])};
       if (! isempty (cb))
-        T{end+1} = solid.cylinder (cb(1) / 2, cb(2));
+        T{end+1} = translate (solid.cylinder (cb(1) / 2, reach + cb(2)), ...
+                              [0, 0, -reach]);
       endif
       if (! isempty (cs))
         T{end+1} = solid.cone (cs(1) / 2, D / 2, ...
                                (cs(1) - D) / 2 / tand (cs(2) / 2));
+        T{end+1} = translate (solid.cylinder (cs(1) / 2, reach), ...
+                              [0, 0, -reach]);
       endif
       if (! isempty (tip))
         T{end+1} = translate (solid.cone (D / 2, 0, D / 2 / tand (tip / 2)), ...
@@ -1434,6 +1446,16 @@ endfunction
 %! S = hole (B, [20, 20, 12], 8, 5, 'Tip', 118);
 %! assert_equal (volume (S), 38400 - 16 * pi * (5 + 4 / tand (59) / 3), 1e-9);
 %! assert_equal (isvalid (S), true);
+
+%!testif ; exist ('__occt__') == 3  # into a sloping face, clean all round
+%! R = geom.Region ([0, 0; 80, 0; 80, 20; 0, 40]);
+%! R.UCS = geom.UCS ([0, -1, 0], [0, 40, 0]);
+%! B = solid.extrude (R, 40);
+%! S = hole (B, [20, 20, 35], 8, Inf);
+%! assert_equal (volume (B) - volume (S), 16 * pi * 35, -1e-8);
+%! T = hole (B, [20, 20, 35], 8, 10);
+%! assert_equal (volume (B) - volume (T), 16 * pi * 10, -1e-8);
+%! assert_equal (isvalid (T), true);
 
 %!testif ; exist ('__occt__') == 3  # counterbored
 %! S = hole (solid.box (80, 40, 12), [20, 20, 12], 8, Inf, ...
