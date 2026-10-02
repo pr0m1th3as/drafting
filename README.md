@@ -6,12 +6,13 @@ Octave.
 The package provides the drafting layer an engineering design package needs:
 compute geometry, build a drawing from it, and emit that drawing as a DXF file a
 CAD program or a CNC machine will accept, as a solid for a slicer, as LaTeX for
-a report, or as a figure on screen.
+a report, or as a figure on screen. Solids proper, built, combined and
+exchanged as STEP, come through Open CASCADE when the package is built with it.
 
-Thirty public functions across four namespaces plus the `draw.Drawing` class,
-847 built-in self-tests and 67 `%!demo` blocks, nearly all of which
-end in a `plot` call, so the documentation shows what a function does rather
-than only describing it.
+Thirty-seven public functions across five namespaces plus the `draw.Drawing`
+and `solid.Shape` classes, 965 built-in self-tests and 67 `%!demo` blocks,
+nearly all of which end in a `plot` call, so the documentation shows what a
+function does rather than only describing it.
 
 ## Layout
 
@@ -20,11 +21,14 @@ inst/+geom    planar geometry (no file formats, no drawing semantics)
 inst/+dxf     AutoCAD R12 (AC1009) ASCII DXF, both directions
 inst/+stl     binary STL from a stack of planar sections
 inst/+draw    format-agnostic drawing model, and the backends that render it
+inst/+solid   solids through Open CASCADE, STEP and STL
 inst/tests    classdef .m-tst suites
+src           the compiled interface to Open CASCADE
 ```
 
 Dependencies point downward only: `+draw` builds on `+geom` and emits through
-`+dxf`; `+geom`, `+dxf` and `+stl` know nothing of drawings.
+`+dxf`; `+geom`, `+dxf` and `+stl` know nothing of drawings. `+solid` needs
+nothing else in the package, only Open CASCADE.
 
 `+geom` covers primitives (signed area, bounding box, centroid, affine
 transform, offset, largest inscribed rectangle, triangulation), curve geometry
@@ -86,6 +90,25 @@ leaving the planar model. Each section is written as its own closed shell, so a
 single section is a closed manifold and a stack of several is not. Slicers
 union it without complaint; a tool demanding one closed surface will not.
 
+`+solid` models solids through [Open CASCADE](https://dev.opencascade.org/),
+the kernel FreeCAD is built on, so curved faces stay exact. `solid.Shape` holds
+a solid, with the booleans `union`, `subtract` and `intersect`, translation,
+rotation, mirroring and scaling, and volume, area, centroid and bounding box;
+`solid.box`, `solid.cylinder`, `solid.cone`, `solid.sphere` and `solid.torus`
+make the primitives; `solid.read` reads STEP, and `solid.write` writes STEP for
+a CAD program or STL for a slicer:
+
+```
+plate = subtract (solid.box (80, 40, 12), ...
+                  translate (solid.cylinder (4, 12), [20, 20, 0]), ...
+                  translate (solid.cylinder (4, 12), [60, 20, 0]));
+solid.write ('plate.step', plate);
+solid.write ('plate.stl', plate);
+```
+
+Open CASCADE is optional: a package built without it works as before, and
+every `solid` function raises an error saying so.
+
 All geometry is in millimetres.
 
 ## Why R12 rather than a later DXF revision
@@ -137,8 +160,8 @@ solver, each with the reason it was ruled out.
 ## Install
 
 To install the latest release, you need Octave (>=11.1.0) installed on your
-system. The **drafting** package has no further dependencies. Install it by
-typing:
+system. The **drafting** package has no further required dependencies. Install
+it by typing:
 
   `pkg install drafting`
 
@@ -151,10 +174,22 @@ If you need to install a specific release, for example `0.1.0`, type:
 
   `pkg install "https://github.com/pr0m1th3as/drafting/archive/refs/tags/release-0.1.0.tar.gz"`
 
+The `+solid` namespace needs Open CASCADE 7.8 or later at build time, and is
+built only where its headers are found, by default in
+`/usr/include/opencascade`. On Debian or Ubuntu, where the packaged version is
+7.8 or later, install them before the package with:
+
+  `sudo apt install libocct-foundation-dev libocct-modeling-data-dev libocct-modeling-algorithms-dev libocct-data-exchange-dev`
+
+If the headers are elsewhere, name their directory before installing, for
+example `setenv ("OCCT_INC", "/opt/occt/include/opencascade")`; the libraries
+must be where the linker finds them. Linux is supported first; Windows and
+macOS are not yet.
+
 After installation, type:
 - `pkg load drafting` to load the **drafting** package.
 - `news drafting` to review all the user visible changes since last version.
-- `pkg test drafting` to run a test suite for all 31 functions and class
+- `pkg test drafting` to run a test suite for all 39 functions and class
   definitions currently available and ensure that they work properly on your
   system.
 

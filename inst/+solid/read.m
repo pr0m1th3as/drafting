@@ -28,7 +28,8 @@
 ## STEP (ISO 10303-21) is the format every mechanical CAD program exchanges
 ## solids in, and it keeps their exact geometry: a hole read from it is a true
 ## cylinder, as it was modelled.  @var{FILE} must end in @file{.step} or
-## @file{.stp}, in either case.
+## @file{.stp}, in either case, and open with the keyword
+## @qcode{ISO-10303-21;}, which may follow white space and comments.
 ##
 ## @seealso{solid.write, solid.Shape}
 ## @end deftypefn
@@ -49,12 +50,46 @@ function S = read (FILE)
   if (! isfile (FILE))
     error ("solid.read: cannot find file '%s'.", FILE);
   endif
+  if (! isstep (FILE))
+    error ("solid.read: FILE is not a readable STEP file.");
+  endif
   errmsg = solid.__checkocct__ ();
   if (! isempty (errmsg))
     error ("solid.read: %s", errmsg);
   endif
 
   S = solid.Shape (__occt__ ('readstep', 'solid.read', FILE));
+
+endfunction
+
+## Check that FILE opens with the keyword of ISO 10303-21
+function TF = isstep (FILE)
+
+  TF = false;
+  fid = fopen (FILE, 'r');
+  if (fid < 0)
+    return;
+  endif
+  head = fread (fid, [1, 65536], 'uint8=>char');
+  fclose (fid);
+
+  ## Skip white space and comments
+  while (true)
+    k = find (! isspace (head), 1);
+    if (isempty (k))
+      return;
+    endif
+    head = head(k:end);
+    if (! strncmp (head, '/*', 2))
+      break;
+    endif
+    k = strfind (head(3:end), '*/');
+    if (isempty (k))
+      return;
+    endif
+    head = head(k(1)+4:end);
+  endwhile
+  TF = strncmpi (head, 'ISO-10303-21;', 13);
 
 endfunction
 
@@ -91,22 +126,15 @@ endfunction
 %!   unlink (f);
 %! end_unwind_protect
 
-## A file that is not STEP can only be told apart by Open CASCADE, and %!error
-## takes no run-time condition, so this error is caught in a conditional test.
-%!testif ; exist ('__occt__') == 3
+%!testif ; exist ('__occt__') == 3  # a comment before the keyword
 %! f = [tempname(), '.step'];
-%! fid = fopen (f, 'w');
-%! fprintf (fid, "not a STEP file\n");
-%! fclose (fid);
 %! unwind_protect
-%!   try
-%!     solid.read (f);
-%!     msg = '';
-%!   catch err
-%!     msg = err.message;
-%!   end_try_catch
-%!   assert_equal (msg, sprintf (strcat ("solid.read: cannot read '%s'", ...
-%!                                       " as a STEP file."), f));
+%!   solid.write (f, solid.box (1, 2, 3));
+%!   txt = fileread (f);
+%!   fid = fopen (f, 'w');
+%!   fprintf (fid, "/* exported */\n%s", txt);
+%!   fclose (fid);
+%!   assert_equal (volume (solid.read (f)), 6, 1e-12);
 %! unwind_protect_cleanup
 %!   unlink (f);
 %! end_unwind_protect
@@ -118,3 +146,13 @@ endfunction
 %!error<solid.read: FILE must end in .step or .stp.> solid.read ('part')
 %!error<solid.read: cannot find file 'no_such_part_9f2c.step'.> ...
 %! solid.read ('no_such_part_9f2c.step')
+%!error<solid.read: FILE is not a readable STEP file.>
+%! f = [tempname(), '.step'];
+%! fid = fopen (f, 'w');
+%! fprintf (fid, "not a STEP file\n");
+%! fclose (fid);
+%! unwind_protect
+%!   solid.read (f);
+%! unwind_protect_cleanup
+%!   unlink (f);
+%! end_unwind_protect
