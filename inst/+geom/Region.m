@@ -100,6 +100,19 @@ classdef Region
 
     endfunction
 
+    ## The region as Open CASCADE takes it: the outline and a cell of the
+    ## holes, each as geom.Path's __data__ makes it, and the frame of the
+    ## region's plane, rows origin, x axis, y axis and normal
+    function D = __data__ (this)
+
+      U = this.UCS;
+      D = struct ('outline', __data__ (this.Outline), ...
+                  'holes', {cellfun(@__data__, this.Holes, ...
+                                    'UniformOutput', false)}, ...
+                  'frame', [U.Origin; U.XAxis; U.YAxis; U.Normal]);
+
+    endfunction
+
     ## The region with the outline O and the holes in the cell H, N-by-2
     ## vertices of straight segments in the xy plane, O anticlockwise and the
     ## holes clockwise, already known to be valid, as a cut through a mesh
@@ -421,6 +434,154 @@ classdef Region
 
     endfunction
 
+    ## -*- texinfo -*-
+    ## @deftypefn {geom.Region} {@var{R} =} union (@var{R1}, @var{R2}, @dots{})
+    ##
+    ## The area of any of several regions.
+    ##
+    ## @code{@var{R} = union (@var{R1}, @var{R2}, @dots{})} returns the area
+    ## covered by any of the regions, as a 1-by-@math{N} cell array of
+    ## @code{geom.Region} objects, one for each separate piece, largest first,
+    ## in the @code{geom.UCS} of @var{R1}.  Each argument is a region or a cell
+    ## array of them, such as another of these operations returns, so that they
+    ## chain.  Every region must lie in the plane of the first.  Where two meet
+    ## along an edge they become one, and the edges of the result are those of
+    ## the regions, arcs and splines exact.  This is OpenSCAD's @code{union} of
+    ## 2-D shapes, before the result is extruded or revolved.
+    ##
+    ## @example
+    ## @group
+    ## ## A plate and a tab, as one outline
+    ## R = union (geom.Region ([0, 0; 60, 0; 60, 40; 0, 40]), ...
+    ##            geom.Region ([50, 10; 80, 10; 80, 30; 50, 30]));
+    ## S = solid.extrude (R@{1@}, 5);
+    ## @end group
+    ## @end example
+    ##
+    ## Open CASCADE computes it, so the package must be built with it.
+    ##
+    ## @seealso{geom.Region.subtract, geom.Region.intersect, geom.Region.offset}
+    ## @end deftypefn
+    function R = union (varargin)
+
+      R = combine ('union', 'geom.Region.union', varargin);
+
+    endfunction
+
+    ## -*- texinfo -*-
+    ## @deftypefn {geom.Region} {@var{R} =} subtract (@var{R1}, @var{R2}, @dots{})
+    ##
+    ## The area of a region outside several others.
+    ##
+    ## @code{@var{R} = subtract (@var{R1}, @var{R2}, @dots{})} returns the area
+    ## of @var{R1} that lies in none of the regions after it, as
+    ## @code{geom.Region.union} returns its result: a cell array of regions,
+    ## largest first, in the @code{geom.UCS} of @var{R1}, empty when nothing is
+    ## left.  This is OpenSCAD's @code{difference} of 2-D shapes.
+    ##
+    ## @seealso{geom.Region.union, geom.Region.intersect}
+    ## @end deftypefn
+    function R = subtract (varargin)
+
+      R = combine ('subtract', 'geom.Region.subtract', varargin);
+
+    endfunction
+
+    ## -*- texinfo -*-
+    ## @deftypefn {geom.Region} {@var{R} =} intersect (@var{R1}, @var{R2}, @dots{})
+    ##
+    ## The area common to several regions.
+    ##
+    ## @code{@var{R} = intersect (@var{R1}, @var{R2}, @dots{})} returns the
+    ## area that lies in every one of the regions, as
+    ## @code{geom.Region.union} returns its result, empty when they share
+    ## none.  This is OpenSCAD's @code{intersection} of 2-D shapes.
+    ##
+    ## @seealso{geom.Region.union, geom.Region.subtract}
+    ## @end deftypefn
+    function R = intersect (varargin)
+
+      R = combine ('intersect', 'geom.Region.intersect', varargin);
+
+    endfunction
+
+    ## -*- texinfo -*-
+    ## @deftypefn  {geom.Region} {@var{R} =} offset (@var{R}, @var{D})
+    ## @deftypefnx {geom.Region} {@var{R} =} offset (@var{R}, @var{D}, @qcode{'Corners'}, @var{C})
+    ##
+    ## Grow or shrink a region by a distance.
+    ##
+    ## @code{@var{R} = offset (@var{R}, @var{D})} returns the points of the
+    ## plane that lie within @var{D} millimetres of the region, for a
+    ## positive @var{D}, or the points of the region at least @minus{}@var{D}
+    ## inside its edges, for a negative one: the outline moves out by @var{D}
+    ## and the holes close in by it, or the other way.  The corners that come
+    ## out of the move are round by default, arcs of radius @var{D}, as
+    ## OpenSCAD's @code{offset (r = @var{D})} makes them.  Shrinking can split a
+    ## region into pieces or leave nothing, so the result is a cell array of
+    ## regions as @code{geom.Region.union} returns it.
+    ##
+    ## With @qcode{'Corners'} set to @qcode{'sharp'} the edges are carried on
+    ## to meet, as @code{offset (delta = @var{D})} makes them, and with
+    ## @qcode{'chamfer'} each such corner between straight edges is cut off
+    ## square to the corner, @var{D} from where it was, as
+    ## @code{offset (delta = @var{D}, chamfer = true)} does.
+    ##
+    ## The edges of the result are those of the region moved, straight edges
+    ## straight and arcs exact; a spline's offset is a spline that Open CASCADE
+    ## fits to it, to about a part in ten million.  It computes the offset, so
+    ## the package must be built with it.
+    ##
+    ## @example
+    ## @group
+    ## ## A band 2 wide round a flange, G@{1@}; G@{2@} is the band 2 wide
+    ## ## inside its bore, which grows into it too
+    ## F = geom.Region ([0, 0; 60, 0; 60, 40; 0, 40], ...
+    ##                  @{[30, 20, 1; 40, 20, 1]@});
+    ## G = subtract (offset (F, 2), F);
+    ## @end group
+    ## @end example
+    ##
+    ## @seealso{geom.Region.union, geom.Region.fillet, geom.offset}
+    ## @end deftypefn
+    function R = offset (this, D, varargin)
+
+      ## Input validation
+      if (nargin != 2 && nargin != 4)
+        error ("geom.Region.offset: invalid number of input arguments.");
+      endif
+      if (! isnumeric (D) || ! isreal (D) || ! isscalar (D) || ! isfinite (D))
+        error ("geom.Region.offset: D must be a finite real scalar.");
+      endif
+      C = 'round';
+      if (nargin == 4)
+        if (! ischar (varargin{1}) || ! strcmp (varargin{1}, 'Corners'))
+          error ("geom.Region.offset: unknown parameter.");
+        endif
+        C = varargin{2};
+        if (! ischar (C) || ! any (strcmp (C, {'round', 'sharp', 'chamfer'})))
+          error (strcat ("geom.Region.offset: Corners must be 'round',", ...
+                         " 'sharp' or 'chamfer'."));
+        endif
+      endif
+      if (D == 0)
+        R = {this};
+        return;
+      endif
+      if (exist ('__occt__') != 3)
+        error (strcat ("geom.Region.offset: Open CASCADE is not available:", ...
+                       " the drafting package was built without it."));
+      endif
+
+      U = this.UCS;
+      F = __occt__ ('offset2d', 'geom.Region.offset', __data__ (this), ...
+                    double (D), find (strcmp (C, {'round', 'sharp', ...
+                                                  'chamfer'})) - 1, ...
+                    [U.Origin; U.XAxis; U.YAxis; U.Normal]);
+      R = regions (F, U);
+
+    endfunction
+
     function this = Region (OUTLINE, HOLES = {})
 
       ## Input validation
@@ -548,6 +709,64 @@ function [errmsg, P] = toloop (ARG, NAME, IN)
   if (! flat (P))
     errmsg = sprintf ("%s must lie in the plane of OUTLINE.", NAME);
   endif
+
+endfunction
+
+## The union, difference or intersection, OP, of the regions in ARGS, each a
+## region or a cell array of them, for CALLER, which names any error
+function R = combine (op, caller, args)
+
+  L = {};
+  for k = 1:numel (args)
+    a = args{k};
+    if (isa (a, 'geom.Region') && isscalar (a))
+      L{end+1} = a;
+    elseif (iscell (a) && all (cellfun (@(r) isa (r, 'geom.Region') ...
+                                         && isscalar (r), a(:)')))
+      L = [L, a(:)'];
+    else
+      error (strcat ("%s: every argument must be a geom.Region object or", ...
+                     " a cell array of them."), caller);
+    endif
+  endfor
+  R = cell (1, 0);
+  if (isempty (L))
+    return;
+  endif
+  U = L{1}.UCS;
+  for k = 2:numel (L)
+    V = L{k}.UCS;
+    scale = max ([1, abs(U.Origin), abs(V.Origin)]);
+    if (abs (V.Normal * U.Normal') < 1 - 1e-9 ...
+        || abs ((V.Origin - U.Origin) * U.Normal') > 1e-9 * scale)
+      error ("%s: every region must lie in the plane of the first.", caller);
+    endif
+  endfor
+  if (exist ('__occt__') != 3)
+    error (strcat ("%s: Open CASCADE is not available: the drafting", ...
+                   " package was built without it."), caller);
+  endif
+  F = __occt__ ('region2d', caller, op, cellfun (@__data__, L, ...
+                                                 'UniformOutput', false), ...
+                [U.Origin; U.XAxis; U.YAxis; U.Normal]);
+  R = regions (F, U);
+
+endfunction
+
+## The regions of the faces F that Open CASCADE hands back in the frame of the
+## UCS U, laid in U, largest first
+function R = regions (F, U)
+
+  R = cell (1, numel (F));
+  A = zeros (1, numel (F));
+  for k = 1:numel (F)
+    H = cellfun (@geom.Path.__loop__, F{k}.holes, 'UniformOutput', false);
+    R{k} = geom.Region (geom.Path.__loop__ (F{k}.outline), H);
+    A(k) = __area__ (R{k}.Outline) + sum (cellfun (@__area__, R{k}.Holes));
+    R{k}.UCS = U;
+  endfor
+  [~, i] = sort (A, 'descend');
+  R = R(i);
 
 endfunction
 
@@ -911,6 +1130,102 @@ endfunction
 %! F = fit (R);
 %! assert_equal (F.UCS, U);
 %! assert_equal (__area__ (F.Outline), 25 * pi, 1e-9);
+
+%!testif ; exist ('__occt__') == 3  # union: one outline, or pieces
+%! A = geom.Region ([0, 0; 60, 0; 60, 40; 0, 40]);
+%! R = union (A, geom.Region ([50, 10; 80, 10; 80, 30; 50, 30]));
+%! assert_equal (numel (R), 1);
+%! assert_equal (__area__ (R{1}.Outline), 2800, 1e-9);
+%! assert_equal (rows (R{1}.Outline.Vertices), 8);
+%! R = union (A, geom.Region ([70, 0; 80, 0; 80, 10]));
+%! assert_equal (cellfun (@(r) __area__ (r.Outline), R), [2400, 50], 1e-9);
+%! ## Meeting along an edge, one block
+%! R = union (A, geom.Region ([60, 0; 70, 0; 70, 40; 60, 40]));
+%! assert_equal (rows (R{1}.Outline.Vertices), 4);
+
+%!testif ; exist ('__occt__') == 3  # two discs, their arcs exact
+%! D = @(x) geom.Region ([x - 10, 0, 1; x + 10, 0, 1]);
+%! R = union (D (0), D (10));
+%! A = 2 * 100 * acos (0.5) - 10 * sqrt (100 - 25);
+%! assert_equal (__area__ (R{1}.Outline), 2 * 100 * pi - A, 1e-9);
+%! R = intersect (D (0), D (10));
+%! assert_equal (__area__ (R{1}.Outline), A, 1e-9);
+
+%!testif ; exist ('__occt__') == 3  # subtract: a hole, or a cut in two
+%! A = geom.Region ([0, 0; 60, 0; 60, 40; 0, 40]);
+%! R = subtract (A, geom.Region ([20, 20, 1; 40, 20, 1]));
+%! assert_equal (numel (R{1}.Holes), 1);
+%! assert_equal (__area__ (R{1}.Holes{1}), -100 * pi, 1e-9);
+%! R = subtract (A, geom.Region ([20, -5; 30, -5; 30, 45; 20, 45]));
+%! assert_equal (cellfun (@(r) __area__ (r.Outline), R), [1200, 800], 1e-9);
+%! assert_equal (subtract (A, A), cell (1, 0));
+
+%!testif ; exist ('__occt__') == 3  # chained, and in a UCS of their own
+%! U = geom.UCS ([0, 1, 1], [1, 2, 3]);
+%! A = geom.Region ([0, 0; 60, 0; 60, 40; 0, 40]);
+%! A.UCS = U;
+%! B = geom.Region ([50, 10; 80, 10; 80, 30; 50, 30]);
+%! B.UCS = U;
+%! C = geom.Region ([20, 20, 1; 40, 20, 1]);
+%! C.UCS = U;
+%! R = subtract (union (A, B), C);
+%! assert_equal (R{1}.UCS, U);
+%! assert_equal (__area__ (R{1}.Outline) + __area__ (R{1}.Holes{1}), ...
+%!               2800 - 100 * pi, 1e-9);
+
+%!testif ; exist ('__occt__') == 3  # offset: round, sharp and cut corners
+%! S = geom.Region ([0, 0; 10, 0; 10, 10; 0, 10]);
+%! R = offset (S, 1);
+%! assert_equal (__area__ (R{1}.Outline), 140 + pi, 1e-9);
+%! R = offset (S, 1, 'Corners', 'sharp');
+%! assert_equal (__area__ (R{1}.Outline), 144, 1e-9);
+%! R = offset (S, 1, 'Corners', 'chamfer');
+%! assert_equal (__area__ (R{1}.Outline), 144 - 4 * (sqrt (2) - 1) ^ 2, 1e-9);
+%! assert_equal (rows (R{1}.Outline.Vertices), 8);
+%! R = offset (S, -1);
+%! assert_equal (__area__ (R{1}.Outline), 64, 1e-9);
+%! assert_equal (offset (S, -6), cell (1, 0));
+%! R = offset (S, 0);
+%! assert_equal (__area__ (R{1}.Outline), 100);
+
+%!testif ; exist ('__occt__') == 3  # an outline of arcs, a hole that closes in
+%! S = geom.Region ([0, -6, 0; 40, -6, 1; 40, 6, 0; 0, 6, 1]);
+%! R = offset (S, 1);
+%! assert_equal (__area__ (R{1}.Outline), 560 + 49 * pi, 1e-9);
+%! F = geom.Region ([0, 0; 20, 0; 20, 20; 0, 20], ...
+%!                  {[8, 8; 12, 8; 12, 12; 8, 12]});
+%! R = offset (F, 1);
+%! assert_equal (__area__ (R{1}.Outline), 480 + pi, 1e-9);
+%! assert_equal (__area__ (R{1}.Holes{1}), -4, 1e-9);
+
+%!testif ; exist ('__occt__') == 3  # shrinking a dumbbell parts it
+%! P = [0, 0; 10, 0; 10, 4.5; 20, 4.5; 20, 0; 30, 0; 30, 10; 20, 10; ...
+%!      20, 5.5; 10, 5.5; 10, 10; 0, 10];
+%! R = offset (geom.Region (P), -1);
+%! assert_equal (numel (R), 2);
+
+%!testif ; exist ('__occt__') == 3  # a spline outline, to Open CASCADE's fit
+%! H = geom.Spline ([0, 0; 30, -5; 45, 15; 25, 30; 5, 20], 'Closed', true);
+%! S = geom.Region (H);
+%! R = offset (S, 1);
+%! A = __area__ (S.Outline) + length (H) + pi;
+%! assert_equal (__area__ (R{1}.Outline), A, -1e-6);
+
+%!error<geom.Region.union: every argument must be a geom.Region object or a cell array of them.> ...
+%! union (geom.Region ([0, 0; 1, 0; 1, 1]), [0, 0; 1, 0; 1, 1])
+%!error<geom.Region.subtract: every region must lie in the plane of the first.>
+%! A = geom.Region ([0, 0; 1, 0; 1, 1]);
+%! B = A;
+%! B.UCS = geom.UCS ([0, 0, 1], [0, 0, 1]);
+%! subtract (A, B);
+%!error<geom.Region.offset: invalid number of input arguments.> ...
+%! offset (geom.Region ([0, 0; 1, 0; 1, 1]))
+%!error<geom.Region.offset: D must be a finite real scalar.> ...
+%! offset (geom.Region ([0, 0; 1, 0; 1, 1]), NaN)
+%!error<geom.Region.offset: unknown parameter.> ...
+%! offset (geom.Region ([0, 0; 1, 0; 1, 1]), 1, 'Join', 'round')
+%!error<geom.Region.offset: Corners must be 'round', 'sharp' or 'chamfer'.> ...
+%! offset (geom.Region ([0, 0; 1, 0; 1, 1]), 1, 'Corners', 'square')
 
 %!error<geom.Region.fit: MODE must be 'lines', 'arcs' or 'curves'.> ...
 %! fit (geom.Region ([0, 0; 1, 0; 1, 1]), 'splines')

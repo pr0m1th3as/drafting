@@ -696,6 +696,178 @@ transform (const TopoDS_Shape& s, const gp_Trsf& t)
   return BRepBuilderAPI_Transform (s, t, Standard_True).Shape ();
 }
 
+// The transformation into the frame F, rows origin, x axis, y axis and
+// normal, where its plane is z = 0
+static gp_Trsf
+intoframe (const Matrix& f)
+{
+  gp_Trsf t;
+  t.SetTransformation (gp_Ax3 (gp_Pnt (f(0,0), f(0,1), f(0,2)),
+                               gp_Dir (f(3,0), f(3,1), f(3,2)),
+                               gp_Dir (f(1,0), f(1,1), f(1,2))));
+  return t;
+}
+
+// The wire W of an offset made with round corners, in the plane z = 0, each
+// corner arc of radius D about a vertex of the face F between two straight
+// edges replaced by the line square to the corner that touches the arc in
+// its middle, the edges either side carried on to meet it
+static TopoDS_Wire
+chamferwire (const TopoDS_Wire& w, const TopoDS_Face& f, double d)
+{
+  vector<gp_Pnt> corners;
+  for (TopExp_Explorer x (f, TopAbs_VERTEX); x.More (); x.Next ())
+  {
+    corners.push_back (BRep_Tool::Pnt (TopoDS::Vertex (x.Current ())));
+  }
+  // The edges in turn, each with its start and end the way the wire runs
+  struct ed
+  {
+    TopoDS_Edge e;
+    gp_Pnt a, b;
+    bool line, corner = false;
+    gp_Pnt c1, c2;
+  };
+  vector<ed> E;
+  for (BRepTools_WireExplorer x (w); x.More (); x.Next ())
+  {
+    ed g;
+    g.e = x.Current ();
+    g.a = BRep_Tool::Pnt (TopExp::FirstVertex (g.e, Standard_True));
+    g.b = BRep_Tool::Pnt (TopExp::LastVertex (g.e, Standard_True));
+    const BRepAdaptor_Curve c (g.e);
+    g.line = (c.GetType () == GeomAbs_Line);
+    if (c.GetType () == GeomAbs_Circle && std::abs (c.Circle ().Radius () - d)
+                                          <= 1e-7 * (1 + d))
+    {
+      for (const gp_Pnt& p : corners)
+      {
+        g.corner = g.corner || p.Distance (c.Circle ().Location ())
+                               <= 1e-7 * (1 + d);
+      }
+    }
+    E.push_back (g);
+  }
+  const size_t n = E.size ();
+  for (size_t i = 0; i < n; i++)
+  {
+    ed& g = E[i];
+    ed& p = E[(i + n - 1) % n];
+    ed& q = E[(i + 1) % n];
+    if (! g.corner || ! p.line || ! q.line || n < 3)
+    {
+      g.corner = false;
+      continue;
+    }
+    // The chamfer touches the arc where it is half way round
+    double u0, u1;
+    const Handle (Geom_Curve) c = BRep_Tool::Curve (g.e, u0, u1);
+    const gp_Pnt m = c->Value ((u0 + u1) / 2);
+    gp_Vec t;
+    gp_Pnt dummy;
+    c->D1 ((u0 + u1) / 2, dummy, t);
+    // Where the chamfer line meets the lines of the edges either side
+    auto meet = [&] (const gp_Pnt& a, const gp_Pnt& b)
+    {
+      const gp_Vec u (a, b);
+      const gp_Vec w0 (a, m);
+      const double den = u.X () * t.Y () - u.Y () * t.X ()
+                         + 1e-300;
+      const double s = (w0.X () * t.Y () - w0.Y () * t.X ()) / den;
+      return gp_Pnt (a.XYZ () + s * u.XYZ ());
+    };
+    g.c1 = meet (p.a, p.b);
+    g.c2 = meet (q.a, q.b);
+    p.b = g.c1;
+    q.a = g.c2;
+  }
+  BRepBuilderAPI_MakeWire mw;
+  for (size_t i = 0; i < n; i++)
+  {
+    const ed& g = E[i];
+    if (g.corner)
+    {
+      mw.Add (BRepBuilderAPI_MakeEdge (g.c1, g.c2).Edge ());
+    }
+    else if (g.line)
+    {
+      mw.Add (BRepBuilderAPI_MakeEdge (g.a, g.b).Edge ());
+    }
+    else
+    {
+      mw.Add (g.e);
+    }
+  }
+  return mw.IsDone () ? mw.Wire () : w;
+}
+
+// The signed area inside the wire W in the plane z = 0, positive where it
+// runs anticlockwise, from points along each edge in turn
+static double
+wirearea (const TopoDS_Wire& w)
+{
+  double a = 0;
+  for (BRepTools_WireExplorer x (w); x.More (); x.Next ())
+  {
+    const BRepAdaptor_Curve c (x.Current ());
+    const bool rev = (x.Current ().Orientation () == TopAbs_REVERSED);
+    const double u0 = c.FirstParameter (), u1 = c.LastParameter ();
+    const int n = 64;
+    gp_Pnt p = c.Value (rev ? u1 : u0);
+    for (int k = 1; k <= n; k++)
+    {
+      const double t = rev ? u1 - (u1 - u0) * k / n : u0 + (u1 - u0) * k / n;
+      const gp_Pnt q = c.Value (t);
+      a += (p.X () * q.Y () - q.X () * p.Y ()) / 2;
+      p = q;
+    }
+  }
+  return a;
+}
+
+// The faces of C, lying in the plane z = 0, each as its outer loop and its
+// inner loops, in pieces as sectionloop gives them; faces whose area is
+// nothing beside SCALE left out
+static Cell
+facesout (const TopoDS_Shape& c, double scale)
+{
+  vector<octave_value> faces;
+  for (TopExp_Explorer x (c, TopAbs_FACE); x.More (); x.Next ())
+  {
+    const TopoDS_Face face = TopoDS::Face (x.Current ());
+    GProp_GProps p;
+    BRepGProp::SurfaceProperties (face, p);
+    if (p.Mass () <= 1e-12 * scale)
+    {
+      continue;
+    }
+    const TopoDS_Wire outer = BRepTools::OuterWire (face);
+    vector<octave_value> holes;
+    for (TopExp_Explorer y (face, TopAbs_WIRE); y.More (); y.Next ())
+    {
+      if (! y.Current ().IsSame (outer))
+      {
+        holes.push_back (sectionloop (TopoDS::Wire (y.Current ()), face));
+      }
+    }
+    Cell h (1, holes.size ());
+    for (size_t i = 0; i < holes.size (); i++)
+    {
+      h(i) = holes[i];
+    }
+    octave_scalar_map m;
+    m.assign ("outline", sectionloop (outer, face));
+    m.assign ("holes", h);
+    faces.push_back (m);
+  }
+  Cell out (1, faces.size ());
+  for (size_t i = 0; i < faces.size (); i++)
+  {
+    out(i) = faces[i];
+  }
+  return out;
+}
+
 // The result of a boolean operation, its coplanar faces and collinear edges
 // merged so that a union of two blocks reads as one block.
 static TopoDS_Shape
@@ -1397,7 +1569,6 @@ function directly. \n\
       const TopoDS_Shape s = transform (toshape (args(2), caller), t);
       Bnd_Box box;
       BRepBndLib::Add (s, box);
-      vector<octave_value> faces;
       double x0, y0, z0, x1, y1, z1;
       box.Get (x0, y0, z0, x1, y1, z1);
       const double tol = box.GetGap () + Precision::Confusion ();
@@ -1409,43 +1580,150 @@ function directly. \n\
                                      y0 - r, y1 + r).Face ();
         BRepAlgoAPI_Common op (s, plane);
         const TopoDS_Shape c = boolean (op, caller, "section");
-        const double scale = (x1 - x0) * (y1 - y0) + 1;
-        for (TopExp_Explorer x (c, TopAbs_FACE); x.More (); x.Next ())
+        out = facesout (c, (x1 - x0) * (y1 - y0) + 1);
+      }
+      else
+      {
+        out = Cell (1, 0);
+      }
+    }
+
+    // Regions combined: the union, difference or intersection of regions
+    // in one plane, read back in the frame of the first as the faces of a
+    // section are
+    else if (cmd == "region2d")
+    {
+      const string op = args(2).string_value ();
+      const Cell R = args(3).cell_value ();
+      vector<TopoDS_Shape> f;
+      for (octave_idx_type i = 0; i < R.numel (); i++)
+      {
+        f.push_back (planarface (toregion (R(i))));
+      }
+      TopoDS_Shape c = f[0];
+      if (f.size () > 1)
+      {
+        TopTools_ListOfShape first, rest;
+        first.Append (f[0]);
+        for (size_t i = 1; i < f.size (); i++)
         {
-          const TopoDS_Face face = TopoDS::Face (x.Current ());
-          GProp_GProps p;
-          BRepGProp::SurfaceProperties (face, p);
-          if (p.Mass () <= 1e-12 * scale)
+          rest.Append (f[i]);
+        }
+        if (op == "union")
+        {
+          BRepAlgoAPI_Fuse b;
+          b.SetArguments (first);
+          b.SetTools (rest);
+          c = boolean (b, caller, "union");
+        }
+        else if (op == "subtract")
+        {
+          BRepAlgoAPI_Cut b;
+          b.SetArguments (first);
+          b.SetTools (rest);
+          c = boolean (b, caller, "difference");
+        }
+        else
+        {
+          for (size_t i = 1; i < f.size (); i++)
           {
-            continue;
+            BRepAlgoAPI_Common b (c, f[i]);
+            c = boolean (b, caller, "intersection");
           }
-          const TopoDS_Wire outer = BRepTools::OuterWire (face);
-          vector<octave_value> holes;
-          for (TopExp_Explorer y (face, TopAbs_WIRE); y.More (); y.Next ())
-          {
-            if (! y.Current ().IsSame (outer))
-            {
-              holes.push_back (sectionloop (TopoDS::Wire (y.Current ()),
-                                            face));
-            }
-          }
-          Cell h (1, holes.size ());
-          for (size_t i = 0; i < holes.size (); i++)
-          {
-            h(i) = holes[i];
-          }
-          octave_scalar_map m;
-          m.assign ("outline", sectionloop (outer, face));
-          m.assign ("holes", h);
-          faces.push_back (m);
         }
       }
-      Cell out_ (1, faces.size ());
-      for (size_t i = 0; i < faces.size (); i++)
+      const Matrix fr = args(4).matrix_value ();
+      c = transform (c, intoframe (fr));
+      Bnd_Box box;
+      BRepBndLib::Add (c, box);
+      double x0 = 0, y0 = 0, z0, x1 = 0, y1 = 0, z1;
+      if (! box.IsVoid ())
       {
-        out_(i) = faces[i];
+        box.Get (x0, y0, z0, x1, y1, z1);
       }
-      out = out_;
+      out = facesout (c, (x1 - x0) * (y1 - y0) + 1);
+    }
+
+    // A region offset in its plane by D, outwards where D is positive, its
+    // corners round, sharp, or cut square to the corner at the distance D:
+    // the offset of its face, whose loops running the way the outline runs
+    // are filled and those running the other way cut out
+    else if (cmd == "offset2d")
+    {
+      // Worked in the region's frame, where its plane is z = 0
+      const Matrix fr = args(5).matrix_value ();
+      const TopoDS_Face face
+        = TopoDS::Face (transform (planarface (toregion (args(2))),
+                                   intoframe (fr)));
+      const double d = args(3).double_value ();
+      const int corners = args(4).int_value ();
+      // A chamfer is cut from the round corners
+      BRepOffsetAPI_MakeOffset op (face, corners == 1 ? GeomAbs_Intersection
+                                                      : GeomAbs_Arc);
+      op.Perform (d);
+      if (! op.IsDone ())
+      {
+        error ("%s: Open CASCADE could not compute the offset.",
+               caller.c_str ());
+      }
+      vector<TopoDS_Face> pos, neg;
+      for (TopExp_Explorer x (op.Shape (), TopAbs_WIRE); x.More (); x.Next ())
+      {
+        TopoDS_Wire w = TopoDS::Wire (x.Current ());
+        if (corners == 2)
+        {
+          w = chamferwire (w, face, std::abs (d));
+        }
+        // A loop running as the outline does is filled, one running the
+        // other way, as a hole does, is cut out
+        const bool fill = wirearea (w) > 0;
+        BRepBuilderAPI_MakeFace mf (fill ? w : TopoDS::Wire (w.Reversed ()),
+                                    Standard_True);
+        if (mf.IsDone ())
+        {
+          (fill ? pos : neg).push_back (mf.Face ());
+        }
+      }
+      TopoDS_Shape c;
+      if (! pos.empty ())
+      {
+        c = pos[0];
+        if (pos.size () > 1)
+        {
+          TopTools_ListOfShape first, rest;
+          first.Append (pos[0]);
+          for (size_t i = 1; i < pos.size (); i++)
+          {
+            rest.Append (pos[i]);
+          }
+          BRepAlgoAPI_Fuse b;
+          b.SetArguments (first);
+          b.SetTools (rest);
+          c = boolean (b, caller, "offset");
+        }
+        if (! neg.empty ())
+        {
+          TopTools_ListOfShape first, rest;
+          first.Append (c);
+          for (const TopoDS_Face& g : neg)
+          {
+            rest.Append (g);
+          }
+          BRepAlgoAPI_Cut b;
+          b.SetArguments (first);
+          b.SetTools (rest);
+          c = boolean (b, caller, "offset");
+        }
+        Bnd_Box box;
+        BRepBndLib::Add (c, box);
+        double x0, y0, z0, x1, y1, z1;
+        box.Get (x0, y0, z0, x1, y1, z1);
+        out = facesout (c, (x1 - x0) * (y1 - y0) + 1);
+      }
+      else
+      {
+        out = Cell (1, 0);
+      }
     }
 
     // Queries

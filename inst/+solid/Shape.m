@@ -1338,8 +1338,9 @@ classdef Shape
                 [U.Origin; U.XAxis; U.YAxis; U.Normal]);
       A = zeros (1, numel (F));
       for k = 1:numel (F)
-        H = cellfun (@toloop, F{k}.holes, 'UniformOutput', false);
-        R{k} = geom.Region (toloop (F{k}.outline), H);
+        H = cellfun (@geom.Path.__loop__, F{k}.holes, ...
+                     'UniformOutput', false);
+        R{k} = geom.Region (geom.Path.__loop__ (F{k}.outline), H);
         R{k}.UCS = U;
         A(k) = __area__ (R{k}.Outline) + sum (cellfun (@__area__, R{k}.Holes));
       endfor
@@ -1351,31 +1352,6 @@ classdef Shape
   endmethods
 
 endclassdef
-
-## A closed loop of a cut, as a geom.Path, from its pieces in turn: lines,
-## arcs through three points and B-splines
-function P = toloop (pieces)
-
-  Q = cell (1, numel (pieces));
-  for i = 1:numel (pieces)
-    c = pieces{i};
-    switch (c.type)
-      case 'line'
-        Q{i} = geom.Path (c.points);
-      case 'arc'
-        Q{i} = geom.Path.arc (c.points(1,:), c.points(2,:), c.points(3,:));
-      otherwise
-        Q{i} = geom.Spline.nurbs (c.points, repelem (c.knots', c.mults'), ...
-                                  c.weights);
-    endswitch
-  endfor
-  if (numel (Q) == 1)
-    P = geom.Path (Q{1});
-  else
-    P = join (Q{:}, 'Tangent', false);
-  endif
-
-endfunction
 
 ## Run an Open CASCADE operation on behalf of CALLER, which names any error
 function out = occt (caller, cmd, varargin)

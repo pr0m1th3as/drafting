@@ -17,31 +17,14 @@
 
 ## Internal helper.  Hand a geom.Path to Open CASCADE.
 ##
-## D is the struct __occt__ reads for a path, all in world coordinates: its
-## vertices, the midpoints of its arcs, NaN for a segment that is not an arc,
-## a cell with, for each spline segment, its control points, their weights,
-## its distinct knots and their multiplicities and its degree, its end control
-## points set on the vertices so that the wire closes exactly, and whether the
-## path is closed.
+## D is the struct __occt__ reads for a path, all in world coordinates, as
+## the path's hidden method __data__ makes it: its vertices, the midpoints of
+## its arcs, its splines' control points, weights, knots and degrees, and
+## whether it is closed.
 
 function D = __path__ (P)
 
-  V = toworld (P.UCS, P.Vertices);
-  M = P.Midpoints;
-  arc = ! isnan (M(:,1));
-  M(arc,:) = toworld (P.UCS, M(arc,:));
-  n = rows (V);
-  C = cell (n, 1);
-  for i = find (! cellfun (@isempty, P.Splines))'
-    SP = P.Splines{i};
-    B = toworld (P.UCS, SP.ControlPoints);
-    B([1, end],:) = V([i, mod(i, n) + 1],:);
-    [k, ~, j] = unique (SP.Knots);
-    C{i} = struct ('poles', B, 'weights', SP.Weights, 'knots', k(:), ...
-                   'mults', accumarray (j(:), 1), 'degree', SP.Degree);
-  endfor
-  D = struct ('vertices', V, 'midpoints', M, 'splines', {C}, ...
-              'closed', P.Closed);
+  D = __data__ (P);
 
 endfunction
 

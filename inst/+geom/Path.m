@@ -136,6 +136,33 @@ classdef Path
 
     endfunction
 
+    ## The path as Open CASCADE takes it, all in world coordinates: its
+    ## vertices, the midpoints of its arcs, NaN for a segment that is not an
+    ## arc, a cell with, for each spline segment, its control points, their
+    ## weights, its distinct knots and their multiplicities and its degree,
+    ## its end control points set on the vertices so that the wire closes
+    ## exactly, and whether the path is closed
+    function D = __data__ (this)
+
+      V = toworld (this.UCS, this.Vertices);
+      M = this.Midpoints;
+      arc = ! isnan (M(:,1));
+      M(arc,:) = toworld (this.UCS, M(arc,:));
+      n = rows (V);
+      C = cell (n, 1);
+      for i = find (! cellfun (@isempty, this.Splines))'
+        SP = this.Splines{i};
+        B = toworld (this.UCS, SP.ControlPoints);
+        B([1, end],:) = V([i, mod(i, n) + 1],:);
+        [k, ~, j] = unique (SP.Knots);
+        C{i} = struct ('poles', B, 'weights', SP.Weights, 'knots', k(:), ...
+                       'mults', accumarray (j(:), 1), 'degree', SP.Degree);
+      endfor
+      D = struct ('vertices', V, 'midpoints', M, 'splines', {C}, ...
+                  'closed', this.Closed);
+
+    endfunction
+
     ## The same path run the other way round, a closed one from the same first
     ## vertex: each segment reversed and moved to the vertex it now leaves
     function this = __reversed__ (this)
@@ -728,6 +755,38 @@ classdef Path
       P.Vertices = W(! gone,:);
       P.Midpoints = N(! gone,:);
       P.Splines = S(! gone);
+
+    endfunction
+
+  endmethods
+
+  methods (Static, Hidden)
+
+    ## The closed path through PIECES in turn, each a line, an arc through
+    ## three points or a B-spline, as Open CASCADE hands back the loops of a
+    ## face lying in the plane z = 0
+    function P = __loop__ (pieces)
+
+      Q = cell (1, numel (pieces));
+      for i = 1:numel (pieces)
+        c = pieces{i};
+        switch (c.type)
+          case 'line'
+            Q{i} = geom.Path (c.points);
+          case 'arc'
+            Q{i} = geom.Path.arc (c.points(1,:), c.points(2,:), ...
+                                  c.points(3,:));
+          otherwise
+            Q{i} = geom.Spline.nurbs (c.points, ...
+                                      repelem (c.knots', c.mults'), ...
+                                      c.weights);
+        endswitch
+      endfor
+      if (numel (Q) == 1)
+        P = geom.Path (Q{1});
+      else
+        P = join (Q{:}, 'Tangent', false);
+      endif
 
     endfunction
 

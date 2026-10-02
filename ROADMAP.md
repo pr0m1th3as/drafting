@@ -42,8 +42,9 @@ are deliberate:
   a CAM package that consumes this one.
 - The kernel is not ours. Solids are built, combined and read through Open
   CASCADE; the package writes no boolean, fillet or surface-intersection code
-  of its own. The planar model stays plain Octave code and needs nothing
-  compiled.
+  of its own. The booleans and offsets of regions are Open CASCADE's too. The
+  rest of the planar model is plain Octave, and the work on triangle meshes is
+  compiled, needing nothing but Octave.
 
 Everything below is checked against those two lines.
 
@@ -150,71 +151,62 @@ assembly, one smooth solid with its section carried along, not new shapes.
 A sweep along a spline is what a grip, a curved rib or a cooling channel
 following the shape of a printed mould is made from.
 
-## Milestone 1: close the package's own shape (0.2.0)
+## Milestone 1: an OpenSCAD alternative (0.2.0)
 
-Small, unglamorous work that removes asymmetries in what is already here. Each
-item costs little and each one is noticed the moment it is missing.
+The package is the base for packages like `cycloidal`, and an alternative to
+OpenSCAD written in Octave itself, without OpenSCAD's limits: exact geometry
+rather than facets, fillets, chamfers, shells and holes, lofts, sweeps and
+helices, STEP as well as STL, sections that can be built from again, and a
+real language around it all. What an OpenSCAD user reaches for is therefore
+the measure of this release. Primitives, linear and rotational extrusion
+(twist and scale included), the solid booleans and transforms, the cut
+projection (`section`) and STL in and out are here. These are not:
 
-**A drawing made by another application.** The output half of this gap is
-closed: the suite reads back the page it printed. The input half is not, and it
-is open for a structural reason rather than an inattentive one. Every DXF the
-tests read was written by this package, and there are shapes our writer cannot
-produce: it flattens a nested block on export, it never emits the layout
-containers a real file defines, and it writes an aligned dimension as a rotated
-one. **No round trip can reach a path that our own output never takes**, which
-is exactly where the two import defects fixed since 0.1.0 were hiding, invisible
-to eight hundred passing tests.
-
-The first such drawing is in, under `inst/tests/fixtures/`: one rectangle, one
-circle and seven dimensions, saved by LibreCAD in every version it offers. It
-found three defects in its first minute. The reader could not read **any** file
-containing an empty group value; entity types met inside a block were dropped
-without being counted; and an aligned dimension, which the format gives its own
-type code and which we have never written, was not raised at all.
-
-What remains is the rest of the same idea: blocks with nested inserts, the
-entities R12 cannot store, polyline widths and bulges, an inch file, a layer
-table, each drawn elsewhere, checked in with the values it was drawn to, and
-read by tests that assert them. It goes first for the same reason the render
-test did: it protects everything after it, and it is the difference between a
-reader that happens to work on our files and one that reads DXF.
-
-**Units in the model.** The millimetre loop is closed and correct: `dxf.read`
-converts an inch file to millimetres on the way in (a one-inch line arrives as
-25.4), and `dxf.write` declares `$INSUNITS` as millimetres on the way out. So
-this is not a correctness hole, and nothing is silently mis-scaled.
-
-What is missing is the ability to *work* in anything else. A `Units` property on
-`Drawing`, honoured by `print`, `dxf.write` and `stl.write`, would let a drawing
-be authored in inches and say so in its output, rather than requiring the author
-to convert in their head. Worth having, and an ergonomic feature rather than a
-fix, so it earns its place here on cost, not on urgency.
-
-**Elementary geometric queries.** The package can offset a polygon and find the
-largest rectangle inside it, but cannot answer where the nearest point on a
-polyline is. The following are each between five and thirty lines, and their
-absence forces every downstream package to write them again, worse:
-
-| Function | What it answers |
+| OpenSCAD | Here |
 |---|---|
-| `geom.distance` | point to segment, polyline or polygon boundary |
-| `geom.nearestpoint` | the closest point on a curve, and its parameter |
-| `geom.projectpoint` | orthogonal projection onto a line or segment |
-| `geom.convexhull` | the hull of a point set, consistently oriented |
-| `geom.orientedbbox` | minimum-area enclosing rectangle, the circumscribed dual of `largestrect` |
-| `geom.minimumcircle` | smallest enclosing circle |
+| `union`, `difference`, `intersection` of 2-D shapes | `union`, `subtract` and `intersect` on `geom.Region`, through Open CASCADE, arcs and splines exact |
+| `offset (r)`, `offset (delta)`, `chamfer` | `offset` on `geom.Region`, its corners round, sharp or cut |
+| `hull ()` of 2-D shapes | the hull of regions, its arcs exact and its lines tangent to them |
+| `text ()` | the outlines of text as regions, from Open CASCADE's font builder |
+| `polyhedron ()`, an STL in a boolean | a watertight mesh sewn into a `solid.Shape` |
+| `multmatrix`, `resize`, `color` | a general affine transform, resizing to a box, colour carried to the viewer and to STEP |
+| `projection (cut = false)` | the outline of a solid on a plane, which milestone 4's views need as well |
+| `hull ()` of solids | the hull of a solid's points, as a faceted solid |
 
-**`stl.read`.** The `stl` namespace writes and cannot read. Both the ASCII and
-binary forms are an afternoon's work, and a package that emits meshes for other
-tools ought to be able to take them back. Reading, welding and slicing are
-compiled, in a file of their own that needs no Open CASCADE: an interpreted
-loop chains a cut's segments fifty times slower. With it comes slicing a mesh
-with a plane into `geom.Region` objects, as `solid.Shape.section` cuts a
-solid: the cut of a mesh is a polygon, healed to a tolerance where the mesh
-has gaps. Fitting arcs and splines to that polygon, so that a faceted bore
-becomes a circle again, is `geom.Region.fit`: lines, arcs and splines within
-a tolerance, absolute or relative, corners found on a sliding window so that
-noise and small faceted fillets are not taken for them.
+`minkowski ()` is not planned: its common use, rounding a shape, is `fillet`
+and the offsets, and a Minkowski sum of exact solids has no counterpart in Open
+CASCADE.
+
+**The package's own shape.** Three pieces of the drawing side close here.
+
+*A drawing made by another application.* Every DXF the tests read was written
+by this package, and no round trip can reach a path our own output never takes:
+a nested block, the layout containers a real file defines, an aligned dimension.
+One such drawing is in, under `inst/tests/fixtures/`, saved by LibreCAD in every
+version it offers, and it found three defects in its first minute. The rest of
+the idea follows: blocks with nested inserts, the entities R12 cannot store,
+polyline widths and bulges, an inch file, a layer table, each drawn elsewhere,
+checked in with the values it was drawn to, and read by tests that assert them.
+
+*DXF dimension types 5 and 6.* Type 5, angular, maps onto `angdim`; type 6,
+ordinate, has no entity in the drawing model yet.
+
+*Units in the model.* `dxf.read` converts an inch file to millimetres and
+`dxf.write` declares millimetres, so nothing is mis-scaled; what is missing is
+working in anything else. A `Units` property on `Drawing`, honoured by
+`print`, `dxf.write` and `stl.write`, would let a drawing be authored in inches.
+It is ergonomic rather than a fix, and may slip to a later release.
+
+**Meshes.** `stl.read` reads binary and ASCII STL, `stl.section` cuts a mesh
+with a plane into regions, healed to a tolerance where the mesh has gaps, and
+`geom.Region.fit` turns the cut's facets back into lines, arcs and splines, so
+that a faceted bore becomes a circle again. The viewer shows meshes and picks a
+UCS on them. Reading, welding, cutting and fitting are compiled, in a file of
+their own that needs no Open CASCADE.
+
+General geometric queries (the distance to a curve, the nearest point on it,
+the smallest enclosing circle or box) wait until a package built on this one
+needs them.
 
 ## Milestone 2: the language of a technical drawing (0.3.0)
 
@@ -371,24 +363,19 @@ reason to leave DXF R12, because `geom.hatchlines` already emits hatch as line
 segments and R12 carries those. A spline has no R12 representation at all.
 This milestone is what makes the format work worth doing.
 
-## Milestone 6: polygon booleans (0.7.0)
+## Milestone 6: polygon booleans without Open CASCADE (0.7.0)
 
-Union, intersection, difference and exclusive-or on polygons with holes. This
-is the workhorse operation of two-dimensional CAD, and core Octave has nothing
-like it. It unlocks hatch boundaries with islands, clearance and interference
-checks, material-removal work, and profile combination.
+Union, intersection and difference of regions come through Open CASCADE from
+0.2.0, exact for arcs and splines. What remains is the same on plain N-by-2
+polygons for a build without Open CASCADE, for hatch boundaries with islands
+and clearance checks there.
 
 It should be entered with clear eyes. Vatti, Greiner-Hormann and
-Martínez-Rueda are each of publishable quality, and every one of them fails on
-degeneracies rather than on the general case: collinear edges, coincident
-vertices, self-touching boundaries, and edges that meet at a point without
-crossing. Getting the happy path working is a week. Making it robust is the
-actual project, and it requires either exact geometric predicates or a
-deliberate, documented and tested tolerance policy, chosen up front, not
-discovered.
-
-Because of that risk this milestone stands alone, and nothing else should be
-scheduled to depend on it landing on time.
+Martínez-Rueda each fail on degeneracies rather than on the general case:
+collinear edges, coincident vertices, self-touching boundaries, edges that meet
+at a point without crossing. Making them robust is the actual project, and it
+needs either exact predicates or a tolerance policy chosen up front, so nothing
+else is scheduled to depend on it.
 
 ## Milestone 7: profiles to solids (0.8.0)
 
