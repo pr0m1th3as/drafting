@@ -44,6 +44,7 @@ Drawing model
 Solid modelling
  solid.Shape
  solid.box
+ solid.wedge
  solid.cylinder
  solid.cone
  solid.sphere

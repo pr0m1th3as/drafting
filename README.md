@@ -9,9 +9,9 @@ CAD program or a CNC machine will accept, as a solid for a slicer, as LaTeX for
 a report, or as a figure on screen. Solids proper, built, combined and
 exchanged as STEP, come through Open CASCADE when the package is built with it.
 
-Forty-three public functions across five namespaces plus the `draw.Drawing`,
+Forty-four public functions across five namespaces plus the `draw.Drawing`,
 `geom.Polyline`, `geom.Region`, `geom.UCS`, `solid.Shape` and `solid.Viewer`
-classes, 1202 built-in self-tests and 67 `%!demo` blocks, nearly all of which
+classes, 1256 built-in self-tests and 67 `%!demo` blocks, nearly all of which
 end in a `plot` call, so the documentation shows what a function does rather
 than only describing it.
 
@@ -103,15 +103,14 @@ union it without complaint; a tool demanding one closed surface will not.
 the kernel FreeCAD is built on, so curved faces stay exact. `solid.Shape` holds
 a solid, with the booleans `union`, `subtract` and `intersect`, translation,
 rotation, mirroring and scaling, and volume, area, centroid and bounding box;
-`solid.box`, `solid.cylinder`, `solid.cone`, `solid.sphere` and `solid.torus`
-make the primitives; `solid.extrude`, `solid.revolve`, `solid.loft`,
-`solid.sweep` and `solid.helix` make a solid from a `geom.Region`, where the
-region's plane puts it, its arcs carried as true arcs and its holes right
-through. Methods
-drill holes (plain, counterbored, countersunk, tapping size), round and bevel
-edges and hollow a shape, on edges and faces chosen by kind, direction and
-position. `solid.read` reads STEP, and `solid.write` writes STEP for a CAD
-program or STL for a slicer:
+`solid.box`, `solid.wedge`, `solid.cylinder`, `solid.cone`, `solid.sphere` and
+`solid.torus` make the primitives; `solid.extrude`, `solid.revolve`,
+`solid.loft`, `solid.sweep` and `solid.helix` make a solid from a
+`geom.Region`, where the region's plane puts it, its arcs carried as true arcs
+and its holes right through. Methods drill holes (plain, counterbored,
+countersunk, tapping size), round and bevel edges and hollow a shape, on edges
+and faces chosen by kind, direction and position. `solid.read` reads STEP, and
+`solid.write` writes STEP for a CAD program or STL for a slicer:
 
 ```
 plate = solid.box (80, 40, 12);
@@ -234,7 +233,7 @@ macOS are not yet.
 After installation, type:
 - `pkg load drafting` to load the **drafting** package.
 - `news drafting` to review all the user visible changes since last version.
-- `pkg test drafting` to run a test suite for all 49 functions and class
+- `pkg test drafting` to run a test suite for all 50 functions and class
   definitions currently available and ensure that they work properly on your
   system.
 

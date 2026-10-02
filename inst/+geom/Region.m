@@ -156,6 +156,59 @@ classdef Region
 
     endfunction
 
+    ## -*- texinfo -*-
+    ## @deftypefn {geom.Region} {@var{R} =} fillet (@var{R}, @var{RADIUS})
+    ##
+    ## Round the corners of a region.
+    ##
+    ## @code{@var{R} = fillet (@var{R}, @var{RADIUS})} rounds every corner of
+    ## the outline and of every hole where two straight segments meet, with an
+    ## arc of radius @var{RADIUS} millimetres tangent to both, as
+    ## @code{geom.Polyline.fillet} does: the outline's corners and the inside
+    ## corners of its holes alike.  This is the rounded outline of a plate or a
+    ## pocket, drawn before it is extruded, which is simpler and more exact
+    ## than rounding the edges of the solid afterwards.  To round only some
+    ## corners, round the outline or a hole as a polyline and make the region
+    ## again.
+    ##
+    ## @example
+    ## @group
+    ## ## A plate 60 by 40 with corners of radius 5 and a slot with sharp
+    ## ## corners rounded to 1
+    ## R = geom.Region ([0, 0; 60, 0; 60, 40; 0, 40], ...
+    ##                  @{[20, 15; 40, 15; 40, 25; 20, 25]@});
+    ## S = solid.extrude (fillet (R, 1), 6);
+    ## @end group
+    ## @end example
+    ##
+    ## @seealso{geom.Polyline.fillet}
+    ## @end deftypefn
+    function this = fillet (this, RADIUS)
+
+      ## Input validation
+      if (nargin != 2)
+        error ("geom.Region.fillet: invalid number of input arguments.");
+      endif
+
+      try
+        O = fillet (this.Outline, RADIUS);
+      catch err
+        error ("geom.Region.fillet: OUTLINE: %s", ...
+               regexprep (err.message, '^geom\.Polyline\.fillet: ', ''));
+      end_try_catch
+      H = this.Holes;
+      for k = 1:numel (H)
+        try
+          H{k} = fillet (H{k}, RADIUS);
+        catch err
+          error ("geom.Region.fillet: HOLES{%d}: %s", k, ...
+                 regexprep (err.message, '^geom\.Polyline\.fillet: ', ''));
+        end_try_catch
+      endfor
+      this = geom.Region (O, H);
+
+    endfunction
+
     function this = Region (OUTLINE, HOLES = {})
 
       ## Input validation
@@ -403,6 +456,23 @@ endfunction
 %! assert_equal (R.Holes{1}.UCS, U);
 %! assert_equal (R.Outline.Vertices, [0, 0, 0; 60, 0, 0; 60, 40, 0; 0, 40, 0]);
 %! assert_equal (R.Holes{1}.Vertices, [20, 20, -1; 40, 20, -1]);
+
+%!test  # every corner of the outline and of a hole rounded
+%! R = geom.Region ([0, 0; 60, 0; 60, 40; 0, 40], ...
+%!                  {[20, 15; 40, 15; 40, 25; 20, 25]});
+%! Q = fillet (R, 1);
+%! assert_equal (rows (Q.Outline.Vertices), 8);
+%! assert_equal (rows (Q.Holes{1}.Vertices), 8);
+%! assert_equal (all (Q.Holes{1}.Vertices(1:2:end,3) < 0), true);
+%! assert_equal (Q.UCS, R.UCS);
+
+%!error<geom.Region.fillet: invalid number of input arguments.> ...
+%! fillet (geom.Region ([0, 0; 1, 0; 1, 1]))
+%!error<geom.Region.fillet: OUTLINE: RADIUS must be a positive and finite real scalar.> ...
+%! fillet (geom.Region ([0, 0; 1, 0; 1, 1]), -1)
+%!error<geom.Region.fillet: HOLES\{1\}: the round at vertex 1 does not fit its segments.> ...
+%! fillet (geom.Region ([0, 0; 60, 0; 60, 40; 0, 40], ...
+%!                      {[20, 15; 24, 15; 24, 25; 20, 25]}), 3)
 
 %!error<geom.Region: invalid number of input arguments.> geom.Region ()
 %!error<geom.Region: UCS must be a geom.UCS object.>

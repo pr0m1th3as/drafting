@@ -586,6 +586,12 @@ classdef Shape
     ## A box @code{[@var{xmin}, @var{ymin}, @var{zmin}, @var{xmax},
     ## @var{ymax}, @var{zmax}]}, as @code{solid.Shape.bbox} returns one.  An
     ## edge is chosen when it lies wholly inside, to within 1e-6 millimetres.
+    ##
+    ## @item @qcode{'Face'}
+    ## Face indices, as @code{solid.Shape.faces} returns them.  An edge is
+    ## chosen when it bounds any of these faces, so all the edges round a
+    ## face can be rounded or chamfered in one step:
+    ## @code{fillet (@var{S}, edges (@var{S}, 'Face', @var{F}), @var{R})}.
     ## @end table
     ##
     ## @example
@@ -606,7 +612,7 @@ classdef Shape
       kinds = {'line', 'circle', 'ellipse', 'bspline', 'other'};
       [errmsg, opt] = options (varargin, struct ('Type', [], ...
                                                  'Direction', [], ...
-                                                 'Within', []));
+                                                 'Within', [], 'Face', []));
       if (isempty (errmsg))
         [errmsg, opt.Type] = checktype (opt.Type, kinds, 'curve');
       endif
@@ -615,6 +621,9 @@ classdef Shape
       endif
       if (isempty (errmsg))
         errmsg = checkbox (opt.Within);
+      endif
+      if (isempty (errmsg) && ! isempty (opt.Face))
+        errmsg = checkindex (opt.Face, numfaces (this), 'Face', 'face', false);
       endif
       if (! isempty (errmsg))
         error ("solid.Shape.edges: %s", errmsg);
@@ -625,7 +634,7 @@ classdef Shape
         return;
       endif
       info = occt ('solid.Shape.edges', 'edges', this.Data);
-      [type, dir, box, seam] = info{:};
+      [type, dir, box, seam, onfaces] = info{:};
       keep = ! seam;
       if (! isempty (opt.Type))
         keep &= ismember (type, opt.Type);
@@ -635,6 +644,9 @@ classdef Shape
       endif
       if (! isempty (opt.Within))
         keep &= inside (box, opt.Within);
+      endif
+      if (! isempty (opt.Face))
+        keep &= cellfun (@(f) any (ismember (f, opt.Face)), onfaces);
       endif
       E = find (keep)';
 
@@ -766,41 +778,72 @@ classdef Shape
     endfunction
 
     ## -*- texinfo -*-
-    ## @deftypefn {solid.Shape} {@var{S} =} chamfer (@var{S}, @var{E}, @var{D})
+    ## @deftypefn  {solid.Shape} {@var{S} =} chamfer (@var{S}, @var{E}, @var{D})
+    ## @deftypefnx {solid.Shape} {@var{S} =} chamfer (@var{S}, @var{E}, [@var{D1}, @var{D2}], @var{F})
     ##
-    ## Bevel edges of a shape at 45 degrees.
+    ## Bevel edges of a shape.
     ##
     ## @code{@var{S} = chamfer (@var{S}, @var{E}, @var{D})} cuts the edges of
     ## @var{S} indexed by @var{E}, as @code{solid.Shape.edges} returns them,
     ## back by @var{D} millimetres on both faces, so a chamfer on a square
     ## corner is the 45 degree bevel a drawing calls @code{@var{D} x 45}.
     ##
+    ## @code{@var{S} = chamfer (@var{S}, @var{E}, [@var{D1}, @var{D2}],
+    ## @var{F})} cuts each edge back by @var{D1} along the face @var{F}, a face
+    ## index as @code{solid.Shape.faces} returns one, and by @var{D2} along the
+    ## other face of the edge.  Every edge must bound @var{F}, as the edges
+    ## round a face do: @code{edges (@var{S}, 'Face', @var{F})}.
+    ##
     ## A chamfer too large for the faces beside an edge cannot be built and
     ## raises an error, as does an edge that cannot be chamfered at all.
     ##
     ## @seealso{solid.Shape.edges, solid.Shape.fillet}
     ## @end deftypefn
-    function this = chamfer (this, E, D)
+    function this = chamfer (this, E, D, F)
 
       ## Input validation
-      if (nargin != 3)
+      if (nargin < 3 || nargin > 4)
         error ("solid.Shape.chamfer: invalid number of input arguments.");
       endif
-      errmsg = checkindex (E, numedges (this), 'E', 'edge', false);
-      if (isempty (errmsg))
-        errmsg = solid.__checkpos__ (D, 'D');
+      if (! isnumeric (D) || ! isreal (D) || ! isvector (D) ...
+          || numel (D) > 2 || ! all (isfinite (D)) || ! all (D > 0))
+        error (strcat ("solid.Shape.chamfer: D must be one positive finite", ...
+                       " distance, or two with a face F."));
       endif
+      if (numel (D) == 2 && nargin != 4)
+        error ("solid.Shape.chamfer: two distances need the face F of D1.");
+      endif
+      if (numel (D) == 1 && nargin == 4)
+        error ("solid.Shape.chamfer: a face F goes with two distances.");
+      endif
+      if (nargin == 4 && ! isscalar (F))
+        error ("solid.Shape.chamfer: F must be a single face index of S.");
+      endif
+      errmsg = checkindex (E, numedges (this), 'E', 'edge', false);
       if (! isempty (errmsg))
         error ("solid.Shape.chamfer: %s", errmsg);
       endif
+      F0 = 0;
+      if (nargin == 4)
+        errmsg = checkindex (F, numfaces (this), 'F', 'face', false);
+        if (! isempty (errmsg))
+          error ("solid.Shape.chamfer: %s", errmsg);
+        endif
+        on = edges (this, 'Face', F);
+        if (! all (ismember (E, on)))
+          error ("solid.Shape.chamfer: every edge in E must bound the face F.");
+        endif
+        F0 = double (F);
+      endif
 
       this.Data = occt ('solid.Shape.chamfer', 'chamfer', this.Data, ...
-                        unique (double (E)), double (D));
+                        unique (double (E)), double (D), F0);
 
     endfunction
 
     ## -*- texinfo -*-
-    ## @deftypefn {solid.Shape} {@var{S} =} shell (@var{S}, @var{F}, @var{T})
+    ## @deftypefn  {solid.Shape} {@var{S} =} shell (@var{S}, @var{F}, @var{T})
+    ## @deftypefnx {solid.Shape} {@var{S} =} shell (@dots{}, @qcode{'Outward'}, @var{TF})
     ##
     ## Hollow a shape to a uniform wall thickness.
     ##
@@ -811,6 +854,11 @@ classdef Shape
     ## of the part keeps its size and the inner corners stay sharp.  With
     ## @var{F} empty no face is removed and the result is a closed shell
     ## around a sealed cavity.
+    ##
+    ## @code{@var{S} = shell (@dots{}, @qcode{'Outward'}, true)} grows the
+    ## walls outwards instead, so the inside keeps the size and shape of
+    ## @var{S} and the outside grows by @var{T}: the way to make a box that a
+    ## part of the shape of @var{S} fits into.  It is @code{false} by default.
     ##
     ## Walls too thick for the shape, which would meet in the middle, cannot
     ## be built and raise an error.
@@ -827,11 +875,21 @@ classdef Shape
     ##
     ## @seealso{solid.Shape.faces}
     ## @end deftypefn
-    function this = shell (this, F, T)
+    function this = shell (this, F, T, varargin)
 
       ## Input validation
-      if (nargin != 3)
+      if (nargin < 3)
         error ("solid.Shape.shell: invalid number of input arguments.");
+      endif
+      [errmsg, opt] = options (varargin, struct ('Outward', false));
+      if (isempty (errmsg) && (! (islogical (opt.Outward) ...
+                                  || isnumeric (opt.Outward)) ...
+                               || ! isscalar (opt.Outward) ...
+                               || ! any (opt.Outward == [0, 1])))
+        errmsg = "Outward must be a logical scalar.";
+      endif
+      if (! isempty (errmsg))
+        error ("solid.Shape.shell: %s", errmsg);
       endif
       errmsg = checkindex (F, numfaces (this), 'F', 'face', true);
       if (isempty (errmsg))
@@ -845,7 +903,8 @@ classdef Shape
       endif
 
       this.Data = occt ('solid.Shape.shell', 'shell', this.Data, ...
-                        unique (double (F)), double (T));
+                        unique (double (F)), double (T), ...
+                        logical (opt.Outward));
 
     endfunction
 
@@ -1416,6 +1475,40 @@ endfunction
 %! assert_equal (numfaces (S), 10);
 %! assert_equal (isvalid (S), true);
 
+%!testif ; exist ('__occt__') == 3  # the edges round a face
+%! B = solid.box (10, 20, 30);
+%! F = faces (B, 'Normal', [0, 0, 1]);
+%! assert_equal (numel (edges (B, 'Face', F)), 4);
+%! top = edges (B, 'Within', [0, 0, 30, 10, 20, 30]);
+%! assert_equal (edges (B, 'Face', F), top);
+%! S = fillet (B, edges (B, 'Face', F), 2);
+%! assert_equal (isvalid (S), true);
+%! assert_equal (numfaces (S), 10);
+
+%!testif ; exist ('__occt__') == 3  # two distances, D1 along the face given
+%! B = solid.box (10, 20, 30);
+%! F = faces (B, 'Normal', [0, 0, 1]);
+%! E = edges (B, 'Face', F, 'Direction', [1, 0, 0]);
+%! S = chamfer (B, E, [2, 5], F);
+%! assert_equal (volume (S), 6000 - 2 * (2 * 5 / 2) * 10, 1e-9);
+%! ## 2 along the top face and 5 down the side: a normal along [0, -5, 2]
+%! assert_equal (numel (faces (S, 'Normal', [0, -5, 2])), 1);
+%! assert_equal (numel (faces (S, 'Normal', [0, -2, 5])), 0);
+%! assert_equal (isvalid (S), true);
+
+%!testif ; exist ('__occt__') == 3  # an edge not on the face is refused
+%! B = solid.box (10, 20, 30);
+%! F = faces (B, 'Normal', [0, 0, 1]);
+%! E = edges (B, 'Within', [0, 0, 0, 10, 20, 0]);
+%! msg = '';
+%! try
+%!   chamfer (B, E, [2, 5], F);
+%! catch err
+%!   msg = err.message;
+%! end_try_catch
+%! assert_equal (msg, strcat ("solid.Shape.chamfer: every edge in E must", ...
+%!                           " bound the face F."));
+
 %!testif ; exist ('__occt__') == 3  # an open box
 %! B = solid.box (10, 20, 30);
 %! S = shell (B, faces (B, 'Normal', [0, 0, 1]), 1);
@@ -1426,6 +1519,15 @@ endfunction
 %!testif ; exist ('__occt__') == 3  # a closed shell round a cavity
 %! B = solid.box (10, 20, 30);
 %! assert_equal (volume (shell (B, [], 1)), 6000 - 8 * 18 * 28, 1e-9);
+
+%!testif ; exist ('__occt__') == 3  # walls grown outwards, open and closed
+%! B = solid.box (10, 20, 30);
+%! S = shell (B, faces (B, 'Normal', [0, 0, 1]), 1, 'Outward', true);
+%! assert_equal (volume (S), 12 * 22 * 31 - 6000, 1e-9);
+%! assert_equal (bbox (S), [-1, -1, -1, 11, 21, 30], 1e-9);
+%! S = shell (B, [], 1, 'Outward', true);
+%! assert_equal (volume (S), 12 * 22 * 32 - 6000, 1e-9);
+%! assert_equal (isvalid (S), true);
 
 %!testif ; exist ('__occt__') == 3  # a cup
 %! C = solid.cylinder (4, 12);
@@ -1573,8 +1675,26 @@ endfunction
 %! chamfer (solid.Shape ())
 %!error<solid.Shape.chamfer: E must be a vector of edge indices of S.> ...
 %! chamfer (solid.Shape (), 0.5, 2)
+%!error<solid.Shape.chamfer: D must be one positive finite distance, or two with a face F.> ...
+%! chamfer (solid.Shape (), 1, [1, 2, 3])
+%!error<solid.Shape.chamfer: D must be one positive finite distance, or two with a face F.> ...
+%! chamfer (solid.Shape (), 1, 0)
+%!error<solid.Shape.chamfer: two distances need the face F of D1.> ...
+%! chamfer (solid.Shape (), 1, [1, 2])
+%!error<solid.Shape.chamfer: a face F goes with two distances.> ...
+%! chamfer (solid.Shape (), 1, 1, 1)
+%!error<solid.Shape.chamfer: F must be a single face index of S.> ...
+%! chamfer (solid.Shape (), 1, [1, 2], [1, 2])
+%!error<solid.Shape.edges: Face must be a vector of face indices of S.> ...
+%! edges (solid.Shape (), 'Face', 1)
 %!error<solid.Shape.shell: invalid number of input arguments.> ...
 %! shell (solid.Shape (), [])
+%!error<solid.Shape.shell: Name/Value arguments must come in pairs.> ...
+%! shell (solid.Shape (), [], 1, 'Outward')
+%!error<solid.Shape.shell: unknown parameter.> ...
+%! shell (solid.Shape (), [], 1, 'Inward', true)
+%!error<solid.Shape.shell: Outward must be a logical scalar.> ...
+%! shell (solid.Shape (), [], 1, 'Outward', 2)
 %!error<solid.Shape.shell: F must be a vector of face indices of S.> ...
 %! shell (solid.Shape (), 1, 1)
 %!error<solid.Shape.shell: T must be a positive and finite real scalar.> ...

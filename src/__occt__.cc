@@ -41,8 +41,12 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <BRepFilletAPI_MakeChamfer.hxx>
 #include <BRepFilletAPI_MakeFillet.hxx>
 #include <BRepGProp.hxx>
+#include <BRepLProp_SLProps.hxx>
+#include <BRepTools.hxx>
+#include <BRepTools_ReShape.hxx>
 #include <BRepLib.hxx>
 #include <BRepMesh_IncrementalMesh.hxx>
+#include <BRepOffsetAPI_MakeOffset.hxx>
 #include <BRepOffsetAPI_MakePipeShell.hxx>
 #include <BRepOffsetAPI_MakeThickSolid.hxx>
 #include <BRepOffsetAPI_ThruSections.hxx>
@@ -51,12 +55,14 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <BRepPrimAPI_MakeCylinder.hxx>
 #include <BRepPrimAPI_MakePrism.hxx>
 #include <BRepPrimAPI_MakeRevol.hxx>
+#include <BRepPrimAPI_MakeWedge.hxx>
 #include <BRepPrimAPI_MakeSphere.hxx>
 #include <BRepPrimAPI_MakeTorus.hxx>
 #include <BRep_Tool.hxx>
 #include <BinTools.hxx>
 #include <Bnd_Box.hxx>
 #include <GC_MakeArcOfCircle.hxx>
+#include <GeomLib_IsPlanarSurface.hxx>
 #include <Geom2d_Line.hxx>
 #include <Geom_CylindricalSurface.hxx>
 #include <GProp_GProps.hxx>
@@ -69,6 +75,7 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <StlAPI_Writer.hxx>
 #include <TCollection_HAsciiString.hxx>
 #include <TopExp.hxx>
+#include <TopExp_Explorer.hxx>
 #include <TopTools_IndexedDataMapOfShapeListOfShape.hxx>
 #include <TopTools_IndexedMapOfShape.hxx>
 #include <TopoDS.hxx>
@@ -263,6 +270,13 @@ planarface (const region& r)
   return f.Face ();
 }
 
+// One side of an extrusion of R, height H along its normal, its walls leaning
+// in by A radians (out when A is negative), corners kept sharp as a drafted
+// wall's are: each outline is joined by straight lines to its offset at the
+// top, and the holes are cut from the outline.
+static TopoDS_Shape
+taperedside (const region& r, double h, double a, const string& caller);
+
 // S less every shape in TOOLS, in one operation
 static TopoDS_Shape
 cutall (const TopoDS_Shape& s, const vector<TopoDS_Shape>& tools,
@@ -309,9 +323,9 @@ dirrow (const gp_Dir& d, Matrix& m, octave_idx_type i)
 }
 
 // The edges of a shape: the kind of curve each lies on, its direction (a
-// line's, or the axis of a circle or ellipse), its bounding box, and whether
-// it is a seam or a degenerate edge, which bounds a face without being a
-// feature of the part.
+// line's, or the axis of a circle or ellipse), its bounding box, whether it is
+// a seam or a degenerate edge, which bounds a face without being a feature of
+// the part, and the indices of the faces it bounds.
 static Cell
 edgeinfo (const TopoDS_Shape& s)
 {
@@ -319,8 +333,11 @@ edgeinfo (const TopoDS_Shape& s)
   TopExp::MapShapes (s, TopAbs_EDGE, map);
   TopTools_IndexedDataMapOfShapeListOfShape faces;
   TopExp::MapShapesAndAncestors (s, TopAbs_EDGE, TopAbs_FACE, faces);
+  TopTools_IndexedMapOfShape fmap;
+  TopExp::MapShapes (s, TopAbs_FACE, fmap);
   const octave_idx_type n = map.Extent ();
   Cell type (n, 1);
+  Cell onfaces (n, 1);
   Matrix dir (n, 3, octave_NaN);
   Matrix box (n, 6);
   boolNDArray seam (dim_vector (n, 1), false);
@@ -332,6 +349,7 @@ edgeinfo (const TopoDS_Shape& s)
     {
       type(i) = "degenerate";
       seam(i) = true;
+      onfaces(i) = RowVector (0);
       continue;
     }
     const BRepAdaptor_Curve c (e);
@@ -359,16 +377,32 @@ edgeinfo (const TopoDS_Shape& s)
     const int k = faces.FindIndex (e);
     if (k > 0)
     {
+      RowVector idx (0);
       for (const TopoDS_Shape& f : faces (k))
       {
         if (BRep_Tool::IsClosed (e, TopoDS::Face (f)))
         {
           seam(i) = true;
         }
+        const int j = fmap.FindIndex (f);
+        bool seen = false;
+        for (octave_idx_type q = 0; q < idx.numel (); q++)
+        {
+          seen = seen || idx(q) == j;
+        }
+        if (! seen)
+        {
+          idx.resize (idx.numel () + 1, j);
+        }
       }
+      onfaces(i) = idx;
+    }
+    else
+    {
+      onfaces(i) = RowVector (0);
     }
   }
-  return Cell (ovl (type, dir, box, seam));
+  return Cell (ovl (type, dir, box, seam, onfaces));
 }
 
 // The faces of a shape: the kind of surface each lies on, the outward normal
@@ -501,6 +535,120 @@ pipe (const TopoDS_Wire& spine, const TopoDS_Wire& w, bool frenet,
   return op.Shape ();
 }
 
+// A wire offset by D in its plane, outwards for a positive D whichever way
+// it runs, its corners kept sharp; then lifted by V
+static TopoDS_Wire
+offsetwire (const TopoDS_Wire& w, double d, const gp_Vec& v,
+            const string& caller)
+{
+  BRepOffsetAPI_MakeOffset op (w, GeomAbs_Intersection);
+  op.Perform (d);
+  TopExp_Explorer x;
+  if (op.IsDone ())
+  {
+    x.Init (op.Shape (), TopAbs_WIRE);
+  }
+  if (! op.IsDone () || ! x.More ())
+  {
+    error ("%s: Open CASCADE could not compute the taper.", caller.c_str ());
+  }
+  gp_Trsf t;
+  t.SetTranslation (v);
+  return TopoDS::Wire (transform (x.Current (), t));
+}
+
+// S with every spline face that lies in a plane made a true plane on the
+// same edges, so that a flat wall counts as flat when queried, picked or
+// drawn.  A ruled loft makes even a flat wall a spline.
+static TopoDS_Shape
+planarize (const TopoDS_Shape& s)
+{
+  BRepTools_ReShape rs;
+  bool changed = false;
+  for (TopExp_Explorer x (s, TopAbs_FACE); x.More (); x.Next ())
+  {
+    const TopoDS_Face& f = TopoDS::Face (x.Current ());
+    const BRepAdaptor_Surface a (f, Standard_False);
+    if (a.GetType () != GeomAbs_BSplineSurface
+        && a.GetType () != GeomAbs_BezierSurface)
+    {
+      continue;
+    }
+    GeomLib_IsPlanarSurface pl (BRep_Tool::Surface (f), 1e-7);
+    if (! pl.IsPlanar ())
+    {
+      continue;
+    }
+    // The plane facing as the face does, then the face rebuilt on it
+    gp_Pln p = pl.Plan ();
+    const double u = (a.FirstUParameter () + a.LastUParameter ()) / 2;
+    const double v = (a.FirstVParameter () + a.LastVParameter ()) / 2;
+    BRepLProp_SLProps props (BRepAdaptor_Surface (f), u, v, 1, 1e-9);
+    gp_Dir n = props.Normal ();
+    if (f.Orientation () == TopAbs_REVERSED)
+    {
+      n.Reverse ();
+    }
+    if (p.Axis ().Direction ().Dot (n) < 0)
+    {
+      p = gp_Pln (p.Location (), p.Axis ().Direction ().Reversed ());
+    }
+    BRepBuilderAPI_MakeFace mf (p, BRepTools::OuterWire (f), Standard_True);
+    for (TopExp_Explorer w (f, TopAbs_WIRE); w.More (); w.Next ())
+    {
+      if (! w.Current ().IsSame (BRepTools::OuterWire (f)))
+      {
+        mf.Add (TopoDS::Wire (w.Current ()));
+      }
+    }
+    if (! mf.IsDone ())
+    {
+      continue;
+    }
+    TopoDS_Face nf = mf.Face ();
+    nf.Orientation (f.Orientation ());
+    rs.Replace (f, nf);
+    changed = true;
+  }
+  return changed ? rs.Apply (s) : s;
+}
+
+// The solid between a wire and its offset lifted, by straight lines
+static TopoDS_Shape
+ruled (const TopoDS_Wire& a, const TopoDS_Wire& b, const string& caller)
+{
+  BRepOffsetAPI_ThruSections op (Standard_True, Standard_True);
+  op.AddWire (a);
+  op.AddWire (b);
+  op.Build ();
+  if (! op.IsDone ())
+  {
+    error ("%s: Open CASCADE could not compute the taper.", caller.c_str ());
+  }
+  return op.Shape ();
+}
+
+static TopoDS_Shape
+taperedside (const region& r, double h, double a, const string& caller)
+{
+  const gp_Vec up = gp_Vec (r.normal) * h;
+  if (a == 0)
+  {
+    return BRepPrimAPI_MakePrism (planarface (r), up).Shape ();
+  }
+  // The section at the top is the region offset by the run of the wall:
+  // its outline in, its holes out, for walls leaning in
+  const double d = h * tan (a);
+  vector<TopoDS_Shape> holes;
+  for (const TopoDS_Wire& w : r.holes)
+  {
+    holes.push_back (ruled (w, offsetwire (w, d, up, caller), caller));
+  }
+  return planarize (cutall (ruled (r.outer, offsetwire (r.outer, -d, up,
+                                                       caller), caller),
+                            holes, caller));
+}
+
 static void
 writestep (const TopoDS_Shape& s, const string& file, const string& name,
            const string& caller)
@@ -605,6 +753,21 @@ function directly. \n\
                                               args(3).double_value ())
                     .Shape ());
     }
+    // A wedge: a block DX by DY at the base, DZ high, its top face spanning
+    // XMIN to XMAX and YMIN to YMAX.  Open CASCADE builds a wedge with its
+    // height along y, so it is built in axes that turn that onto z.
+    else if (cmd == "wedge")
+    {
+      const double dx = args(2).double_value ();
+      const double dy = args(3).double_value ();
+      const double dz = args(4).double_value ();
+      const NDArray top = args(5).array_value ();
+      const gp_Ax2 axes (gp_Pnt (0, dy, 0), gp_Dir (0, -1, 0),
+                         gp_Dir (1, 0, 0));
+      out = todata (BRepPrimAPI_MakeWedge (axes, dx, dz, dy, top(0),
+                                           dy - top(3), top(2), dy - top(1))
+                    .Shape ());
+    }
     else if (cmd == "cone")
     {
       out = todata (BRepPrimAPI_MakeCone (args(2).double_value (),
@@ -625,12 +788,52 @@ function directly. \n\
     // extrusion rises along the normal; a revolution turns about the plane's
     // y axis through its origin; a loft passes through regions where they
     // lie; a sweep carries the region from where it lies along a path.
+    // An extrusion runs H1 along the normal and H2 against it, each side's
+    // walls leaning in by its own angle
     else if (cmd == "extrude")
     {
       const region r = toregion (args(2));
-      out = todata (BRepPrimAPI_MakePrism
-                      (planarface (r),
-                       gp_Vec (r.normal) * args(3).double_value ()).Shape ());
+      const double h1 = args(3).double_value ();
+      const double h2 = args(4).double_value ();
+      const double a1 = args(5).double_value () * M_PI / 180;
+      const double a2 = args(6).double_value () * M_PI / 180;
+      if (a1 == 0 && a2 == 0)
+      {
+        gp_Trsf t;
+        t.SetTranslation (gp_Vec (r.normal) * -h2);
+        out = todata (BRepPrimAPI_MakePrism
+                        (transform (planarface (r), t),
+                         gp_Vec (r.normal) * (h1 + h2)).Shape ());
+      }
+      else
+      {
+        TopTools_ListOfShape sides;
+        if (h1 > 0)
+        {
+          sides.Append (taperedside (r, h1, a1, caller));
+        }
+        if (h2 > 0)
+        {
+          // The far side is a near side mirrored in the region's plane
+          gp_Trsf m;
+          m.SetMirror (gp_Ax2 (r.origin, r.normal));
+          sides.Append (transform (taperedside (r, h2, a2, caller), m));
+        }
+        if (sides.Extent () == 1)
+        {
+          out = todata (sides.First ());
+        }
+        else
+        {
+          TopTools_ListOfShape objects, tools;
+          objects.Append (sides.First ());
+          tools.Append (sides.Last ());
+          BRepAlgoAPI_Fuse op;
+          op.SetArguments (objects);
+          op.SetTools (tools);
+          out = todata (boolean (op, caller, "extrusion"));
+        }
+      }
     }
     else if (cmd == "revolve")
     {
@@ -740,7 +943,7 @@ function directly. \n\
       const TopoDS_Shape s = toshape (args(2), caller);
       const TopTools_ListOfShape edges
         = picked (s, TopAbs_EDGE, args(3).array_value ());
-      const double size = args(4).double_value ();
+      const double size = args(4).array_value ()(0);
       TopoDS_Shape r;
       if (cmd == "fillet")
       {
@@ -760,9 +963,26 @@ function directly. \n\
       else
       {
         BRepFilletAPI_MakeChamfer op (s);
-        for (const TopoDS_Shape& e : edges)
+        const NDArray d = args(4).array_value ();
+        if (d.numel () == 2)
         {
-          op.Add (size, TopoDS::Edge (e));
+          // D1 is set back along the face given, D2 along the other
+          TopTools_IndexedMapOfShape fmap;
+          TopExp::MapShapes (s, TopAbs_FACE, fmap);
+          const TopoDS_Face f = TopoDS::Face
+                                  (fmap (static_cast<int> (args(5)
+                                                           .double_value ())));
+          for (const TopoDS_Shape& e : edges)
+          {
+            op.Add (d(0), d(1), TopoDS::Edge (e), f);
+          }
+        }
+        else
+        {
+          for (const TopoDS_Shape& e : edges)
+          {
+            op.Add (size, TopoDS::Edge (e));
+          }
         }
         op.Build ();
         if (! op.IsDone () || ! BRepCheck_Analyzer (op.Shape ()).IsValid ())
@@ -779,8 +999,11 @@ function directly. \n\
       const TopoDS_Shape s = toshape (args(2), caller);
       const TopTools_ListOfShape open
         = picked (s, TopAbs_FACE, args(3).array_value ());
+      // The walls grow inwards, or outwards when asked
+      const bool outward = (args.length () > 5 && args(5).bool_value ());
+      const double t = args(4).double_value ();
       BRepOffsetAPI_MakeThickSolid op;
-      op.MakeThickSolidByJoin (s, open, -args(4).double_value (), 1e-6,
+      op.MakeThickSolidByJoin (s, open, outward ? t : -t, 1e-6,
                                BRepOffset_Skin, Standard_False,
                                Standard_False, GeomAbs_Intersection);
       op.Build ();
@@ -788,14 +1011,22 @@ function directly. \n\
       if (op.IsDone ())
       {
         r = op.Shape ();
-        // With no face opened Open CASCADE returns the offset solid, which
-        // is the cavity, so the cavity is cut from the shape
+        // With no face opened Open CASCADE returns the offset solid: inwards
+        // the cavity, cut from the shape; outwards the outside, from which
+        // the shape is cut
         if (open.IsEmpty ())
         {
+          // The outside comes back inside out, its volume negative
+          GProp_GProps g;
+          BRepGProp::VolumeProperties (r, g);
+          if (g.Mass () < 0)
+          {
+            r.Reverse ();
+          }
           BRepAlgoAPI_Cut cut;
           TopTools_ListOfShape objects, tools;
-          objects.Append (s);
-          tools.Append (r);
+          objects.Append (outward ? r : s);
+          tools.Append (outward ? s : r);
           cut.SetArguments (objects);
           cut.SetTools (tools);
           cut.Build ();
@@ -811,9 +1042,11 @@ function directly. \n\
       {
         BRepGProp::VolumeProperties (r, after);
       }
+      const bool same = std::abs (after.Mass () - before.Mass ())
+                        <= 1e-9 * before.Mass ();
       if (r.IsNull () || ! BRepCheck_Analyzer (r).IsValid ()
-          || after.Mass () <= 0
-          || after.Mass () >= before.Mass () * (1 - 1e-9))
+          || after.Mass () <= 0 || same
+          || (! outward && after.Mass () > before.Mass ()))
       {
         error ("%s: Open CASCADE could not hollow the shape.",
                caller.c_str ());
