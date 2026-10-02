@@ -50,9 +50,9 @@
 ## @group
 ## ## A compression spring along z: wire of diameter 2 on a mean diameter of
 ## ## 20, five turns at a pitch of 4
-## P = geom.Polyline ([9, 1, 1; 11, 1, 1], 'Closed', true, ...
-##                    'Normal', [0, -1, 0]);
-## S = solid.helix (geom.Region (P), 4, 5);
+## R = geom.Region ([9, 1, 1; 11, 1, 1]);
+## R.UCS = geom.UCS ([0, -1, 0], [0, 0, 0]);   # the xz plane: y is world z
+## S = solid.helix (R, 4, 5);
 ## @end group
 ## @end example
 ##
@@ -104,9 +104,9 @@ endfunction
 %! assert_equal (isvalid (S), true);
 
 %!testif ; exist ('__occt__') == 3  # a spring of round wire along z
-%! P = geom.Polyline ([9, 1, 1; 11, 1, 1], 'Closed', true, ...
-%!                    'Normal', [0, -1, 0]);
-%! S = solid.helix (geom.Region (P), 4, 5);
+%! R = geom.Region ([9, 1, 1; 11, 1, 1]);
+%! R.UCS = geom.UCS ([0, -1, 0], [0, 0, 0]);
+%! S = solid.helix (R, 4, 5);
 %! assert_equal (volume (S), pi * 2 * pi * 10 * 5, -5e-6);
 %! assert_equal (bbox (S)([3, 6]), [0, 22], 1e-4);
 %! assert_equal (isvalid (S), true);

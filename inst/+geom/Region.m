@@ -38,13 +38,13 @@ classdef Region
   ## another.
   ##
   ## The outline and holes may be drawn either way round.  The region stores
-  ## the outline anticlockwise and the holes clockwise, all in the plane of the
-  ## outline, which is the plane of the region.
+  ## the outline anticlockwise and the holes clockwise, all in the
+  ## @code{geom.UCS} of the outline, which is the UCS of the region.
+  ## Assigning the region another UCS moves it there.
   ##
-  ## A @code{geom.Region} is a value: it is made by its constructor and never
-  ## changes.
+  ## A @code{geom.Region} is a value: every change makes a new one.
   ##
-  ## @seealso{geom.Polyline, solid.extrude}
+  ## @seealso{geom.Polyline, geom.UCS, solid.extrude}
   ## @end deftp
 
   properties (SetAccess = private)
@@ -71,6 +71,23 @@ classdef Region
     ##
     ## @end deftp
     Holes = cell (1, 0);
+
+  endproperties
+
+  properties (Dependent)
+
+    ## -*- texinfo -*-
+    ## @deftp {geom.Region} {property} UCS
+    ##
+    ## Coordinate system of the region
+    ##
+    ## The @code{geom.UCS} the outline and holes are coordinates in.
+    ## Assigning another moves the region onto it, its shape unchanged in its
+    ## own coordinates, so a region drawn in the @math{xy} plane is laid on the
+    ## face of a part by assigning it the face's UCS.
+    ##
+    ## @end deftp
+    UCS
 
   endproperties
 
@@ -121,6 +138,24 @@ classdef Region
     ## fault.
     ##
     ## @end deftypefn
+    function U = get.UCS (this)
+
+      U = this.Outline.UCS;
+
+    endfunction
+
+    function this = set.UCS (this, U)
+
+      if (! isa (U, 'geom.UCS') || ! isscalar (U))
+        error ("geom.Region: UCS must be a geom.UCS object.");
+      endif
+      this.Outline.UCS = U;
+      for k = 1:numel (this.Holes)
+        this.Holes{k}.UCS = U;
+      endfor
+
+    endfunction
+
     function this = Region (OUTLINE, HOLES = {})
 
       ## Input validation
@@ -209,7 +244,7 @@ function [errmsg, PL] = topolyline (ARG, NAME, IN)
     if (isempty (IN))
       args = {};
     else
-      args = {'Origin', IN.Origin, 'XAxis', IN.XAxis, 'Normal', IN.Normal};
+      args = {'UCS', IN.UCS};
     endif
     try
       PL = geom.Polyline (ARG, 'Closed', true, args{:});
@@ -233,21 +268,34 @@ function [errmsg, PL] = topolyline (ARG, NAME, IN)
     return;
   endif
 
-  ## Into the frame of IN, which must be the same plane
-  scale = max ([1, abs(ARG.Origin), abs(IN.Origin)]);
-  if (abs (ARG.Normal * IN.Normal') < 1 - 1e-9 ...
-      || abs ((ARG.Origin - IN.Origin) * IN.Normal') > 1e-9 * scale)
+  ## Into the UCS of IN, which must be on the same plane
+  [errmsg, PL] = into (ARG, IN.UCS);
+  if (! isempty (errmsg))
     errmsg = sprintf ("%s must lie in the plane of OUTLINE.", NAME);
+  endif
+
+endfunction
+
+## The closed polyline PL carried into the UCS U on the same plane, its
+## vertices given in the coordinates of U; a mirror reverses the sense of every
+## arc.  Returns a nonempty error message when U is on another plane.
+function [errmsg, PL] = into (PL, U)
+
+  errmsg = '';
+  F = PL.UCS;
+  scale = max ([1, abs(F.Origin), abs(U.Origin)]);
+  if (abs (F.Normal * U.Normal') < 1 - 1e-9 ...
+      || abs ((F.Origin - U.Origin) * U.Normal') > 1e-9 * scale)
+    errmsg = 'not on the plane';
     return;
   endif
-  V = ARG.Vertices;
-  W = ARG.Origin + V(:,1) * ARG.XAxis + V(:,2) * ARG.YAxis - IN.Origin;
-  V(:,1:2) = [W * IN.XAxis', W * IN.YAxis'];
-  if (ARG.Normal * IN.Normal' < 0)
+  V = PL.Vertices;
+  W = tolocal (U, toworld (F, V(:,1:2)));
+  V(:,1:2) = W(:,1:2);
+  if (F.Normal * U.Normal' < 0)
     V(:,3) = -V(:,3);
   endif
-  PL = geom.Polyline (V, 'Closed', true, 'Origin', IN.Origin, ...
-                      'XAxis', IN.XAxis, 'Normal', IN.Normal);
+  PL = geom.Polyline (V, 'Closed', true, 'UCS', U);
 
 endfunction
 
@@ -276,8 +324,7 @@ function PL = reversed (PL)
   V = PL.Vertices;
   n = rows (V);
   V = [V([1, n:-1:2],1:2), -V(n:-1:1,3)];
-  PL = geom.Polyline (V, 'Closed', true, 'Origin', PL.Origin, ...
-                      'XAxis', PL.XAxis, 'Normal', PL.Normal);
+  PL = geom.Polyline (V, 'Closed', true, 'UCS', PL.UCS);
 
 endfunction
 
@@ -332,23 +379,35 @@ endfunction
 %! assert_equal (R.Holes{2}.Vertices, [4, 4, 0; 4, 10, 0; 10, 10, 0; 10, 4, 0]);
 
 %!test  # an outline on a sloping plane, its holes in the same plane
-%! O = geom.Polyline ([0, 0; 50, 0; 50, 30; 0, 30], 'Closed', true, ...
-%!                    'Origin', [0, 0, 10], 'Normal', [0, -3, 4]);
+%! U = geom.UCS ([0, -3, 4], [0, 0, 10]);
+%! O = geom.Polyline ([0, 0; 50, 0; 50, 30; 0, 30], 'Closed', true, 'UCS', U);
 %! R = geom.Region (O, {[10, 10; 20, 10; 20, 20; 10, 20]});
-%! assert_equal (R.Holes{1}.Origin, [0, 0, 10]);
-%! assert_equal (R.Holes{1}.Normal, R.Outline.Normal);
+%! assert_equal (R.UCS, U);
+%! assert_equal (R.Holes{1}.UCS, U);
 
 %!test  # a hole drawn in another frame of the same plane is carried over
 %! O = geom.Polyline ([0, 0; 60, 0; 60, 40; 0, 40], 'Closed', true);
 %! H = geom.Polyline ([0, 0, 1; 10, 0, 1], 'Closed', true, ...
-%!                    'Origin', [30, 20, 0], 'Normal', [0, 0, -1]);
+%!                    'UCS', geom.UCS ([0, 0, -1], [30, 20, 0]));
 %! R = geom.Region (O, {H});
 %! V = R.Holes{1}.Vertices;
 %! assert_equal (V(:,1:2), [30, 20; 20, 20], 1e-12);
 %! assert_equal (V(:,3), [-1; -1]);
-%! assert_equal (R.Holes{1}.Normal, [0, 0, 1]);
+%! assert_equal (R.Holes{1}.UCS, geom.UCS ());
+
+%!test  # assigning a UCS moves the region, holes and all
+%! R = geom.Region ([0, 0; 60, 0; 60, 40; 0, 40], {[20, 20, 1; 40, 20, 1]});
+%! U = geom.UCS ([0, -3, 4], [0, 0, 10]);
+%! R.UCS = U;
+%! assert_equal (R.UCS, U);
+%! assert_equal (R.Holes{1}.UCS, U);
+%! assert_equal (R.Outline.Vertices, [0, 0, 0; 60, 0, 0; 60, 40, 0; 0, 40, 0]);
+%! assert_equal (R.Holes{1}.Vertices, [20, 20, -1; 40, 20, -1]);
 
 %!error<geom.Region: invalid number of input arguments.> geom.Region ()
+%!error<geom.Region: UCS must be a geom.UCS object.>
+%! R = geom.Region ([0, 0; 1, 0; 1, 1]);
+%! R.UCS = 1;
 %!error<geom.Region: OUTLINE must be a closed geom.Polyline or a matrix of its vertices.> ...
 %! geom.Region ({[0, 0; 1, 0; 1, 1]})
 %!error<geom.Region: OUTLINE: P must be an N-by-2 or N-by-3 real matrix of finite values with at least two rows.> ...
@@ -366,11 +425,11 @@ endfunction
 %!error<geom.Region: HOLES\{1\} must lie in the plane of OUTLINE.> ...
 %! geom.Region ([0, 0; 10, 0; 10, 10], ...
 %!              {geom.Polyline([6, 2; 7, 2; 7, 3], 'Closed', true, ...
-%!                             'Origin', [0, 0, 1])})
+%!                             'UCS', geom.UCS ([0, 0, 1], [0, 0, 1]))})
 %!error<geom.Region: HOLES\{1\} must lie in the plane of OUTLINE.> ...
 %! geom.Region ([0, 0; 10, 0; 10, 10], ...
 %!              {geom.Polyline([6, 2; 7, 2; 7, 3], 'Closed', true, ...
-%!                             'Normal', [0, 1, 1])})
+%!                             'UCS', geom.UCS ([0, 1, 1], [0, 0, 0]))})
 %!error<geom.Region: OUTLINE must not cross or touch itself.> ...
 %! geom.Region ([0, 0; 10, 10; 10, 0; 0, 10])
 %!error<geom.Region: HOLES\{1\} must not cross or touch itself.> ...

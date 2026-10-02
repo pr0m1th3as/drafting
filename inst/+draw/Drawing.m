@@ -480,9 +480,9 @@ classdef Drawing
     ## @end example
     ##
     ## A drawing is flat, so @var{PL} must lie in its @math{xy} plane.  Its
-    ## plane may still have its own origin and @math{x} axis there, and may
-    ## face down: the vertices are carried into the drawing's coordinates, and
-    ## an arc keeps its true sense seen from above.
+    ## @code{geom.UCS} may still have its own origin and @math{x} axis there,
+    ## and may face down: the vertices are carried into the drawing's
+    ## coordinates, and an arc keeps its true sense seen from above.
     ##
     ## @seealso{geom.Polyline}
     ## @end deftypefn
@@ -494,15 +494,16 @@ classdef Drawing
       if (! isa (PL, 'geom.Polyline') || ! isscalar (PL))
         error ("draw.Drawing.polyline: PL must be a geom.Polyline object.");
       endif
-      if (abs (PL.Normal(3)) < 1 - 1e-9 || abs (PL.Origin(3)) > 1e-9)
+      U = PL.UCS;
+      if (abs (U.Normal(3)) < 1 - 1e-9 || abs (U.Origin(3)) > 1e-9)
         error ("draw.Drawing.polyline: PL must lie in the xy plane.");
       endif
 
       ## Into the drawing's coordinates; a plane facing down is mirrored seen
       ## from above, which reverses the sense of every arc
       V = PL.Vertices;
-      W = PL.Origin(1:2) + V(:,1) * PL.XAxis(1:2) + V(:,2) * PL.YAxis(1:2);
-      b = V(:,3)' * sign (PL.Normal(3));
+      W = U.Origin(1:2) + V(:,1) * U.XAxis(1:2) + V(:,2) * U.YAxis(1:2);
+      b = V(:,3)' * sign (U.Normal(3));
       e = makeentity ('polyline', this.Layer, this.Linetype, this.Colour);
       e.pts = W;
       e.closed = PL.Closed;

@@ -96,9 +96,11 @@
 %!error<draw.Drawing.polyline: PL must be a geom.Polyline object.> ...
 %! draw.Drawing ().polyline ([0, 0; 1, 1])
 %!error<draw.Drawing.polyline: PL must lie in the xy plane.> ...
-%! draw.Drawing ().polyline (geom.Polyline ([0, 0; 1, 1], 'Normal', [1, 0, 0]))
+%! draw.Drawing ().polyline (geom.Polyline ([0, 0; 1, 1], 'UCS', ...
+%!                                         geom.UCS ([1, 0, 0], [0, 0, 0])))
 %!error<draw.Drawing.polyline: PL must lie in the xy plane.> ...
-%! draw.Drawing ().polyline (geom.Polyline ([0, 0; 1, 1], 'Origin', [0, 0, 5]))
+%! draw.Drawing ().polyline (geom.Polyline ([0, 0; 1, 1], 'UCS', ...
+%!                                         geom.UCS ([0, 0, 1], [0, 0, 5])))
 
 %!test  # arc keeps its centre, radius and both angles
 %! D = draw.Drawing ().arc ([10, 20], 5, 30, 120);
@@ -578,15 +580,16 @@
 %! assert_equal (rows (E(1).pts), 2);
 
 %!test  # a polyline with its own origin and x axis in the xy plane
-%! PL = geom.Polyline ([0, 0, 1; 10, 0, 0], 'Origin', [5, 5, 0], ...
-%!                     'XAxis', [0, 1, 0]);
+%! PL = geom.Polyline ([0, 0, 1; 10, 0, 0], ...
+%!                     'UCS', geom.UCS ([0, 0, 1], [5, 5, 0], [5, 6, 0]));
 %! E = entities (draw.Drawing ().polyline (PL), 'dimensions', 'explode');
 %! assert_equal (E(1).pts, [5, 5; 5, 15], 1e-12);
 %! assert_equal (E(1).bulge, [1, 0]);
 
 %!test  # a plane facing down is mirrored seen from above: the arc keeps its
 %!       # true side, and its bulge changes sign
-%! PL = geom.Polyline ([0, 0, 1; 20, 0, 0], 'Normal', [0, 0, -1]);
+%! PL = geom.Polyline ([0, 0, 1; 20, 0, 0], ...
+%!                     'UCS', geom.UCS ([0, 0, -1], [0, 0, 0]));
 %! D = draw.Drawing ().polyline (PL);
 %! E = entities (D, 'dimensions', 'explode');
 %! assert_equal (E(1).pts, [0, 0; -20, 0], 1e-12);

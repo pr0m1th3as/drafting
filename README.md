@@ -121,9 +121,9 @@ plate = fillet (plate, edges (plate, 'Direction', [0, 0, 1], ...
 solid.write ('plate.step', plate);
 solid.write ('plate.stl', plate);
 
-section = geom.Polyline ([0, 0; 10, 0; 10, 30; 6, 30; 6, 50; 0, 50], ...
-                         'Closed', true, 'Normal', [0, -1, 0]);
-shaft = solid.revolve (geom.Region (section));    # turned about z
+section = geom.Region ([0, 0; 10, 0; 10, 30; 6, 30; 6, 50; 0, 50]);
+section.UCS = geom.UCS ([0, -1, 0], [0, 0, 0]);  # the xz plane: y is world z
+shaft = solid.revolve (section);                  # turned about z
 ```
 
 `solid.show` shows a solid in a window Open CASCADE draws in a process of its

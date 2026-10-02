@@ -50,23 +50,22 @@ Everything below is checked against those two lines.
 ## Polylines and regions
 
 Two value classes in `+geom` are the package's one representation of planar
-outlines, used by drawings and solids alike. Functions take the classes and
-nothing else; only the constructors accept plain matrices. Point sets that
-carry no arcs, such as the input of `geom.offset` or `geom.curvature`, stay
-N-by-2 matrices.
+outlines, each lying in a `geom.UCS` (below), used by drawings and solids
+alike. Functions take the classes and nothing else; only the constructors
+accept plain matrices. Point sets that carry no arcs, such as the input of
+`geom.offset` or `geom.curvature`, stay N-by-2 matrices.
 
 - **`geom.Polyline`**: the DXF polyline. `Vertices` is an N-by-3 matrix
-  `[x, y, bulge]` in the polyline's own plane; an N-by-2 matrix is accepted and
-  given zero bulges. It is open or `Closed`, and may cross itself. Its plane is
-  a user coordinate system, an `Origin`, an `XAxis` and a `Normal`, the xy plane
-  by default; a plane given by its normal alone takes its x axis from DXF's
-  arbitrary axis algorithm, so it reads and writes DXF exactly.
+  `[x, y, bulge]` in the coordinates of its `UCS`; an N-by-2 matrix is accepted
+  and given zero bulges. It is open or `Closed`, and may cross itself.
 - **`geom.Region`**: a closed planar area, one outline and any number of holes
   of any shape, all `geom.Polyline` objects in one plane. It refuses an outline
   or a hole that is open, crosses or touches itself or encloses no area, a hole
   not strictly inside the outline, and holes that meet. It normalises the
   outline anticlockwise and the holes clockwise. An island inside a hole is
-  not supported; a second region unioned onto the solid makes one.
+  not supported; a second region unioned onto the solid makes one. Assigning
+  its `UCS` moves it, keeping its shape in its own coordinates: a region drawn
+  in the xy plane is laid on a face by giving it the face's UCS.
 
 A region is what a solid is made from (`solid.extrude`, `revolve`, `sweep`,
 `loft`, `helix`), what a section of a solid is, and what a hatch fills, and the
@@ -79,9 +78,33 @@ the same number of holes; `sweep` sweeps the region from where it lies along a
 path in model coordinates. A pocket, a recess of limited
 depth, is an operation on a solid, not part of a region.
 
-This replaces, before any of it is released, the matrix-and-bulge arguments
-of `+solid`, and breaks `draw.Drawing.polyline` from 0.1.0, which takes a
-`geom.Polyline` instead of vertices and a separate bulge vector.
+## User coordinate systems
+
+**`geom.UCS`** is a user coordinate system: an `Origin`, an `XAxis` and a
+`Normal`, defining a plane with coordinates of its own. Every polyline and
+region carries one, the world xy plane by default. It is a coordinate system
+and not just a plane: the origin and x axis carry meaning (a revolution turns
+about its y axis), and DXF stores named UCS records of exactly this form.
+
+- `geom.UCS ()` is the world xy plane.
+- `geom.UCS (NORMAL, ORIGIN, XPOINT)` lays the plane square to the normal
+  through the origin, its x axis towards the point, projected onto the plane.
+- `geom.UCS (NORMAL, ORIGIN)` takes the x axis from DXF's arbitrary axis
+  algorithm, so it reads and writes DXF exactly.
+- `geom.UCS.threepoint (P1, P2, P3)` is AutoCAD's three-point UCS: origin, +x,
+  and a point on the +y side.
+- `geom.UCS (V)` picks one with the mouse in the viewer `V`. Picking lives in
+  the viewer; `+geom` only calls the method of the object it is given, so it
+  never depends on `+solid`.
+
+A UCS is picked in two steps. The axes come first, from a planar face and two
+points (the face gives the normal, the points the +x direction) or from three
+points (+x from the first to the second, the third on the +y side). The origin
+comes second, from one point, or from two whose x and y it takes, which places
+a datum corner where a fillet leaves no vertex; with none, it is the first
+point. Every point snaps to a vertex, the centre of a circular edge, the
+midpoint of a straight edge, or a point on a face. The pick prints the
+`geom.UCS` it made, by coordinates, for the script.
 
 ## Milestone 1: close the package's own shape (0.2.0)
 

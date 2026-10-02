@@ -49,8 +49,8 @@
 ## @group
 ## ## A square of 20 at the base becoming a circle of diameter 12 at 30
 ## base = geom.Region ([-10, -10; 10, -10; 10, 10; -10, 10]);
-## top = geom.Region (geom.Polyline ([6, 0, 1; -6, 0, 1], 'Closed', true, ...
-##                                   'Origin', [0, 0, 30]));
+## top = geom.Region ([6, 0, 1; -6, 0, 1]);
+## top.UCS = geom.UCS ([0, 0, 1], [0, 0, 30]);
 ## S = solid.loft (@{base, top@});
 ## @end group
 ## @end example
@@ -101,9 +101,11 @@ function S = loft (REGIONS, varargin)
 
 endfunction
 
-## A region of the outline P lifted to the height Z, for the tests
-%!function R = at (P, z)
-%!  R = geom.Region (geom.Polyline (P, 'Closed', true, 'Origin', [0, 0, z]));
+## A region of the outline P and the holes H lifted to the height Z, for the
+## tests
+%!function R = at (P, z, H = {})
+%!  R = geom.Region (P, H);
+%!  R.UCS = geom.UCS ([0, 0, 1], [0, 0, z]);
 %!endfunction
 
 %!testif ; exist ('__occt__') == 3  # a frustum of a square pyramid
@@ -145,17 +147,14 @@ endfunction
 
 %!testif ; exist ('__occt__') == 3  # a duct of uniform wall, its hole lofted
 %! sq = @(a) [-a, -a; a, -a; a, a; -a, a];
-%! R = @(z) geom.Region (geom.Polyline (sq (5), 'Closed', true, ...
-%!                                      'Origin', [0, 0, z]), {sq(4)});
-%! S = solid.loft ({R(0), R(10)});
+%! S = solid.loft ({at(sq (5), 0, {sq(4)}), at(sq (5), 10, {sq(4)})});
 %! assert_equal (volume (S), (100 - 64) * 10, 1e-9);
 %! assert_equal (isvalid (S), true);
 
 %!testif ; exist ('__occt__') == 3  # sections that are not parallel
 %! B = at ([-5, -5; 5, -5; 5, 5; -5, 5], 0);
-%! T = geom.Region (geom.Polyline ([-5, -5; 5, -5; 5, 5; -5, 5], ...
-%!                                 'Closed', true, 'Origin', [0, 0, 20], ...
-%!                                 'Normal', [1, 0, 1]));
+%! T = geom.Region ([-5, -5; 5, -5; 5, 5; -5, 5]);
+%! T.UCS = geom.UCS ([1, 0, 1], [0, 0, 20]);
 %! S = solid.loft ({B, T});
 %! assert_equal (isvalid (S), true);
 %! assert_equal (volume (S) > 0, true);

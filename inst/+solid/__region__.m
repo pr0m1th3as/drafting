@@ -32,11 +32,11 @@ function [errmsg, D] = __region__ (R, NAME)
     errmsg = sprintf ("%s must be a geom.Region object.", NAME);
     return;
   endif
-  O = R.Outline;
-  D = struct ('outline', O.Vertices, ...
+  U = R.UCS;
+  D = struct ('outline', R.Outline.Vertices, ...
               'holes', {cellfun(@(h) h.Vertices, R.Holes, ...
                                 'UniformOutput', false)}, ...
-              'frame', [O.Origin; O.XAxis; O.YAxis; O.Normal]);
+              'frame', [U.Origin; U.XAxis; U.YAxis; U.Normal]);
 
 endfunction
 

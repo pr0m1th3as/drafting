@@ -111,11 +111,11 @@ endfunction
 
 %!testif ; exist ('__occt__') == 3  # square to a sloping plane
 %! n = [0, -0.6, 0.8];
-%! PL = geom.Polyline ([0, 0; 10, 0; 10, 10; 0, 10], 'Closed', true, ...
-%!                     'Origin', [0, 0, 5], 'Normal', n);
-%! S = solid.extrude (geom.Region (PL), 4);
+%! R = geom.Region ([0, 0; 10, 0; 10, 10; 0, 10]);
+%! R.UCS = geom.UCS (n, [0, 0, 5]);
+%! S = solid.extrude (R, 4);
 %! assert_equal (volume (S), 400, 1e-9);
-%! c = [0, 0, 5] + 5 * PL.XAxis + 5 * PL.YAxis + 2 * n;
+%! c = [0, 0, 5] + 5 * R.UCS.XAxis + 5 * R.UCS.YAxis + 2 * n;
 %! assert_equal (centroid (S), c, 1e-9);
 %! assert_equal (isvalid (S), true);
 

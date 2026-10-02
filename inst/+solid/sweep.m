@@ -97,9 +97,9 @@ endfunction
 %! assert_equal (isvalid (S), true);
 
 %!testif ; exist ('__occt__') == 3  # along x, the region placed at the start
-%! P = geom.Polyline ([-1, -1; 1, -1; 1, 1; -1, 1], 'Closed', true, ...
-%!                    'Origin', [5, 5, 5], 'Normal', [1, 0, 0]);
-%! S = solid.sweep (geom.Region (P), [5, 5, 5; 15, 5, 5]);
+%! R = geom.Region ([-1, -1; 1, -1; 1, 1; -1, 1]);
+%! R.UCS = geom.UCS ([1, 0, 0], [5, 5, 5]);
+%! S = solid.sweep (R, [5, 5, 5; 15, 5, 5]);
 %! assert_equal (volume (S), 40, 1e-9);
 %! assert_equal (bbox (S), [5, 4, 4, 15, 6, 6], 1e-9);
 

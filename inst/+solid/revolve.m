@@ -37,9 +37,9 @@
 ## @example
 ## @group
 ## ## A shaft of diameter 20 stepping down to 12, a 1 mm chamfer at its end
-## P = geom.Polyline ([0, 0; 10, 0; 10, 30; 6, 30; 6, 49; 5, 50; 0, 50], ...
-##                    'Closed', true, 'Normal', [0, -1, 0]);
-## S = solid.revolve (geom.Region (P));
+## R = geom.Region ([0, 0; 10, 0; 10, 30; 6, 30; 6, 49; 5, 50; 0, 50]);
+## R.UCS = geom.UCS ([0, -1, 0], [0, 0, 0]);   # the xz plane: y is world z
+## S = solid.revolve (R);
 ## volume (S)
 ## @result{} 1.1669e+04
 ## @end group
@@ -96,9 +96,9 @@ endfunction
 %! assert_equal (isvalid (S), true);
 
 %!testif ; exist ('__occt__') == 3  # in the xz plane, about the z axis
-%! P = geom.Polyline ([0, 0; 4, 0; 4, 12; 0, 12], 'Closed', true, ...
-%!                    'Normal', [0, -1, 0]);
-%! S = solid.revolve (geom.Region (P));
+%! R = geom.Region ([0, 0; 4, 0; 4, 12; 0, 12]);
+%! R.UCS = geom.UCS ([0, -1, 0], [0, 0, 0]);
+%! S = solid.revolve (R);
 %! assert_equal (bbox (S), [-4, -4, 0, 4, 4, 12], 1e-9);
 
 %!testif ; exist ('__occt__') == 3  # a stepped shaft with a chamfer
