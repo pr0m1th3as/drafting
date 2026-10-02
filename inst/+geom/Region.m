@@ -287,6 +287,140 @@ classdef Region
 
     endfunction
 
+    ## -*- texinfo -*-
+    ## @deftypefn  {geom.Region} {@var{R} =} fit (@var{R})
+    ## @deftypefnx {geom.Region} {@var{R} =} fit (@var{R}, @var{MODE})
+    ## @deftypefnx {geom.Region} {@var{R} =} fit (@dots{}, @var{Name}, @var{Value}, @dots{})
+    ##
+    ## Fit lines, arcs and splines to a faceted region.
+    ##
+    ## @code{@var{R} = fit (@var{R})} replaces the straight segments of the
+    ## outline and the holes of @var{R} with as few lines and circular arcs as
+    ## follow them within a tolerance, so that a region cut from a mesh, whose
+    ## round bore is a polygon of facets and whose edges zigzag with the noise
+    ## of a scan, becomes the outline it was drawn from: its edges straight,
+    ## its bore a circle, its fillets arcs.  Where two pieces meet without a
+    ## corner they meet tangentially.  Arcs and splines already in @var{R} are
+    ## kept, and the straight segments between them fitted.
+    ##
+    ## @var{MODE} chooses what the fit may use: @qcode{'lines'}, lines only;
+    ## @qcode{'arcs'}, lines and arcs, the default; or @qcode{'curves'},
+    ## lines, arcs that turn at least 60 degrees, lines at least a fiftieth of
+    ## the region's size, and smooth cubic splines for the stretches between
+    ## them, the shape of a free-form part.
+    ##
+    ## Name/Value pairs:
+    ##
+    ## @table @asis
+    ## @item @qcode{'AbsTol'}
+    ## The furthest, in millimetres, the fit may stray from the segments it
+    ## replaces, and they from it.
+    ##
+    ## @item @qcode{'RelTol'}
+    ## The same as a fraction of the region's size, the diagonal of the box
+    ## around its outline.  Given alone, either tolerance holds alone; given
+    ## both, the stricter.  The default is a @qcode{'RelTol'} of 1e-3.  To
+    ## turn a faceted bore into a circle the tolerance must be larger than its
+    ## facets stray from the circle.
+    ##
+    ## @item @qcode{'Corner'}
+    ## The turn, in degrees, at which the outline has a corner, 20 by
+    ## default.  The turn is measured on a sliding window: between the mean
+    ## direction of the outline over a stretch behind a point and over a
+    ## stretch ahead of it, so that noise and a small fillet saved as a few
+    ## facets do not make corners of their own.  A corner is kept only where
+    ## the outline lies within the tolerance of the sharp corner its two
+    ## sides make, which then sits where the sides meet; a larger fillet is
+    ## fitted as an arc.
+    ##
+    ## @item @qcode{'Window'}
+    ## The length of each stretch, in millimetres, ten tolerances by default.
+    ## @end table
+    ##
+    ## The fitted region is checked as any region is.  Should a fit make a loop
+    ## cross or touch another, as when two lie closer than the tolerance, the
+    ## region is fitted again at half the tolerance, up to four times, and
+    ## returned as it was when it never passes.
+    ##
+    ## @example
+    ## @group
+    ## ## A slice of a scanned part, its bore a circle again
+    ## M = stl.read ('part.stl');
+    ## R = stl.section (M, geom.UCS ([0, 0, 1], [0, 0, 5]));
+    ## R = fit (R@{1@}, 'arcs', 'AbsTol', 0.01);
+    ## @end group
+    ## @end example
+    ##
+    ## @seealso{stl.section, geom.Region.fillet, geom.Spline}
+    ## @end deftypefn
+    function this = fit (this, MODE = 'arcs', varargin)
+
+      ## Input validation
+      if (! ischar (MODE) || ! any (strcmp (MODE, {'lines', 'arcs', 'curves'})))
+        error ("geom.Region.fit: MODE must be 'lines', 'arcs' or 'curves'.");
+      endif
+      if (mod (numel (varargin), 2) != 0)
+        error ("geom.Region.fit: Name/Value arguments must come in pairs.");
+      endif
+      opt = struct ('RelTol', [], 'AbsTol', [], 'Corner', 20, 'Window', []);
+      for k = 1:2:numel (varargin)
+        name = varargin{k};
+        if (! ischar (name) || ! isrow (name) ...
+            || ! any (strcmp (name, fieldnames (opt))))
+          error ("geom.Region.fit: unknown parameter.");
+        endif
+        opt.(name) = varargin{k+1};
+      endfor
+      pos = @(x) isnumeric (x) && isreal (x) && isscalar (x) ...
+                 && isfinite (x) && x > 0;
+      for name = {'RelTol', 'AbsTol', 'Window'}
+        x = opt.(name{1});
+        if (! isempty (x) && ! pos (x))
+          error (strcat ("geom.Region.fit: %s must be a positive and", ...
+                         " finite real scalar."), name{1});
+        endif
+      endfor
+      A = opt.Corner;
+      if (! isnumeric (A) || ! isreal (A) || ! isscalar (A) || ! (A > 0) ...
+          || ! (A < 180))
+        error (strcat ("geom.Region.fit: Corner must be an angle in the", ...
+                       " range (0, 180) degrees."));
+      endif
+
+      Q = __sample__ (this.Outline);
+      size = norm (max (Q(:,1:2), [], 1) - min (Q(:,1:2), [], 1));
+      tol = [];
+      if (! isempty (opt.RelTol))
+        tol = opt.RelTol * size;
+      endif
+      if (! isempty (opt.AbsTol))
+        tol = min ([tol, opt.AbsTol]);
+      endif
+      if (isempty (tol))
+        tol = 1e-3 * size;
+      endif
+      mode = find (strcmp (MODE, {'lines', 'arcs', 'curves'}));
+      loops = [{this.Outline}, this.Holes];
+      for attempt = 0:4
+        T = tol / 2 ^ attempt;
+        W = opt.Window;
+        if (isempty (W))
+          W = 10 * T;
+        endif
+        L = cellfun (@(P) fitloop (P, mode, T, A * pi / 180, W), loops, ...
+                     'UniformOutput', false);
+        try
+          R = geom.Region (L{1}, L(2:end));
+        catch
+          continue;
+        end_try_catch
+        R.UCS = this.UCS;
+        this = R;
+        return;
+      endfor
+
+    endfunction
+
     function this = Region (OUTLINE, HOLES = {})
 
       ## Input validation
@@ -413,6 +547,87 @@ function [errmsg, P] = toloop (ARG, NAME, IN)
   P = __into__ (P, IN.UCS);
   if (! flat (P))
     errmsg = sprintf ("%s must lie in the plane of OUTLINE.", NAME);
+  endif
+
+endfunction
+
+## The closed path P fitted in MODE, 1 lines, 2 arcs, 3 curves, within TOL,
+## corners at the angle CORNER on windows of length W: the whole of it when it
+## is all straight segments, else each run of straight segments between the
+## arcs and splines it keeps
+function Q = fitloop (P, mode, tol, corner, W)
+
+  V = P.Vertices(:,1:2);
+  n = rows (V);
+  straight = isnan (P.Midpoints(:,1)) & cellfun (@isempty, P.Splines);
+  if (all (straight))
+    Q = topath (__mesh__ ('fit', 'geom.Region.fit', V, true, mode, tol, ...
+                          corner, W));
+    return;
+  endif
+  parts = {};
+  first = find (! straight, 1);
+  run = V(mod (first, n) + 1,:);
+  for j = first + (1:n)
+    k = mod (j - 1, n) + 1;
+    nxt = V(mod (k, n) + 1,:);
+    if (straight(k))
+      run(end+1,:) = nxt;
+      continue;
+    endif
+    if (rows (run) > 1)
+      parts{end+1} = topath (__mesh__ ('fit', 'geom.Region.fit', run, ...
+                                       false, mode, tol, corner, W));
+    endif
+    if (isempty (P.Splines{k}))
+      parts{end+1} = geom.Path.arc ([V(k,:), 0], P.Midpoints(k,:), [nxt, 0]);
+    else
+      parts{end+1} = geom.Path (P.Splines{k});
+    endif
+    run = nxt;
+  endfor
+  Q = join (parts{:}, 'Tangent', false);
+
+endfunction
+
+## The path of the fitted PIECES in turn, lines that follow one another as one
+## polyline; closed when it ends where it starts
+function Q = topath (pieces)
+
+  parts = {};
+  lines = zeros (0, 2);
+  for i = 1:numel (pieces)
+    p = pieces{i};
+    if (strcmp (p.type, 'line'))
+      if (isempty (lines))
+        lines = p.points;
+      else
+        lines(end+1,:) = p.points(2,:);
+      endif
+      continue;
+    endif
+    if (! isempty (lines))
+      parts{end+1} = geom.Path (lines);
+      lines = zeros (0, 2);
+    endif
+    if (strcmp (p.type, 'arc'))
+      parts{end+1} = geom.Path.arc ([p.points(1,:), 0], [p.points(2,:), 0], ...
+                                    [p.points(3,:), 0]);
+    else
+      parts{end+1} = geom.Spline.nurbs (p.points, p.knots);
+    endif
+  endfor
+  if (! isempty (lines))
+    parts{end+1} = geom.Path (lines);
+  endif
+  if (numel (parts) > 1)
+    Q = join (parts{:}, 'Tangent', false);
+  elseif (isa (parts{1}, 'geom.Spline'))
+    Q = geom.Path (parts{1});
+  elseif (isequal (lines(1,:), lines(end,:)))
+    Q = geom.Path (lines(1:end-1,:), 'Closed', true);
+  else
+    Q = parts{1};
   endif
 
 endfunction
@@ -588,6 +803,129 @@ endfunction
 %!                        [1, w, 1, w, 1, w, 1, w, 1]);
 %! R = geom.Region ([0, 0; 40, 0; 40, 20; 0, 20], {H});
 %! assert_equal (__area__ (R.Holes{1}), -25 * pi, 1e-12);
+
+## The furthest any point of A lies from the closed polygon B, for the tests
+%!function d = gap (A, B)
+%!  E = B([2:end, 1],:) - B;
+%!  L2 = sum (E .^ 2, 2)';
+%!  d = 0;
+%!  for k = 1:500:rows (A)
+%!    P = A(k:min (k + 499, rows (A)),:);
+%!    t = ((P(:,1) - B(:,1)') .* E(:,1)' ...
+%!         + (P(:,2) - B(:,2)') .* E(:,2)') ./ L2;
+%!    t = min (max (t, 0), 1);
+%!    dx = P(:,1) - (B(:,1)' + t .* E(:,1)');
+%!    dy = P(:,2) - (B(:,2)' + t .* E(:,2)');
+%!    d = max (d, max (min (sqrt (dx .^ 2 + dy .^ 2), [], 2)));
+%!  endfor
+%!endfunction
+## A 60 by 40 rectangle whose corners are fillets of radius R, each N facets
+%!function P = rounded (R, N)
+%!  c = [60 - R, R; 60 - R, 40 - R; R, 40 - R; R, R];
+%!  a = [-90; 0; 90; 180];
+%!  f = @(k) c(k,:) + R * [cosd(a(k) + (0:N)' * 90 / N), ...
+%!                         sind(a(k) + (0:N)' * 90 / N)];
+%!  P = cell2mat (arrayfun (f, (1:4)', 'UniformOutput', false));
+%!endfunction
+
+%!test  # a faceted bore: two half circles, or kept below its facet error
+%! a = (0:63)' * 2 * pi / 64;
+%! R = geom.Region ([0, 0; 40, 0; 40, 30; 0, 30], ...
+%!                  {[20 + 5 * cos(a), 15 + 5 * sin(a)]});
+%! F = fit (R);
+%! assert_equal (rows (F.Outline.Vertices), 4);
+%! assert_equal (rows (F.Holes{1}.Vertices), 2);
+%! assert_equal (all (! isnan (F.Holes{1}.Midpoints(:,1))), true);
+%! assert_equal (__area__ (F.Holes{1}), -25 * pi, 1e-9);
+%! F = fit (R, 'arcs', 'AbsTol', 1e-3);
+%! assert_equal (rows (F.Holes{1}.Vertices), 64);
+%! ## Both tolerances: the stricter holds
+%! F = fit (R, 'arcs', 'RelTol', 1e-3, 'AbsTol', 1e-3);
+%! assert_equal (rows (F.Holes{1}.Vertices), 64);
+%! F = fit (R, 'arcs', 'AbsTol', 0.05);
+%! assert_equal (rows (F.Holes{1}.Vertices), 2);
+
+%!test  # a noisy rectangle: four lines, its corners where its sides meet
+%! s = (0:199)' / 200;
+%! P = [60 * s, 0 * s; 60 + 0 * s, 40 * s; 60 - 60 * s, 40 + 0 * s; ...
+%!      0 * s, 40 - 40 * s];
+%! P += 1e-3 * [sin(1:800)', cos(3 * (1:800))'];
+%! F = fit (geom.Region (P), 'arcs', 'AbsTol', 0.01);
+%! V = sortrows (round (F.Outline.Vertices(:,1:2)));
+%! assert_equal (V, [0, 0; 0, 40; 60, 0; 60, 40]);
+%! E = F.Outline.Vertices(:,1:2) - round (F.Outline.Vertices(:,1:2));
+%! assert_equal (max (abs (E(:))) < 3e-3, true);
+
+%!test  # fillets of radius 1 in eight facets: lines and arcs, tangent
+%! F = fit (geom.Region (rounded (1, 8)), 'arcs', 'AbsTol', 0.005);
+%! M = F.Outline.Midpoints;
+%! assert_equal (rows (M), 8);
+%! assert_equal (nnz (! isnan (M(:,1))), 4);
+%! assert_equal (__area__ (F.Outline), 2400 - (4 - pi), 1e-6);
+%! [tin, tout] = __tangents__ (F.Outline);
+%! assert_equal (sum (tout .* tin([2:end, 1],:), 2), ones (8, 1), 1e-9);
+
+%!test  # fillets smaller than the tolerance allows are sharp corners
+%! F = fit (geom.Region (rounded (0.002, 8)), 'arcs', 'AbsTol', 0.01);
+%! assert_equal (sortrows (F.Outline.Vertices(:,1:2)), ...
+%!               [0, 0; 0, 40; 60, 0; 60, 40], 1e-9);
+
+%!test  # lines only, within the tolerance
+%! a = (0:63)' * 2 * pi / 64;
+%! P = [5 * cos(a), 5 * sin(a)];
+%! F = fit (geom.Region (P), 'lines', 'AbsTol', 0.05);
+%! assert_equal (rows (F.Outline.Vertices) < 64, true);
+%! assert_equal (all (isnan (F.Outline.Midpoints(:))), true);
+%! assert_equal (gap (P, F.Outline.Vertices(:,1:2)) <= 0.05, true);
+
+%!test  # curves: splines within the tolerance both ways, smooth throughout
+%! t = linspace (0, 2 * pi, 2001)';
+%! t(end) = [];
+%! r = 30 + 6 * cos (5 * t);
+%! P = [r .* cos(t), r .* sin(t)];
+%! F = fit (geom.Region (P), 'curves', 'AbsTol', 0.01);
+%! assert_equal (any (! cellfun (@isempty, F.Outline.Splines)), true);
+%! S = __sample__ (F.Outline)(:,1:2);
+%! assert_equal (gap (S, P) <= 0.01, true);
+%! assert_equal (gap (P, S) <= 0.01, true);
+%! [tin, tout] = __tangents__ (F.Outline);
+%! assert_equal (sum (tout .* tin([2:end, 1],:), 2), ...
+%!               ones (rows (tin), 1), 1e-9);
+
+%!test  # an arc already in the outline is kept, the straight run fitted
+%! s = (1:99)' / 100;
+%! P = geom.Path ([0, -6; 40 * s, -6 + 1e-3 * sin(1:99)'; 40, -6]);
+%! O = join (geom.Path ([0, 6; 0, -6]), P, ...
+%!           geom.Path.arc ([40, -6, 0], [46, 0, 0], [40, 6, 0]), ...
+%!           geom.Path ([40, 6; 0, 6]));
+%! F = fit (geom.Region (O), 'arcs', 'AbsTol', 0.01);
+%! assert_equal (rows (F.Outline.Vertices), 4);
+%! M = F.Outline.Midpoints;
+%! assert_equal (M(! isnan (M(:,1)),:), [46, 0, 0], 1e-12);
+
+%!test  # in the region's own UCS
+%! a = (0:63)' * 2 * pi / 64;
+%! U = geom.UCS ([0, 1, 1], [1, 2, 3]);
+%! R = geom.Region ([5 * cos(a), 5 * sin(a)]);
+%! R.UCS = U;
+%! F = fit (R);
+%! assert_equal (F.UCS, U);
+%! assert_equal (__area__ (F.Outline), 25 * pi, 1e-9);
+
+%!error<geom.Region.fit: MODE must be 'lines', 'arcs' or 'curves'.> ...
+%! fit (geom.Region ([0, 0; 1, 0; 1, 1]), 'splines')
+%!error<geom.Region.fit: Name/Value arguments must come in pairs.> ...
+%! fit (geom.Region ([0, 0; 1, 0; 1, 1]), 'arcs', 'AbsTol')
+%!error<geom.Region.fit: unknown parameter.> ...
+%! fit (geom.Region ([0, 0; 1, 0; 1, 1]), 'arcs', 'Tol', 1)
+%!error<geom.Region.fit: AbsTol must be a positive and finite real scalar.> ...
+%! fit (geom.Region ([0, 0; 1, 0; 1, 1]), 'arcs', 'AbsTol', 0)
+%!error<geom.Region.fit: RelTol must be a positive and finite real scalar.> ...
+%! fit (geom.Region ([0, 0; 1, 0; 1, 1]), 'arcs', 'RelTol', Inf)
+%!error<geom.Region.fit: Window must be a positive and finite real scalar.> ...
+%! fit (geom.Region ([0, 0; 1, 0; 1, 1]), 'arcs', 'Window', -1)
+%!error<geom.Region.fit: Corner must be an angle in the range \(0, 180\) degrees.> ...
+%! fit (geom.Region ([0, 0; 1, 0; 1, 1]), 'arcs', 'Corner', 180)
 
 %!error<geom.Region.chamfer: invalid number of input arguments.> ...
 %! chamfer (geom.Region ([0, 0; 1, 0; 1, 1]))

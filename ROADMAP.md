@@ -212,7 +212,9 @@ loop chains a cut's segments fifty times slower. With it comes slicing a mesh
 with a plane into `geom.Region` objects, as `solid.Shape.section` cuts a
 solid: the cut of a mesh is a polygon, healed to a tolerance where the mesh
 has gaps. Fitting arcs and splines to that polygon, so that a faceted bore
-becomes a circle again, follows in a later release.
+becomes a circle again, is `geom.Region.fit`: lines, arcs and splines within
+a tolerance, absolute or relative, corners found on a sliding window so that
+noise and small faceted fillets are not taken for them.
 
 ## Milestone 2: the language of a technical drawing (0.3.0)
 

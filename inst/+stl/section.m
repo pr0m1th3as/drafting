@@ -35,7 +35,8 @@
 ## segments, exact for the mesh: a round hole in a mesh is a polygon of its
 ## facets.  The triangles may be turned either way, inwards or outwards,
 ## which many files get wrong; outlines and holes are told apart by how they
-## nest.
+## nest.  @code{geom.Region.fit} turns the polygon back into lines, arcs and
+## splines within a tolerance, so that a faceted bore is a circle again.
 ##
 ## @code{@var{R} = stl.section (@var{M}, @var{U}, @qcode{'Tolerance'},
 ## @var{T})} heals a mesh with gaps: where the cut through it breaks off, ends
@@ -59,7 +60,7 @@
 ## @end group
 ## @end example
 ##
-## @seealso{stl.read, solid.Shape.section, geom.Region}
+## @seealso{stl.read, solid.Shape.section, geom.Region, geom.Region.fit}
 ## @end deftypefn
 
 function [R, OPEN] = section (M, U, varargin)
@@ -204,6 +205,17 @@ endfunction
 %! assert_equal (numel (R), 1);
 %! assert_equal (OPEN, cell (1, 0));
 %! assert_equal (__area__ (R{1}.Outline), 200, 2e-3);
+
+%!test  # a cylinder of 64 facets cut, and fitted back into a circle
+%! a = (0:63)' * 2 * pi / 64;
+%! T = [ones(62, 1), (2:63)', (3:64)'];
+%! M = prism ([10 * cos(a), 10 * sin(a)], T, 20);
+%! R = stl.section (M, geom.UCS ([0, 0, 1], [0, 0, 7]));
+%! assert_equal (rows (R{1}.Outline.Vertices), 64);
+%! F = fit (R{1});
+%! assert_equal (rows (F.Outline.Vertices), 2);
+%! assert_equal (__area__ (F.Outline), 100 * pi, 1e-9);
+%! assert_equal (F.UCS, R{1}.UCS);
 
 %!error<stl.section: invalid number of input arguments.> stl.section (1)
 %!error<stl.section: M must be a mesh struct with vertices, an N-by-3 matrix, and faces, a K-by-3 matrix of indices into them.> ...

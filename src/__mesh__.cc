@@ -1021,6 +1021,1170 @@ section (const Matrix& V, const Matrix& F, double tol, Cell& pieces,
   }
 }
 
+
+// Fitting lines, arcs and splines to a polygon, within a tolerance
+
+pt
+operator+ (const pt& a, const pt& b)
+{
+  return pt {a.x + b.x, a.y + b.y};
+}
+
+pt
+operator- (const pt& a, const pt& b)
+{
+  return pt {a.x - b.x, a.y - b.y};
+}
+
+pt
+operator* (double s, const pt& a)
+{
+  return pt {s * a.x, s * a.y};
+}
+
+double
+dot (const pt& a, const pt& b)
+{
+  return a.x * b.x + a.y * b.y;
+}
+
+double
+cross (const pt& a, const pt& b)
+{
+  return a.x * b.y - a.y * b.x;
+}
+
+double
+len (const pt& a)
+{
+  return std::hypot (a.x, a.y);
+}
+
+pt
+unit (const pt& a)
+{
+  const double l = len (a);
+  return (l > 0) ? (1 / l) * a : a;
+}
+
+// The left normal of a direction
+pt
+left (const pt& a)
+{
+  return pt {-a.y, a.x};
+}
+
+double
+segdist (const pt& q, const pt& a, const pt& b)
+{
+  const pt d = b - a;
+  const double l2 = dot (d, d);
+  double t = (l2 > 0) ? dot (q - a, d) / l2 : 0;
+  t = std::min (1.0, std::max (0.0, t));
+  return len (q - (a + t * d));
+}
+
+// A fitted piece: a line from P[0] to P[1]; an arc from P[0] through P[1] to
+// P[2]; or a cubic spline with control points P and the full knot vector K
+struct piece
+{
+  int type;
+  vector<pt> P;
+  vector<double> K;
+  size_t e = 0;     // the index in its run of the point it ends at
+  size_t b = 0;     // and of the point it starts at
+};
+
+// A circular arc from A to B with centre C and radius R, turning anticlockwise
+// when CCW, through the angle SWEEP
+struct arc
+{
+  pt A, B, C;
+  double R, sweep;
+  bool ccw;
+
+  // The angle from A round to the point Q, in the arc's sense, in [0, 2 pi)
+  double at (const pt& Q) const
+  {
+    double a = std::atan2 (cross (A - C, Q - C), dot (A - C, Q - C));
+    if (! ccw)
+    {
+      a = -a;
+    }
+    return (a < 0) ? a + 2 * M_PI : a;
+  }
+
+  double dist (const pt& Q) const
+  {
+    const double a = at (Q);
+    if (a <= sweep + 1e-9 || a >= 2 * M_PI - 1e-9)
+    {
+      return std::abs (len (Q - C) - R);
+    }
+    return std::min (len (Q - A), len (Q - B));
+  }
+
+  pt point (double a) const
+  {
+    const double s = ccw ? a : -a;
+    const pt r = A - C;
+    return C + pt {r.x * std::cos (s) - r.y * std::sin (s),
+                   r.x * std::sin (s) + r.y * std::cos (s)};
+  }
+
+  pt tangent (const pt& Q) const
+  {
+    const pt t = unit (left (Q - C));
+    return ccw ? t : -1.0 * t;
+  }
+};
+
+// The arc from A through M to B
+bool
+arc3 (const pt& A, const pt& M, const pt& B, arc& c)
+{
+  const pt a = A - M, b = B - M;
+  const double d = 2 * cross (a, b);
+  if (std::abs (d) <= 1e-12 * dot (a, a) * std::sqrt (dot (b, b)) + 1e-300)
+  {
+    return false;
+  }
+  const double aa = dot (a, a), bb = dot (b, b);
+  c.C = M + pt {(b.y * aa - a.y * bb) / d, (a.x * bb - b.x * aa) / d};
+  c.R = len (A - c.C);
+  c.A = A;
+  c.B = B;
+  c.ccw = cross (M - A, B - M) > 0;
+  c.sweep = c.at (B);
+  return c.sweep > 0;
+}
+
+// The arc from A leaving in the direction T and ending at B
+bool
+arct (const pt& A, const pt& T, const pt& B, arc& c)
+{
+  const pt n = left (T), v = B - A;
+  const double d = 2 * dot (v, n);
+  if (std::abs (d) <= 1e-12 * len (v))
+  {
+    return false;
+  }
+  const double r = dot (v, v) / d;
+  c.C = A + r * n;
+  c.R = std::abs (r);
+  c.A = A;
+  c.B = B;
+  c.ccw = r > 0;
+  c.sweep = c.at (B);
+  return c.sweep > 0;
+}
+
+// A run of points of a polygon to fit, with the distance along it
+struct run
+{
+  vector<pt> Q;
+  vector<double> s;
+
+  explicit run (const vector<pt>& q) : Q (q), s (q.size (), 0)
+  {
+    for (size_t i = 1; i < Q.size (); i++)
+    {
+      s[i] = s[i-1] + len (Q[i] - Q[i-1]);
+    }
+  }
+};
+
+// Whether the curve DIST strays no further than TOL from the run's points a
+// to e and the middles of the segments between them, the first starting at S
+template <typename F>
+bool
+within (const run& r, size_t a, size_t e, const pt& S, double tol, F dist)
+{
+  pt prev = S;
+  for (size_t i = a + 1; i <= e; i++)
+  {
+    if (dist (r.Q[i]) > tol || dist (0.5 * (prev + r.Q[i])) > tol)
+    {
+      return false;
+    }
+    prev = r.Q[i];
+  }
+  return true;
+}
+
+// The furthest point e from a for which OK (e) holds, found by doubling then
+// halving from a + FIRST; a when it does not hold there
+template <typename F>
+size_t
+reach (size_t a, size_t m, F ok, size_t first = 1)
+{
+  if (a + first > m || ! ok (a + first))
+  {
+    return a;
+  }
+  size_t good = a + first, bad = m + 1, step = 2 * first;
+  while (good < m)
+  {
+    const size_t e = std::min (m, a + step);
+    if (ok (e))
+    {
+      good = e;
+      step *= 2;
+    }
+    else
+    {
+      bad = e;
+      break;
+    }
+  }
+  while (bad <= m && bad - good > 1)
+  {
+    const size_t e = (good + bad) / 2;
+    if (ok (e))
+    {
+      good = e;
+    }
+    else
+    {
+      bad = e;
+    }
+  }
+  return good;
+}
+
+// The nonzero cubic B-spline basis functions at u on the knots K, and the
+// index of the first
+size_t
+basis (const vector<double>& K, double u, double N[4])
+{
+  const size_t n = K.size () - 4;
+  size_t s = std::upper_bound (K.begin (), K.end (), u) - K.begin () - 1;
+  s = std::min (std::max (s, size_t (3)), n - 1);
+  double left[4], right[4];
+  N[0] = 1;
+  for (int j = 1; j <= 3; j++)
+  {
+    left[j] = u - K[s + 1 - j];
+    right[j] = K[s + j] - u;
+    double saved = 0;
+    for (int r = 0; r < j; r++)
+    {
+      const double t = N[r] / (right[r + 1] + left[j - r]);
+      N[r] = saved + right[r + 1] * t;
+      saved = left[j - r] * t;
+    }
+    N[j] = saved;
+  }
+  return s - 3;
+}
+
+// Solve the symmetric positive definite system A x = b, A n-by-n
+bool
+cholsolve (vector<double>& A, vector<double>& b, size_t n)
+{
+  for (size_t j = 0; j < n; j++)
+  {
+    double d = A[j * n + j];
+    for (size_t k = 0; k < j; k++)
+    {
+      d -= A[j * n + k] * A[j * n + k];
+    }
+    if (d <= 0)
+    {
+      return false;
+    }
+    d = std::sqrt (d);
+    A[j * n + j] = d;
+    for (size_t i = j + 1; i < n; i++)
+    {
+      double t = A[i * n + j];
+      for (size_t k = 0; k < j; k++)
+      {
+        t -= A[i * n + k] * A[j * n + k];
+      }
+      A[i * n + j] = t / d;
+    }
+  }
+  for (size_t i = 0; i < n; i++)
+  {
+    double t = b[i];
+    for (size_t k = 0; k < i; k++)
+    {
+      t -= A[i * n + k] * b[k];
+    }
+    b[i] = t / A[i * n + i];
+  }
+  for (size_t i = n; i-- > 0; )
+  {
+    double t = b[i];
+    for (size_t k = i + 1; k < n; k++)
+    {
+      t -= A[k * n + i] * b[k];
+    }
+    b[i] = t / A[i * n + i];
+  }
+  return true;
+}
+
+// The least-squares cubic spline through the run's points a to e, starting at
+// S and ending at E, leaving S in the direction T0 and arriving at E in the
+// direction T1 where they are given, with knots added in the span where it
+// strays most until it is within TOL
+bool
+splinefit (const run& r, size_t a, size_t e, const pt& S, const pt& E,
+           const pt *T0, const pt *T1, double tol, piece& out)
+{
+  vector<pt> D;
+  D.push_back (S);
+  for (size_t i = a + 1; i < e; i++)
+  {
+    D.push_back (r.Q[i]);
+  }
+  D.push_back (E);
+  const size_t k = D.size ();
+  vector<double> u (k, 0);
+  for (size_t i = 1; i < k; i++)
+  {
+    u[i] = u[i-1] + len (D[i] - D[i-1]);
+  }
+  if (u.back () <= 0)
+  {
+    return false;
+  }
+  for (double& x : u)
+  {
+    x /= u.back ();
+  }
+  vector<double> K = {0, 0, 0, 0, 1, 1, 1, 1};
+  const size_t cap = std::max (size_t (4), std::min (k / 2, size_t (200)));
+  while (true)
+  {
+    const size_t n = K.size () - 4;
+    // Unknowns: the x and y of each free control point, then the lengths
+    // along T0 and T1 of the second and the last but one
+    vector<int> slot (n, -1);
+    size_t nz = 0;
+    for (size_t i = 1; i + 1 < n; i++)
+    {
+      if ((i == 1 && T0) || (i == n - 2 && T1))
+      {
+        continue;
+      }
+      slot[i] = nz;
+      nz += 2;
+    }
+    const int ia = T0 ? nz++ : -1;
+    const int ib = T1 ? nz++ : -1;
+    if (nz == 0 || (n == 4 && T0 && T1 && false))
+    {
+      return false;
+    }
+    vector<double> A (nz * nz, 0), b (nz, 0);
+    for (size_t j = 0; j < k; j++)
+    {
+      double N[4];
+      const size_t f = basis (K, u[j], N);
+      // Row for x and for y: sum of coefficients times unknowns = rhs
+      for (int c = 0; c < 2; c++)
+      {
+        std::vector<std::pair<int, double>> row;
+        double rhs = c ? D[j].y : D[j].x;
+        for (int q = 0; q < 4; q++)
+        {
+          const size_t i = f + q;
+          const double w = N[q];
+          if (w == 0)
+          {
+            continue;
+          }
+          if (i == 0)
+          {
+            rhs -= w * (c ? S.y : S.x);
+          }
+          else if (i == n - 1)
+          {
+            rhs -= w * (c ? E.y : E.x);
+          }
+          else if (i == 1 && T0)
+          {
+            rhs -= w * (c ? S.y : S.x);
+            row.emplace_back (ia, w * (c ? T0->y : T0->x));
+          }
+          else if (i == n - 2 && T1)
+          {
+            rhs -= w * (c ? E.y : E.x);
+            row.emplace_back (ib, -w * (c ? T1->y : T1->x));
+          }
+          else
+          {
+            row.emplace_back (slot[i] + c, w);
+          }
+        }
+        for (const auto& p : row)
+        {
+          b[p.first] += p.second * rhs;
+          for (const auto& q : row)
+          {
+            A[p.first * nz + q.first] += p.second * q.second;
+          }
+        }
+      }
+    }
+    double tr = 0;
+    for (size_t i = 0; i < nz; i++)
+    {
+      tr += A[i * nz + i];
+    }
+    for (size_t i = 0; i < nz; i++)
+    {
+      A[i * nz + i] += 1e-12 * tr / nz + 1e-300;
+    }
+    if (! cholsolve (A, b, nz))
+    {
+      return false;
+    }
+    vector<pt> P (n);
+    P[0] = S;
+    P[n-1] = E;
+    for (size_t i = 1; i + 1 < n; i++)
+    {
+      if (i == 1 && T0)
+      {
+        P[i] = S + b[ia] * *T0;
+      }
+      else if (i == n - 2 && T1)
+      {
+        P[i] = E - b[ib] * *T1;
+      }
+      else
+      {
+        P[i] = pt {b[slot[i]], b[slot[i] + 1]};
+      }
+    }
+    if ((T0 && b[ia] <= 0) || (T1 && b[ib] <= 0))
+    {
+      return false;
+    }
+    auto eval = [&] (double t)
+    {
+      double N[4];
+      const size_t f = basis (K, t, N);
+      pt c {0, 0};
+      for (int q = 0; q < 4; q++)
+      {
+        c = c + N[q] * P[f + q];
+      }
+      return c;
+    };
+    // The worst of the points and of the middles of the segments
+    double worst = 0;
+    double where = 0.5;
+    for (size_t j = 0; j < k; j++)
+    {
+      const double d = len (eval (u[j]) - D[j]);
+      if (d > worst)
+      {
+        worst = d;
+        where = u[j];
+      }
+      if (j + 1 < k)
+      {
+        const double t = (u[j] + u[j+1]) / 2;
+        const double dm = segdist (eval (t), D[j], D[j+1]);
+        if (dm > worst)
+        {
+          worst = dm;
+          where = t;
+        }
+      }
+    }
+    if (worst <= tol)
+    {
+      out.type = 2;
+      out.P = P;
+      out.K = K;
+      return true;
+    }
+    if (n >= cap)
+    {
+      return false;
+    }
+    size_t s = std::upper_bound (K.begin (), K.end (), where) - K.begin () - 1;
+    s = std::min (std::max (s, size_t (3)), n - 1);
+    K.insert (K.begin () + s + 1, (K[s] + K[s + 1]) / 2);
+  }
+}
+
+// The end direction of a piece
+pt
+endtangent (const piece& p)
+{
+  if (p.type == 0)
+  {
+    return unit (p.P[1] - p.P[0]);
+  }
+  if (p.type == 1)
+  {
+    arc c;
+    arc3 (p.P[0], p.P[1], p.P[2], c);
+    return c.tangent (p.P[2]);
+  }
+  return unit (p.P.back () - p.P[p.P.size () - 2]);
+}
+
+pt
+starttangent (const piece& p)
+{
+  if (p.type == 0)
+  {
+    return unit (p.P[1] - p.P[0]);
+  }
+  if (p.type == 1)
+  {
+    arc c;
+    arc3 (p.P[0], p.P[1], p.P[2], c);
+    return c.tangent (p.P[0]);
+  }
+  return unit (p.P[1] - p.P[0]);
+}
+
+// The pieces of a run from its first point to its last, ends fixed, mode 1
+// lines, 2 arcs, 3 curves: from each start the line or arc that reaches
+// furthest within TOL, tangent to the piece before it where it can be; in
+// mode 3 a stretch no line or arc covers well is one spline
+vector<piece>
+fitrun (const run& r, int mode, double tol, double size)
+{
+  vector<piece> out;
+  const size_t m = r.Q.size () - 1;
+  size_t a = 0;
+  pt S = r.Q[0];
+  bool smooth = false;      // a tangent to keep from the piece before
+  pt T {0, 0};
+  bool loose = false;       // inside a stretch for a spline
+  size_t fa = 0;
+  pt fS {0, 0};
+  bool fsmooth = false;
+  pt fT {0, 0};
+
+  // A piece from S at a to e: a line, along T when given
+  auto line = [&] (size_t e, const pt *t, piece& p)
+  {
+    pt E = r.Q[e];
+    if (t)
+    {
+      const double l = dot (E - S, *t);
+      if (l <= 0)
+      {
+        return false;
+      }
+      if (e != m)
+      {
+        E = S + l * *t;
+      }
+    }
+    if (len (E - S) <= 0)
+    {
+      return false;
+    }
+    if (! within (r, a, e, S, tol, [&] (const pt& q)
+                  { return segdist (q, S, E); }))
+    {
+      return false;
+    }
+    p.type = 0;
+    p.P = {S, E};
+    return true;
+  };
+  auto circ = [&] (size_t e, const pt *t, piece& p, double& sweep)
+  {
+    arc c;
+    if (t)
+    {
+      if (! arct (S, *t, r.Q[e], c))
+      {
+        return false;
+      }
+    }
+    else
+    {
+      if (e < a + 2)
+      {
+        return false;
+      }
+      const double mid = (r.s[a] + r.s[e]) / 2;
+      size_t i = std::lower_bound (r.s.begin () + a, r.s.begin () + e,
+                                   mid) - r.s.begin ();
+      i = std::min (std::max (i, a + 1), e - 1);
+      if (! arc3 (S, r.Q[i], r.Q[e], c))
+      {
+        return false;
+      }
+    }
+    if (c.sweep > M_PI + 1e-9 || c.R > 1e6 * (r.s.back () + 1))
+    {
+      return false;
+    }
+    if (! within (r, a, e, S, tol, [&] (const pt& q) { return c.dist (q); }))
+    {
+      return false;
+    }
+    p.type = 1;
+    p.P = {S, c.point (c.sweep / 2), r.Q[e]};
+    sweep = c.sweep;
+    return true;
+  };
+
+  auto spline = [&] (size_t b, const pt& E, const pt *T1)
+  {
+    piece p;
+    if (b > fa + 1 && splinefit (r, fa, b, fS, E, fsmooth ? &fT : nullptr,
+                                 T1, tol, p))
+    {
+      p.e = b;
+      p.b = fa;
+      out.push_back (p);
+      return;
+    }
+    // Failing that, the polygon itself
+    pt from = fS;
+    for (size_t i = fa + 1; i <= b; i++)
+    {
+      const pt to = (i == b) ? E : r.Q[i];
+      out.push_back (piece {0, {from, to}, {}, i, i - 1});
+      from = to;
+    }
+  };
+
+  while (a < m)
+  {
+    const pt *t = (smooth && ! loose) ? &T : nullptr;
+    piece pl, pa;
+    double sweep = 0;
+    size_t el = reach (a, m, [&] (size_t e) { return line (e, t, pl); });
+    size_t ea = (mode >= 2) ? reach (a, m, [&] (size_t e)
+                                     { return circ (e, t, pa, sweep); },
+                                     t ? 1 : 2) : a;
+    if (t && el == a && ea == a)
+    {
+      t = nullptr;
+      el = reach (a, m, [&] (size_t e) { return line (e, t, pl); });
+      ea = (mode >= 2) ? reach (a, m, [&] (size_t e)
+                                { return circ (e, t, pa, sweep); }, 2) : a;
+    }
+    if (el > a)
+    {
+      line (el, t, pl);
+    }
+    if (ea > a)
+    {
+      circ (ea, t, pa, sweep);
+    }
+    const bool isarc = ea > el;
+    const size_t e = isarc ? ea : el;
+    if (e == a)
+    {
+      // Nothing fits, not even one segment: take the segment as it is
+      out.push_back (piece {0, {S, r.Q[a + 1]}, {}, a + 1, a});
+      S = r.Q[a + 1];
+      smooth = false;
+      a++;
+      continue;
+    }
+    const piece& best = isarc ? pa : pl;
+    if (mode == 3)
+    {
+      const bool big = isarc ? (e - a >= 4 && sweep >= M_PI / 3)
+                             : (e - a >= 2 && r.s[e] - r.s[a] >= 0.02 * size);
+      if (! big)
+      {
+        if (! loose)
+        {
+          loose = true;
+          fa = a;
+          fS = S;
+          fsmooth = smooth;
+          fT = T;
+        }
+        a++;
+        S = r.Q[a];
+        smooth = false;
+        continue;
+      }
+      if (loose)
+      {
+        const pt T1 = starttangent (best);
+        spline (a, S, &T1);
+        loose = false;
+      }
+    }
+    out.push_back (best);
+    out.back ().e = e;
+    out.back ().b = a;
+    S = best.P.back ();
+    T = endtangent (best);
+    smooth = true;
+    a = e;
+  }
+  if (loose)
+  {
+    spline (m, r.Q[m], nullptr);
+  }
+  return out;
+}
+
+// The point at the distance S along the polygon P with distances D, round
+// and round when it is closed, held to its ends when not
+pt
+along (const vector<pt>& P, const vector<double>& D, bool closed, double s)
+{
+  const double L = D.back ();
+  if (closed)
+  {
+    s = std::fmod (s, L);
+    if (s < 0)
+    {
+      s += L;
+    }
+  }
+  else
+  {
+    s = std::min (std::max (s, 0.0), D[P.size () - 1]);
+  }
+  size_t i = std::upper_bound (D.begin (), D.end (), s) - D.begin ();
+  i = std::min (std::max (i, size_t (1)), D.size () - 1);
+  const pt& a = P[(i - 1) % P.size ()];
+  const pt& b = P[i % P.size ()];
+  const double l = D[i] - D[i-1];
+  return (l > 0) ? a + ((s - D[i-1]) / l) * (b - a) : a;
+}
+
+// The line through the points of the polygon between the distances S0 and
+// S1 along it, by least squares: a point on it and its direction
+void
+fitline (const vector<pt>& P, const vector<double>& D, bool closed,
+         double s0, double s1, pt& O, pt& dir)
+{
+  vector<pt> q;
+  q.push_back (along (P, D, closed, s0));
+  const size_t n = P.size ();
+  const double L = D.back ();
+  for (size_t i = 0; i < n; i++)
+  {
+    double s = D[i];
+    for (double w : {s - L, s, s + L})
+    {
+      if (w > s0 && w < s1 && (closed || w == s))
+      {
+        q.push_back (P[i]);
+      }
+    }
+  }
+  q.push_back (along (P, D, closed, s1));
+  pt c {0, 0};
+  for (const pt& p : q)
+  {
+    c = c + p;
+  }
+  c = (1.0 / q.size ()) * c;
+  double sxx = 0, sxy = 0, syy = 0;
+  for (const pt& p : q)
+  {
+    const pt d = p - c;
+    sxx += d.x * d.x;
+    sxy += d.x * d.y;
+    syy += d.y * d.y;
+  }
+  const double th = 0.5 * std::atan2 (2 * sxy, sxx - syy);
+  O = c;
+  dir = pt {std::cos (th), std::sin (th)};
+  if (dot (dir, q.back () - q.front ()) < 0)
+  {
+    dir = -1.0 * dir;
+  }
+}
+
+// The corners of the polygon P: where the turn between its mean direction
+// over W behind a point and over W ahead passes the angle CORNER, at the
+// peak, kept where the polygon near it lies within TOL of the sharp corner
+// the lines of its two sides make and no arc through it does.  Each is the
+// index of its vertex and the corner point.
+vector<std::pair<size_t, pt>>
+corners (const vector<pt>& P, bool closed, double tol, double corner,
+         double W)
+{
+  const size_t n = P.size ();
+  vector<double> D (n + 1, 0);
+  for (size_t i = 1; i <= n; i++)
+  {
+    D[i] = D[i-1] + ((i < n || closed) ? len (P[i % n] - P[i-1]) : 0);
+  }
+  if (! closed)
+  {
+    D.pop_back ();
+  }
+  const double L = D.back ();
+  vector<double> turn (n, 0);
+  for (size_t i = 0; i < n; i++)
+  {
+    if (! closed && (D[i] - W < 0 || D[i] + W > L))
+    {
+      continue;
+    }
+    const pt b = P[i] - along (P, D, closed, D[i] - W);
+    const pt f = along (P, D, closed, D[i] + W) - P[i];
+    turn[i] = std::atan2 (std::abs (cross (b, f)), dot (b, f));
+  }
+
+  // The peak of each run of points turning more than CORNER, a run broken
+  // where it does not or where two points lie more than 2 W apart
+  auto gap = [&] (size_t i)
+  {
+    const size_t h = (i + n - 1) % n;
+    return (i == 0 && ! closed) || D[i] - D[h] > 2 * W
+           || (i == 0 && L - D[h] > 2 * W);
+  };
+  auto breaks = [&] (size_t i) { return turn[i] <= corner || gap (i); };
+  vector<size_t> cand;
+  size_t start = 0;
+  if (closed)
+  {
+    while (start < n && ! breaks (start))
+    {
+      start++;
+    }
+    if (start == n)
+    {
+      return {};
+    }
+  }
+  for (size_t k = 0; k < n; )
+  {
+    const size_t i = (start + k) % n;
+    if (turn[i] <= corner)
+    {
+      k++;
+      continue;
+    }
+    size_t best = i;
+    size_t j = k + 1;
+    while (j < n && turn[(start + j) % n] > corner && ! gap ((start + j) % n))
+    {
+      if (turn[(start + j) % n] > turn[best])
+      {
+        best = (start + j) % n;
+      }
+      j++;
+    }
+    cand.push_back (best);
+    k = j;
+  }
+  std::sort (cand.begin (), cand.end ());
+
+  vector<std::pair<size_t, pt>> out;
+  for (size_t c = 0; c < cand.size (); c++)
+  {
+    const size_t i = cand[c];
+    const double si = D[i];
+    double back = L, ahead = L;
+    if (cand.size () > 1)
+    {
+      const size_t p = cand[(c + cand.size () - 1) % cand.size ()];
+      const size_t q = cand[(c + 1) % cand.size ()];
+      back = si - D[p];
+      ahead = D[q] - si;
+      if (closed)
+      {
+        back = (back <= 0) ? back + L : back;
+        ahead = (ahead <= 0) ? ahead + L : ahead;
+      }
+    }
+    if (! closed)
+    {
+      back = std::min (back, si);
+      ahead = std::min (ahead, L - si);
+    }
+    const double lb = std::min (6 * W, back / 2 - W);
+    const double la = std::min (6 * W, ahead / 2 - W);
+    if (lb <= 0 || la <= 0)
+    {
+      continue;
+    }
+    pt O1, d1, O2, d2;
+    fitline (P, D, closed, si - W - lb, si - W, O1, d1);
+    fitline (P, D, closed, si + W, si + W + la, O2, d2);
+    const double sn = cross (d1, d2);
+    if (std::abs (std::asin (std::min (1.0, std::abs (sn)))) < corner / 2)
+    {
+      continue;
+    }
+    const double t = cross (O2 - O1, d2) / sn;
+    const pt X = O1 + t * d1;
+    const pt A = O1 + dot (along (P, D, closed, si - W - lb) - O1, d1) * d1;
+    const pt B = O2 + dot (along (P, D, closed, si + W + la) - O2, d2) * d2;
+
+    // The polygon near it, and the sharp corner and an arc against it
+    vector<std::pair<double, pt>> zone;
+    zone.emplace_back (si - W - lb, along (P, D, closed, si - W - lb));
+    for (size_t k = 0; k < n; k++)
+    {
+      for (double w : {D[k] - L, D[k], D[k] + L})
+      {
+        if (w > si - W - lb && w < si + W + la && (closed || w == D[k]))
+        {
+          zone.emplace_back (w, P[k]);
+        }
+      }
+    }
+    zone.emplace_back (si + W + la, along (P, D, closed, si + W + la));
+    std::sort (zone.begin (), zone.end (),
+               [] (const std::pair<double, pt>& u,
+                   const std::pair<double, pt>& v)
+               { return u.first < v.first; });
+    vector<pt> near;
+    for (const auto& z : zone)
+    {
+      near.push_back (z.second);
+    }
+    bool sharp = true;
+    for (size_t k = 0; k < near.size () && sharp; k++)
+    {
+      auto dist = [&] (const pt& q)
+      {
+        return std::min (segdist (q, A, X), segdist (q, X, B));
+      };
+      sharp = dist (near[k]) <= tol
+              && (k + 1 == near.size ()
+                  || dist (0.5 * (near[k] + near[k+1])) <= tol);
+    }
+    if (! sharp)
+    {
+      continue;
+    }
+    arc ca;
+    bool round = arc3 (near.front (), P[i], near.back (), ca);
+    for (size_t k = 0; k < near.size () && round; k++)
+    {
+      round = ca.dist (near[k]) <= tol
+              && (k + 1 == near.size ()
+                  || ca.dist (0.5 * (near[k] + near[k+1])) <= tol);
+    }
+    if (round)
+    {
+      continue;
+    }
+    out.emplace_back (i, X);
+  }
+  return out;
+}
+
+// The pieces that fit the polygon P, closed or open, mode 1 lines, 2 arcs,
+// 3 curves: split at its corners, each stretch between them fitted on its
+// own; a closed polygon with no corner that lies on one circle is two half
+// circles
+vector<piece>
+fitpolygon (vector<pt> P, bool closed, int mode, double tol, double corner,
+            double W)
+{
+  // Points closer than a hair of the tolerance are one
+  vector<pt> Q;
+  for (const pt& p : P)
+  {
+    if (Q.empty () || len (p - Q.back ()) > 1e-9 * tol)
+    {
+      Q.push_back (p);
+    }
+  }
+  while (closed && Q.size () > 1 && len (Q.front () - Q.back ()) <= 1e-9 * tol)
+  {
+    Q.pop_back ();
+  }
+  P.swap (Q);
+  const size_t n = P.size ();
+  vector<piece> out;
+  double size = 0;
+  {
+    double lo[2] = {INFINITY, INFINITY}, hi[2] = {-INFINITY, -INFINITY};
+    for (const pt& p : P)
+    {
+      lo[0] = std::min (lo[0], p.x);
+      lo[1] = std::min (lo[1], p.y);
+      hi[0] = std::max (hi[0], p.x);
+      hi[1] = std::max (hi[1], p.y);
+    }
+    size = std::hypot (hi[0] - lo[0], hi[1] - lo[1]);
+  }
+  if (n < 2 || (closed && n < 3))
+  {
+    return out;
+  }
+  vector<std::pair<size_t, pt>> C;
+  if (n >= 3)
+  {
+    C = corners (P, closed, tol, corner, W);
+  }
+
+  if (closed && C.empty ())
+  {
+    // One circle through it all, as two half circles
+    vector<double> D (n + 1, 0);
+    for (size_t i = 1; i <= n; i++)
+    {
+      D[i] = D[i-1] + len (P[i % n] - P[i-1]);
+    }
+    // Through the vertices a third and two thirds of the way round, which
+    // lie on the circle where the facets meet it
+    const size_t i1 = std::lower_bound (D.begin (), D.end (), D[n] / 3)
+                      - D.begin ();
+    const size_t i2 = std::lower_bound (D.begin (), D.end (), 2 * D[n] / 3)
+                      - D.begin ();
+    arc c;
+    if (mode >= 2 && i1 > 0 && i2 > i1 && i2 < n
+        && arc3 (P[0], P[i1], P[i2], c))
+    {
+      bool ok = true;
+      for (size_t i = 0; i < n && ok; i++)
+      {
+        const double di = std::abs (len (P[i] - c.C) - c.R);
+        const pt mid = 0.5 * (P[i] + P[(i + 1) % n]);
+        ok = di <= tol && std::abs (len (mid - c.C) - c.R) <= tol;
+      }
+      if (ok)
+      {
+        const pt A = P[0];
+        const pt B = c.C + (c.C - A);
+        c.B = B;
+        c.sweep = M_PI;
+        const pt M1 = c.point (M_PI / 2);
+        arc d = c;
+        d.A = B;
+        const pt M2 = d.point (M_PI / 2);
+        out.push_back (piece {1, {A, M1, B}, {}});
+        out.push_back (piece {1, {B, M2, A}, {}});
+        return out;
+      }
+    }
+    // Otherwise from the point that turns most, round to it again
+    size_t s0 = 0;
+    double most = -1;
+    for (size_t i = 0; i < n; i++)
+    {
+      const pt a = P[i] - P[(i + n - 1) % n], b = P[(i + 1) % n] - P[i];
+      const double t = std::atan2 (std::abs (cross (a, b)), dot (a, b));
+      if (t > most)
+      {
+        most = t;
+        s0 = i;
+      }
+    }
+    vector<pt> q;
+    for (size_t k = 0; k <= n; k++)
+    {
+      q.push_back (P[(s0 + k) % n]);
+    }
+    out = fitrun (run (q), mode, tol, size);
+
+    // Again from where the first piece ended, so that the seam falls where
+    // the pieces change and does not cut one in two
+    if (out.size () > 1)
+    {
+      const size_t s1 = (s0 + out.front ().e) % n;
+      q.clear ();
+      for (size_t k = 0; k <= n; k++)
+      {
+        q.push_back (P[(s1 + k) % n]);
+      }
+      const run rq (q);
+      out = fitrun (rq, mode, tol, size);
+
+      // A spline closing the loop arrives in the direction the loop leaves
+      if (out.size () > 1 && out.back ().type == 2)
+      {
+        const piece& l = out.back ();
+        const pt T1 = starttangent (out.front ());
+        const pt T0 = endtangent (out[out.size () - 2]);
+        piece p;
+        if (splinefit (rq, l.b, l.e, l.P.front (), l.P.back (), &T0, &T1,
+                       tol, p))
+        {
+          p.b = l.b;
+          p.e = l.e;
+          out.back () = p;
+        }
+      }
+    }
+    return out;
+  }
+
+  // Stretch by stretch between the corners, or from end to end
+  vector<size_t> at;
+  vector<pt> X;
+  for (const auto& c : C)
+  {
+    at.push_back (c.first);
+    X.push_back (c.second);
+  }
+  if (! closed)
+  {
+    at.insert (at.begin (), 0);
+    X.insert (X.begin (), P[0]);
+    at.push_back (n - 1);
+    X.push_back (P[n-1]);
+  }
+  const size_t nc = at.size ();
+  const size_t ns = closed ? nc : nc - 1;
+  for (size_t k = 0; k < ns; k++)
+  {
+    const size_t i0 = at[k], i1 = at[(k + 1) % nc];
+    vector<pt> q = {X[k]};
+    for (size_t i = (i0 + 1) % n; i != i1; i = (i + 1) % n)
+    {
+      if (len (P[i] - q.back ()) > 1e-9 * tol)
+      {
+        q.push_back (P[i]);
+      }
+    }
+    if (len (X[(k + 1) % nc] - q.back ()) > 1e-9 * tol || q.size () == 1)
+    {
+      q.push_back (X[(k + 1) % nc]);
+    }
+    else
+    {
+      q.back () = X[(k + 1) % nc];
+    }
+    const vector<piece> p = fitrun (run (q), mode, tol, size);
+    out.insert (out.end (), p.begin (), p.end ());
+  }
+  return out;
+}
+
+Cell
+topieces (const vector<piece>& pieces)
+{
+  Cell c (1, pieces.size ());
+  for (size_t i = 0; i < pieces.size (); i++)
+  {
+    const piece& p = pieces[i];
+    octave_scalar_map m;
+    m.assign ("type", p.type == 0 ? "line" : p.type == 1 ? "arc" : "spline");
+    Matrix P (p.P.size (), 2);
+    for (size_t k = 0; k < p.P.size (); k++)
+    {
+      P(k,0) = p.P[k].x;
+      P(k,1) = p.P[k].y;
+    }
+    m.assign ("points", P);
+    RowVector K (p.K.size ());
+    for (size_t k = 0; k < p.K.size (); k++)
+    {
+      K(k) = p.K[k];
+    }
+    m.assign ("knots", K);
+    c(i) = m;
+  }
+  return c;
+}
+
 }
 
 DEFUN_DLD (__mesh__, args, ,
@@ -1053,6 +2217,23 @@ Undocumented internal function.\n\
     section (args(2).matrix_value (), args(3).matrix_value (),
              args(4).double_value (), pieces, open);
     return ovl (pieces, open);
+  }
+
+  // PIECES = __mesh__ ('fit', caller, P, CLOSED, MODE, TOL, CORNER, W): the
+  // lines, arcs and splines that fit the polygon P, N-by-2, within TOL
+  else if (cmd == "fit")
+  {
+    const Matrix P = args(2).matrix_value ();
+    vector<pt> q (P.rows ());
+    for (octave_idx_type i = 0; i < P.rows (); i++)
+    {
+      q[i] = pt {P(i,0), P(i,1)};
+    }
+    return ovl (topieces (fitpolygon (q, args(3).bool_value (),
+                                      args(4).int_value (),
+                                      args(5).double_value (),
+                                      args(6).double_value (),
+                                      args(7).double_value ())));
   }
 
   error ("__mesh__: unknown command '%s'.", cmd.c_str ());

@@ -11,7 +11,7 @@ exchanged as STEP, come through Open CASCADE when the package is built with it.
 
 Forty-six public functions across five namespaces plus the `draw.Drawing`,
 `geom.Polyline`, `geom.Spline`, `geom.Region`, `geom.Path`, `geom.UCS`,
-`solid.Shape` and `solid.Viewer` classes, 1516 built-in self-tests and 67 `%!demo` blocks, nearly all of which
+`solid.Shape` and `solid.Viewer` classes, 1532 built-in self-tests and 67 `%!demo` blocks, nearly all of which
 end in a `plot` call, so the documentation shows what a function does rather
 than only describing it.
 
@@ -108,11 +108,15 @@ takes, welding the corners every triangle repeats. `stl.section` cuts the mesh
 with the plane of a `geom.UCS` into `geom.Region` objects, as
 `solid.Shape.section` cuts a solid, healing small gaps in the mesh to a
 tolerance and returning what will not close; the regions build solids like any
-others. Both are compiled and need nothing but Octave:
+others. `fit` on a region turns the cut's facets back into lines, arcs and
+splines within a tolerance, absolute or relative, so a faceted bore is a
+circle again and a filleted corner an arc. All three are compiled and need
+nothing but Octave:
 
 ```
 M = stl.read ('bracket.stl');
 R = stl.section (M, geom.UCS ([0, 0, 1], [0, 0, 5]));
+R = fit (R{1}, 'arcs', 'AbsTol', 0.01);
 ```
 
 `+solid` models solids through [Open CASCADE](https://dev.opencascade.org/),
