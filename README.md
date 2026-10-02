@@ -9,11 +9,11 @@ CAD program or a CNC machine will accept, as a solid for a slicer, as LaTeX for
 a report, or as a figure on screen. Solids proper, built, combined and
 exchanged as STEP, come through Open CASCADE when the package is built with it.
 
-Forty-three public functions across five namespaces plus the
-`draw.Drawing`, `geom.Polyline`, `geom.Region`, `solid.Shape` and
-`solid.Viewer` classes, 1167 built-in self-tests and 67 `%!demo` blocks,
-nearly all of which end in a `plot` call, so the documentation shows what a
-function does rather than only describing it.
+Forty-three public functions across five namespaces plus the `draw.Drawing`,
+`geom.Polyline`, `geom.Region`, `geom.UCS`, `solid.Shape` and `solid.Viewer`
+classes, 1199 built-in self-tests and 67 `%!demo` blocks, nearly all of which
+end in a `plot` call, so the documentation shows what a function does rather
+than only describing it.
 
 ## Layout
 
@@ -137,7 +137,14 @@ script to use in place of the numbers:
 ```
 V = solid.show (plate);
 E = pick (V, 'edge');     # click edges, then press Enter
+U = geom.UCS (V);         # click a face, two points for +x, then the origin
 ```
+
+A `geom.UCS` is a user coordinate system, a plane with an origin and axes of
+its own. Every polyline and region lies in one, and assigning a region another
+moves it there, so a profile drawn in the xy plane is laid on any face of a
+part. It is made from a normal and points, or picked with the mouse as above,
+and the pick prints the line that makes it again from coordinates.
 
 Open CASCADE is optional: a package built without it works as before, and
 every `solid` function raises an error saying so.
@@ -227,7 +234,7 @@ macOS are not yet.
 After installation, type:
 - `pkg load drafting` to load the **drafting** package.
 - `news drafting` to review all the user visible changes since last version.
-- `pkg test drafting` to run a test suite for all 48 functions and class
+- `pkg test drafting` to run a test suite for all 49 functions and class
   definitions currently available and ensure that they work properly on your
   system.
 

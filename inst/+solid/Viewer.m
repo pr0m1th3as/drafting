@@ -113,6 +113,21 @@ classdef Viewer < handle
 
     endfunction
 
+    ## Start a single pick of KIND, face or point, without waiting for it
+    function __pickonestart__ (this, KIND)
+
+      send (this, ["pickone " KIND]);
+
+    endfunction
+
+    ## A click at the pixel PX during a single pick; the viewer's reply
+    function r = __clickone__ (this, PX)
+
+      send (this, sprintf ("click %d %d", round (PX)));
+      r = receive (this, 10);
+
+    endfunction
+
     ## A click at the pixel PX during a pick; the number of items now picked
     function N = __click__ (this, PX)
 
@@ -135,6 +150,92 @@ classdef Viewer < handle
 
     endfunction
 
+    ## The UCS picking behind pickucs.  CLICKS, for tests, replaces the mouse:
+    ## a row of pixels per click, NaN for the Enter key and Inf for Escape;
+    ## empty is the mouse.
+    function U = __pickucs__ (this, MODE, CLICKS)
+
+      st = state (this);
+      while (ischar (fgetl (st.out)))
+      endwhile
+      fclear (st.out);
+      S = this.Shape;
+      finished = false;
+      unwind_protect
+
+        ## The axes
+        if (strcmp (MODE, 'face'))
+          info = __occt__ ('faces', 'solid.Viewer.pickucs', S.Data);
+          ask = "Pick a flat face for the plane";
+          do
+            [r, CLICKS] = one (this, 'face', ask, CLICKS);
+            n = [];
+            if (strcmp (r{1}, 'face'))
+              k = str2double (r{2});
+              n = info{2}(k,:);
+              f = str2double (r(3:5));
+            endif
+            ask = "That face is not flat: pick a flat face for the plane";
+          until (! isempty (n) && ! any (isnan (n)))
+          [p1, CLICKS] = point (this, "Pick the start of the x axis", CLICKS);
+          ask = "Pick a point towards +x";
+          do
+            [p2, CLICKS] = point (this, ask, CLICKS);
+            A = struct ('normal', n, 'face', f, 'points', [p1; p2]);
+            ask = "No direction in the face: pick another point towards +x";
+          until (isvalidaxes (A))
+        else
+          [p1, CLICKS] = point (this, "Pick the start of the x axis", CLICKS);
+          ask = "Pick a point towards +x";
+          do
+            [p2, CLICKS] = point (this, ask, CLICKS);
+            ask = "Pick a point away from the first, towards +x";
+          until (! isequal (p1, p2))
+          ask = "Pick a point on the +y side";
+          do
+            [p3, CLICKS] = point (this, ask, CLICKS);
+            A = struct ('points', [p1; p2; p3]);
+            ask = "That point is on the x axis: pick one on the +y side";
+          until (isvalidaxes (A))
+        endif
+
+        ## The origin
+        O = zeros (0, 3);
+        [r, CLICKS] = one (this, 'point', strcat ("Pick the origin, or", ...
+                                                   " Enter to keep the", ...
+                                                   " first point"), CLICKS);
+        if (strcmp (r{1}, 'point'))
+          O = str2double (r(2:4));
+          [r, CLICKS] = one (this, 'point', ...
+                             strcat ("Pick a point to take the origin's y", ...
+                                     " from, or Enter to put it here"), ...
+                             CLICKS);
+          if (strcmp (r{1}, 'point'))
+            O(2,:) = str2double (r(2:4));
+          endif
+        endif
+        U = solid.Viewer.__ucs__ (A, O);
+        finished = true;
+
+      unwind_protect_cleanup
+        if (isopen (this))
+          if (! finished)
+            send (this, "cancel");
+          endif
+          send (this, "clearmarks");
+          send (this, "prompt");
+        endif
+      end_unwind_protect
+
+      v = @(x) sprintf ("[%s]", strjoin (arrayfun (@(c) sprintf ("%.10g", ...
+                                                   c + 0), x, ...
+                                                   'UniformOutput', false), ...
+                                         ", "));
+      printf ("U = geom.UCS (%s, %s, %s);\n", v (U.Normal), v (U.Origin), ...
+              v (U.Origin + U.XAxis));
+
+    endfunction
+
     ## The title the window carries
     function T = __title__ (this)
 
@@ -154,6 +255,33 @@ classdef Viewer < handle
   endmethods
 
   methods (Static, Hidden)
+
+    ## The UCS from picked points.  AXES holds the axes picked: a planar face
+    ## (its outward normal NORMAL and a point FACE on it) and two POINTS, the
+    ## start of the x axis and a point towards +x, or three POINTS with no
+    ## face.  ORIGIN holds none, one or two points for the origin.
+    function U = __ucs__ (AXES, ORIGIN)
+
+      P = AXES.points;
+      if (isfield (AXES, 'normal') && ! isempty (AXES.normal))
+        n = AXES.normal / norm (AXES.normal);
+        p1 = P(1,:) - ((P(1,:) - AXES.face) * n') * n;
+        U = geom.UCS (n, p1, P(2,:));
+      else
+        U = geom.UCS.threepoint (P(1,:), P(2,:), P(3,:));
+      endif
+      O = U.Origin;
+      switch (rows (ORIGIN))
+        case 1
+          d = ORIGIN(1,:) - O;
+          O = O + (d * U.XAxis') * U.XAxis + (d * U.YAxis') * U.YAxis;
+        case 2
+          O = O + ((ORIGIN(1,:) - O) * U.XAxis') * U.XAxis ...
+                + ((ORIGIN(2,:) - O) * U.YAxis') * U.YAxis;
+      endswitch
+      U = geom.UCS (U.Normal, O, O + U.XAxis);
+
+    endfunction
 
     ## The query that finds the edges or faces IDX of S, and how many it finds
     function [Q, N] = __query__ (S, KIND, IDX, NAME)
@@ -417,6 +545,63 @@ classdef Viewer < handle
     endfunction
 
     ## -*- texinfo -*-
+    ## @deftypefn  {solid.Viewer} {@var{U} =} pickucs (@var{V})
+    ## @deftypefnx {solid.Viewer} {@var{U} =} pickucs (@var{V}, @var{MODE})
+    ##
+    ## Pick a user coordinate system with the mouse.
+    ##
+    ## @code{@var{U} = pickucs (@var{V})} returns the @code{geom.UCS} you
+    ## pick on the shape in the viewer's window, in two steps, each prompted at
+    ## the foot of the window.  @code{geom.UCS (@var{V})} does the same.
+    ##
+    ## The axes come first.  Click a flat face, which gives the plane and its
+    ## outward normal, then two points: the direction from the first to the
+    ## second, laid in the face, is @math{+x}.  The points can be anywhere on
+    ## the part, two corners along an edge for instance.  With @var{MODE}
+    ## @qcode{'points'} no face is picked; three points give the axes instead,
+    ## @math{+x} from the first to the second and the third on the @math{+y}
+    ## side, as for @code{geom.UCS.threepoint}.  @var{MODE} is
+    ## @qcode{'face'} by default.
+    ##
+    ## The origin comes second.  Click one point and the origin is there, laid
+    ## in the plane.  Click a second and the origin takes its @math{x} from the
+    ## first point and its @math{y} from the second, which puts a datum corner
+    ## where a fillet or chamfer leaves no vertex to click.  Press @kbd{Enter}
+    ## at once to keep the origin at the first point of the axes.
+    ##
+    ## Every point snaps to what it lands on: a corner to its vertex, a
+    ## circular edge to its centre, another edge to its midpoint, a face to
+    ## the point clicked.  Each is marked in the window.  The shape can be
+    ## turned between clicks, and @kbd{Escape} cancels with an error.
+    ##
+    ## A pick depends on the shape it was made on, so @code{pickucs} prints the
+    ## line that makes the same UCS from coordinates, for the script:
+    ##
+    ## @example
+    ## @group
+    ## U = pickucs (V);
+    ## @print{} U = geom.UCS ([0, 0, 1], [20, 20, 12], [21, 20, 12]);
+    ## R.UCS = U;
+    ## @end group
+    ## @end example
+    ##
+    ## @seealso{geom.UCS, solid.Viewer.pick}
+    ## @end deftypefn
+    function U = pickucs (this, MODE = 'face')
+
+      ## Input validation
+      if (! ischar (MODE) || ! any (strcmp (MODE, {'face', 'points'})))
+        error ("solid.Viewer.pickucs: MODE must be 'face' or 'points'.");
+      endif
+      if (! isopen (this) || isempty (state (this).data))
+        error ("solid.Viewer.pickucs: the viewer is showing no shape.");
+      endif
+
+      U = __pickucs__ (this, MODE, []);
+
+    endfunction
+
+    ## -*- texinfo -*-
     ## @deftypefn {solid.Viewer} {} close (@var{V})
     ##
     ## Close the viewer's window.
@@ -462,6 +647,41 @@ classdef Viewer < handle
   endmethods
 
   methods (Access = private)
+
+    ## One pick of KIND, face or point, prompted with ASK: the viewer's reply
+    ## as words.  A click is taken from CLICKS when it is not empty, so that
+    ## tests need no mouse; a NaN row there is the Enter key and an Inf row
+    ## Escape.  Escape or a closed window ends the whole pick with an error.
+    function [r, CLICKS] = one (V, KIND, ASK, CLICKS)
+
+      send (V, ["prompt " ASK]);
+      send (V, ["pickone " KIND]);
+      if (! isempty (CLICKS))
+        if (any (isnan (CLICKS(1,:))))
+          send (V, "enter");
+        elseif (any (isinf (CLICKS(1,:))))
+          send (V, "cancel");
+        else
+          send (V, sprintf ("click %d %d", round (CLICKS(1,:))));
+        endif
+        CLICKS(1,:) = [];
+      endif
+      r = strsplit (receive (V, Inf));
+      if (any (strcmp (r{1}, {'cancel', 'closed'})))
+        error ("solid.Viewer.pickucs: the pick was cancelled.");
+      endif
+
+    endfunction
+
+    ## One point, prompted with ASK until a point is picked
+    function [p, CLICKS] = point (V, ASK, CLICKS)
+
+      do
+        [r, CLICKS] = one (V, 'point', ASK, CLICKS);
+      until (strcmp (r{1}, 'point'))
+      p = str2double (r(2:4));
+
+    endfunction
 
     function st = state (this)
 
@@ -547,6 +767,18 @@ function T = title (st)
   else
     T = "drafting";
   endif
+
+endfunction
+
+## True when the picked axes define a UCS
+function TF = isvalidaxes (A)
+
+  try
+    solid.Viewer.__ucs__ (A, zeros (0, 3));
+    TF = true;
+  catch
+    TF = false;
+  end_try_catch
 
 endfunction
 
@@ -693,6 +925,91 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
+%!test  # axes from a face and two points, the origin from one point
+%! A = struct ('normal', [0, 0, 2], 'face', [5, 5, 12], ...
+%!             'points', [0, 0, 12; 80, 0, 12]);
+%! U = solid.Viewer.__ucs__ (A, [20, 20, 3]);
+%! assert_equal (U == geom.UCS ([0, 0, 1], [20, 20, 12], [21, 20, 12]), true);
+
+%!test  # the start of the x axis is laid in the face; Enter keeps it
+%! A = struct ('normal', [0, -1, 0], 'face', [10, 0, 6], ...
+%!             'points', [0, -3, 0; 80, -3, 0]);
+%! U = solid.Viewer.__ucs__ (A, zeros (0, 3));
+%! assert_equal (U.Origin, [0, 0, 0]);
+%! assert_equal ([U.XAxis; U.YAxis], [1, 0, 0; 0, 0, 1]);
+
+%!test  # three points, and a datum corner from two
+%! A = struct ('points', [0, 0, 12; 80, 0, 12; 0, 40, 12]);
+%! U = solid.Viewer.__ucs__ (A, [80, 17, 3; 31, 0, 9]);
+%! assert_equal (U.Origin, [80, 0, 12]);
+%! assert_equal (U.XAxis, [1, 0, 0]);
+%! assert_equal (U.Normal, [0, 0, 1]);
+
+%!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
+%! ## A face and two corners, then a hole's rim for the origin: its centre
+%! B = hole (solid.box (80, 40, 12), [20, 20, 12], 8, Inf);
+%! V = solid.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Shape = B;
+%!   px = @(p) V.__project__ (p);
+%!   C = [px([40, 30, 12]); px([0, 0, 12]); px([80, 0, 12]); ...
+%!        px([20, 24, 12]); NaN, NaN];
+%!   evalc ("U = V.__pickucs__ ('face', C);");
+%!   assert_equal (U == geom.UCS ([0, 0, 1], [20, 20, 12], [21, 20, 12]), true);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
+%! ## A curved face is refused and asked for again; a datum corner from a
+%! ## point on the right face and one on the front
+%! B = hole (solid.box (80, 40, 12), [20, 20, 12], 8, Inf);
+%! V = solid.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Shape = B;
+%!   px = @(p) V.__project__ (p);
+%!   C = [px([17.17, 22.83, 10]); px([40, 30, 12]); px([0, 0, 12]); ...
+%!        px([80, 0, 12]); px([80, 20, 6]); px([40, 0, 6])];
+%!   evalc ("U = V.__pickucs__ ('face', C);");
+%!   assert_equal (U.Origin, [80, 0, 12], 1e-9);
+%!   assert_equal (U.Normal, [0, 0, 1]);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
+%! ## Three corners, Enter keeping the first, and the line it prints
+%! V = solid.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Shape = solid.box (80, 40, 12);
+%!   px = @(p) V.__project__ (p);
+%!   C = [px([0, 0, 12]); px([80, 0, 12]); px([0, 40, 12]); NaN, NaN];
+%!   out = evalc ("U = V.__pickucs__ ('points', C);");
+%!   assert_equal (strtrim (out), ...
+%!                 "U = geom.UCS ([0, 0, 1], [0, 0, 12], [1, 0, 12]);");
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
+%! ## Escape cancels the pick with an error, and the viewer goes on
+%! V = solid.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Shape = solid.box (80, 40, 12);
+%!   C = [V.__project__([40, 30, 12]); Inf, Inf];
+%!   msg = '';
+%!   try
+%!     V.__pickucs__ ('face', C);
+%!   catch err
+%!     msg = err.message;
+%!   end_try_catch
+%!   assert_equal (msg, "solid.Viewer.pickucs: the pick was cancelled.");
+%!   assert_equal (V.__pickat__ ('face', V.__project__ ([40, 20, 12]))(1:4), ...
+%!                 'face');
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
 %!test
 %! V = solid.Viewer ();
 %! assert_equal (isopen (V), false);
@@ -725,3 +1042,7 @@ endfunction
 %! unwind_protect_cleanup
 %!   setenv ('DISPLAY', d);
 %! end_unwind_protect
+%!error<solid.Viewer.pickucs: MODE must be 'face' or 'points'.> ...
+%! pickucs (solid.Viewer (), 'edges')
+%!error<solid.Viewer.pickucs: the viewer is showing no shape.> ...
+%! pickucs (solid.Viewer ())

@@ -28,14 +28,24 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 //   pick KIND      KIND is edge, face or any: clicks toggle a selection until
 //                  Enter, which replies with "edge K" and "face K" lines and
 //                  then "done", or Escape, which replies "cancel"
+//   pickone KIND   KIND is face or point: the next click replies at once with
+//                  "face K X Y Z", the face and the point on it, or with
+//                  "point X Y Z SNAP", the point snapped to a vertex, the
+//                  centre of a circular edge, the midpoint of another edge or
+//                  a point on a face, SNAP naming which, and marks it; Enter
+//                  replies "skip" and Escape "cancel"
+//   enter          during a pickone, as the Enter key: replies "skip"
+//   prompt TEXT    shows TEXT at the foot of the view; no TEXT clears it
+//   clearmarks     removes the marks of picked points
 //   cancel         ends a pick as Escape does
 //   title TEXT     sets the window's title
 //   gettitle       replies "title TEXT", the title the window carries
 //   project X Y Z  replies "point PX PY", the pixel the model point lands on
 //   pickat KIND PX PY
 //                  replies "edge K", "face K" or "none", what lies at a pixel
-//   click PX PY    during a pick, a click at a pixel: replies "selected N",
-//                  how many items the pick now holds
+//   click PX PY    a click at a pixel: during a pick replies "selected N",
+//                  how many items the pick now holds, and during a pickone
+//                  replies as the pick does
 //   dump FILE      writes the view to an image file (PPM); replies "dumped"
 //   close          closes the window
 //
@@ -51,15 +61,19 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <set>
 #include <sstream>
 #include <string>
+#include <vector>
 
 #include <sys/select.h>
 #include <unistd.h>
 
 #include <AIS_InteractiveContext.hxx>
+#include <AIS_Point.hxx>
 #include <AIS_Shape.hxx>
 #include <AIS_TextLabel.hxx>
 #include <AIS_ViewController.hxx>
+#include <BRepAdaptor_Curve.hxx>
 #include <BRep_Tool.hxx>
+#include <Geom_CartesianPoint.hxx>
 #include <BinTools.hxx>
 #include <Graphic3d_TransformPers.hxx>
 #include <Message.hxx>
@@ -69,6 +83,7 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <Prs3d_LineAspect.hxx>
 #include <Quantity_Color.hxx>
 #include <SelectMgr_Filter.hxx>
+#include <SelectMgr_ViewerSelector.hxx>
 #include <Standard_Failure.hxx>
 #include <StdSelect_BRepOwner.hxx>
 #include <TopExp.hxx>
@@ -77,6 +92,7 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <TopoDS.hxx>
 #include <TopoDS_Edge.hxx>
 #include <TopoDS_Face.hxx>
+#include <TopoDS_Vertex.hxx>
 #include <TopoDS_Shape.hxx>
 #include <V3d_View.hxx>
 #include <V3d_Viewer.hxx>
@@ -98,14 +114,17 @@ reply (const string& line)
   fflush (stdout);
 }
 
-// Keeps seam and degenerate edges from ever being detected, so that a click
-// on a seam finds the face beneath it
+// Keeps seam and degenerate edges, and the vertices that only close such
+// edges or circles, from ever being detected, so that a click there finds
+// what lies beneath: the face, or the circle and its centre
 class seamfilter : public SelectMgr_Filter
 {
 public:
 
-  seamfilter (const TopTools_IndexedMapOfShape& edges, const set<int>& skip)
-    : m_edges (edges), m_skip (skip)
+  seamfilter (const TopTools_IndexedMapOfShape& edges, const set<int>& skip,
+              const TopTools_IndexedMapOfShape& vertices,
+              const set<int>& vskip)
+    : m_edges (edges), m_skip (skip), m_vertices (vertices), m_vskip (vskip)
   { }
 
   Standard_Boolean IsOk (const Handle (SelectMgr_EntityOwner)& owner)
@@ -113,18 +132,28 @@ public:
   {
     Handle (StdSelect_BRepOwner) o = Handle (StdSelect_BRepOwner)::DownCast
                                        (owner);
-    if (o.IsNull () || ! o->HasShape ()
-        || o->Shape ().ShapeType () != TopAbs_EDGE)
+    if (o.IsNull () || ! o->HasShape ())
     {
       return Standard_True;
     }
-    return m_skip.count (m_edges.FindIndex (o->Shape ())) == 0;
+    const TopoDS_Shape& s = o->Shape ();
+    if (s.ShapeType () == TopAbs_EDGE)
+    {
+      return m_skip.count (m_edges.FindIndex (s)) == 0;
+    }
+    if (s.ShapeType () == TopAbs_VERTEX)
+    {
+      return m_vskip.count (m_vertices.FindIndex (s)) == 0;
+    }
+    return Standard_True;
   }
 
 private:
 
   const TopTools_IndexedMapOfShape& m_edges;
   const set<int>& m_skip;
+  const TopTools_IndexedMapOfShape& m_vertices;
+  const set<int>& m_vskip;
 };
 
 class viewer : public AIS_ViewController
@@ -190,7 +219,8 @@ public:
       hs->SetUnFreeBoundaryAspect (new Prs3d_LineAspect (picked,
                                                          Aspect_TOL_SOLID, 4));
     }
-    m_context->AddFilter (new seamfilter (m_edges, m_skip));
+    m_context->AddFilter (new seamfilter (m_edges, m_skip, m_vertices,
+                                          m_vskip));
 
     // A click toggles what it lands on, so a pick can gather several
     ChangeMouseSelectionSchemes ().Bind (Aspect_VKeyMouse_LeftButton,
@@ -247,6 +277,42 @@ public:
       {
         finish (false);
       }
+      if (m_one != 0)
+      {
+        endone ("cancel");
+      }
+    }
+    else if (cmd == "pickone")
+    {
+      string kind;
+      in >> kind;
+      if (m_pick != 0)
+      {
+        finish (false);
+      }
+      m_one = (kind == "face") ? 2 : 7;
+      activate (m_one);
+    }
+    else if (cmd == "enter")
+    {
+      if (m_one != 0)
+      {
+        endone ("skip");
+      }
+    }
+    else if (cmd == "prompt")
+    {
+      string text;
+      getline (in, text);
+      label (text.empty () ? text : text.substr (1));
+    }
+    else if (cmd == "clearmarks")
+    {
+      for (const Handle (AIS_Point)& m : m_marks)
+      {
+        m_context->Remove (m, Standard_False);
+      }
+      m_marks.clear ();
     }
     else if (cmd == "project")
     {
@@ -276,9 +342,16 @@ public:
     {
       int px, py;
       in >> px >> py;
-      m_context->MoveTo (px, py, m_view, Standard_False);
-      m_context->SelectDetected (AIS_SelectionScheme_XOR);
-      reply ("selected " + to_string (m_context->NbSelected ()));
+      if (m_one != 0)
+      {
+        onepick (px, py);
+      }
+      else
+      {
+        m_context->MoveTo (px, py, m_view, Standard_False);
+        m_context->SelectDetected (AIS_SelectionScheme_XOR);
+        reply ("selected " + to_string (m_context->NbSelected ()));
+      }
     }
     else if (cmd == "dump")
     {
@@ -345,11 +418,19 @@ public:
         {
           finish (true);
         }
+        else if (m_one != 0)
+        {
+          endone ("skip");
+        }
         break;
       case Aspect_VKey_Escape:
         if (m_pick != 0)
         {
           finish (false);
+        }
+        else if (m_one != 0)
+        {
+          endone ("cancel");
         }
         break;
       case Aspect_VKey_F:
@@ -373,7 +454,114 @@ public:
     m_view->Invalidate ();
   }
 
+protected:
+
+  // A click during a pickone answers at once instead of selecting
+  void handleSelectionPick (const Handle (AIS_InteractiveContext)& ctx,
+                            const Handle (V3d_View)& view) override
+  {
+    if (m_one != 0 && ! myGL.Selection.Points.IsEmpty ())
+    {
+      const Graphic3d_Vec2i p = myGL.Selection.Points.Last ();
+      myGL.Selection.Points.Clear ();
+      onepick (p.x (), p.y ());
+      return;
+    }
+    AIS_ViewController::handleSelectionPick (ctx, view);
+  }
+
 private:
+
+  // What lies at a pixel during a pickone: replies and marks it, or does
+  // nothing when the click found nothing
+  void onepick (int px, int py)
+  {
+    m_context->MoveTo (px, py, m_view, Standard_False);
+    if (! m_context->HasDetected ())
+    {
+      return;
+    }
+    Handle (StdSelect_BRepOwner) o = Handle (StdSelect_BRepOwner)::DownCast
+                                       (m_context->DetectedOwner ());
+    if (o.IsNull () || ! o->HasShape ())
+    {
+      return;
+    }
+    const TopoDS_Shape& s = o->Shape ();
+    const gp_Pnt hit = m_context->MainSelector ()->PickedPoint (1);
+    string r;
+    gp_Pnt p = hit;
+    if (m_one == 2)
+    {
+      const int k = m_faces.FindIndex (s);
+      if (s.ShapeType () != TopAbs_FACE || k == 0)
+      {
+        return;
+      }
+      r = "face " + to_string (k);
+    }
+    else
+    {
+      string snap = "face";
+      if (s.ShapeType () == TopAbs_VERTEX)
+      {
+        p = BRep_Tool::Pnt (TopoDS::Vertex (s));
+        snap = "vertex";
+      }
+      else if (s.ShapeType () == TopAbs_EDGE)
+      {
+        const BRepAdaptor_Curve c (TopoDS::Edge (s));
+        if (c.GetType () == GeomAbs_Circle)
+        {
+          p = c.Circle ().Location ();
+          snap = "centre";
+        }
+        else
+        {
+          p = c.Value ((c.FirstParameter () + c.LastParameter ()) / 2);
+          snap = "midpoint";
+        }
+      }
+      r = "point";
+      mark (p);
+      r += num (p) + " " + snap;
+      m_context->ClearDetected (Standard_False);
+      reply (r);
+      endone ("");
+      return;
+    }
+    m_context->ClearDetected (Standard_False);
+    reply (r + num (p));
+    endone ("");
+  }
+
+  static string num (const gp_Pnt& p)
+  {
+    char b[128];
+    snprintf (b, sizeof (b), " %.17g %.17g %.17g", p.X (), p.Y (), p.Z ());
+    return b;
+  }
+
+  // Leave a pickone, replying R unless it is empty
+  void endone (const string& r)
+  {
+    if (! r.empty ())
+    {
+      reply (r);
+    }
+    m_one = 0;
+    activate (m_pick);
+  }
+
+  void mark (const gp_Pnt& p)
+  {
+    Handle (AIS_Point) m = new AIS_Point (new Geom_CartesianPoint (p));
+    m->SetMarker (Aspect_TOM_BALL);
+    m->SetColor (Quantity_Color (1.0, 0.35, 0.0, Quantity_TOC_sRGB));
+    m->SetZLayer (Graphic3d_ZLayerId_Topmost);
+    m_context->Display (m, 0, -1, Standard_False);
+    m_marks.push_back (m);
+  }
 
   static int kindcode (const string& kind)
   {
@@ -391,6 +579,10 @@ private:
     if (m_pick != 0)
     {
       finish (false);
+    }
+    if (m_one != 0)
+    {
+      endone ("cancel");
     }
     TopoDS_Shape s;
     if (! data.empty ())
@@ -421,6 +613,34 @@ private:
       if (skip)
       {
         m_skip.insert (i);
+      }
+    }
+
+    // A vertex is a feature of the part only where an edge that is neither
+    // skipped nor closed on itself meets it
+    m_vertices.Clear ();
+    m_vskip.clear ();
+    TopExp::MapShapes (s, TopAbs_VERTEX, m_vertices);
+    TopTools_IndexedDataMapOfShapeListOfShape vanc;
+    TopExp::MapShapesAndAncestors (s, TopAbs_VERTEX, TopAbs_EDGE, vanc);
+    for (int i = 1; i <= m_vertices.Extent (); i++)
+    {
+      bool feature = false;
+      const int k = vanc.FindIndex (m_vertices (i));
+      if (k > 0)
+      {
+        for (const TopoDS_Shape& e : vanc (k))
+        {
+          const TopoDS_Edge& ed = TopoDS::Edge (e);
+          feature = feature
+                    || (m_skip.count (m_edges.FindIndex (ed)) == 0
+                        && ! TopExp::FirstVertex (ed).IsSame
+                               (TopExp::LastVertex (ed)));
+        }
+      }
+      if (! feature)
+      {
+        m_vskip.insert (i);
       }
     }
 
@@ -458,8 +678,10 @@ private:
     }
     const int edge = AIS_Shape::SelectionMode (TopAbs_EDGE);
     const int face = AIS_Shape::SelectionMode (TopAbs_FACE);
+    const int vertex = AIS_Shape::SelectionMode (TopAbs_VERTEX);
     m_context->Deactivate (m_shape, edge);
     m_context->Deactivate (m_shape, face);
+    m_context->Deactivate (m_shape, vertex);
     if (kind & 1)
     {
       m_context->Activate (m_shape, edge);
@@ -467,6 +689,10 @@ private:
     if (kind & 2)
     {
       m_context->Activate (m_shape, face);
+    }
+    if (kind & 4)
+    {
+      m_context->Activate (m_shape, vertex);
     }
   }
 
@@ -552,8 +778,12 @@ private:
   Handle (AIS_TextLabel) m_label;
   TopTools_IndexedMapOfShape m_edges;
   TopTools_IndexedMapOfShape m_faces;
+  TopTools_IndexedMapOfShape m_vertices;
   set<int> m_skip;
+  set<int> m_vskip;
+  vector<Handle (AIS_Point)> m_marks;
   int m_pick = 0;
+  int m_one = 0;
   bool m_quit = false;
 };
 

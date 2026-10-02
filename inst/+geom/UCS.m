@@ -145,6 +145,7 @@ classdef UCS
     ## -*- texinfo -*-
     ## @deftypefn  {geom.UCS} {@var{U} =} geom.UCS ()
     ## @deftypefnx {geom.UCS} {@var{U} =} geom.UCS (@var{V})
+    ## @deftypefnx {geom.UCS} {@var{U} =} geom.UCS (@var{V}, @var{MODE})
     ## @deftypefnx {geom.UCS} {@var{U} =} geom.UCS (@var{NORMAL}, @var{ORIGIN})
     ## @deftypefnx {geom.UCS} {@var{U} =} geom.UCS (@var{NORMAL}, @var{ORIGIN}, @var{XPOINT})
     ##
@@ -154,8 +155,10 @@ classdef UCS
     ## @math{xy} plane, with its origin at the world origin.
     ##
     ## @code{@var{U} = geom.UCS (@var{V})} picks one with the mouse in the
-    ## viewer @var{V}, a @code{solid.Viewer} showing a shape; see
-    ## @code{solid.Viewer.pickucs}.
+    ## viewer @var{V}, a @code{solid.Viewer} showing a shape: a flat face and
+    ## two points for the axes, then the origin.  With @var{MODE}
+    ## @qcode{'points'} three points give the axes instead of a face and two.
+    ## See @code{solid.Viewer.pickucs}.
     ##
     ## @code{@var{U} = geom.UCS (@var{NORMAL}, @var{ORIGIN}, @var{XPOINT})}
     ## lays the plane square to the direction @var{NORMAL} through the point
@@ -197,13 +200,13 @@ classdef UCS
       endif
 
       ## Picked with the mouse in a viewer, which knows how
-      if (nargin == 1)
+      if (nargin == 1 || (nargin == 2 && isobject (varargin{1})))
         V = varargin{1};
         if (! isobject (V) || ! isscalar (V) || ! ismethod (V, 'pickucs'))
           error (strcat ("geom.UCS: V must be a viewer to pick in, such as", ...
                          " a solid.Viewer."));
         endif
-        U = pickucs (V);
+        U = pickucs (V, varargin{2:end});
         this.Origin = U.Origin;
         this.XAxis = U.XAxis;
         this.Normal = U.Normal;
