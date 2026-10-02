@@ -10,7 +10,7 @@ a report, or as a figure on screen. Solids proper, built, combined and
 exchanged as STEP, come through Open CASCADE when the package is built with it.
 
 Forty-three public functions across five namespaces plus the
-`draw.Drawing`, `solid.Shape` and `solid.Viewer` classes, 1121 built-in
+`draw.Drawing`, `solid.Shape` and `solid.Viewer` classes, 1122 built-in
 self-tests and 67 `%!demo` blocks,
 nearly all of which end in a `plot` call, so the documentation shows what a
 function does rather than only describing it.

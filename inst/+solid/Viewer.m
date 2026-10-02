@@ -121,6 +121,35 @@ classdef Viewer < handle
 
     endfunction
 
+    ## Start a pick of KIND without waiting for it, so that tests can click
+    function __pickstart__ (this, KIND)
+
+      send (this, ["pick " KIND]);
+
+    endfunction
+
+    ## A click at the pixel PX during a pick; the number of items now picked
+    function N = __click__ (this, PX)
+
+      send (this, sprintf ("click %d %d", round (PX)));
+      N = str2double (receive (this, 10)(10:end));
+
+    endfunction
+
+    ## The view as an RGB image
+    function IMG = __dump__ (this)
+
+      f = [tempname() '.ppm'];
+      send (this, ["dump " f]);
+      r = receive (this, 30);
+      if (! strcmp (r, 'dumped'))
+        error ("solid.Viewer: %s", r);
+      endif
+      IMG = imread (f);
+      unlink (f);
+
+    endfunction
+
     ## The title the window carries
     function T = __title__ (this)
 
@@ -291,8 +320,9 @@ classdef Viewer < handle
     ## and faces in the viewer's window, then returns the indices of the edges
     ## in @var{E} and of the faces in @var{F}, in the numbering
     ## @code{solid.Shape.edges} and @code{solid.Shape.faces} use.  A click
-    ## selects what is under the pointer and a second click on it lets it go;
-    ## the shape can still be turned between clicks.  @kbd{Enter} finishes and
+    ## selects what is under the pointer, which stays drawn in orange, a
+    ## selected edge thick and a selected face filled, and a second click on
+    ## it lets it go; the shape can still be turned between clicks.  @kbd{Enter} finishes and
     ## @kbd{Escape} cancels, returning nothing.  With @qcode{'edge'} or
     ## @qcode{'face'} only that kind can be picked, and its indices are the one
     ## output.
@@ -583,6 +613,27 @@ endfunction
 %!   assert_equal (V.__pickat__ ('face', px), 'none');
 %!   V.Shape = solid.box (10, 20, 30);
 %!   assert_equal (V.__pickat__ ('face', px)(1:4), 'face');
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
+%! ## What a pick holds is drawn in orange, so that a click visibly took
+%! orange = @(I) I(:,:,1) > 200 & I(:,:,2) < 150 & I(:,:,3) < 60;
+%! near = @(M, p) any (any (M(round (p(2)) + (-3:5), round (p(1)) + (-3:5))));
+%! V = solid.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Shape = solid.box (10, 20, 30);
+%!   pe = V.__project__ ([5, 0, 30]);
+%!   pf = V.__project__ ([10, 10, 15]);
+%!   V.__pickstart__ ('any');
+%!   assert_equal (any (any (orange (V.__dump__ ()))), false);
+%!   assert_equal (V.__click__ (pe), 1);
+%!   M = orange (V.__dump__ ());
+%!   assert_equal (near (M, pe), true);
+%!   assert_equal (near (M, pf), false);
+%!   assert_equal (V.__click__ (pf), 2);
+%!   assert_equal (near (orange (V.__dump__ ()), pf), true);
 %! unwind_protect_cleanup
 %!   close (V);
 %! end_unwind_protect

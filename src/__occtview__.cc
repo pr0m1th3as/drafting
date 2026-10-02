@@ -34,6 +34,9 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 //   project X Y Z  replies "point PX PY", the pixel the model point lands on
 //   pickat KIND PX PY
 //                  replies "edge K", "face K" or "none", what lies at a pixel
+//   click PX PY    during a pick, a click at a pixel: replies "selected N",
+//                  how many items the pick now holds
+//   dump FILE      writes the view to an image file (PPM); replies "dumped"
 //   close          closes the window
 //
 // K is a 1-based index into the map of all edges or faces of the shape, the
@@ -63,6 +66,7 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <Message_Messenger.hxx>
 #include <OpenGl_GraphicDriver.hxx>
 #include <Prs3d_Drawer.hxx>
+#include <Prs3d_LineAspect.hxx>
 #include <Quantity_Color.hxx>
 #include <SelectMgr_Filter.hxx>
 #include <Standard_Failure.hxx>
@@ -166,6 +170,26 @@ public:
     dr->SetFaceBoundaryDraw (Standard_True);
     dr->SetFaceBoundaryUpperContinuity (GeomAbs_G1);
     m_context->SetAutomaticHilight (Standard_True);
+
+    // What a pick holds stays drawn in a strong colour, edges thick and faces
+    // filled, so that a click visibly took; what lies under the pointer keeps
+    // Open CASCADE's cyan
+    const Quantity_Color picked (1.0, 0.35, 0.0, Quantity_TOC_sRGB);
+    for (const Prs3d_TypeOfHighlight t : {Prs3d_TypeOfHighlight_Selected,
+                                          Prs3d_TypeOfHighlight_LocalSelected})
+    {
+      const Handle (Prs3d_Drawer)& hs = m_context->HighlightStyle (t);
+      hs->SetColor (picked);
+      hs->SetDisplayMode (AIS_Shaded);
+      // Drawn after the part against its depth, so a face's fill is not lost
+      // to the face it lies on, while what stands in front still hides it
+      hs->SetZLayer (Graphic3d_ZLayerId_Top);
+      hs->SetWireAspect (new Prs3d_LineAspect (picked, Aspect_TOL_SOLID, 4));
+      hs->SetFreeBoundaryAspect (new Prs3d_LineAspect (picked,
+                                                       Aspect_TOL_SOLID, 4));
+      hs->SetUnFreeBoundaryAspect (new Prs3d_LineAspect (picked,
+                                                         Aspect_TOL_SOLID, 4));
+    }
     m_context->AddFilter (new seamfilter (m_edges, m_skip));
 
     // A click toggles what it lands on, so a pick can gather several
@@ -247,6 +271,22 @@ public:
       m_context->ClearDetected (Standard_False);
       activate (m_pick);
       reply (r.empty () ? "none" : r);
+    }
+    else if (cmd == "click")
+    {
+      int px, py;
+      in >> px >> py;
+      m_context->MoveTo (px, py, m_view, Standard_False);
+      m_context->SelectDetected (AIS_SelectionScheme_XOR);
+      reply ("selected " + to_string (m_context->NbSelected ()));
+    }
+    else if (cmd == "dump")
+    {
+      string file;
+      getline (in, file);
+      m_view->Redraw ();
+      const bool ok = m_view->Dump (file.empty () ? "" : file.c_str () + 1);
+      reply (ok ? "dumped" : "error the view could not be written");
     }
     else if (cmd == "title")
     {
