@@ -899,14 +899,30 @@ function directly. \n\
     }
     else if (cmd == "sweep")
     {
+      // The path's vertices, the midpoints of its arcs, NaN for a straight
+      // segment, and whether it is closed
       const region r = toregion (args(2));
-      const Matrix path = args(3).matrix_value ();
+      const Matrix v = args(3).matrix_value ();
+      const Matrix m = args(4).matrix_value ();
+      const bool closed = args(5).bool_value ();
+      const octave_idx_type n = v.rows ();
       BRepBuilderAPI_MakeWire spine;
-      for (octave_idx_type i = 0; i + 1 < path.rows (); i++)
+      for (octave_idx_type i = 0; i < (closed ? n : n - 1); i++)
       {
-        spine.Add (BRepBuilderAPI_MakeEdge
-                     (gp_Pnt (path(i,0), path(i,1), path(i,2)),
-                      gp_Pnt (path(i+1,0), path(i+1,1), path(i+1,2))).Edge ());
+        const octave_idx_type j = (i + 1) % n;
+        const gp_Pnt a (v(i,0), v(i,1), v(i,2));
+        const gp_Pnt b (v(j,0), v(j,1), v(j,2));
+        if (octave::math::isnan (m(i,0)))
+        {
+          spine.Add (BRepBuilderAPI_MakeEdge (a, b).Edge ());
+        }
+        else
+        {
+          const Handle (Geom_TrimmedCurve) arc
+            = GC_MakeArcOfCircle (a, gp_Pnt (m(i,0), m(i,1), m(i,2)), b)
+              .Value ();
+          spine.Add (BRepBuilderAPI_MakeEdge (arc).Edge ());
+        }
       }
       vector<TopoDS_Shape> holes;
       for (const TopoDS_Wire& h : r.holes)

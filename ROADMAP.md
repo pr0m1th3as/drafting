@@ -106,6 +106,28 @@ point. Every point snaps to a vertex, the centre of a circular edge, the
 midpoint of a straight edge, or a point on a face. The pick prints the
 `geom.UCS` it made, by coordinates, for the script.
 
+## Paths
+
+**`geom.Path`** is the route a section is swept along: a chain of straight
+segments and circular arcs in 3-D, open or closed, its vertices coordinates
+in a `geom.UCS` of its own, the world by default; assigning another moves it. It is
+not a polyline: a polyline lies in one plane, and a pipe run or a bent frame
+does not. An arc is kept by the point half way along it, since in 3-D a bulge
+leaves the arc's plane undecided.
+
+- `geom.Path (P)` runs through the points of an M-by-3 matrix.
+- `geom.Path (PL)` carries a `geom.Polyline` into 3-D in its UCS, its bulges
+  kept as exact arcs.
+- `fillet (P, R, IDX)` rounds corners between straight segments with tangent
+  arcs, the bends of a bent tube.
+- `geom.Path.arc (P1, PM, P2)` is an arc through three points, as when a
+  path follows a circular edge picked in the viewer.
+- `join` puts pieces end to end; `length` measures the path.
+
+An arc given by a centre and angles is left out on purpose: a sweep along one
+arc is a revolution, which `solid.revolve` already makes. What a path adds is
+assembly, one smooth solid with its section carried along, not new shapes.
+
 ## Milestone 1: close the package's own shape (0.2.0)
 
 Small, unglamorous work that removes asymmetries in what is already here. Each
