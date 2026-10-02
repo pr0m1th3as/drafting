@@ -177,9 +177,7 @@ classdef Path
       this.Vertices *= F;
       this.Midpoints *= F;
       for i = find (! cellfun (@isempty, this.Splines))'
-        this.Splines{i} = __with__ (this.Splines{i}, ...
-                                    this.Splines{i}.Points * F, ...
-                                    this.Splines{i}.Tangents);
+        this.Splines{i} = __affine__ (this.Splines{i}, F * eye (3), 0);
       endfor
 
     endfunction
@@ -200,20 +198,7 @@ classdef Path
         endif
         B = V(mod (i, n) + 1,:);
         if (! isempty (S{i}))
-          [t, m, W] = __hermite__ (S{i});
-          for j = 1:rows (W) - 1
-            a = acos (min (1, dot (m(j,:), m(j+1,:)) ...
-                              / (norm (m(j,:)) * norm (m(j+1,:)))));
-            u = (0:max (16, ceil (a / (pi / 90))))' ...
-                / max (16, ceil (a / (pi / 90)));
-            h = t(j+1) - t(j);
-            P = (2 * u .^ 3 - 3 * u .^ 2 + 1) .* W(j,:) ...
-                + (u .^ 3 - 2 * u .^ 2 + u) .* h .* m(j,:) ...
-                + (-2 * u .^ 3 + 3 * u .^ 2) .* W(j+1,:) ...
-                + (u .^ 3 - u .^ 2) .* h .* m(j+1,:);
-            Q{i} = [Q{i}; P(2:end,:)];
-          endfor
-          Q{i}(end,:) = [];
+          Q{i} = __sample__ (S{i})(1:end-1,:);
         elseif (! isnan (M(i,1)))
           [C, x, y, th] = circle (V(i,:), M(i,:), B);
           r = norm (V(i,:) - C);
@@ -238,14 +223,7 @@ classdef Path
       for i = 1:n
         B = V(mod (i, n) + 1,:);
         if (! isempty (S{i}))
-          [t, m, W] = __hermite__ (S{i});
-          for j = 1:rows (W) - 1
-            h = t(j+1) - t(j);
-            c = [W(j,:); h * m(j,:); ...
-                 -3 * W(j,:) - 2 * h * m(j,:) + 3 * W(j+1,:) - h * m(j+1,:); ...
-                 2 * W(j,:) + h * m(j,:) - 2 * W(j+1,:) + h * m(j+1,:)];
-            A += (polyint01 (c(:,1), c(:,2)) - polyint01 (c(:,2), c(:,1))) / 2;
-          endfor
+          A += __green__ (S{i});
         else
           A += (V(i,1) * B(2) - B(1) * V(i,2)) / 2;
           if (! isnan (M(i,1)))
@@ -336,12 +314,12 @@ classdef Path
         SP = V;
         SP.UCS = geom.UCS ();
         if (SP.Closed)
-          this.Vertices = SP.Points(1,:);
+          this.Vertices = SP.ControlPoints(1,:);
           this.Midpoints = NaN (1, 3);
           this.Splines = {SP};
           this.Closed = true;
         else
-          this.Vertices = SP.Points([1, end],:);
+          this.Vertices = SP.ControlPoints([1, end],:);
           this.Midpoints = NaN (2, 3);
           this.Splines = {SP; []};
         endif
@@ -568,9 +546,10 @@ classdef Path
     ## last piece ends where the first begins, the path is closed.  The path
     ## is in the UCS of @var{P1}, the others' points carried into it.
     ##
-    ## Where a free end of a spline meets a straight segment, an arc or a
-    ## spline end with a direction of its own, the spline takes that
-    ## direction, so the path runs on smoothly there.  With
+    ## Where a free end of a spline drawn through points meets a straight
+    ## segment, an arc or a spline end with a direction of its own, the spline
+    ## takes that direction, so the path runs on smoothly there.  A spline made
+    ## from control points is kept as it is.  With
     ## @qcode{'Tangent'} set to @code{false}, free ends stay free and the
     ## path may have a corner there.
     ##
@@ -650,23 +629,25 @@ classdef Path
         joints(end+1) = 1;
       endif
 
-      ## A free end of a spline takes the direction of what it meets, unless
-      ## that is a free spline end too
+      ## A free end of a spline drawn through points takes the direction of
+      ## what it meets, unless that is a free spline end too
       if (tangent)
         [tin, tout] = tangents (V, M, S, closed);
         n = rows (V);
+        free = @(SP, e) ! isempty (SP) && ! isempty (SP.FitPoints) ...
+                        && isnan (SP.Tangents(e,1));
         for j = joints
           in = j - 1 + n * (j == 1);
-          fin = ! isempty (S{in}) && isnan (S{in}.Tangents(2,1));
-          fout = ! isempty (S{j}) && isnan (S{j}.Tangents(1,1));
+          fin = free (S{in}, 2);
+          fout = free (S{j}, 1);
           if (fout && ! fin)
             T = S{j}.Tangents;
             T(1,:) = tout(in,:);
-            S{j} = geom.Spline (S{j}.Points, 'Tangents', T);
+            S{j} = geom.Spline (S{j}.FitPoints, 'Tangents', T);
           elseif (fin && ! fout)
             T = S{in}.Tangents;
             T(2,:) = tin(j,:);
-            S{in} = geom.Spline (S{in}.Points, 'Tangents', T);
+            S{in} = geom.Spline (S{in}.FitPoints, 'Tangents', T);
           endif
         endfor
       endif
@@ -890,15 +871,6 @@ function [C, X, Y, TH] = circle (A, M, B)
 
 endfunction
 
-## The integral from 0 to 1 of a (u) times the derivative of b (u), for the
-## cubics whose coefficients, lowest power first, are A and B
-function v = polyint01 (A, B)
-
-  c = conv (A(:)', B(2:4)' .* [1, 2, 3]);
-  v = sum (c ./ (1:numel (c)));
-
-endfunction
-
 ## The vertices of the polyline PL in its UCS, and the midpoints of its arcs,
 ## a bulge B on the segment from p to q putting the middle of the arc B times
 ## half the chord to the right of it
@@ -932,9 +904,9 @@ function [V, M, S] = into (P, U)
     V = tolocal (U, toworld (A, V));
     M(arc,:) = tolocal (U, toworld (A, M(arc,:)));
     R = [A.XAxis; A.YAxis; A.Normal] * [U.XAxis; U.YAxis; U.Normal]';
+    b = (A.Origin - U.Origin) * [U.XAxis; U.YAxis; U.Normal]';
     for i = find (! cellfun (@isempty, S))'
-      S{i} = __with__ (S{i}, tolocal (U, toworld (A, S{i}.Points)), ...
-                       S{i}.Tangents * R);
+      S{i} = __affine__ (S{i}, R, b);
     endfor
   endif
 
@@ -964,9 +936,7 @@ function [tin, tout] = tangents (A, M, S, closed)
     tout(arc,:) = 2 * sum (d(arc,:) .* b, 2) .* b - d(arc,:);
   endif
   for i = find (! cellfun (@isempty, S))'
-    [~, m] = __hermite__ (S{i});
-    tin(i,:) = unit (m(1,:));
-    tout(i,:) = unit (m(end,:));
+    [tin(i,:), tout(i,:)] = __ends__ (S{i});
   endfor
 
 endfunction
@@ -1077,7 +1047,7 @@ endfunction
 %! P = geom.Path (SP);
 %! assert_equal (P.Vertices, [0, 0, 0; 20, 0, 0]);
 %! assert_equal (P.UCS, SP.UCS);
-%! assert_equal (P.Splines{1}.Points, SP.Points);
+%! assert_equal (P.Splines{1}.FitPoints, SP.FitPoints);
 %! assert_equal (length (P), length (SP), 1e-12);
 
 %!test  # a free spline end takes the direction of the line it meets
@@ -1095,7 +1065,7 @@ endfunction
 %! P = join (geom.Path ([0, 0, 0; 0, 0, 10]), SP);
 %! assert_equal (P.Splines{2}.Tangents, [1, 0, 1; NaN, NaN, NaN] / sqrt (2), ...
 %!               1e-15);
-%! P = join (geom.Path ([0, 0, 0; 0, 0, 10]), geom.Spline (SP.Points), ...
+%! P = join (geom.Path ([0, 0, 0; 0, 0, 10]), geom.Spline (SP.FitPoints), ...
 %!           'Tangent', false);
 %! assert_equal (P.Splines{2}.Tangents, NaN (2, 3));
 
@@ -1109,7 +1079,8 @@ endfunction
 %! SP = geom.Spline ([0, 0; 5, 5; 10, 0], 'Tangents', [1, 0, 0; NaN, NaN, NaN]);
 %! SP.UCS = geom.UCS ([1, 0, 0], [0, 0, 10]);
 %! P = join (geom.Path ([0, 0, 0; 0, 0, 10]), SP, 'Tangent', false);
-%! assert_equal (P.Splines{2}.Points, [0, 0, 10; 0, 5, 15; 0, 10, 10], 1e-12);
+%! assert_equal (P.Splines{2}.FitPoints, [0, 0, 10; 0, 5, 15; 0, 10, 10], ...
+%!               1e-12);
 %! assert_equal (P.Splines{2}.Tangents(1,:), [0, 1, 0], 1e-12);
 
 %!test  # a corner next to a spline is not rounded
@@ -1117,7 +1088,7 @@ endfunction
 %!           geom.Spline ([10, 10, 0; 15, 15, 0; 10, 20, 0]));
 %! Q = fillet (P, 2);
 %! assert_equal (rows (Q.Vertices), rows (P.Vertices) + 1);
-%! assert_equal (Q.Splines{4}.Points, P.Splines{3}.Points);
+%! assert_equal (Q.Splines{4}.FitPoints, P.Splines{3}.FitPoints);
 
 %!test  # points in the plane of the UCS
 %! P = geom.Path ([0, 0; 10, 0; 10, 5]);
@@ -1153,7 +1124,7 @@ endfunction
 %! R = __reversed__ (P);
 %! assert_equal (R.Vertices, flipud (P.Vertices));
 %! assert_equal (R.Midpoints(2,:), [15, 5, 0], 1e-12);
-%! assert_equal (R.Splines{1}.Points, flipud (P.Splines{3}.Points));
+%! assert_equal (R.Splines{1}.FitPoints, flipud (P.Splines{3}.FitPoints));
 %! assert_equal (length (R), length (P), 1e-12);
 
 %!test  # area: a square, a disc of two arcs, a closed spline's polygon

@@ -19,9 +19,10 @@
 ##
 ## D is the struct __occt__ reads for a path, all in world coordinates: its
 ## vertices, the midpoints of its arcs, NaN for a segment that is not an arc,
-## a cell with, for each spline segment, the control points of its cubic
-## pieces and the parameters where they meet, its ends set on the vertices so
-## that the wire closes exactly, and whether the path is closed.
+## a cell with, for each spline segment, its control points, their weights,
+## its distinct knots and their multiplicities and its degree, its end control
+## points set on the vertices so that the wire closes exactly, and whether the
+## path is closed.
 
 function D = __path__ (P)
 
@@ -32,10 +33,12 @@ function D = __path__ (P)
   n = rows (V);
   C = cell (n, 1);
   for i = find (! cellfun (@isempty, P.Splines))'
-    [B, t] = __bezier__ (P.Splines{i});
-    B = toworld (P.UCS, B);
+    SP = P.Splines{i};
+    B = toworld (P.UCS, SP.ControlPoints);
     B([1, end],:) = V([i, mod(i, n) + 1],:);
-    C{i} = struct ('poles', B, 'knots', t);
+    [k, ~, j] = unique (SP.Knots);
+    C{i} = struct ('poles', B, 'weights', SP.Weights, 'knots', k(:), ...
+                   'mults', accumarray (j(:), 1), 'degree', SP.Degree);
   endfor
   D = struct ('vertices', V, 'midpoints', M, 'splines', {C}, ...
               'closed', P.Closed);
@@ -53,5 +56,7 @@ endfunction
 %! SP = geom.Spline ([0, 0; 10, 0; 5, 8], 'Closed', true);
 %! D = solid.__path__ (geom.Path (SP));
 %! assert_equal (D.vertices, [0, 0, 0]);
-%! assert_equal (rows (D.splines{1}.poles), 10);
+%! assert_equal (rows (D.splines{1}.poles), 6);
 %! assert_equal (D.splines{1}.poles([1, end],:), [0, 0, 0; 0, 0, 0]);
+%! assert_equal (D.splines{1}.mults', [4, 1, 1, 4]);
+%! assert_equal (D.splines{1}.degree, 3);

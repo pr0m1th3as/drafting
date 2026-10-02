@@ -11,7 +11,7 @@ exchanged as STEP, come through Open CASCADE when the package is built with it.
 
 Forty-four public functions across five namespaces plus the `draw.Drawing`,
 `geom.Polyline`, `geom.Spline`, `geom.Region`, `geom.Path`, `geom.UCS`,
-`solid.Shape` and `solid.Viewer` classes, 1455 built-in self-tests and 67 `%!demo` blocks, nearly all of which
+`solid.Shape` and `solid.Viewer` classes, 1474 built-in self-tests and 67 `%!demo` blocks, nearly all of which
 end in a `plot` call, so the documentation shows what a function does rather
 than only describing it.
 
@@ -40,13 +40,13 @@ Polylines can be resampled or simplified.
 Outlines and curves are value classes. A `geom.Polyline` is a DXF polyline,
 open or closed: vertices `[x, y, bulge]` in a plane of its own, an origin, an x
 axis and a normal, the xy plane unless told otherwise, so a sketch can be laid
-on any face. A `geom.Spline` is a smooth curve through points, open or closed.
-A `geom.Region` is a closed area, one outline with holes of any shape in it,
-straight segments, arcs and splines, checked to be valid; it is what a solid
-is made from. A `geom.Path` is a route in 3-D of
-straight segments, arcs and splines, along which a region is swept; its corners
-are rounded into bends with `fillet`. Functions take the classes; only their
-constructors take plain matrices.
+on any face. A `geom.Spline` is a NURBS curve, drawn through points or given
+by its control points, knots and weights, open or closed. A `geom.Region` is a
+closed area, one outline with holes of any shape in it, straight segments, arcs
+and splines, checked to be valid; it is what a solid is made from. A
+`geom.Path` is a route in 3-D of straight segments, arcs and splines, along
+which a region is swept; its corners are rounded into bends with `fillet`.
+Functions take the classes; only their constructors take plain matrices.
 
 `draw.Drawing` is a value class carrying lines, polylines with per-vertex
 bulges, arcs, circles, ellipses, text, hatches, blocks and inserts, and a full

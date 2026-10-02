@@ -58,14 +58,16 @@ accept plain matrices. Point sets that carry no arcs, such as the input of
 - **`geom.Polyline`**: the DXF polyline. `Vertices` is an N-by-3 matrix
   `[x, y, bulge]` in the coordinates of its `UCS`; an N-by-2 matrix is accepted
   and given zero bulges. It is open or `Closed`, and may cross itself.
-- **`geom.Spline`**: a smooth curve through points, the DXF `SPLINE` kept
-  apart from the polyline as DXF keeps it. An open cubic through an M-by-3
-  matrix of points in the coordinates of its `UCS`, parametrised by the
-  distance from point to point; either end may be given a direction, and a
-  free end is shaped as Octave's `spline` shapes it. Its curve is computed in
-  Octave and handed to Open CASCADE exactly. It is open, or closed and smooth
-  all round. A path takes it as one smooth segment, and a region as an
-  outline or a hole, or as part of one.
+- **`geom.Spline`**: the DXF `SPLINE`, kept apart from the polyline as DXF
+  keeps it. It holds a NURBS curve, control points, weights, knots and a
+  degree, in the coordinates of its `UCS`, so it carries exactly the curves a
+  cut through a solid gives: conics as rational splines, and Open CASCADE's
+  own B-splines. A spline drawn through points keeps them and the end
+  directions as fit data, as DXF does: a cubic through an M-by-3 matrix of
+  points, parametrised by the distance from point to point, a free end shaped
+  as Octave's `spline` shapes it. It is open, or closed and smooth all round.
+  A path takes it as one smooth segment, and a region as an outline or a
+  hole, or as part of one.
 - **`geom.Region`**: a closed planar area, one outline and any number of holes
   of any shape, each a closed `geom.Path` in one plane, so of straight
   segments, arcs and splines; closed polylines and splines are taken and

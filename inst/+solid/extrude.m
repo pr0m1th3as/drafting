@@ -237,6 +237,16 @@ endfunction
 %! assert_equal (volume (S), 6 * __area__ (R.Outline) * 1.75 / 3, -1e-9);
 %! assert_equal (isvalid (S), true);
 
+%!testif ; exist ('__occt__') == 3  # a hole of a rational spline, a circle
+%! w = sqrt (2) / 2;
+%! C = [1, 0; 1, 1; 0, 1; -1, 1; -1, 0; -1, -1; 0, -1; 1, -1; 1, 0];
+%! H = geom.Spline.nurbs (5 * C + [20, 10], ...
+%!                        [0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 4], ...
+%!                        [1, w, 1, w, 1, w, 1, w, 1]);
+%! S = solid.extrude (geom.Region ([0, 0; 40, 0; 40, 20; 0, 20], {H}), 3);
+%! assert_equal (volume (S), (800 - 25 * pi) * 3, -1e-9);
+%! assert_equal (isvalid (S), true);
+
 %!testif ; exist ('__occt__') == 3  # holes of any shape go right through
 %! R = geom.Region ([0, 0; 60, 0; 60, 40; 0, 40], ...
 %!                  {[20, 20, 1; 40, 20, 1], [4, 4; 10, 4; 10, 10; 4, 10]});

@@ -19,25 +19,34 @@ classdef Spline
   ## -*- texinfo -*-
   ## @deftp {drafting} geom.Spline
   ##
-  ## A smooth curve through points.
+  ## A smooth curve: a NURBS, drawn through points or given by its control
+  ## points.
   ##
-  ## A @code{geom.Spline} is a cubic spline that passes through each of its
-  ## points in turn, smooth all along: its direction and its curvature change
-  ## without a jump.  It is open, or closed and smooth all round, back from
-  ## its last point to its first.  It is the curve of a grip, a curved rib or a
-  ## channel that follows a surface, and @code{solid.sweep} carries a section
-  ## along it as one segment of a @code{geom.Path}.  A closed spline is a
-  ## smooth outline or hole of a @code{geom.Region}.
+  ## A @code{geom.Spline} holds a non-uniform rational B-spline: control
+  ## points that pull the curve towards them, a weight for each, a degree and
+  ## a knot vector.  This form carries exactly the curves a solid is made of
+  ## and a cut through it gives, a circle, an ellipse or any other conic as a
+  ## rational spline and Open CASCADE's own B-splines as they are, and it is
+  ## what a DXF @code{SPLINE} holds.  The curve is open, or closed and joined
+  ## back to its start.
   ##
-  ## The curve is parametrised by the distance from point to point.  Either
-  ## end of an open spline may be given a direction; an end left free is
-  ## shaped as Octave's
-  ## @code{spline} shapes it, the first and last two pieces each one cubic,
-  ## so a spline through points of a parabola is that parabola.  When a
-  ## spline is joined into a path, its free ends take the direction of what
-  ## they meet.
+  ## A spline is usually drawn through points: a cubic that passes through
+  ## each in turn, smooth all along, its direction and curvature changing
+  ## without a jump.  It is parametrised by the distance from point to point.
+  ## Either end of an open spline may be given a direction; an end left free is
+  ## shaped as Octave's @code{spline} shapes it, the first and last two pieces
+  ## each one cubic.  A closed spline is smooth all round.  The points and the
+  ## directions are kept as the spline's fit data, as DXF keeps them, and when
+  ## the spline is joined into a path its free ends take the direction of
+  ## what they meet.  @code{geom.Spline.nurbs} makes a spline from control
+  ## points, knots and weights instead, with no fit data.
   ##
-  ## The points are coordinates in the spline's @code{geom.UCS}, the world
+  ## A spline is the curve of a grip, a curved rib or a channel that follows a
+  ## surface: @code{solid.sweep} carries a section along it as one segment of
+  ## a @code{geom.Path}, and a closed spline is a smooth outline or hole of a
+  ## @code{geom.Region}.
+  ##
+  ## Its points are coordinates in the spline's @code{geom.UCS}, the world
   ## coordinate system by default, and assigning another UCS moves the
   ## spline, its shape unchanged in its own coordinates.  A spline whose
   ## points all have @math{z = 0} lies in the plane of its UCS.
@@ -50,39 +59,85 @@ classdef Spline
   properties (SetAccess = private)
 
     ## -*- texinfo -*-
-    ## @deftp {geom.Spline} {property} Points
+    ## @deftp {geom.Spline} {property} Degree
     ##
-    ## Points the spline passes through
+    ## Degree of the curve
     ##
-    ## The points as an @math{M}-by-3 matrix @code{[@var{x}, @var{y},
-    ## @var{z}]}, in millimetres in the spline's UCS, in the order the spline
-    ## passes through them.
+    ## The degree of the polynomial pieces the curve is made of, 3 for a
+    ## spline drawn through points.
     ##
     ## @end deftp
-    Points = zeros (0, 3);
+    Degree = 3;
 
     ## -*- texinfo -*-
-    ## @deftp {geom.Spline} {property} Tangents
+    ## @deftp {geom.Spline} {property} ControlPoints
     ##
-    ## Directions at the ends
+    ## Control points
     ##
-    ## A 2-by-3 matrix whose rows are the unit directions of the spline at its
-    ## first and its last point, or @code{NaN} for an end left free, as both
-    ## are for a closed spline.
+    ## The control points as an @math{N}-by-3 matrix in millimetres in the
+    ## spline's UCS.  The curve starts at the first and ends at the last.
     ##
     ## @end deftp
-    Tangents = NaN (2, 3);
+    ControlPoints = zeros (0, 3);
+
+    ## -*- texinfo -*-
+    ## @deftp {geom.Spline} {property} Weights
+    ##
+    ## Weights of the control points
+    ##
+    ## An @math{N}-by-1 vector of positive weights, all 1 for a curve that is
+    ## not rational.
+    ##
+    ## @end deftp
+    Weights = zeros (0, 1);
+
+    ## -*- texinfo -*-
+    ## @deftp {geom.Spline} {property} Knots
+    ##
+    ## Knot vector
+    ##
+    ## The full knot vector, a row of @math{N} + @code{Degree} + 1
+    ## nondecreasing parameters, its first and its last value each repeated
+    ## @code{Degree} + 1 times.  For a spline drawn through points the inner
+    ## knots are the distances along the points.
+    ##
+    ## @end deftp
+    Knots = zeros (1, 0);
 
     ## -*- texinfo -*-
     ## @deftp {geom.Spline} {property} Closed
     ##
     ## Closed flag
     ##
-    ## @code{true} when the spline runs on from its last point back to its
-    ## first, smooth there as everywhere.
+    ## @code{true} when the curve ends where it starts.
     ##
     ## @end deftp
     Closed = false;
+
+    ## -*- texinfo -*-
+    ## @deftp {geom.Spline} {property} FitPoints
+    ##
+    ## Points the spline was drawn through
+    ##
+    ## For a spline drawn through points, the points as an @math{M}-by-3
+    ## matrix in its UCS, in the order the spline passes through them; empty
+    ## for a spline made from control points.
+    ##
+    ## @end deftp
+    FitPoints = zeros (0, 3);
+
+    ## -*- texinfo -*-
+    ## @deftp {geom.Spline} {property} Tangents
+    ##
+    ## Directions at the ends
+    ##
+    ## For a spline drawn through points, a 2-by-3 matrix whose rows are the
+    ## unit directions given at its first and its last point, or @code{NaN}
+    ## for an end left free, as both are for a closed spline; empty for a
+    ## spline made from control points.
+    ##
+    ## @end deftp
+    Tangents = zeros (0, 3);
 
   endproperties
 
@@ -107,121 +162,62 @@ classdef Spline
     function disp (this)
 
       if (this.Closed)
-        printf ("  geom.Spline: closed, %d points\n", rows (this.Points));
+        c = "closed";
       else
-        free = {"given", "free"};
-        printf ("  geom.Spline: %d points, start %s, end %s\n", ...
-                rows (this.Points), free{isnan (this.Tangents(1,1)) + 1}, ...
-                free{isnan (this.Tangents(2,1)) + 1});
+        c = "open";
       endif
+      if (any (this.Weights != 1))
+        r = "rational, ";
+      else
+        r = "";
+      endif
+      printf ("  geom.Spline: %s, %sdegree %d, %d control points", c, r, ...
+              this.Degree, rows (this.ControlPoints));
+      if (! isempty (this.FitPoints))
+        printf (", through %d points", rows (this.FitPoints));
+      endif
+      printf ("\n");
 
     endfunction
 
-    ## The points the pieces of the spline run between, the first again at the
-    ## end of a closed spline; the parameter of each, the distance from point
-    ## to point; and the derivative of the curve there with respect to it
-    function [t, m, V] = __hermite__ (this)
+    ## The unit directions of the curve at its start and at its end
+    function [T1, T2] = __ends__ (this)
 
-      V = this.Points;
-      if (this.Closed)
-        V(end+1,:) = V(1,:);
-      endif
-      T = this.Tangents;
-      n = rows (V);
-      h = sqrt (sum (diff (V) .^ 2, 2));
-      t = [0; cumsum(h)];
-      d = diff (V) ./ h;
-      free = isnan (T(:,1));
-      if (this.Closed)
-        ## The second derivative continuous at every point, round and round
-        k = n - 1;
-        A = zeros (k);
-        b = zeros (k, 3);
-        for i = 1:k
-          p = mod (i - 2, k) + 1;
-          q = mod (i, k) + 1;
-          A(i,[p, i, q]) += [h(i), 2 * (h(p) + h(i)), h(p)];
-          b(i,:) = 3 * (h(i) * d(p,:) + h(p) * d(i,:));
-        endfor
-        m = A \ b;
-        m(end+1,:) = m(1,:);
-        return;
-      endif
-      if (n == 2)
-        m = [d; d];
-        if (! free(1) && ! free(2))
-          m = T;
-        elseif (! free(1))
-          m = [T(1,:); 2 * d - T(1,:)];
-        elseif (! free(2))
-          m = [2 * d - T(2,:); T(2,:)];
-        endif
-        return;
-      endif
-      if (n == 3 && all (free))
-        ## Free at both ends through three points: the parabola through them
-        c = (d(2,:) - d(1,:)) / (h(1) + h(2));
-        m = [d(1,:) - h(1) * c; d(1,:) + h(1) * c; d(2,:) + h(2) * c];
-        return;
-      endif
+      [~, D] = curve (this, this.Knots([1, end])');
+      D = D ./ sqrt (sum (D .^ 2, 2));
+      T1 = D(1,:);
+      T2 = D(2,:);
 
-      ## The second derivative continuous at every inner point
-      A = zeros (n);
-      b = zeros (n, 3);
-      for i = 2:n-1
-        A(i,i-1:i+1) = [h(i), 2 * (h(i-1) + h(i)), h(i-1)];
-        b(i,:) = 3 * (h(i) * d(i-1,:) + h(i-1) * d(i,:));
+    endfunction
+
+    ## Points along the curve from its start to its end, both included, each
+    ## piece cut finely enough that the curve turns by at most 2 degrees from
+    ## one to the next
+    function Q = __sample__ (this)
+
+      u = unique (this.Knots);
+      Q = cell (numel (u) - 1, 1);
+      for j = 1:numel (u) - 1
+        [~, D] = curve (this, [u(j); (u(j) + u(j+1)) / 2; u(j+1)]);
+        a = turn (D(1,:), D(2,:)) + turn (D(2,:), D(3,:));
+        k = max (16, ceil (a / (pi / 90)));
+        s = u(j) + (u(j+1) - u(j)) * (0:k-1)' / k;
+        Q{j} = curve (this, s);
       endfor
-
-      ## Either end given its direction, or one cubic over its last two pieces
-      if (free(1))
-        A(1,1:2) = [h(2), h(1) + h(2)];
-        b(1,:) = ((h(1) + 2 * (h(1) + h(2))) * h(2) * d(1,:) ...
-                  + h(1) ^ 2 * d(2,:)) / (h(1) + h(2));
-      else
-        A(1,1) = 1;
-        b(1,:) = T(1,:);
-      endif
-      if (free(2))
-        A(n,n-1:n) = [h(n-1) + h(n-2), h(n-2)];
-        b(n,:) = (h(n-1) ^ 2 * d(n-2,:) ...
-                  + (2 * (h(n-2) + h(n-1)) + h(n-1)) * h(n-2) * d(n-1,:)) ...
-                 / (h(n-2) + h(n-1));
-      else
-        A(n,n) = 1;
-        b(n,:) = T(2,:);
-      endif
-      m = A \ b;
+      Q = [vertcat(Q{:}); curve(this, u(end))];
 
     endfunction
 
-    ## The control points of the spline as cubic Bezier pieces, end to end,
-    ## and the parameters where the pieces meet
-    function [P, t] = __bezier__ (this)
+    ## Half the integral of x dy - y dx along the curve, its share of the
+    ## signed area of a closed loop in the plane of its UCS
+    function G = __green__ (this)
 
-      [t, m, V] = __hermite__ (this);
-      h = diff (t);
-      n = rows (V);
-      P = zeros (3 * (n - 1) + 1, 3);
-      P(1:3:end,:) = V;
-      P(2:3:end,:) = V(1:n-1,:) + h .* m(1:n-1,:) / 3;
-      P(3:3:end,:) = V(2:n,:) - h .* m(2:n,:) / 3;
-
-    endfunction
-
-  endmethods
-
-  methods (Access = public)
-
-    ## The same spline with the points V and end directions T, open or closed
-    ## as it is, for a spline moved, scaled or reversed
-    function this = __with__ (this, V, T)
-
-      if (this.Closed)
-        this = geom.Spline (V, 'Closed', true);
-      else
-        this = geom.Spline (V, 'Tangents', T);
-      endif
+      u = unique (this.Knots);
+      G = 0;
+      for j = 1:numel (u) - 1
+        G += integral (@(s) green (this, s), u(j), u(j+1), ...
+                       'RelTol', 1e-13, 'AbsTol', 1e-14);
+      endfor
 
     endfunction
 
@@ -229,27 +225,54 @@ classdef Spline
     ## first point
     function this = __reversed__ (this)
 
-      V = this.Points;
-      if (this.Closed)
-        V = V([1, end:-1:2],:);
-      else
-        V = flipud (V);
+      K = this.Knots;
+      this.ControlPoints = flipud (this.ControlPoints);
+      this.Weights = flipud (this.Weights);
+      this.Knots = K(1) + K(end) - fliplr (K);
+      if (! isempty (this.FitPoints))
+        if (this.Closed)
+          this.FitPoints = this.FitPoints([1, end:-1:2],:);
+        else
+          this.FitPoints = flipud (this.FitPoints);
+        endif
+        this.Tangents = -flipud (this.Tangents);
       endif
-      R = geom.Spline (V, 'Tangents', -flipud (this.Tangents), ...
-                       'Closed', this.Closed);
-      R.UCS = this.UCS;
-      this = R;
 
     endfunction
+
+    ## The spline with every point p moved to p * M + B and every direction d
+    ## turned to d * M, for M a rotation, a reflection or a uniform scale; a
+    ## spline drawn through points is drawn again through its moved points
+    function this = __affine__ (this, M, B)
+
+      U = this.UCS;
+      if (! isempty (this.FitPoints))
+        T = this.Tangents * M;
+        T(! isnan (T(:,1)),:) ./= sqrt (sum (T(! isnan (T(:,1)),:) .^ 2, 2));
+        if (this.Closed)
+          this = geom.Spline (this.FitPoints * M + B, 'Closed', true);
+        else
+          this = geom.Spline (this.FitPoints * M + B, 'Tangents', T);
+        endif
+      else
+        this.ControlPoints = this.ControlPoints * M + B;
+      endif
+      this.UCS = U;
+
+    endfunction
+
+  endmethods
+
+  methods (Access = public)
 
     ## -*- texinfo -*-
     ## @deftypefn  {geom.Spline} {@var{SP} =} geom.Spline (@var{V})
     ## @deftypefnx {geom.Spline} {@var{SP} =} geom.Spline (@var{V}, @var{Name}, @var{Value}, @dots{})
     ##
-    ## Make a spline.
+    ## Make a spline through points.
     ##
-    ## @code{@var{SP} = geom.Spline (@var{V})} makes the spline through the
-    ## points given as rows of @var{V}, an @math{M}-by-3 matrix in
+    ## @code{@var{SP} = geom.Spline (@var{V})} makes the cubic spline through
+    ## the points given as rows of @var{V}, an @math{M}-by-3 matrix in
     ## millimetres, or an @math{M}-by-2 matrix of points in the plane of the
     ## UCS, with at least two rows.  Through two points with both ends free,
     ## the spline is the straight line between them.
@@ -286,6 +309,7 @@ classdef Spline
     ## @end group
     ## @end example
     ##
+    ## @seealso{geom.Spline.nurbs}
     ## @end deftypefn
     function this = Spline (V, varargin)
 
@@ -359,10 +383,25 @@ classdef Spline
       if (any (all (D == 0, 2)))
         error ("geom.Spline: V must not repeat a point consecutively.");
       endif
+      T = T ./ sqrt (sum (T .^ 2, 2));
 
-      this.Points = V;
-      this.Tangents = T ./ sqrt (sum (T .^ 2, 2));
+      ## The cubic through the points with their derivatives there, as a
+      ## B-spline with a simple knot at each inner point
+      [t, m, W] = slopes (V, T, closed);
+      K = [t(1), t(1), t(1), t', t(end), t(end), t(end)];
+      I = eye (rows (W) + 2);
+      [Q, KQ] = derivative (I, K, 3);
+      A = [deboor(I, K, 3, t); deboor(Q, KQ, 2, t([1, end]))];
+
+      this.ControlPoints = A \ [W; m([1, end],:)];
+      if (closed)
+        this.ControlPoints(end,:) = this.ControlPoints(1,:);
+      endif
+      this.Weights = ones (rows (this.ControlPoints), 1);
+      this.Knots = K;
       this.Closed = closed;
+      this.FitPoints = V;
+      this.Tangents = T;
       this.UCS = opt.UCS;
 
     endfunction
@@ -378,12 +417,11 @@ classdef Spline
     ## @end deftypefn
     function L = length (this)
 
-      [t, m, V] = __hermite__ (this);
+      u = unique (this.Knots);
       L = 0;
-      for i = 1:rows (V) - 1
-        L += integral (@(s) speed (V(i:i+1,:), m(i:i+1,:), t(i+1) - t(i), ...
-                                    s), 0, 1, 'RelTol', 1e-13, ...
-                       'AbsTol', 1e-14);
+      for j = 1:numel (u) - 1
+        L += integral (@(s) speed (this, s), u(j), u(j+1), ...
+                       'RelTol', 1e-13, 'AbsTol', 1e-14);
       endfor
 
     endfunction
@@ -394,13 +432,12 @@ classdef Spline
     ## Points along a spline.
     ##
     ## @code{@var{P} = points (@var{SP}, @var{N})} returns @var{N} points
-    ## along the spline @var{SP}, from its first point to its last, or round
-    ## a closed spline from its first point back to it, as an @var{N}-by-3
-    ## matrix of coordinates in its UCS.  They are spaced evenly
-    ## in the spline's parameter, the distance from point to point, so they
-    ## include every point the spline passes through only when @var{N} falls
-    ## on them.  Convert them to world coordinates with
-    ## @code{geom.UCS.toworld}.
+    ## along the spline @var{SP}, from its start to its end, or round a closed
+    ## spline back to its start, as an @var{N}-by-3 matrix of coordinates in its
+    ## UCS.  They are spaced evenly in the spline's parameter, for a spline
+    ## drawn through points the distance from point to point, so they include
+    ## every point it passes through only when @var{N} falls on them.  Convert
+    ## them to world coordinates with @code{geom.UCS.toworld}.
     ##
     ## @end deftypefn
     function P = points (this, N)
@@ -414,15 +451,8 @@ classdef Spline
         error ("geom.Spline.points: N must be an integer of at least 2.");
       endif
 
-      [t, m, V] = __hermite__ (this);
-      s = linspace (0, t(end), double (N))';
-      i = min (max (lookup (t, s), 1), rows (V) - 1);
-      h = t(i+1) - t(i);
-      u = (s - t(i)) ./ h;
-      P = (2 * u .^ 3 - 3 * u .^ 2 + 1) .* V(i,:) ...
-          + (u .^ 3 - 2 * u .^ 2 + u) .* h .* m(i,:) ...
-          + (-2 * u .^ 3 + 3 * u .^ 2) .* V(i+1,:) ...
-          + (u .^ 3 - u .^ 2) .* h .* m(i+1,:);
+      P = curve (this, linspace (this.Knots(1), this.Knots(end), ...
+                                 double (N))');
 
     endfunction
 
@@ -461,24 +491,297 @@ classdef Spline
 
   endmethods
 
+  methods (Static)
+
+    ## -*- texinfo -*-
+    ## @deftypefn  {geom.Spline} {@var{SP} =} geom.Spline.nurbs (@var{P}, @var{KNOTS})
+    ## @deftypefnx {geom.Spline} {@var{SP} =} geom.Spline.nurbs (@var{P}, @var{KNOTS}, @var{W})
+    ## @deftypefnx {geom.Spline} {@var{SP} =} geom.Spline.nurbs (@dots{}, @qcode{'UCS'}, @var{U})
+    ##
+    ## Make a spline from its control points.
+    ##
+    ## @code{@var{SP} = geom.Spline.nurbs (@var{P}, @var{KNOTS})} makes the
+    ## B-spline with the control points given as rows of @var{P}, an
+    ## @math{N}-by-3 matrix in millimetres, or an @math{N}-by-2 matrix of
+    ## points in the plane of the UCS, with at least two rows, and the knot
+    ## vector @var{KNOTS}.  @var{KNOTS} has @math{N} + @var{D} + 1
+    ## nondecreasing values, which sets the degree @var{D}: its first and its
+    ## last value are each repeated @var{D} + 1 times, so the curve starts at
+    ## the first control point and ends at the last, and no inner knot is
+    ## repeated more than @var{D} times.  The degree is at most 25.
+    ##
+    ## @code{@var{SP} = geom.Spline.nurbs (@var{P}, @var{KNOTS}, @var{W})}
+    ## gives each control point a positive weight, which makes the curve
+    ## rational, a NURBS, as a circle or another conic must be.
+    ##
+    ## The option @qcode{'UCS'} gives the @code{geom.UCS} the control points
+    ## are coordinates in, the world coordinate system by default.  The spline
+    ## is closed when its first and last control points coincide.  It has no
+    ## fit data.
+    ##
+    ## @example
+    ## @group
+    ## ## A quarter of a circle of radius 10, exactly
+    ## SP = geom.Spline.nurbs ([10, 0; 10, 10; 0, 10], [0, 0, 0, 1, 1, 1], ...
+    ##                         [1; sqrt(2) / 2; 1]);
+    ## length (SP)
+    ## @result{} 15.708
+    ## @end group
+    ## @end example
+    ##
+    ## @seealso{geom.Spline}
+    ## @end deftypefn
+    function this = nurbs (P, KNOTS, varargin)
+
+      ## Input validation
+      if (nargin < 2)
+        error ("geom.Spline.nurbs: invalid number of input arguments.");
+      endif
+      W = [];
+      if (! isempty (varargin) && ! ischar (varargin{1}))
+        W = varargin{1};
+        varargin(1) = [];
+      endif
+      if (mod (numel (varargin), 2) != 0)
+        error ("geom.Spline.nurbs: Name/Value arguments must come in pairs.");
+      endif
+      U = geom.UCS ();
+      for k = 1:2:numel (varargin)
+        if (! ischar (varargin{k}) || ! strcmp (varargin{k}, 'UCS'))
+          error ("geom.Spline.nurbs: unknown parameter.");
+        endif
+        U = varargin{k+1};
+        if (! isa (U, 'geom.UCS') || ! isscalar (U))
+          error ("geom.Spline.nurbs: UCS must be a geom.UCS object.");
+        endif
+      endfor
+      if (! isnumeric (P) || ! isreal (P) || ! ismatrix (P) ...
+          || ! any (columns (P) == [2, 3]) || rows (P) < 2 ...
+          || ! all (isfinite (P(:))))
+        error (strcat ("geom.Spline.nurbs: P must be an N-by-2 or N-by-3", ...
+                       " real matrix of finite values with at least two", ...
+                       " rows."));
+      endif
+      n = rows (P);
+      if (! isnumeric (KNOTS) || ! isreal (KNOTS) || ! isvector (KNOTS) ...
+          || numel (KNOTS) < n + 2 || ! all (isfinite (KNOTS)) ...
+          || any (diff (KNOTS) < 0) || KNOTS(1) == KNOTS(end))
+        error (strcat ("geom.Spline.nurbs: KNOTS must be a nondecreasing", ...
+                       " real vector of at least N + 2 finite values, not", ...
+                       " all equal."));
+      endif
+      K = double (KNOTS(:)');
+      d = numel (K) - n - 1;
+      if (d > 25)
+        error ("geom.Spline.nurbs: the degree must be at most 25.");
+      endif
+      if (any (K(1:d+1) != K(1)) || any (K(end-d:end) != K(end)))
+        error (strcat ("geom.Spline.nurbs: KNOTS must repeat its first and", ...
+                       " its last value one more time than the degree."));
+      endif
+      [~, ~, j] = unique (K);
+      mult = accumarray (j(:), 1);
+      if (any (mult(2:end-1) > d))
+        error (strcat ("geom.Spline.nurbs: an inner knot may be repeated", ...
+                       " no more times than the degree."));
+      endif
+      if (isempty (W))
+        W = ones (n, 1);
+      elseif (! isnumeric (W) || ! isreal (W) || ! isvector (W) ...
+              || numel (W) != n || ! all (isfinite (W)) || ! all (W > 0))
+        error (strcat ("geom.Spline.nurbs: W must be a vector of N", ...
+                       " positive finite weights."));
+      endif
+
+      P = double (P);
+      if (columns (P) == 2)
+        P(:,3) = 0;
+      endif
+      this = geom.Spline ([0, 0; 1, 0]);
+      this.Degree = d;
+      this.ControlPoints = P;
+      this.Weights = double (W(:));
+      this.Knots = K;
+      scale = max (1, max (abs (P(:))));
+      this.Closed = norm (P(1,:) - P(end,:)) <= 1e-12 * scale;
+      this.FitPoints = zeros (0, 3);
+      this.Tangents = zeros (0, 3);
+      this.UCS = U;
+
+    endfunction
+
+  endmethods
+
 endclassdef
 
-## The speed along the piece from the point V(1,:) to V(2,:), with derivatives
-## M and parameter length H, at the fractions S of the way along it
-function v = speed (V, M, H, S)
+## The points of the spline SP at the parameters U, a column, and the
+## derivatives of the curve there
+function [C, D] = curve (SP, U)
 
-  S = S(:);
-  D = (6 * S .^ 2 - 6 * S) .* (V(1,:) - V(2,:)) / H ...
-      + (3 * S .^ 2 - 4 * S + 1) .* M(1,:) + (3 * S .^ 2 - 2 * S) .* M(2,:);
-  v = sqrt (sum (D .^ 2, 2))' * H;
+  Pw = [SP.ControlPoints .* SP.Weights, SP.Weights];
+  A = deboor (Pw, SP.Knots, SP.Degree, U);
+  C = A(:,1:3) ./ A(:,4);
+  if (nargout > 1)
+    [Q, KQ] = derivative (Pw, SP.Knots, SP.Degree);
+    dA = deboor (Q, KQ, SP.Degree - 1, U);
+    D = (dA(:,1:3) - dA(:,4) .* C) ./ A(:,4);
+  endif
+
+endfunction
+
+## The speed along the spline SP at the parameters U, a row
+function v = speed (SP, U)
+
+  [~, D] = curve (SP, U(:));
+  v = sqrt (sum (D .^ 2, 2))';
+
+endfunction
+
+## Half of x y' - y x' along the spline SP at the parameters U, a row
+function g = green (SP, U)
+
+  [C, D] = curve (SP, U(:));
+  g = (C(:,1) .* D(:,2) - C(:,2) .* D(:,1))' / 2;
+
+endfunction
+
+## The angle between the directions A and B
+function a = turn (A, B)
+
+  a = acos (min (1, max (-1, dot (A, B) / (norm (A) * norm (B)))));
+
+endfunction
+
+## The sum of the rows of PW weighted by the B-spline basis functions of
+## degree P on the knot vector K, at each of the parameters U: the point of a
+## curve at each, or with an identity matrix for PW, the basis itself
+function A = deboor (PW, K, P, U)
+
+  U = U(:);
+  K = K(:);
+  n = rows (PW);
+  s = min (max (lookup (K, U), P + 1), n);
+  N = [ones(numel (U), 1), zeros(numel (U), P)];
+  left = zeros (numel (U), P);
+  right = zeros (numel (U), P);
+  for j = 1:P
+    left(:,j) = U - K(s + 1 - j);
+    right(:,j) = K(s + j) - U;
+    saved = zeros (numel (U), 1);
+    for r = 0:j-1
+      tmp = N(:,r+1) ./ (right(:,r+1) + left(:,j-r));
+      N(:,r+1) = saved + right(:,r+1) .* tmp;
+      saved = left(:,j-r) .* tmp;
+    endfor
+    N(:,j+1) = saved;
+  endfor
+  A = zeros (numel (U), columns (PW));
+  for r = 0:P
+    A += N(:,r+1) .* PW(s - P + r,:);
+  endfor
+
+endfunction
+
+## The control points Q and knot vector KQ of the derivative of the B-spline
+## of degree P with control points PW on the knot vector K
+function [Q, KQ] = derivative (PW, K, P)
+
+  n = rows (PW);
+  h = K((1:n-1) + P + 1) - K((1:n-1) + 1);
+  Q = P * diff (PW) ./ h(:);
+  Q(h == 0,:) = 0;
+  KQ = K(2:end-1);
+
+endfunction
+
+## The parameters T of the points V, the distances from point to point, and
+## the derivatives M of the cubic through them there, with the given end
+## directions T or the ends free, not-a-knot; a closed spline round and round,
+## its first point again at the end of W, the points the pieces run between
+function [t, m, W] = slopes (V, T, closed)
+
+  W = V;
+  if (closed)
+    W(end+1,:) = W(1,:);
+  endif
+  n = rows (W);
+  h = sqrt (sum (diff (W) .^ 2, 2));
+  t = [0; cumsum(h)];
+  d = diff (W) ./ h;
+  free = isnan (T(:,1));
+  if (closed)
+    ## The second derivative continuous at every point, round and round
+    k = n - 1;
+    A = zeros (k);
+    b = zeros (k, 3);
+    for i = 1:k
+      p = mod (i - 2, k) + 1;
+      q = mod (i, k) + 1;
+      A(i,[p, i, q]) += [h(i), 2 * (h(p) + h(i)), h(p)];
+      b(i,:) = 3 * (h(i) * d(p,:) + h(p) * d(i,:));
+    endfor
+    m = A \ b;
+    m(end+1,:) = m(1,:);
+    return;
+  endif
+  if (n == 2)
+    m = [d; d];
+    if (! free(1) && ! free(2))
+      m = T;
+    elseif (! free(1))
+      m = [T(1,:); 2 * d - T(1,:)];
+    elseif (! free(2))
+      m = [2 * d - T(2,:); T(2,:)];
+    endif
+    return;
+  endif
+  if (n == 3 && all (free))
+    ## Free at both ends through three points: the parabola through them
+    c = (d(2,:) - d(1,:)) / (h(1) + h(2));
+    m = [d(1,:) - h(1) * c; d(1,:) + h(1) * c; d(2,:) + h(2) * c];
+    return;
+  endif
+
+  ## The second derivative continuous at every inner point
+  A = zeros (n);
+  b = zeros (n, 3);
+  for i = 2:n-1
+    A(i,i-1:i+1) = [h(i), 2 * (h(i-1) + h(i)), h(i-1)];
+    b(i,:) = 3 * (h(i) * d(i-1,:) + h(i-1) * d(i,:));
+  endfor
+
+  ## Either end given its direction, or one cubic over its last two pieces
+  if (free(1))
+    A(1,1:2) = [h(2), h(1) + h(2)];
+    b(1,:) = ((h(1) + 2 * (h(1) + h(2))) * h(2) * d(1,:) ...
+              + h(1) ^ 2 * d(2,:)) / (h(1) + h(2));
+  else
+    A(1,1) = 1;
+    b(1,:) = T(1,:);
+  endif
+  if (free(2))
+    A(n,n-1:n) = [h(n-1) + h(n-2), h(n-2)];
+    b(n,:) = (h(n-1) ^ 2 * d(n-2,:) ...
+              + (2 * (h(n-2) + h(n-1)) + h(n-1)) * h(n-2) * d(n-1,:)) ...
+             / (h(n-2) + h(n-1));
+  else
+    A(n,n) = 1;
+    b(n,:) = T(2,:);
+  endif
+  m = A \ b;
 
 endfunction
 
 %!test
 %! SP = geom.Spline ([0, 0; 10, 0; 20, 5]);
-%! assert_equal (SP.Points, [0, 0, 0; 10, 0, 0; 20, 5, 0]);
+%! assert_equal (SP.FitPoints, [0, 0, 0; 10, 0, 0; 20, 5, 0]);
 %! assert_equal (SP.Tangents, NaN (2, 3));
 %! assert_equal (SP.UCS, geom.UCS ());
+%! assert_equal (SP.Degree, 3);
+%! assert_equal (SP.ControlPoints([1, end],:), [0, 0, 0; 20, 5, 0], 1e-12);
+%! assert_equal (SP.Weights, ones (5, 1));
+%! assert_equal (SP.Knots, [0, 0, 0, 0, 10, 10 + sqrt(125) * [1, 1, 1, 1]], ...
+%!               1e-12);
 
 %!test  # the same curve as Octave's spline, free ends not-a-knot
 %! V = [0, 0, 0; 10, 5, 2; 20, 3, 8; 30, 10, 9; 35, 20, 4];
@@ -497,15 +800,14 @@ endfunction
 %!test  # one end given, one free
 %! SP = geom.Spline ([0, 0; 10, 10; 20, 0; 30, 10], ...
 %!                   'Tangents', [1, 0, 0; NaN, NaN, NaN]);
-%! [~, m] = __hermite__ (SP);
-%! assert_equal (m(1,:), [1, 0, 0], 1e-12);
+%! assert_equal (__ends__ (SP), [1, 0, 0], 1e-12);
 %! assert_equal (SP.Tangents(2,:), NaN (1, 3));
 
 %!test  # through three points with free ends, the parabola through them
 %! SP = geom.Spline ([-1, 1; 0, 0; 1, 1]);
 %! P = points (SP, 3);
 %! assert_equal (P, [-1, 1, 0; 0, 0, 0; 1, 1, 0], 1e-12);
-%! assert_equal (length (SP), sqrt (5) + asinh (2) / 2, -1e-6);
+%! assert_equal (length (SP), sqrt (5) + asinh (2) / 2, -1e-12);
 
 %!test  # through points on a line, that line
 %! SP = geom.Spline ([0, 0, 0; 1, 2, 2; 4, 8, 8; 5, 10, 10]);
@@ -528,20 +830,21 @@ endfunction
 %! SP = geom.Spline ([0, 0; 10, 5; 20, 0], 'UCS', U);
 %! assert_equal (SP.UCS, U);
 %! SP.UCS = geom.UCS ();
-%! assert_equal (SP.Points, [0, 0, 0; 10, 5, 0; 20, 0, 0]);
+%! assert_equal (SP.FitPoints, [0, 0, 0; 10, 5, 0; 20, 0, 0]);
 
 %!test  # closed: smooth round a circle, the repeat of the first point dropped
 %! a = (0:11)' * pi / 6;
 %! V = [10 * cos(a), 10 * sin(a)];
 %! SP = geom.Spline ([V; V(1,:)], 'Closed', true);
-%! assert_equal (rows (SP.Points), 12);
+%! assert_equal (rows (SP.FitPoints), 12);
 %! assert_equal (SP.Closed, true);
+%! assert_equal (SP.ControlPoints(end,:), SP.ControlPoints(1,:));
 %! assert_equal (length (SP), 20 * pi, -2e-4);
 %! P = points (SP, 361);
 %! assert_equal (sqrt (sum (P .^ 2, 2)), 10 * ones (361, 1), 3e-3);
 %! assert_equal (P(end,:), P(1,:), 1e-12);
-%! [~, m] = __hermite__ (SP);
-%! assert_equal (m(end,:), m(1,:));
+%! [T1, T2] = __ends__ (SP);
+%! assert_equal (T2, T1, 1e-12);
 
 %!test  # closed: a periodic spline, the same whichever point it starts at
 %! V = [0, 0; 30, -5; 45, 15; 25, 30; 5, 20];
@@ -554,11 +857,11 @@ endfunction
 %! SP = geom.Spline ([0, 0; 10, 5; 20, 0; 30, 5], ...
 %!                   'Tangents', [1, 0, 0; NaN, NaN, NaN]);
 %! R = __reversed__ (SP);
-%! assert_equal (R.Points, flipud (SP.Points));
+%! assert_equal (R.FitPoints, flipud (SP.FitPoints));
 %! assert_equal (R.Tangents, [NaN, NaN, NaN; -1, 0, 0]);
 %! assert_equal (points (R, 11), flipud (points (SP, 11)), 1e-10);
 %! C = __reversed__ (geom.Spline ([0, 0; 10, 0; 5, 8], 'Closed', true));
-%! assert_equal (C.Points, [0, 0, 0; 5, 8, 0; 10, 0, 0]);
+%! assert_equal (C.FitPoints, [0, 0, 0; 5, 8, 0; 10, 0, 0]);
 
 %!test  # directions kept as unit vectors
 %! SP = geom.Spline ([0, 0; 1, 0], 'Tangents', [3, 4, 0; NaN, NaN, NaN]);
@@ -569,6 +872,45 @@ endfunction
 %!           geom.Path ([10, 0, 10; 10, 0, 20]));
 %! assert_equal (class (P), 'geom.Path');
 %! assert_equal (P.Splines{1}.Tangents(2,:), [0, 0, 1]);
+
+%!test  # a rational quarter circle, exact
+%! SP = geom.Spline.nurbs ([10, 0; 10, 10; 0, 10], [0, 0, 0, 1, 1, 1], ...
+%!                         [1; sqrt(2) / 2; 1]);
+%! assert_equal (SP.Degree, 2);
+%! assert_equal (SP.Closed, false);
+%! assert_equal (isempty (SP.FitPoints), true);
+%! P = points (SP, 101);
+%! assert_equal (sqrt (sum (P .^ 2, 2)), 10 * ones (101, 1), 1e-12);
+%! assert_equal (length (SP), 5 * pi, 1e-12);
+%! assert_equal (__green__ (SP), 25 * pi, 1e-12);
+%! [T1, T2] = __ends__ (SP);
+%! assert_equal ([T1; T2], [0, 1, 0; -1, 0, 0], 1e-12);
+
+%!test  # a whole circle of nine control points, closed
+%! w = sqrt (2) / 2;
+%! P = [1, 0; 1, 1; 0, 1; -1, 1; -1, 0; -1, -1; 0, -1; 1, -1; 1, 0];
+%! SP = geom.Spline.nurbs (P, [0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 4], ...
+%!                         [1, w, 1, w, 1, w, 1, w, 1]);
+%! assert_equal (SP.Closed, true);
+%! assert_equal (length (SP), 2 * pi, 1e-12);
+%! assert_equal (__green__ (SP), pi, 1e-12);
+%! Q = __sample__ (SP);
+%! assert_equal (sqrt (sum (Q .^ 2, 2)), ones (rows (Q), 1), 1e-12);
+%! assert_equal (rows (Q) >= 180, true);
+
+%!test  # a cubic B-spline, not rational, reversed
+%! SP = geom.Spline.nurbs ([0, 0; 1, 2; 3, 2; 4, 0], [0, 0, 0, 0, 1, 1, 1, 1]);
+%! R = __reversed__ (SP);
+%! assert_equal (points (R, 7), flipud (points (SP, 7)), 1e-12);
+%! assert_equal (points (SP, 3)(2,:), [2, 1.5, 0], 1e-12);
+
+%!test  # moved: control points, or the fit points drawn through again
+%! SP = geom.Spline.nurbs ([0, 0; 1, 1; 2, 0], [0, 0, 0, 1, 1, 1]);
+%! Q = __affine__ (SP, 2 * eye (3), [1, 0, 0]);
+%! assert_equal (Q.ControlPoints, [1, 0, 0; 3, 2, 0; 5, 0, 0]);
+%! F = __affine__ (geom.Spline ([0, 0; 1, 1; 2, 0]), 2 * eye (3), [0, 0, 1]);
+%! assert_equal (F.FitPoints, [0, 0, 1; 2, 2, 1; 4, 0, 1]);
+%! assert_equal (F.Knots(end), 4 * sqrt (2), 1e-12);
 
 %!error<geom.Spline: invalid number of input arguments.> geom.Spline ()
 %!error<geom.Spline: V must be an M-by-2 or M-by-3 real matrix of finite values with at least two rows.> ...
@@ -609,3 +951,27 @@ endfunction
 %! points (geom.Spline ([0, 0; 1, 0]), 1)
 %!error<geom.Spline.points: N must be an integer of at least 2.> ...
 %! points (geom.Spline ([0, 0; 1, 0]), 2.5)
+%!error<geom.Spline.nurbs: invalid number of input arguments.> ...
+%! geom.Spline.nurbs ([0, 0; 1, 0])
+%!error<geom.Spline.nurbs: Name/Value arguments must come in pairs.> ...
+%! geom.Spline.nurbs ([0, 0; 1, 0], [0, 0, 1, 1], 'UCS')
+%!error<geom.Spline.nurbs: unknown parameter.> ...
+%! geom.Spline.nurbs ([0, 0; 1, 0], [0, 0, 1, 1], 'Closed', true)
+%!error<geom.Spline.nurbs: UCS must be a geom.UCS object.> ...
+%! geom.Spline.nurbs ([0, 0; 1, 0], [0, 0, 1, 1], 'UCS', 1)
+%!error<geom.Spline.nurbs: P must be an N-by-2 or N-by-3 real matrix of finite values with at least two rows.> ...
+%! geom.Spline.nurbs ([0, 0], [0, 0, 1, 1])
+%!error<geom.Spline.nurbs: KNOTS must be a nondecreasing real vector of at least N \+ 2 finite values, not all equal.> ...
+%! geom.Spline.nurbs ([0, 0; 1, 0], [0, 1, 1])
+%!error<geom.Spline.nurbs: KNOTS must be a nondecreasing real vector of at least N \+ 2 finite values, not all equal.> ...
+%! geom.Spline.nurbs ([0, 0; 1, 0], [0, 1, 0, 1])
+%!error<geom.Spline.nurbs: KNOTS must be a nondecreasing real vector of at least N \+ 2 finite values, not all equal.> ...
+%! geom.Spline.nurbs ([0, 0; 1, 0], [1, 1, 1, 1])
+%!error<geom.Spline.nurbs: KNOTS must repeat its first and its last value one more time than the degree.> ...
+%! geom.Spline.nurbs ([0, 0; 1, 0; 2, 1], [0, 0, 0, 0.5, 1, 1])
+%!error<geom.Spline.nurbs: an inner knot may be repeated no more times than the degree.> ...
+%! geom.Spline.nurbs ([0, 0; 1, 0; 2, 1; 3, 3], [0, 0, 0.5, 0.5, 1, 1])
+%!error<geom.Spline.nurbs: the degree must be at most 25.> ...
+%! geom.Spline.nurbs ([0, 0; 1, 0], [zeros(1, 27), ones(1, 27)])
+%!error<geom.Spline.nurbs: W must be a vector of N positive finite weights.> ...
+%! geom.Spline.nurbs ([0, 0; 1, 0], [0, 0, 1, 1], [1, 0])

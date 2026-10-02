@@ -191,32 +191,32 @@ todir (const octave_value& v)
   return gp_Dir (a(0), a(1), a(2));
 }
 
-// The cubic B-spline made of the Bezier pieces whose control points are the
-// rows of P, end to end, the pieces meeting at the parameters T.  Where they
-// meet smoothly, as a geom.Spline's do, the knot is made simple again.
+// The B-spline of a geom.Spline as solid.__path__ hands it over: its control
+// points, their weights, its distinct knots and their multiplicities, and
+// its degree; rational when the weights differ
 static Handle (Geom_BSplineCurve)
-bspline (const Matrix& p, const ColumnVector& t)
+bspline (const octave_scalar_map& s)
 {
-  const octave_idx_type k = t.numel ();
+  const Matrix p = s.contents ("poles").matrix_value ();
+  const ColumnVector w = s.contents ("weights").column_vector_value ();
+  const ColumnVector t = s.contents ("knots").column_vector_value ();
+  const ColumnVector m = s.contents ("mults").column_vector_value ();
+  const int degree = s.contents ("degree").int_value ();
   TColgp_Array1OfPnt poles (1, p.rows ());
+  TColStd_Array1OfReal weights (1, p.rows ());
   for (octave_idx_type i = 0; i < p.rows (); i++)
   {
     poles.SetValue (i + 1, gp_Pnt (p(i,0), p(i,1), p(i,2)));
+    weights.SetValue (i + 1, w(i));
   }
-  TColStd_Array1OfReal knots (1, k);
-  TColStd_Array1OfInteger mults (1, k);
-  for (octave_idx_type i = 0; i < k; i++)
+  TColStd_Array1OfReal knots (1, t.numel ());
+  TColStd_Array1OfInteger mults (1, t.numel ());
+  for (octave_idx_type i = 0; i < t.numel (); i++)
   {
     knots.SetValue (i + 1, t(i));
-    mults.SetValue (i + 1, (i == 0 || i == k - 1) ? 4 : 3);
+    mults.SetValue (i + 1, static_cast<int> (m(i)));
   }
-  Handle (Geom_BSplineCurve) c
-    = new Geom_BSplineCurve (poles, knots, mults, 3);
-  for (octave_idx_type i = 2; i < k; i++)
-  {
-    c->RemoveKnot (i, 1, 1e-9 * t(k-1));
-  }
-  return c;
+  return new Geom_BSplineCurve (poles, weights, knots, mults, degree);
 }
 
 // The wire of a geom.Path as solid.__path__ hands it over, in world
@@ -242,10 +242,7 @@ chain (const octave_value& p)
     const gp_Pnt b (v(j,0), v(j,1), v(j,2));
     if (! sp(i).isempty ())
     {
-      const octave_scalar_map c = sp(i).scalar_map_value ();
-      w.Add (BRepBuilderAPI_MakeEdge
-               (bspline (c.contents ("poles").matrix_value (),
-                         c.contents ("knots").column_vector_value ()))
+      w.Add (BRepBuilderAPI_MakeEdge (bspline (sp(i).scalar_map_value ()))
              .Edge ());
     }
     else if (octave::math::isnan (m(i,0)))

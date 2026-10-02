@@ -414,8 +414,10 @@ function TF = flat (P)
   d = [];
   for i = find (! cellfun (@isempty, P.Splines))'
     SP = P.Splines{i};
-    z = [z; SP.Points(:,3)];
-    d = [d; SP.Tangents(! isnan (SP.Tangents(:,1)),3)];
+    z = [z; SP.ControlPoints(:,3); SP.FitPoints(:,3)];
+    if (! isempty (SP.Tangents))
+      d = [d; SP.Tangents(! isnan (SP.Tangents(:,1)),3)];
+    endif
   endfor
   scale = max ([1; abs(V(:)); abs(P.UCS.Origin(:))]);
   TF = all (abs (z) <= 1e-9 * scale) && all (abs (d) <= 1e-9);
@@ -565,6 +567,15 @@ endfunction
 %! geom.Region ([0, 0; 30, 0; 30, 30; 0, 30], ...
 %!              {geom.Spline([10, 10, 0; 20, 10, 0; 15, 20, 1], ...
 %!                           'Closed', true)})
+%!test  # a hole of a rational spline, its area exact
+%! w = sqrt (2) / 2;
+%! C = [1, 0; 1, 1; 0, 1; -1, 1; -1, 0; -1, -1; 0, -1; 1, -1; 1, 0];
+%! H = geom.Spline.nurbs (5 * C + [20, 10], ...
+%!                        [0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 4], ...
+%!                        [1, w, 1, w, 1, w, 1, w, 1]);
+%! R = geom.Region ([0, 0; 40, 0; 40, 20; 0, 20], {H});
+%! assert_equal (__area__ (R.Holes{1}), -25 * pi, 1e-12);
+
 %!error<geom.Region.chamfer: invalid number of input arguments.> ...
 %! chamfer (geom.Region ([0, 0; 1, 0; 1, 1]))
 %!error<geom.Region.chamfer: OUTLINE: D must be one positive finite distance, or two.> ...

@@ -198,6 +198,17 @@ endfunction
 %! assert_equal (volume (S), pi * length (P), -1e-6);
 %! assert_equal (isvalid (S), true);
 
+%!testif ; exist ('__occt__') == 3  # round a rational circle, a torus
+%! w = sqrt (2) / 2;
+%! C = [1, 0; 1, 1; 0, 1; -1, 1; -1, 0; -1, -1; 0, -1; 1, -1; 1, 0];
+%! SP = geom.Spline.nurbs (10 * C, [0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 4], ...
+%!                         [1, w, 1, w, 1, w, 1, w, 1]);
+%! R = geom.Region ([1, 0, 1; -1, 0, 1]);
+%! R.UCS = geom.UCS ([0, 1, 0], [10, 0, 0], [11, 0, 0]);
+%! S = solid.sweep (R, geom.Path (SP));
+%! assert_equal (volume (S), 2 * pi ^ 2 * 10, -1e-6);
+%! assert_equal (isvalid (S), true);
+
 %!error<solid.sweep: invalid number of input arguments.> ...
 %! solid.sweep (geom.Region ([0, 0; 1, 0; 1, 1]))
 %!error<solid.sweep: R must be a geom.Region object.> ...
