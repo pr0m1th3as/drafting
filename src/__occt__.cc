@@ -62,11 +62,15 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <BinTools.hxx>
 #include <Bnd_Box.hxx>
 #include <GC_MakeArcOfCircle.hxx>
+#include <Geom_BSplineCurve.hxx>
 #include <GeomLib_IsPlanarSurface.hxx>
 #include <Geom2d_Line.hxx>
 #include <Geom_CylindricalSurface.hxx>
 #include <GProp_GProps.hxx>
 #include <Interface_Static.hxx>
+#include <TColStd_Array1OfInteger.hxx>
+#include <TColStd_Array1OfReal.hxx>
+#include <TColgp_Array1OfPnt.hxx>
 #include <Message.hxx>
 #include <Message_Messenger.hxx>
 #include <STEPControl_Reader.hxx>
@@ -223,6 +227,34 @@ outline (const Matrix& P, const gp_XYZ& o, const gp_XYZ& u, const gp_XYZ& v)
     }
   }
   return w.Wire ();
+}
+
+// The cubic B-spline made of the Bezier pieces whose control points are the
+// rows of P, end to end, the pieces meeting at the parameters T.  Where they
+// meet smoothly, as a geom.Spline's do, the knot is made simple again.
+static Handle (Geom_BSplineCurve)
+bspline (const Matrix& p, const ColumnVector& t)
+{
+  const octave_idx_type k = t.numel ();
+  TColgp_Array1OfPnt poles (1, p.rows ());
+  for (octave_idx_type i = 0; i < p.rows (); i++)
+  {
+    poles.SetValue (i + 1, gp_Pnt (p(i,0), p(i,1), p(i,2)));
+  }
+  TColStd_Array1OfReal knots (1, k);
+  TColStd_Array1OfInteger mults (1, k);
+  for (octave_idx_type i = 0; i < k; i++)
+  {
+    knots.SetValue (i + 1, t(i));
+    mults.SetValue (i + 1, (i == 0 || i == k - 1) ? 4 : 3);
+  }
+  Handle (Geom_BSplineCurve) c
+    = new Geom_BSplineCurve (poles, knots, mults, 3);
+  for (octave_idx_type i = 2; i < k; i++)
+  {
+    c->RemoveKnot (i, 1, 1e-9 * t(k-1));
+  }
+  return c;
 }
 
 // A geom.Region as Octave hands it over: the outline's vertices, a cell of
@@ -900,11 +932,13 @@ function directly. \n\
     else if (cmd == "sweep")
     {
       // The path's vertices, the midpoints of its arcs, NaN for a straight
-      // segment, and whether it is closed
+      // segment, whether it is closed, and for each spline segment its
+      // control points and parameters
       const region r = toregion (args(2));
       const Matrix v = args(3).matrix_value ();
       const Matrix m = args(4).matrix_value ();
       const bool closed = args(5).bool_value ();
+      const Cell sp = args(6).cell_value ();
       const octave_idx_type n = v.rows ();
       BRepBuilderAPI_MakeWire spine;
       for (octave_idx_type i = 0; i < (closed ? n : n - 1); i++)
@@ -912,7 +946,15 @@ function directly. \n\
         const octave_idx_type j = (i + 1) % n;
         const gp_Pnt a (v(i,0), v(i,1), v(i,2));
         const gp_Pnt b (v(j,0), v(j,1), v(j,2));
-        if (octave::math::isnan (m(i,0)))
+        if (! sp(i).isempty ())
+        {
+          const octave_scalar_map s = sp(i).scalar_map_value ();
+          spine.Add (BRepBuilderAPI_MakeEdge
+                       (bspline (s.contents ("poles").matrix_value (),
+                                 s.contents ("knots").column_vector_value ()))
+                     .Edge ());
+        }
+        else if (octave::math::isnan (m(i,0)))
         {
           spine.Add (BRepBuilderAPI_MakeEdge (a, b).Edge ());
         }

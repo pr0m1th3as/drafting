@@ -27,10 +27,12 @@
 ## welded sections or a pipe run is modelled; a hole in the region makes a
 ## tube.
 ##
-## Along an arc of the path the solid bends smoothly.  Where two segments meet
-## at an angle the solid keeps a sharp corner, mitred as two sawn lengths are
-## joined; round such a corner with @code{geom.Path.fillet} for a bend.  The
-## path must not turn straight back on itself.  A closed path makes a ring.
+## Along an arc or a spline of the path the solid bends smoothly.  Where two
+## segments meet at an angle the solid keeps a sharp corner, mitred as two
+## sawn lengths are joined; round such a corner with @code{geom.Path.fillet}
+## for a bend.  A spline joined into a path meets its neighbours smoothly
+## unless told not to, see @code{geom.Path.join}.  The path must not turn
+## straight back on itself.  A closed path makes a ring.
 ##
 ## The region is swept from where it lies.  Normally its plane passes through
 ## the first point of the path, square to the path there; a region in the
@@ -53,7 +55,7 @@
 ## solid that intersects itself; check such a result with
 ## @code{solid.Shape.isvalid}.
 ##
-## @seealso{geom.Path, geom.Region, solid.extrude, solid.helix}
+## @seealso{geom.Path, geom.Spline, geom.Region, solid.extrude, solid.helix}
 ## @end deftypefn
 
 function S = sweep (R, P)
@@ -69,14 +71,7 @@ function S = sweep (R, P)
   if (! isa (P, 'geom.Path') || ! isscalar (P))
     error ("solid.sweep: P must be a geom.Path object.");
   endif
-
-  ## The path in world coordinates, and its directions into and out of each
-  ## vertex
-  V = toworld (P.UCS, P.Vertices);
-  M = P.Midpoints;
-  arc = ! isnan (M(:,1));
-  M(arc,:) = toworld (P.UCS, M(arc,:));
-  [tin, tout] = tangents (V, M, P.Closed);
+  [tin, tout] = __tangents__ (P);
   if (P.Closed)
     t = sum (tout .* tin([2:end, 1],:), 2);
   else
@@ -90,38 +85,22 @@ function S = sweep (R, P)
     error ("solid.sweep: %s", errmsg);
   endif
 
-  S = solid.Shape (__occt__ ('sweep', 'solid.sweep', D, V, M, P.Closed));
 
-endfunction
-
-## The unit directions of the path through the vertices V, with the midpoints
-## M of its arcs, at the start and the end of each of its segments.  The
-## tangent at either end of an arc is the chord reflected in the chord to the
-## arc's middle.
-function [tin, tout] = tangents (A, M, closed)
-
-  B = A([2:end, 1],:);
-  if (! closed)
-    A(end,:) = [];
-    B(end,:) = [];
-    M(end,:) = [];
-  endif
-  d = unit (B - A);
-  tin = d;
-  tout = d;
+  ## The path in world coordinates: its vertices, the midpoints of its arcs,
+  ## and each spline as its control points, its ends on the vertices
+  V = toworld (P.UCS, P.Vertices);
+  M = P.Midpoints;
   arc = ! isnan (M(:,1));
-  if (any (arc))
-    a = unit (M(arc,:) - A(arc,:));
-    b = unit (B(arc,:) - M(arc,:));
-    tin(arc,:) = 2 * sum (d(arc,:) .* a, 2) .* a - d(arc,:);
-    tout(arc,:) = 2 * sum (d(arc,:) .* b, 2) .* b - d(arc,:);
-  endif
+  M(arc,:) = toworld (P.UCS, M(arc,:));
+  C = cell (rows (V), 1);
+  for i = find (! cellfun (@isempty, P.Splines))'
+    [B, t] = __bezier__ (P.Splines{i});
+    B = toworld (P.UCS, B);
+    B([1, end],:) = V([i, mod(i, rows (V)) + 1],:);
+    C{i} = struct ('poles', B, 'knots', t);
+  endfor
 
-endfunction
-
-function U = unit (V)
-
-  U = V ./ sqrt (sum (V .^ 2, 2));
+  S = solid.Shape (__occt__ ('sweep', 'solid.sweep', D, V, M, P.Closed, C));
 
 endfunction
 
@@ -188,6 +167,25 @@ endfunction
 %! R.UCS = geom.UCS ([0, -1, 0], P.Vertices(1,:));
 %! S = solid.sweep (R, P);
 %! assert_equal (volume (S), pi * length (P), -1e-6);
+%! assert_equal (isvalid (S), true);
+
+%!testif ; exist ('__occt__') == 3  # along a spline joined smoothly to lines
+%! P = join (geom.Path ([0, 0, 0; 0, 0, 10]), ...
+%!           geom.Spline ([0, 0, 10; 5, 3, 20; 15, 0, 25; 25, 0, 25]), ...
+%!           geom.Path ([25, 0, 25; 40, 0, 25]));
+%! S = solid.sweep (geom.Region ([1, 0, 1; -1, 0, 1]), P);
+%! assert_equal (volume (S), pi * length (P), -1e-4);
+%! assert_equal (isvalid (S), true);
+%! assert_equal (bbox (S)([3, 4]), [0, 40], 1e-6);
+
+%!testif ; exist ('__occt__') == 3  # a spline in a UCS of its own
+%! SP = geom.Spline ([0, 0; 10, 10; 20, 0; 30, 10], ...
+%!                   'Tangents', [0, 1, 0; 0, 1, 0]);
+%! SP.UCS = geom.UCS ([0, -1, 0], [5, 0, 0]);
+%! R = geom.Region ([1, 0, 1; -1, 0, 1]);
+%! R.UCS = geom.UCS ([0, 0, 1], [5, 0, 0]);
+%! S = solid.sweep (R, geom.Path (SP));
+%! assert_equal (volume (S), pi * length (SP), -1e-4);
 %! assert_equal (isvalid (S), true);
 
 %!testif ; exist ('__occt__') == 3  # a polyline's arc, swept from its start

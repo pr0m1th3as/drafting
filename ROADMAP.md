@@ -49,15 +49,22 @@ Everything below is checked against those two lines.
 
 ## Polylines and regions
 
-Two value classes in `+geom` are the package's one representation of planar
-outlines, each lying in a `geom.UCS` (below), used by drawings and solids
-alike. Functions take the classes and nothing else; only the constructors
+Three value classes in `+geom` are the package's one representation of
+outlines and curves, each lying in a `geom.UCS` (below), used by drawings and
+solids alike. Functions take the classes and nothing else; only the constructors
 accept plain matrices. Point sets that carry no arcs, such as the input of
 `geom.offset` or `geom.curvature`, stay N-by-2 matrices.
 
 - **`geom.Polyline`**: the DXF polyline. `Vertices` is an N-by-3 matrix
   `[x, y, bulge]` in the coordinates of its `UCS`; an N-by-2 matrix is accepted
   and given zero bulges. It is open or `Closed`, and may cross itself.
+- **`geom.Spline`**: a smooth curve through points, the DXF `SPLINE` kept
+  apart from the polyline as DXF keeps it. An open cubic through an M-by-3
+  matrix of points in the coordinates of its `UCS`, parametrised by the
+  distance from point to point; either end may be given a direction, and a
+  free end is shaped as Octave's `spline` shapes it. Its curve is computed in
+  Octave and handed to Open CASCADE exactly. Paths take it now, as one smooth
+  segment; regions can take it later.
 - **`geom.Region`**: a closed planar area, one outline and any number of holes
   of any shape, all `geom.Polyline` objects in one plane. It refuses an outline
   or a hole that is open, crosses or touches itself or encloses no area, a hole
@@ -75,16 +82,17 @@ turn about the plane's own y axis through its origin, local x the radius, so a
 region in the default xy plane turns about the model's y axis; `loft` takes
 each section where its plane lies, sections need not be parallel, and all have
 the same number of holes; `sweep` sweeps the region from where it lies along a
-path in model coordinates. A pocket, a recess of limited
+`geom.Path` (below). A pocket, a recess of limited
 depth, is an operation on a solid, not part of a region.
 
-## User coordinate systems
+## User coordinate systems and paths
 
 **`geom.UCS`** is a user coordinate system: an `Origin`, an `XAxis` and a
-`Normal`, defining a plane with coordinates of its own. Every polyline and
-region carries one, the world xy plane by default. It is a coordinate system
-and not just a plane: the origin and x axis carry meaning (a revolution turns
-about its y axis), and DXF stores named UCS records of exactly this form.
+`Normal`, defining a plane with coordinates of its own. Every polyline,
+spline, region and path carries one, the world xy plane by default. It is a
+coordinate system and not just a plane: the origin and x axis carry meaning (a
+revolution turns about its y axis), and DXF stores named UCS records of exactly
+this form.
 
 - `geom.UCS ()` is the world xy plane.
 - `geom.UCS (NORMAL, ORIGIN, XPOINT)` lays the plane square to the normal
@@ -106,14 +114,12 @@ point. Every point snaps to a vertex, the centre of a circular edge, the
 midpoint of a straight edge, or a point on a face. The pick prints the
 `geom.UCS` it made, by coordinates, for the script.
 
-## Paths
-
 **`geom.Path`** is the route a section is swept along: a chain of straight
-segments and circular arcs in 3-D, open or closed, its vertices coordinates
-in a `geom.UCS` of its own, the world by default; assigning another moves it. It is
-not a polyline: a polyline lies in one plane, and a pipe run or a bent frame
-does not. An arc is kept by the point half way along it, since in 3-D a bulge
-leaves the arc's plane undecided.
+segments, circular arcs and splines in 3-D, open or closed, its vertices
+coordinates in a `geom.UCS` of its own, the world by default; assigning another
+moves it. It is not a polyline: a polyline lies in one plane, and a pipe run or
+a bent frame does not. An arc is kept by the point half way along it, since in
+3-D a bulge leaves the arc's plane undecided.
 
 - `geom.Path (P)` runs through the points of an M-by-3 matrix.
 - `geom.Path (PL)` carries a `geom.Polyline` into 3-D in its UCS, its bulges
@@ -122,11 +128,16 @@ leaves the arc's plane undecided.
   arcs, the bends of a bent tube.
 - `geom.Path.arc (P1, PM, P2)` is an arc through three points, as when a
   path follows a circular edge picked in the viewer.
-- `join` puts pieces end to end; `length` measures the path.
+- `geom.Path (SP)` is the one smooth segment of a `geom.Spline`.
+- `join` puts paths and splines end to end; a free end of a spline takes the
+  direction of what it meets so the path runs on smoothly, unless asked not
+  to. `length` measures the path.
 
 An arc given by a centre and angles is left out on purpose: a sweep along one
 arc is a revolution, which `solid.revolve` already makes. What a path adds is
 assembly, one smooth solid with its section carried along, not new shapes.
+A sweep along a spline is what a grip, a curved rib or a cooling channel
+following the shape of a printed mould is made from.
 
 ## Milestone 1: close the package's own shape (0.2.0)
 

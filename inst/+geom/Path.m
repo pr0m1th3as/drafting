@@ -19,7 +19,8 @@ classdef Path
   ## -*- texinfo -*-
   ## @deftp {drafting} geom.Path
   ##
-  ## A path of straight segments and circular arcs in three dimensions.
+  ## A path of straight segments, circular arcs and splines in three
+  ## dimensions.
   ##
   ## A @code{geom.Path} is the route a section is swept along by
   ## @code{solid.sweep}: a pipe run, a bent bar or the centre line of a frame.
@@ -35,12 +36,12 @@ classdef Path
   ## its radius; a bulge, as a polyline keeps, would leave the plane of an arc
   ## undecided in three dimensions.  Arcs come from rounding corners with
   ## @code{geom.Path.fillet}, from a polyline's bulges, or from three points
-  ## with @code{geom.Path.arc}, and pieces are put end to end with
-  ## @code{geom.Path.join}.
+  ## with @code{geom.Path.arc}.  A @code{geom.Spline} makes one smooth segment
+  ## of its own.  Pieces are put end to end with @code{geom.Path.join}.
   ##
   ## A @code{geom.Path} is a value: every change makes a new one.
   ##
-  ## @seealso{solid.sweep, geom.Polyline, geom.Region, geom.UCS}
+  ## @seealso{solid.sweep, geom.Spline, geom.Polyline, geom.Region, geom.UCS}
   ## @end deftp
 
   properties (SetAccess = private)
@@ -68,6 +69,19 @@ classdef Path
     ##
     ## @end deftp
     Midpoints = zeros (0, 3);
+
+    ## -*- texinfo -*-
+    ## @deftp {geom.Path} {property} Splines
+    ##
+    ## Splines of the path
+    ##
+    ## An @math{M}-by-1 cell whose element @math{i} is the @code{geom.Spline}
+    ## of the segment leaving vertex @math{i}, its points in the path's
+    ## coordinates, or empty where that segment is a straight segment or an
+    ## arc.
+    ##
+    ## @end deftp
+    Splines = cell (0, 1);
 
     ## -*- texinfo -*-
     ## @deftp {geom.Path} {property} Closed
@@ -106,9 +120,19 @@ classdef Path
       else
         c = "open";
       endif
-      printf ("  geom.Path: %s, %d segments, %d arcs\n", c, ...
+      printf ("  geom.Path: %s, %d segments, %d arcs, %d splines\n", c, ...
               rows (this.Vertices) - ! this.Closed, ...
-              nnz (! isnan (this.Midpoints(:,1))));
+              nnz (! isnan (this.Midpoints(:,1))), ...
+              nnz (! cellfun (@isempty, this.Splines)));
+
+    endfunction
+
+    ## The unit directions of the path at the start and the end of each of its
+    ## segments, in its coordinates
+    function [tin, tout] = __tangents__ (this)
+
+      [tin, tout] = tangents (this.Vertices, this.Midpoints, this.Splines, ...
+                              this.Closed);
 
     endfunction
 
@@ -120,6 +144,7 @@ classdef Path
     ## @deftypefn  {geom.Path} {@var{P} =} geom.Path (@var{V})
     ## @deftypefnx {geom.Path} {@var{P} =} geom.Path (@var{V}, @var{Name}, @var{Value}, @dots{})
     ## @deftypefnx {geom.Path} {@var{P} =} geom.Path (@var{PL})
+    ## @deftypefnx {geom.Path} {@var{P} =} geom.Path (@var{SP})
     ##
     ## Make a path.
     ##
@@ -144,6 +169,9 @@ classdef Path
     ## @code{geom.Polyline} @var{PL}, in its UCS, open or closed as @var{PL}
     ## is, with its arcs kept exact.
     ##
+    ## @code{@var{P} = geom.Path (@var{SP})} makes the open path of one
+    ## segment along the @code{geom.Spline} @var{SP}, in its UCS.
+    ##
     ## @example
     ## @group
     ## ## The centre line of a tube bent twice, with bends of radius 15
@@ -164,7 +192,18 @@ classdef Path
           error ("geom.Path: invalid number of input arguments.");
         endif
         [this.Vertices, this.Midpoints] = frompolyline (V);
+        this.Splines = cell (rows (this.Vertices), 1);
         this.Closed = V.Closed;
+        this.UCS = V.UCS;
+        return;
+      endif
+      if (isa (V, 'geom.Spline'))
+        if (nargin > 1)
+          error ("geom.Path: invalid number of input arguments.");
+        endif
+        this.Vertices = V.Points([1, end],:);
+        this.Midpoints = NaN (2, 3);
+        this.Splines = {geom.Spline(V.Points, 'Tangents', V.Tangents); []};
         this.UCS = V.UCS;
         return;
       endif
@@ -211,6 +250,7 @@ classdef Path
 
       this.Vertices = V;
       this.Midpoints = NaN (rows (V), 3);
+      this.Splines = cell (rows (V), 1);
       this.Closed = closed;
       this.UCS = opt.UCS;
 
@@ -226,8 +266,8 @@ classdef Path
     ## where two straight segments meet with an arc of radius @var{RADIUS}
     ## millimetres, tangent to both and in their plane, as a tube is bent: the
     ## corner vertex becomes the two points where the arc meets the segments,
-    ## joined by the arc.  Corners where an arc meets a segment are left as
-    ## they are, and so are the two ends of an open path.
+    ## joined by the arc.  Corners where an arc or a spline meets a segment are
+    ## left as they are, and so are the two ends of an open path.
     ##
     ## @code{@var{P} = fillet (@var{P}, @var{RADIUS}, @var{IDX})} rounds only
     ## the corners at the vertices indexed by @var{IDX}, each of which must be
@@ -254,6 +294,7 @@ classdef Path
       ## The corners, their neighbours and the angle the path turns there
       V = this.Vertices;
       M = this.Midpoints;
+      S = this.Splines;
       n = rows (V);
       if (this.Closed)
         prev = [n, 1:n-1];
@@ -269,7 +310,7 @@ classdef Path
       lu = sqrt (sum (u .^ 2, 2))';
       lv = sqrt (sum (v .^ 2, 2))';
       th = acos (min (max (sum (u .* v, 2)' ./ (lu .* lv), -1), 1));
-      straight = isnan (M(:,1))';
+      straight = isnan (M(:,1))' & cellfun (@isempty, S)';
       corner = ! ends & straight(prev) & straight & th > 1e-12;
       if (isempty (IDX))
         IDX = find (corner);
@@ -302,6 +343,7 @@ classdef Path
       ## middle of the arc on the bisector of the corner
       W = num2cell (V, 2);
       N = num2cell (M, 2);
+      C = num2cell (S);
       for i = IDX
         a = V(i,:) - t(i) * u(i,:) / lu(i);
         b = V(i,:) + t(i) * v(i,:) / lv(i);
@@ -309,9 +351,11 @@ classdef Path
         m = V(i,:) + d / norm (d) * RADIUS * (1 / cos (th(i) / 2) - 1);
         W{i} = [a; b];
         N{i} = [m; M(i,:)];
+        C{i} = cell (2, 1);
       endfor
       W = vertcat (W{:});
       N = vertcat (N{:});
+      C = vertcat (C{:});
 
       ## A straight segment that the rounds at its ends used up is dropped
       k = rows (W);
@@ -320,23 +364,32 @@ classdef Path
       else
         L = [sqrt(sum (diff (W) .^ 2, 2)); Inf];
       endif
-      gone = isnan (N(:,1)) & L <= 1e-9 * max (lv);
+      gone = isnan (N(:,1)) & cellfun (@isempty, C) & L <= 1e-9 * max (lv);
       this.Vertices = W(! gone,:);
       this.Midpoints = N(! gone,:);
+      this.Splines = C(! gone);
 
     endfunction
 
     ## -*- texinfo -*-
-    ## @deftypefn {geom.Path} {@var{P} =} join (@var{P1}, @var{P2}, @dots{})
+    ## @deftypefn  {geom.Path} {@var{P} =} join (@var{P1}, @var{P2}, @dots{})
+    ## @deftypefnx {geom.Path} {@var{P} =} join (@dots{}, @qcode{'Tangent'}, @var{TF})
     ##
-    ## Put paths end to end.
+    ## Put paths and splines end to end.
     ##
     ## @code{@var{P} = join (@var{P1}, @var{P2}, @dots{})} returns the path
-    ## that runs along @var{P1}, then @var{P2}, and so on.  Each path must be
-    ## open and begin where the one before it ends.  The pieces need not meet
+    ## that runs along @var{P1}, then @var{P2}, and so on, each a
+    ## @code{geom.Path} or a @code{geom.Spline}.  Each path must be open and
+    ## begin where the piece before it ends.  The pieces need not meet
     ## smoothly: where they meet at an angle, the path has a corner.  When the
     ## last piece ends where the first begins, the path is closed.  The path
     ## is in the UCS of @var{P1}, the others' points carried into it.
+    ##
+    ## Where a free end of a spline meets a straight segment, an arc or a
+    ## spline end with a direction of its own, the spline takes that
+    ## direction, so the path runs on smoothly there.  With
+    ## @qcode{'Tangent'} set to @code{false}, free ends stay free and the
+    ## path may have a corner there.
     ##
     ## @example
     ## @group
@@ -351,15 +404,37 @@ classdef Path
     function this = join (varargin)
 
       ## Input validation
-      if (nargin < 2)
+      k = find (cellfun (@ischar, varargin), 1);
+      opts = {};
+      if (! isempty (k))
+        opts = varargin(k:end);
+        varargin = varargin(1:k-1);
+      endif
+      if (numel (varargin) < 2)
         error ("geom.Path.join: invalid number of input arguments.");
       endif
-      for k = 1:nargin
-        P = varargin{k};
-        if (! isa (P, 'geom.Path') || ! isscalar (P))
-          error ("geom.Path.join: every argument must be a geom.Path object.");
+      if (mod (numel (opts), 2) != 0)
+        error ("geom.Path.join: Name/Value arguments must come in pairs.");
+      endif
+      tangent = true;
+      for k = 1:2:numel (opts)
+        if (! strcmp (opts{k}, 'Tangent'))
+          error ("geom.Path.join: unknown parameter.");
         endif
-        if (P.Closed)
+        tangent = opts{k+1};
+        if (! (islogical (tangent) || isnumeric (tangent)) ...
+            || ! isscalar (tangent) || ! any (tangent == [0, 1]))
+          error ("geom.Path.join: Tangent must be a logical scalar.");
+        endif
+      endfor
+      for k = 1:numel (varargin)
+        P = varargin{k};
+        if (isa (P, 'geom.Spline') && isscalar (P))
+          varargin{k} = geom.Path (P);
+        elseif (! isa (P, 'geom.Path') || ! isscalar (P))
+          error (strcat ("geom.Path.join: every piece must be a geom.Path", ...
+                         " or a geom.Spline object."));
+        elseif (P.Closed)
           error ("geom.Path.join: path %d is closed.", k);
         endif
       endfor
@@ -367,27 +442,56 @@ classdef Path
       this = varargin{1};
       V = this.Vertices;
       M = this.Midpoints;
-      for k = 2:nargin
-        P = varargin{k};
-        [W, N] = into (P, this.UCS);
+      S = this.Splines;
+      joints = [];
+      for k = 2:numel (varargin)
+        [W, N, C] = into (varargin{k}, this.UCS);
         tol = 1e-9 * max ([1, max(abs (V(:))), max(abs (W(:)))]);
         if (norm (W(1,:) - V(end,:)) > tol)
           error (strcat ("geom.Path.join: path %d does not begin where", ...
                          " path %d ends."), k, k - 1);
         endif
+        joints(end+1) = rows (V);
         M = [M(1:end-1,:); N];
+        S = [S(1:end-1); C];
         V = [V; W(2:end,:)];
       endfor
 
       ## A path ending where it began is closed
       tol = 1e-9 * max (1, max (abs (V(:))));
-      if (rows (V) > 2 && norm (V(end,:) - V(1,:)) <= tol)
+      closed = rows (V) > 2 && norm (V(end,:) - V(1,:)) <= tol;
+      if (closed)
         V(end,:) = [];
         M(end,:) = [];
-        this.Closed = true;
+        S(end) = [];
+        joints(end+1) = 1;
       endif
+
+      ## A free end of a spline takes the direction of what it meets, unless
+      ## that is a free spline end too
+      if (tangent)
+        [tin, tout] = tangents (V, M, S, closed);
+        n = rows (V);
+        for j = joints
+          in = j - 1 + n * (j == 1);
+          fin = ! isempty (S{in}) && isnan (S{in}.Tangents(2,1));
+          fout = ! isempty (S{j}) && isnan (S{j}.Tangents(1,1));
+          if (fout && ! fin)
+            T = S{j}.Tangents;
+            T(1,:) = tout(in,:);
+            S{j} = geom.Spline (S{j}.Points, 'Tangents', T);
+          elseif (fin && ! fout)
+            T = S{in}.Tangents;
+            T(2,:) = tin(j,:);
+            S{in} = geom.Spline (S{in}.Points, 'Tangents', T);
+          endif
+        endfor
+      endif
+
       this.Vertices = V;
       this.Midpoints = M;
+      this.Splines = S;
+      this.Closed = closed;
 
     endfunction
 
@@ -397,8 +501,8 @@ classdef Path
     ## The length of a path.
     ##
     ## @code{@var{L} = length (@var{P})} returns the length of the path
-    ## @var{P} in millimetres along its arcs, including the segment that
-    ## closes a closed path.
+    ## @var{P} in millimetres along its arcs and splines, including the
+    ## segment that closes a closed path.
     ##
     ## @end deftypefn
     function L = length (this)
@@ -419,6 +523,9 @@ classdef Path
       th = 4 * atan (2 * s ./ c);
       arc = ! isnan (M(:,1));
       c(arc) = c(arc) ./ (2 * sin (th(arc) / 2)) .* th(arc);
+      for i = find (! cellfun (@isempty, this.Splines(1:rows (c))))'
+        c(i) = length (this.Splines{i});
+      endfor
       L = sum (c);
 
     endfunction
@@ -509,16 +616,61 @@ function [V, M] = frompolyline (PL)
 
 endfunction
 
-## The vertices and midpoints of the path P as coordinates in the UCS U
-function [V, M] = into (P, U)
+## The vertices, arc midpoints and splines of the path P as coordinates in
+## the UCS U
+function [V, M, S] = into (P, U)
 
   V = P.Vertices;
   M = P.Midpoints;
-  if (! (P.UCS == U))
+  S = P.Splines;
+  A = P.UCS;
+  if (! (A == U))
     arc = ! isnan (M(:,1));
-    V = tolocal (U, toworld (P.UCS, V));
-    M(arc,:) = tolocal (U, toworld (P.UCS, M(arc,:)));
+    V = tolocal (U, toworld (A, V));
+    M(arc,:) = tolocal (U, toworld (A, M(arc,:)));
+    R = [A.XAxis; A.YAxis; A.Normal] * [U.XAxis; U.YAxis; U.Normal]';
+    for i = find (! cellfun (@isempty, S))'
+      S{i} = geom.Spline (tolocal (U, toworld (A, S{i}.Points)), ...
+                          'Tangents', S{i}.Tangents * R);
+    endfor
   endif
+
+endfunction
+
+## The unit directions at the start and the end of each segment of the path
+## through the vertices V, with arc midpoints M and splines S.  The tangent at
+## either end of an arc is the chord reflected in the chord to the arc's
+## middle; a spline's is its own.
+function [tin, tout] = tangents (A, M, S, closed)
+
+  B = A([2:end, 1],:);
+  if (! closed)
+    A(end,:) = [];
+    B(end,:) = [];
+    M(end,:) = [];
+    S(end) = [];
+  endif
+  d = unit (B - A);
+  tin = d;
+  tout = d;
+  arc = ! isnan (M(:,1));
+  if (any (arc))
+    a = unit (M(arc,:) - A(arc,:));
+    b = unit (B(arc,:) - M(arc,:));
+    tin(arc,:) = 2 * sum (d(arc,:) .* a, 2) .* a - d(arc,:);
+    tout(arc,:) = 2 * sum (d(arc,:) .* b, 2) .* b - d(arc,:);
+  endif
+  for i = find (! cellfun (@isempty, S))'
+    [~, m] = __hermite__ (S{i});
+    tin(i,:) = unit (m(1,:));
+    tout(i,:) = unit (m(end,:));
+  endfor
+
+endfunction
+
+function U = unit (V)
+
+  U = V ./ sqrt (sum (V .^ 2, 2));
 
 endfunction
 
@@ -616,6 +768,54 @@ endfunction
 %! assert_equal (Q.Vertices, [0, 0, 0; 0, 0, 10; 10, 0, 10], 1e-12);
 %! assert_equal (Q.Midpoints(2,:), [5, 5, 10], 1e-12);
 
+%!test  # a spline as a path of one segment
+%! U = geom.UCS ([1, 0, 0], [1, 2, 3]);
+%! SP = geom.Spline ([0, 0; 10, 5; 20, 0], 'UCS', U);
+%! P = geom.Path (SP);
+%! assert_equal (P.Vertices, [0, 0, 0; 20, 0, 0]);
+%! assert_equal (P.UCS, SP.UCS);
+%! assert_equal (P.Splines{1}.Points, SP.Points);
+%! assert_equal (length (P), length (SP), 1e-12);
+
+%!test  # a free spline end takes the direction of the line it meets
+%! SP = geom.Spline ([0, 0, 10; 5, 0, 20; 10, 0, 30]);
+%! P = join (geom.Path ([0, 0, 0; 0, 0, 10]), SP, ...
+%!           geom.Path ([10, 0, 30; 20, 0, 30]));
+%! assert_equal (P.Splines{2}.Tangents, [0, 0, 1; 1, 0, 0]);
+%! [tin, tout] = __tangents__ (P);
+%! assert_equal (tout(1:2,:), tin(2:3,:), 1e-12);
+%! assert_equal (length (P), 20 + length (P.Splines{2}), 1e-12);
+
+%!test  # an end with its own direction is kept, and opting out keeps free
+%! SP = geom.Spline ([0, 0, 10; 5, 0, 20; 10, 0, 30], ...
+%!                   'Tangents', [1, 0, 1; NaN, NaN, NaN]);
+%! P = join (geom.Path ([0, 0, 0; 0, 0, 10]), SP);
+%! assert_equal (P.Splines{2}.Tangents, [1, 0, 1; NaN, NaN, NaN] / sqrt (2), ...
+%!               1e-15);
+%! P = join (geom.Path ([0, 0, 0; 0, 0, 10]), geom.Spline (SP.Points), ...
+%!           'Tangent', false);
+%! assert_equal (P.Splines{2}.Tangents, NaN (2, 3));
+
+%!test  # a spline first, and the spline's end taken by an arc after it
+%! SP = geom.Spline ([0, 0, 0; 5, 0, 5; 10, 0, 0]);
+%! P = join (SP, geom.Path.arc ([10, 0, 0], [15, 5, 0], [20, 0, 0]));
+%! assert_equal (P.Splines{1}.Tangents(2,:), [0, 1, 0], 1e-12);
+%! assert_equal (isnan (P.Splines{1}.Tangents(1,1)), true);
+
+%!test  # a spline carried into the first piece's UCS
+%! SP = geom.Spline ([0, 0; 5, 5; 10, 0], 'Tangents', [1, 0, 0; NaN, NaN, NaN]);
+%! SP.UCS = geom.UCS ([1, 0, 0], [0, 0, 10]);
+%! P = join (geom.Path ([0, 0, 0; 0, 0, 10]), SP, 'Tangent', false);
+%! assert_equal (P.Splines{2}.Points, [0, 0, 10; 0, 5, 15; 0, 10, 10], 1e-12);
+%! assert_equal (P.Splines{2}.Tangents(1,:), [0, 1, 0], 1e-12);
+
+%!test  # a corner next to a spline is not rounded
+%! P = join (geom.Path ([0, 0, 0; 10, 0, 0; 10, 10, 0]), ...
+%!           geom.Spline ([10, 10, 0; 15, 15, 0; 10, 20, 0]));
+%! Q = fillet (P, 2);
+%! assert_equal (rows (Q.Vertices), rows (P.Vertices) + 1);
+%! assert_equal (Q.Splines{4}.Points, P.Splines{3}.Points);
+
 %!test  # joined end to start, closed
 %! P = join (geom.Path ([0, 0, 0; 10, 0, 0]), ...
 %!           geom.Path.arc ([10, 0, 0], [5, 5, 0], [0, 0, 0]));
@@ -659,8 +859,19 @@ endfunction
 %! fillet (geom.Path ([0, 0, 0; 1, 0, 0; 1, 1, 0]), 2)
 %!error<geom.Path.join: invalid number of input arguments.> ...
 %! join (geom.Path ([0, 0, 0; 1, 0, 0]))
-%!error<geom.Path.join: every argument must be a geom.Path object.> ...
+%!error<geom.Path.join: every piece must be a geom.Path or a geom.Spline object.> ...
 %! join (geom.Path ([0, 0, 0; 1, 0, 0]), [1, 0, 0; 2, 0, 0])
+%!error<geom.Path.join: invalid number of input arguments.> ...
+%! join (geom.Path ([0, 0, 0; 1, 0, 0]), 'Tangent', false)
+%!error<geom.Path.join: Name/Value arguments must come in pairs.> ...
+%! join (geom.Path ([0, 0, 0; 1, 0, 0]), geom.Path ([1, 0, 0; 2, 0, 0]), ...
+%!       'Tangent')
+%!error<geom.Path.join: unknown parameter.> ...
+%! join (geom.Path ([0, 0, 0; 1, 0, 0]), geom.Path ([1, 0, 0; 2, 0, 0]), ...
+%!       'Smooth', true)
+%!error<geom.Path.join: Tangent must be a logical scalar.> ...
+%! join (geom.Path ([0, 0, 0; 1, 0, 0]), geom.Path ([1, 0, 0; 2, 0, 0]), ...
+%!       'Tangent', 2)
 %!error<geom.Path.join: path 2 is closed.> ...
 %! join (geom.Path ([0, 0, 0; 1, 0, 0]), ...
 %!       geom.Path ([1, 0, 0; 2, 0, 0; 2, 1, 0], 'Closed', true))
