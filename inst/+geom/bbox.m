@@ -65,10 +65,12 @@ endfunction
 %! P = (30 + 5 * cos (5 * t)) .* [cos(t), sin(t)];
 %! [B, W, H] = geom.bbox (P)
 %!
-%! D = draw.Drawing ().polyline (P, true);
+%! D = draw.Drawing ().polyline (geom.Polyline (P, 'Closed', true));
 %! D.Linetype = 'PHANTOM';
 %! D.Colour = 'red';
-%! D = D.polyline ([B(1), B(2); B(3), B(2); B(3), B(4); B(1), B(4)], true);
+%! PL = geom.Polyline ([B(1), B(2); B(3), B(2); B(3), B(4); B(1), B(4)], ...
+%!                     'Closed', true);
+%! D = D.polyline (PL);
 %! plot (D);
 %! title ('a profile and the box that bounds it');
 

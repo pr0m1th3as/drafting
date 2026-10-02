@@ -119,7 +119,7 @@ endfunction
 %! printf ('tightest radius %.2f mm at a crest, %.2f mm in a root\n', ...
 %!         min (abs (R(K > 0))), min (abs (R(K < 0))));
 %!
-%! D = draw.Drawing ().polyline (P, true);
+%! D = draw.Drawing ().polyline (geom.Polyline (P, 'Closed', true));
 %! D.Colour = 'red';
 %! [~, i] = max (K);
 %! D = D.circle (P(i,:) - R(i) * (P(i,:) / norm (P(i,:))), abs (R(i)));

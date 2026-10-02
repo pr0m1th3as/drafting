@@ -11,7 +11,7 @@ exchanged as STEP, come through Open CASCADE when the package is built with it.
 
 Forty-three public functions across five namespaces plus the
 `draw.Drawing`, `geom.Polyline`, `geom.Region`, `solid.Shape` and
-`solid.Viewer` classes, 1164 built-in self-tests and 67 `%!demo` blocks,
+`solid.Viewer` classes, 1167 built-in self-tests and 67 `%!demo` blocks,
 nearly all of which end in a `plot` call, so the documentation shows what a
 function does rather than only describing it.
 
@@ -59,7 +59,8 @@ consumes that list rather than walking the drawing itself:
 ```
 D = draw.Drawing ('plate');
 D.Layer = 'OUTLINE';
-D = D.polyline ([-40, -40; 40, -40; 40, 40; -40, 40], true);
+D = D.polyline (geom.Polyline ([-40, -40; 40, -40; 40, 40; -40, 40], ...
+                               'Closed', true));
 D = D.circle ([0, 0], 25);
 
 D.Layer = 'DIMENSIONS';

@@ -188,7 +188,7 @@ endfunction
 %! S = geom.hatchlines (P, 'ANSI31');
 %! printf ('%d segments fill the outline\n', rows (S));
 %!
-%! D = draw.Drawing ().polyline (P, true);
+%! D = draw.Drawing ().polyline (geom.Polyline (P, 'Closed', true));
 %! D.Colour = 'blue';
 %! for k = 1:rows (S)
 %!   D = D.line (S(k,1:2), S(k,3:4));
@@ -206,7 +206,7 @@ endfunction
 %! x = 0;
 %! for nm = {'ANSI31', 'ANSI37', 'HORIZONTAL', 'CROSS'}
 %!   Q = P + [x, 0];
-%!   D = D.polyline (Q, true);
+%!   D = D.polyline (geom.Polyline (Q, 'Closed', true));
 %!   S = geom.hatchlines (Q, nm{1}, 0, 5);
 %!   for k = 1:rows (S)
 %!     D = D.line (S(k,1:2), S(k,3:4));

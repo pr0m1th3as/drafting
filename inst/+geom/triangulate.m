@@ -135,7 +135,7 @@ endfunction
 %!
 %! D = draw.Drawing ();
 %! for k = 1:rows (T)
-%!   D = D.polyline (V(T(k,:),:), true);
+%!   D = D.polyline (geom.Polyline (V(T(k,:),:), 'Closed', true));
 %! endfor
 %! plot (D);
 %! title ('an end cap triangulated around its bore and holes');

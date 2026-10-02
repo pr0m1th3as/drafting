@@ -5,7 +5,8 @@
 %!
 %! D = draw.Drawing ('plate');
 %! D.Layer = 'OUTLINE';
-%! D = D.polyline ([0, 0; 80, 0; 80, 50; 0, 50], true);
+%! D = D.polyline (geom.Polyline ([0, 0; 80, 0; 80, 50; 0, 50], ...
+%!                                'Closed', true));
 %! D = D.circle ([20, 25], 8).circle ([60, 25], 8);
 %! D.Layer = 'AXES';
 %! D.Linetype = 'CENTER';

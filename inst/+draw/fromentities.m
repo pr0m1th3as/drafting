@@ -230,8 +230,13 @@ function [D, LOST] = replay (D, E)
         D = D.line (e.pts(1,:), e.pts(2,:));
 
       case {'POLYLINE', 'LWPOLYLINE'}
-        b = getfield_or (e, 'bulge', []);
-        D = D.polyline (e.pts, logical (getfield_or (e, 'closed', false)), b);
+        [PL, why] = topolyline (e);
+        if (isempty (why))
+          D = D.polyline (PL);
+        else
+          LOST(end+1) = struct ('index', ii, 'type', upper (e.type), ...
+                                'reason', why);
+        endif
 
       case 'CIRCLE'
         D = D.circle (e.pts(1,:), e.radius);
@@ -283,6 +288,40 @@ function [D, LOST] = replay (D, E)
   D.Layer = '0';
   D.Linetype = 'CONTINUOUS';
   D.Colour = 256;
+
+endfunction
+
+## The geom.Polyline of a polyline entity, or the reason there is none.  What
+## a file may hold that a polyline may not, and that changes no geometry, is
+## tidied: a vertex repeated in place, a closed polyline's first vertex
+## repeated at its end, a bulge on the last vertex of an open one.
+function [PL, why] = topolyline (e)
+
+  PL = [];
+  why = '';
+  P = double (e.pts);
+  b = getfield_or (e, 'bulge', []);
+  if (isempty (b))
+    b = zeros (rows (P), 1);
+  endif
+  b = double (b(:));
+  closed = logical (getfield_or (e, 'closed', false));
+  same = all (P(1:end-1,:) == P(2:end,:), 2);
+  keep = [! same; true];
+  P = P(keep,:);
+  b = b(keep);
+  if (closed && rows (P) > 1 && isequal (P(1,:), P(end,:)))
+    P(end,:) = [];
+    b(end) = [];
+  endif
+  if (rows (P) < 2)
+    why = 'fewer than two distinct vertices';
+    return;
+  endif
+  if (! closed)
+    b(end) = 0;
+  endif
+  PL = geom.Polyline ([P, b], 'Closed', closed);
 
 endfunction
 
@@ -418,7 +457,8 @@ endfunction
 %! ## of lines: `draw.fromentities` is the inverse of `entities`.
 %!
 %! D = draw.Drawing ('plate');
-%! D = D.polyline ([0, 0; 100, 0; 100, 60; 0, 60], true).circle ([50, 30], 18);
+%! D = D.polyline (geom.Polyline ([0, 0; 100, 0; 100, 60; 0, 60], ...
+%!                                'Closed', true)).circle ([50, 30], 18);
 %! D = D.dim ([0, 0], [100, 0], -15, 'horizontal').diam ([50, 30], 18, 45);
 %!
 %! fn = fullfile (tempdir (), 'plate.dxf');
@@ -436,7 +476,8 @@ endfunction
 %! ## The imported drawing carries on being a drawing: transform it, add to it
 %! ## and write it out again.
 %!
-%! D = draw.Drawing ().polyline ([0, 0; 60, 0; 60, 40; 0, 40], true);
+%! PL = geom.Polyline ([0, 0; 60, 0; 60, 40; 0, 40], 'Closed', true);
+%! D = draw.Drawing ().polyline (PL);
 %! fn = fullfile (tempdir (), 'part.dxf');
 %! dxf.write (fn, entities (D));
 %! back = draw.fromentities (dxf.read (fn));
@@ -454,6 +495,30 @@ endfunction
 %! assert_equal (numentities (back), 5);
 %! assert_equal (sort (unique ({back.Entities.type})), ...
 %!               {'arc', 'circle', 'line', 'point', 'text'});
+
+%!test  # what a file may hold that a polyline may not is tidied, not refused
+%! E = struct ('type', 'POLYLINE', 'layer', '0', ...
+%!             'pts', [0, 0; 10, 0; 10, 0; 10, 5], 'closed', false, ...
+%!             'bulge', [0, 0, 0, 1]);
+%! [D, LOST] = draw.fromentities (E);
+%! assert_equal (numel (LOST), 0);
+%! assert_equal (D.Entities(1).pts, [0, 0; 10, 0; 10, 5]);
+%! assert_equal (isempty (D.Entities(1).bulge), true);
+
+%!test  # a closed polyline repeating its first vertex at its end
+%! E = struct ('type', 'LWPOLYLINE', 'layer', '0', ...
+%!             'pts', [0, 0; 10, 0; 10, 5; 0, 0], 'closed', true, ...
+%!             'bulge', [0, 1, 0, 0]);
+%! D = draw.fromentities (E);
+%! assert_equal (D.Entities(1).pts, [0, 0; 10, 0; 10, 5]);
+%! assert_equal (D.Entities(1).bulge, [0, 1, 0]);
+
+%!test  # a polyline of one distinct vertex has nothing to raise
+%! E = struct ('type', 'POLYLINE', 'layer', '0', 'pts', [3, 3; 3, 3], ...
+%!             'closed', false, 'bulge', []);
+%! [D, LOST] = draw.fromentities (E);
+%! assert_equal (numentities (D), 0);
+%! assert_equal (LOST.reason, 'fewer than two distinct vertices');
 
 %!test  # a dimension returns as a dimension, not as the lines it was drawn as
 %! D = draw.Drawing ().dim ([0, 0], [100, 0], -15, 'horizontal');

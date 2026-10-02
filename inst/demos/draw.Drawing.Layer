@@ -5,7 +5,8 @@
 %!
 %! D = draw.Drawing ('shaft');
 %! D.Layer = 'BODY';
-%! D = D.polyline ([0, -15; 70, -15; 70, 15; 0, 15], true);
+%! D = D.polyline (geom.Polyline ([0, -15; 70, -15; 70, 15; 0, 15], ...
+%!                                'Closed', true));
 %! D.Layer = 'HIDDEN';
 %! D.Linetype = 'HIDDEN';
 %! D = D.line ([25, -15], [25, 15]).line ([50, -15], [50, 15]);

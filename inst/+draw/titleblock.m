@@ -96,15 +96,19 @@ function D = titleblock (varargin)
   D.Layer = 'FRAME';
 
   ## Trimmed edge, then the border inset for filing
-  D = D.polyline ([0, 0; W, 0; W, H; 0, H], true);
-  D = D.polyline ([20, 10; W - 10, 10; W - 10, H - 10; 20, H - 10], true);
+  D = D.polyline (geom.Polyline ([0, 0; W, 0; W, H; 0, H], 'Closed', true));
+  PL = geom.Polyline ([20, 10; W - 10, 10; W - 10, H - 10; 20, H - 10], ...
+                      'Closed', true);
+  D = D.polyline (PL);
 
   ## The block itself, bottom right, inside the border
   bw = 180;
   bh = 56;
   x0 = W - 10 - bw;
   y0 = 10;
-  D = D.polyline ([x0, y0; x0 + bw, y0; x0 + bw, y0 + bh; x0, y0 + bh], true);
+  PL = geom.Polyline ([x0, y0; x0 + bw, y0; x0 + bw, y0 + bh; x0, y0 + bh], ...
+                      'Closed', true);
+  D = D.polyline (PL);
 
   rows_ = [0, 14, 28, 42];
   for r = rows_(2:end)

@@ -136,7 +136,8 @@ endfunction
 %!     continue;
 %!   endif
 %!   D.Colour = nm{1};
-%!   D = D.polyline ([x, 0; x + 14, 0; x + 14, 14; x, 14], true);
+%!   D = D.polyline (geom.Polyline ([x, 0; x + 14, 0; x + 14, 14; x, 14], ...
+%!                                  'Closed', true));
 %!   D.Colour = 'byLayer';
 %!   D = D.text ([x, -5], nm{1}, 3);
 %!   x += 20;

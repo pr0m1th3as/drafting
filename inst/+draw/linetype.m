@@ -144,7 +144,8 @@ endfunction
 %! ## an edge concealed by the body, a phantom line an alternate position.
 %!
 %! D = draw.Drawing ();
-%! D = D.polyline ([0, 0; 60, 0; 60, 30; 0, 30], true);
+%! D = D.polyline (geom.Polyline ([0, 0; 60, 0; 60, 30; 0, 30], ...
+%!                                'Closed', true));
 %! D.Linetype = 'HIDDEN';
 %! D = D.line ([20, 0], [20, 30]).line ([40, 0], [40, 30]);
 %! D.Linetype = 'CENTER';
@@ -152,7 +153,8 @@ endfunction
 %! D = D.line ([-6, 15], [66, 15]);
 %! D.Linetype = 'PHANTOM';
 %! D.Colour = 'blue';
-%! D = D.polyline ([0, 36; 60, 36; 60, 60; 0, 60], true);
+%! D = D.polyline (geom.Polyline ([0, 36; 60, 36; 60, 60; 0, 60], ...
+%!                                'Closed', true));
 %! plot (D);
 %! title ('visible, hidden, centre and phantom');
 

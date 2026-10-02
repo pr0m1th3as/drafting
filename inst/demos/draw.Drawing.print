@@ -4,7 +4,8 @@
 %! ## title block has to state.
 %!
 %! D = draw.Drawing ('plate');
-%! D = D.polyline ([0, 0; 200, 0; 200, 120; 0, 120], true);
+%! D = D.polyline (geom.Polyline ([0, 0; 200, 0; 200, 120; 0, 120], ...
+%!                                'Closed', true));
 %! D = D.circle ([100, 60], 35);
 %! D = D.dim ([0, 0], [200, 0], -20, 'horizontal');
 %!
@@ -16,7 +17,8 @@
 %! ## The same drawing on A5 needs a smaller scale, and the function picks the
 %! ## largest of the ISO 5455 series that still fits rather than an exact fit.
 %!
-%! D = draw.Drawing ().polyline ([0, 0; 200, 0; 200, 120; 0, 120], true);
+%! PL = geom.Polyline ([0, 0; 200, 0; 200, 120; 0, 120], 'Closed', true);
+%! D = draw.Drawing ().polyline (PL);
 %! fn = fullfile (tempdir (), 'plate5.pdf');
 %! [paper, scale] = print (D, fn, 'Paper', 'A5')
 %! delete (fn);

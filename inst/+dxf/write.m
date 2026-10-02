@@ -565,7 +565,8 @@ endfunction
 %!
 %! D = draw.Drawing ('plate');
 %! D.Layer = 'OUTLINE';
-%! D = D.polyline ([0, 0; 60, 0; 60, 40; 0, 40], true);
+%! D = D.polyline (geom.Polyline ([0, 0; 60, 0; 60, 40; 0, 40], ...
+%!                                'Closed', true));
 %! D.Layer = 'AXES';
 %! D.Linetype = 'CENTER';
 %! D.Colour = 'red';

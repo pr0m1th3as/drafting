@@ -191,11 +191,13 @@ endfunction
 %! t = linspace (0, 2*pi, 241)(1:240)';
 %! P = (30 + 4 * cos (7 * t)) .* [cos(t), sin(t)];
 %!
-%! D = draw.Drawing ().polyline (P, true);
+%! D = draw.Drawing ().polyline (geom.Polyline (P, 'Closed', true));
 %! D.Colour = 'red';
-%! D = D.polyline (geom.curveoffset (P, 4, true), true);
+%! D = D.polyline (geom.Polyline (geom.curveoffset (P, 4, true), ...
+%!                                'Closed', true));
 %! D.Colour = 'blue';
-%! D = D.polyline (geom.curveoffset (P, -4, true), true);
+%! D = D.polyline (geom.Polyline (geom.curveoffset (P, -4, true), ...
+%!                                'Closed', true));
 %! plot (D);
 %! title ('a lobed profile offset 4 mm in (red) and out (blue)');
 

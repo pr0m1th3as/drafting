@@ -140,7 +140,7 @@ endfunction
 %! Q = geom.simplify (P, 0.05);
 %! printf ('%d points -> %d, within 0.05 mm\n', rows (P), rows (Q));
 %!
-%! D = draw.Drawing ().polyline (P, true);
+%! D = draw.Drawing ().polyline (geom.Polyline (P, 'Closed', true));
 %! D.Colour = 'red';
 %! for k = 1:rows (Q)
 %!   D = D.circle (Q(k,:), 0.7);

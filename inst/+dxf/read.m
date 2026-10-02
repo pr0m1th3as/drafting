@@ -445,14 +445,16 @@ endfunction
 %! ## colour it carried.  Anything the reader does not handle is counted rather
 %! ## than silently dropped.
 %!
-%! D = draw.Drawing ().circle ([0, 0], 20).polyline ([0,0; 30,0; 30,20], true);
+%! PL = geom.Polyline ([0,0; 30,0; 30,20], 'Closed', true);
+%! D = draw.Drawing ().circle ([0, 0], 20).polyline (PL);
 %! D.Linetype = 'HIDDEN';
 %! D = D.line ([-25, 0], [25, 0]);
 %!
 %! fn = [tempname(), '.dxf'];
 %! dxf.write (fn, entities (D));
 %! [E, UNITS, SKIPPED] = dxf.read (fn);
-%! printf ('%d entities, units "%s", %d skipped\n', numel (E), UNITS, SKIPPED);
+%! printf ('%d entities, units "%s", %d skipped\n', numel (E), UNITS, ...
+%!         numel (SKIPPED));
 %! for k = 1:numel (E)
 %!   printf ('  %-9s %d point(s), %s\n', E(k).type, ...
 %!           rows (E(k).pts), E(k).linetype);
@@ -464,7 +466,7 @@ endfunction
 %!   if (strcmp (E(k).type, 'CIRCLE'))
 %!     Q = Q.circle (E(k).pts, E(k).radius);
 %!   elseif (strcmp (E(k).type, 'POLYLINE'))
-%!     Q = Q.polyline (E(k).pts, E(k).closed);
+%!     Q = Q.polyline (geom.Polyline (E(k).pts, 'Closed', E(k).closed));
 %!   else
 %!     Q = Q.line (E(k).pts(1,:), E(k).pts(2,:));
 %!   endif

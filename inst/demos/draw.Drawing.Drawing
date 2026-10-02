@@ -3,7 +3,8 @@
 %! ## method returns a new drawing and the methods chain.
 %!
 %! D = draw.Drawing ('plate');
-%! D = D.polyline ([0, 0; 80, 0; 80, 50; 0, 50], true).circle ([40, 25], 12);
+%! D = D.polyline (geom.Polyline ([0, 0; 80, 0; 80, 50; 0, 50], ...
+%!                                'Closed', true)).circle ([40, 25], 12);
 %! numentities (D)
 %! [B, W, H] = bbox (D)
 %! plot (D);

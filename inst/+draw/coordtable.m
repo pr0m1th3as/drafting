@@ -117,8 +117,8 @@ function D = coordtable (P, ORIGIN, varargin)
   ## Frame, one rule per row, one per column boundary
   top = ORIGIN(2);
   bot = top - (n + 1) * rowh;
-  D = D.polyline ([ORIGIN(1), bot; ORIGIN(1) + W, bot; ...
-                   ORIGIN(1) + W, top; ORIGIN(1), top], true);
+  D = D.polyline (geom.Polyline ([ORIGIN(1), bot; ORIGIN(1) + W, bot; ...
+                   ORIGIN(1) + W, top; ORIGIN(1), top], 'Closed', true));
   for r = 1:n
     y = top - r * rowh;
     D = D.line ([ORIGIN(1), y], [ORIGIN(1) + W, y]);
@@ -153,7 +153,7 @@ endfunction
 %! P = (30 + 4 * cos (7 * t)) .* [cos(t), sin(t)];
 %! pts = geom.resample (P, 10, true);
 %!
-%! D = draw.Drawing ().polyline (P, true);
+%! D = draw.Drawing ().polyline (geom.Polyline (P, 'Closed', true));
 %! D.Colour = 'red';
 %! for k = 1:rows (pts)
 %!   D = D.circle (pts(k,:), 1);

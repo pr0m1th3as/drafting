@@ -172,7 +172,7 @@ endfunction
 %! P = (30 + 5 * cos (6 * t)) .* [cos(t), sin(t)];
 %! Q = geom.resample (P, 24, true);
 %!
-%! D = draw.Drawing ().polyline (P, true);
+%! D = draw.Drawing ().polyline (geom.Polyline (P, 'Closed', true));
 %! D.Colour = 'red';
 %! for k = 1:rows (Q)
 %!   D = D.circle (Q(k,:), 1);
@@ -186,9 +186,9 @@ endfunction
 %! ## which only ever removes points and so can never invent a chord across one.
 %!
 %! P = [0, 0; 40, 0; 40, 30];
-%! D = draw.Drawing ().polyline (P);
+%! D = draw.Drawing ().polyline (geom.Polyline (P));
 %! D.Colour = 'red';
-%! D = D.polyline (geom.resample (P, 6));
+%! D = D.polyline (geom.Polyline (geom.resample (P, 6)));
 %! plot (D);
 %! title ('the corner is cut when the samples straddle it');
 

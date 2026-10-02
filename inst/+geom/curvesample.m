@@ -149,7 +149,7 @@ endfunction
 %! printf ('%d points for a chord never more than 0.05 mm off the curve\n', ...
 %!         rows (P));
 %!
-%! D = draw.Drawing ().polyline (P, true);
+%! D = draw.Drawing ().polyline (geom.Polyline (P, 'Closed', true));
 %! D.Colour = 'red';
 %! for k = 1:4:rows (P)
 %!   D = D.circle (P(k,:), 0.6);

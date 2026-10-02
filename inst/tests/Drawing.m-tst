@@ -78,29 +78,27 @@
 
 %!test  # a polyline is open unless told otherwise
 %! P = [0, 0; 10, 0; 10, 10];
-%! D = draw.Drawing ().polyline (P);
+%! D = draw.Drawing ().polyline (geom.Polyline (P));
 %! assert_equal (D.Entities(1).type, 'polyline');
 %! assert_equal (D.Entities(1).pts, P);
 %! assert_equal (D.Entities(1).closed, false);
 %!test  # the closed flag closes it without repeating the first vertex
 %! P = [0, 0; 10, 0; 10, 10; 0, 10];
-%! D = draw.Drawing ().polyline (P, true);
+%! D = draw.Drawing ().polyline (geom.Polyline (P, 'Closed', true));
 %! assert_equal (D.Entities(1).closed, true);
 %! assert_equal (rows (D.Entities(1).pts), 4);
 %!test  # a numeric flag is accepted and stored as a logical
-%! D = draw.Drawing ().polyline ([0, 0; 1, 1], 1);
+%! D = draw.Drawing ().polyline (geom.Polyline ([0, 0; 1, 1], 'Closed', 1));
 %! assert_equal (D.Entities(1).closed, true);
 %! assert_equal (islogical (D.Entities(1).closed), true);
 %!error<draw.Drawing.polyline: invalid number of input arguments.> ...
 %! draw.Drawing ().polyline ()
-%!error<draw.Drawing.polyline: P must be an N-by-2 matrix of point coordinates.> ...
-%! draw.Drawing ().polyline ([0, 0, 0; 1, 1, 1])
-%!error<draw.Drawing.polyline: P must not contain NaN or Inf values.> ...
-%! draw.Drawing ().polyline ([0, 0; NaN, 1])
-%!error<draw.Drawing.polyline: P must contain at least 2 vertices.> ...
-%! draw.Drawing ().polyline ([0, 0])
-%!error<draw.Drawing.polyline: CLOSED must be a logical scalar.> ...
-%! draw.Drawing ().polyline ([0, 0; 1, 1], [true, false])
+%!error<draw.Drawing.polyline: PL must be a geom.Polyline object.> ...
+%! draw.Drawing ().polyline ([0, 0; 1, 1])
+%!error<draw.Drawing.polyline: PL must lie in the xy plane.> ...
+%! draw.Drawing ().polyline (geom.Polyline ([0, 0; 1, 1], 'Normal', [1, 0, 0]))
+%!error<draw.Drawing.polyline: PL must lie in the xy plane.> ...
+%! draw.Drawing ().polyline (geom.Polyline ([0, 0; 1, 1], 'Origin', [0, 0, 5]))
 
 %!test  # arc keeps its centre, radius and both angles
 %! D = draw.Drawing ().arc ([10, 20], 5, 30, 120);
@@ -234,7 +232,7 @@
 %! assert_equal (H, []);
 %!test  # a polyline agrees with geom.bbox on the same points
 %! P = [0, 0; 1600, 0; 1600, 1800; 0, 1800];
-%! D = draw.Drawing ().polyline (P, true);
+%! D = draw.Drawing ().polyline (geom.Polyline (P, 'Closed', true));
 %! [B, W, H] = D.bbox ();
 %! assert_equal (B, geom.bbox (P));
 %! assert_equal ([W, H], [1600, 1800]);
@@ -263,7 +261,8 @@
 
 %!test  # a mixed drawing keeps one uniform field set across every entity
 %! D = draw.Drawing ('mixed');
-%! D = D.line ([0, 0], [1, 0]).polyline ([0, 0; 1, 1; 2, 0], true);
+%! D = D.line ([0, 0], [1, 0]).polyline (geom.Polyline ([0, 0; 1, 1; 2, 0], ...
+%!                                                      'Closed', true));
 %! D = D.arc ([0, 0], 1, 0, 90).circle ([0, 0], 2).text ([0, 0], 'A');
 %! D = D.hatch ([0, 0; 1, 0; 1, 1]).dim ([0, 0], [1, 0], 5);
 %! assert_equal (numel (D.Entities), 7);
@@ -534,15 +533,15 @@
 %! assert_equal (max (E(1).pts(:,2)) > max (E(1).pts(:,1)), true);
 
 %!test  # a bulge of one makes a semicircle on the chord it spans
-%! D = draw.Drawing ().polyline ([0, 0; 20, 0], false, [1, 0]);
+%! D = draw.Drawing ().polyline (geom.Polyline ([0, 0, 1; 20, 0, 0]));
 %! E = entities (D, 'bulges', 'flatten', 'dimensions', 'explode');
 %! r = sqrt (sum ((E(1).pts - [10, 0]) .^ 2, 2));
 %! assert_equal (r, 10 * ones (rows (E(1).pts), 1), 1e-6);
 
 %!test  # a positive bulge is the counter-clockwise arc, which lies to the
 %!       # RIGHT of the direction of travel; a negative one to the left
-%! Dp = draw.Drawing ().polyline ([0, 0; 20, 0], false, [1, 0]);
-%! Dn = draw.Drawing ().polyline ([0, 0; 20, 0], false, [-1, 0]);
+%! Dp = draw.Drawing ().polyline (geom.Polyline ([0, 0, 1; 20, 0, 0]));
+%! Dn = draw.Drawing ().polyline (geom.Polyline ([0, 0, -1; 20, 0, 0]));
 %! Ep = entities (Dp, 'bulges', 'flatten', 'dimensions', 'explode');
 %! En = entities (Dn, 'bulges', 'flatten', 'dimensions', 'explode');
 %! assert_equal (min (Ep(1).pts(:,2)) < 0, true);
@@ -551,7 +550,7 @@
 %!test  # a quarter-circle bulge pins the convention exactly: from (0,0) to
 %!       # (10,10) counter-clockwise the centre is (0,10), not (10,0)
 %! b = tand (22.5);
-%! D = draw.Drawing ().polyline ([0, 0; 10, 10], false, [b, 0]);
+%! D = draw.Drawing ().polyline (geom.Polyline ([0, 0, b; 10, 10, 0]));
 %! E = entities (D, 'bulges', 'flatten', 'dimensions', 'explode');
 %! P = E(1).pts;
 %! d = abs (sqrt (sum ((P - [0, 10]) .^ 2, 2)) - 10);
@@ -560,24 +559,40 @@
 %! assert_equal (P(end,:), [10, 10], 1e-9);
 
 %!test  # a zero bulge leaves the segment straight
-%! D = draw.Drawing ().polyline ([0, 0; 10, 0; 10, 10], false, [0, 0, 0]);
+%! PL = geom.Polyline ([0, 0, 0; 10, 0, 0; 10, 10, 0]);
+%! D = draw.Drawing ().polyline (PL);
 %! E = entities (D, 'bulges', 'flatten', 'dimensions', 'explode');
 %! assert_equal (E(1).pts, [0, 0; 10, 0; 10, 10], 1e-12);
 
 %!test  # arcs and straight runs mix in one polyline, which is the point
-%! D = draw.Drawing ().polyline ([0, 0; 20, 0; 20, 10], false, [1, 0, 0]);
+%! PL = geom.Polyline ([0, 0, 1; 20, 0, 0; 20, 10, 0]);
+%! D = draw.Drawing ().polyline (PL);
 %! E = entities (D, 'bulges', 'flatten', 'dimensions', 'explode');
 %! assert_equal (rows (E(1).pts) > 4, true);
 %! assert_equal (E(1).pts(end,:), [20, 10], 1e-12);
 
 %!test  # kept rather than flattened, the bulge survives to the entity
-%! D = draw.Drawing ().polyline ([0, 0; 20, 0], false, [1, 0]);
+%! D = draw.Drawing ().polyline (geom.Polyline ([0, 0, 1; 20, 0, 0]));
 %! E = entities (D, 'dimensions', 'explode');
 %! assert_equal (E(1).bulge, [1, 0]);
 %! assert_equal (rows (E(1).pts), 2);
 
-%!error<draw.Drawing.polyline: BULGE must hold one real finite value per vertex.> ...
-%! draw.Drawing ().polyline ([0, 0; 1, 0; 2, 0], false, [1, 0])
+%!test  # a polyline with its own origin and x axis in the xy plane
+%! PL = geom.Polyline ([0, 0, 1; 10, 0, 0], 'Origin', [5, 5, 0], ...
+%!                     'XAxis', [0, 1, 0]);
+%! E = entities (draw.Drawing ().polyline (PL), 'dimensions', 'explode');
+%! assert_equal (E(1).pts, [5, 5; 5, 15], 1e-12);
+%! assert_equal (E(1).bulge, [1, 0]);
+
+%!test  # a plane facing down is mirrored seen from above: the arc keeps its
+%!       # true side, and its bulge changes sign
+%! PL = geom.Polyline ([0, 0, 1; 20, 0, 0], 'Normal', [0, 0, -1]);
+%! D = draw.Drawing ().polyline (PL);
+%! E = entities (D, 'dimensions', 'explode');
+%! assert_equal (E(1).pts, [0, 0; -20, 0], 1e-12);
+%! assert_equal (E(1).bulge, [-1, 0]);
+%! F = entities (D, 'bulges', 'flatten', 'dimensions', 'explode');
+%! assert_equal (min (F(1).pts(:,2)), -10, 1e-6);
 %!error<draw.Drawing.ellipse: A must be a real positive finite scalar.> ...
 %! draw.Drawing ().ellipse ([0, 0], 0, 5)
 %!error<draw.Drawing.ellipse: ROT must be a real finite scalar.> ...
@@ -889,7 +904,7 @@
 %! f = figure ('visible', 'off');
 %! unwind_protect
 %!   P = [0, 0; 1, 0; 1, 1];
-%!   H = plot (draw.Drawing ().polyline (P, true), ...
+%!   H = plot (draw.Drawing ().polyline (geom.Polyline (P, 'Closed', true)), ...
 %!                  'Axes', axes ('parent', f));
 %!   assert_equal (numel (get (H(1), 'xdata')), 4);
 %! unwind_protect_cleanup
@@ -969,7 +984,8 @@
 
 %!test  # the sheet is the size asked for, and the scale is reported
 %! fn = tempname ();
-%! D = draw.Drawing ().polyline ([0, 0; 200, 0; 200, 120; 0, 120], true);
+%! PL = geom.Polyline ([0, 0; 200, 0; 200, 120; 0, 120], 'Closed', true);
+%! D = draw.Drawing ().polyline (PL);
 %! unwind_protect
 %!   [P, S] = print (D, [fn, '.pdf'], 'Paper', 'A3');
 %!   assert_equal (P, [420, 297]);
@@ -980,7 +996,8 @@
 
 %!test  # portrait swaps the sheet
 %! fn = tempname ();
-%! D = draw.Drawing ().polyline ([0, 0; 100, 0; 100, 100; 0, 100], true);
+%! PL = geom.Polyline ([0, 0; 100, 0; 100, 100; 0, 100], 'Closed', true);
+%! D = draw.Drawing ().polyline (PL);
 %! unwind_protect
 %!   P = print (D, [fn, '.pdf'], 'Paper', 'A4', 'Orientation', 'portrait');
 %!   assert_equal (P, [210, 297]);
@@ -991,7 +1008,7 @@
 %!test  # the fitted scale comes from the preferred series
 %! fn = tempname ();
 %! P = [0, 0; 20000, 0; 20000, 12000; 0, 12000];
-%! D = draw.Drawing ().polyline (P, true);
+%! D = draw.Drawing ().polyline (geom.Polyline (P, 'Closed', true));
 %! unwind_protect
 %!   [~, S] = print (D, [fn, '.pdf'], 'Paper', 'A4');
 %!   assert_equal (any (S == [1, 2, 5, 10, 20, 50, 100, 200, 500]), true);
@@ -1001,7 +1018,8 @@
 
 %!test  # an explicit scale is honoured, not refitted
 %! fn = tempname ();
-%! D = draw.Drawing ().polyline ([0, 0; 200, 0; 200, 120; 0, 120], true);
+%! PL = geom.Polyline ([0, 0; 200, 0; 200, 120; 0, 120], 'Closed', true);
+%! D = draw.Drawing ().polyline (PL);
 %! unwind_protect
 %!   [~, S] = print (D, [fn, '.pdf'], 'Paper', 'A3', 'Scale', 5);
 %!   assert_equal (S, 5);
@@ -1047,7 +1065,7 @@
 %!test  # the layer travels with the entity
 %! D = draw.Drawing ();
 %! D.Layer = 'outline';
-%! D = D.polyline ([0, 0; 1, 0; 1, 1], true);
+%! D = D.polyline (geom.Polyline ([0, 0; 1, 0; 1, 1], 'Closed', true));
 %! E = entities (D, 'dimensions', 'explode');
 %! assert_equal (E(1).type, 'POLYLINE');
 %! assert_equal (E(1).layer, 'outline');
@@ -1240,7 +1258,8 @@
 %! unwind_protect
 %!   D = draw.Drawing ('rt');
 %!   D.Layer = 'outline';
-%!   D = D.polyline ([0, 0; 1600, 0; 1600, 1800; 0, 1800], true);
+%!   D = D.polyline (geom.Polyline ([0, 0; 1600, 0; 1600, 1800; 0, 1800], ...
+%!                                  'Closed', true));
 %!   D.Layer = 'inner';
 %!   D = D.line ([100, 100], [1500, 100]).circle ([800, 900], 50);
 %!   dxf.write (fn, entities (D, 'dimensions', 'explode'));
@@ -1304,8 +1323,9 @@
 %! assert_equal (! isempty (strfind (S, 'x=1mm, y=1mm')), true);
 
 %!test  # an open polyline is not cycled and a closed one is
-%! So = tikz (draw.Drawing ().polyline ([0, 0; 1, 0; 1, 1]));
-%! Sc = tikz (draw.Drawing ().polyline ([0, 0; 1, 0; 1, 1], true));
+%! So = tikz (draw.Drawing ().polyline (geom.Polyline ([0, 0; 1, 0; 1, 1])));
+%! Sc = tikz (draw.Drawing ().polyline (geom.Polyline ([0, 0; 1, 0; 1, 1], ...
+%!                                                     'Closed', true)));
 %! assert_equal (! isempty (strfind (So, '(0,0) -- (1,0) -- (1,1);')), true);
 %! assert_equal (! isempty (strfind (Sc, '(1,1) -- cycle;')), true);
 
@@ -1594,7 +1614,8 @@
 %!  bore = draw.Drawing ().circle ([0, 0], 3);
 %!  D = draw.Drawing ('every entity');
 %!  D = D.line ([0, 0], [100, 0]);
-%!  D = D.polyline ([0, 0; 100, 0; 100, 60; 0, 60], true);
+%!  D = D.polyline (geom.Polyline ([0, 0; 100, 0; 100, 60; 0, 60], ...
+%!                                 'Closed', true));
 %!  D = D.arc ([50, 30], 20, 0, 90);
 %!  D = D.circle ([50, 30], 10);
 %!  D = D.ellipse ([20, 45], 8, 4, 30);
@@ -1695,7 +1716,8 @@
 %!test  # portrait swaps the page in the file, not only in the return value
 %! fn = [tempname(), '.pdf'];
 %! unwind_protect
-%!   D = draw.Drawing ().polyline ([0, 0; 100, 0; 100, 150; 0, 150], true);
+%!   PL = geom.Polyline ([0, 0; 100, 0; 100, 150; 0, 150], 'Closed', true);
+%!   D = draw.Drawing ().polyline (PL);
 %!   print (D, fn, 'Paper', 'A4', 'Orientation', 'portrait');
 %!   assert_equal (__mediabox__ (fn), [210, 297], 1);
 %! unwind_protect_cleanup
@@ -1718,7 +1740,8 @@
 %!test  # a model length arrives on paper at the stated scale
 %! fn = [tempname(), '.png'];
 %! unwind_protect
-%!   D = draw.Drawing ().polyline ([0, 0; 100, 0; 100, 50; 0, 50], true);
+%!   PL = geom.Polyline ([0, 0; 100, 0; 100, 50; 0, 50], 'Closed', true);
+%!   D = draw.Drawing ().polyline (PL);
 %!   print (D, fn, 'Paper', 'A3', 'Scale', 1, 'Resolution', 300);
 %!   [w, h] = __inkmm__ (fn, 300);
 %!   assert_equal (w, 100, 1);
@@ -1730,7 +1753,8 @@
 %!test  # halving the scale halves the drawing on paper
 %! fn = [tempname(), '.png'];
 %! unwind_protect
-%!   D = draw.Drawing ().polyline ([0, 0; 100, 0; 100, 50; 0, 50], true);
+%!   PL = geom.Polyline ([0, 0; 100, 0; 100, 50; 0, 50], 'Closed', true);
+%!   D = draw.Drawing ().polyline (PL);
 %!   print (D, fn, 'Paper', 'A3', 'Scale', 2, 'Resolution', 300);
 %!   [w, h] = __inkmm__ (fn, 300);
 %!   assert_equal (w, 50, 1);
@@ -1743,7 +1767,8 @@
 %!      # that fits it
 %! fn = [tempname(), '.pdf'];
 %! unwind_protect
-%!   D = draw.Drawing ().polyline ([0, 0; 250, 0; 250, 170; 0, 170], true);
+%!   PL = geom.Polyline ([0, 0; 250, 0; 250, 170; 0, 170], 'Closed', true);
+%!   D = draw.Drawing ().polyline (PL);
 %!   [P, S] = print (D, fn, 'Paper', 'A4', 'Scale', 1);
 %!   assert_equal ([P, S], [297, 210, 1]);
 %! unwind_protect_cleanup
@@ -1753,7 +1778,8 @@
 %!test  # text on the drawing does not shift the scale it is printed at
 %! fn = [tempname(), '.png'];
 %! unwind_protect
-%!   D = draw.Drawing ().polyline ([0, 0; 100, 0; 100, 50; 0, 50], true);
+%!   PL = geom.Polyline ([0, 0; 100, 0; 100, 50; 0, 50], 'Closed', true);
+%!   D = draw.Drawing ().polyline (PL);
 %!   D = D.text ([0, 55], 'A LONG LABEL ACROSS THE TOP', 5);
 %!   print (D, fn, 'Paper', 'A3', 'Scale', 1, 'Resolution', 300);
 %!   [w, h] = __inkmm__ (fn, 300);
@@ -1765,7 +1791,8 @@
 %!test  # a raster sheet is the paper asked for, at the resolution asked for
 %! fn = [tempname(), '.png'];
 %! unwind_protect
-%!   D = draw.Drawing ().polyline ([0, 0; 100, 0; 100, 50; 0, 50], true);
+%!   PL = geom.Polyline ([0, 0; 100, 0; 100, 50; 0, 50], 'Closed', true);
+%!   D = draw.Drawing ().polyline (PL);
 %!   print (D, fn, 'Paper', 'A3', 'Scale', 1, 'Resolution', 100);
 %!   I = imread (fn);
 %!   assert_equal ([columns(I), rows(I)] / 100 * 25.4, [420, 297], 1);
@@ -1776,7 +1803,8 @@
 %!test  # the drawing sits centred on the sheet, clear of the frame
 %! fn = [tempname(), '.png'];
 %! unwind_protect
-%!   D = draw.Drawing ().polyline ([0, 0; 200, 0; 200, 120; 0, 120], true);
+%!   PL = geom.Polyline ([0, 0; 200, 0; 200, 120; 0, 120], 'Closed', true);
+%!   D = draw.Drawing ().polyline (PL);
 %!   print (D, fn, 'Paper', 'A4', 'Scale', 1, 'Margin', 10, 'Resolution', 150);
 %!   I = imread (fn);
 %!   if (islogical (I))

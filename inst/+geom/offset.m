@@ -151,11 +151,11 @@ endfunction
 %! ## vertex order are preserved.
 %!
 %! P = [0, 0; 60, 0; 60, 20; 30, 20; 30, 45; 0, 45];
-%! D = draw.Drawing ().polyline (P, true);
+%! D = draw.Drawing ().polyline (geom.Polyline (P, 'Closed', true));
 %! D.Colour = 'red';
-%! D = D.polyline (geom.offset (P, 5), true);
+%! D = D.polyline (geom.Polyline (geom.offset (P, 5), 'Closed', true));
 %! D.Colour = 'blue';
-%! D = D.polyline (geom.offset (P, -5), true);
+%! D = D.polyline (geom.Polyline (geom.offset (P, -5), 'Closed', true));
 %! plot (D);
 %! title ('an L-shaped outline offset 5 mm in (red) and out (blue)');
 

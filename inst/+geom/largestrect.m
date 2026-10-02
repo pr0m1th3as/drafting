@@ -175,9 +175,9 @@ endfunction
 %! P = [0, 0; 60, 0; 60, 20; 30, 20; 30, 45; 0, 45];
 %! [R, B] = geom.largestrect (P, [4, 6, 4, 3])
 %!
-%! D = draw.Drawing ().polyline (P, true);
+%! D = draw.Drawing ().polyline (geom.Polyline (P, 'Closed', true));
 %! D.Colour = 'red';
-%! D = D.polyline (R, true);
+%! D = D.polyline (geom.Polyline (R, 'Closed', true));
 %! plot (D);
 %! title ('the biggest rectangle that fits, after the clearances');
 

@@ -5,7 +5,8 @@
 %!
 %! D = draw.Drawing ('bracket');
 %! D.Layer = 'BODY';
-%! D = D.polyline ([0, 0; 40, 0; 40, 25; 0, 25], true).circle ([20, 12.5], 6);
+%! D = D.polyline (geom.Polyline ([0, 0; 40, 0; 40, 25; 0, 25], ...
+%!                                'Closed', true)).circle ([20, 12.5], 6);
 %! D.Layer = 'AXES';
 %! D.Linetype = 'CENTER';
 %! D.Colour = 'red';

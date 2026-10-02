@@ -174,15 +174,21 @@ endfunction
 %! ## be given so the operation happens about a point rather than the origin.
 %!
 %! P = [0, 0; 30, 0; 30, 10; 10, 10; 10, 20; 0, 20];
-%! D = draw.Drawing ().polyline (P, true);
+%! D = draw.Drawing ().polyline (geom.Polyline (P, 'Closed', true));
 %! D.Colour = 'red';
-%! D = D.polyline (geom.transform (P, 'translate', [45, 0]), true);
+%! D = D.polyline (geom.Polyline (geom.transform (P, 'translate', [45, 0]), ...
+%!                                'Closed', true));
 %! D.Colour = 'blue';
-%! D = D.polyline (geom.transform (P, 'rotate', 90, [15, 10]), true);
+%! PL = geom.Polyline (geom.transform (P, 'rotate', 90, [15, 10]), ...
+%!                     'Closed', true);
+%! D = D.polyline (PL);
 %! D.Colour = 'green';
-%! D = D.polyline (geom.transform (P, 'scale', 0.5, [15, 10]), true);
+%! PL = geom.Polyline (geom.transform (P, 'scale', 0.5, [15, 10]), ...
+%!                     'Closed', true);
+%! D = D.polyline (PL);
 %! D.Colour = 'magenta';
-%! D = D.polyline (geom.transform (P, 'mirror', 'y'), true);
+%! D = D.polyline (geom.Polyline (geom.transform (P, 'mirror', 'y'), ...
+%!                                'Closed', true));
 %! plot (D);
 %! title ('translate, rotate about a point, scale, mirror');
 

@@ -35,7 +35,8 @@ classdef Drawing
   ## @group
   ## D = draw.Drawing ('plate');
   ## D.Layer = 'outline';
-  ## D = D.polyline ([0, 0; 160, 0; 160, 180; 0, 180], true);
+  ## D = D.polyline (geom.Polyline ([0, 0; 160, 0; 160, 180; 0, 180], ...
+  ##                                'Closed', true));
   ## D = D.circle ([80, 90], 25).text ([0, -20], 'PLATE', 3.5);
   ## @end group
   ## @end example
@@ -266,7 +267,8 @@ classdef Drawing
     ## @example
     ## @group
     ## D = draw.Drawing ('plate');
-    ## D = D.polyline ([0, 0; 80, 0; 80, 50; 0, 50], true);
+    ## D = D.polyline (geom.Polyline ([0, 0; 80, 0; 80, 50; 0, 50], ...
+    ##                                'Closed', true));
     ## D = D.circle ([40, 25], 12);
     ## @end group
     ## @end example
@@ -457,62 +459,55 @@ classdef Drawing
 
 
     ## -*- texinfo -*-
-    ## @deftypefn  {draw.Drawing} {@var{D} =} polyline (@var{D}, @var{P})
-    ## @deftypefnx {draw.Drawing} {@var{D} =} polyline (@var{D}, @var{P}, @var{CLOSED})
-    ## @deftypefnx {draw.Drawing} {@var{D} =} polyline (@dots{}, @var{BULGE})
+    ## @deftypefn {draw.Drawing} {@var{D} =} polyline (@var{D}, @var{PL})
     ##
-    ## Append a polyline through the vertices given as rows of @var{P}.
+    ## Append a polyline.
     ##
-    ## @var{P} is an @math{N}-by-2 matrix in millimetres with at least two
-    ## rows.  @var{CLOSED} is a logical scalar, @code{false} by default; when
-    ## it is @code{true} the polyline closes back onto its first vertex.
+    ## @code{@var{D} = polyline (@var{D}, @var{PL})} appends the
+    ## @code{geom.Polyline} @var{PL}, open or closed, its arcs drawn as arcs.
+    ## A polyline of arcs and lines together is how a slot, a rounded plate or
+    ## an obround is drawn as one entity rather than as a handful that a later
+    ## edit can pull apart:
     ##
-    ## A closed polyline must @strong{not} repeat its first vertex at the end.
-    ## The closed flag does that work, which is the implicitly closed
-    ## convention the @code{geom} namespace uses throughout.
+    ## @example
+    ## @group
+    ## D = draw.Drawing ();
+    ## D = D.polyline (geom.Polyline ([0, 0; 80, 0; 80, 50; 0, 50], ...
+    ##                                'Closed', true));
+    ## D = D.polyline (geom.Polyline ([0, -6, 0; 40, -6, 1; 40, 6, 0; ...
+    ##                                 0, 6, 1], 'Closed', true));
+    ## @end group
+    ## @end example
     ##
-    ## @var{BULGE} gives one value per vertex, turning the segment that leaves
-    ## that vertex into a circular arc.  The value is the tangent of a quarter
-    ## of the arc's included angle, which is the convention DXF uses: zero is a
-    ## straight segment and 1 a semicircle.
+    ## A drawing is flat, so @var{PL} must lie in its @math{xy} plane.  Its
+    ## plane may still have its own origin and @math{x} axis there, and may
+    ## face down: the vertices are carried into the drawing's coordinates, and
+    ## an arc keeps its true sense seen from above.
     ##
-    ## A @strong{positive} bulge is the arc that runs counter-clockwise from the
-    ## vertex to the next, which places it to the @emph{right} of the direction
-    ## of travel; a negative one runs clockwise, to the left.  That is worth
-    ## reading twice, because the sign is easy to guess backwards: an arc from
-    ## @code{[0, 0]} to @code{[20, 0]} with a bulge of 1 dips @emph{below} the
-    ## chord.  A polyline of arcs and lines together is how a slot, a
-    ## rounded plate or an obround is drawn as one entity rather than as a
-    ## handful that a later edit can pull apart.
-    ##
+    ## @seealso{geom.Polyline}
     ## @end deftypefn
-    function this = polyline (this, P, CLOSED = false, BULGE = [])
+    function this = polyline (this, PL)
 
-      if (nargin < 2 || nargin > 4)
+      if (nargin != 2)
         error ("draw.Drawing.polyline: invalid number of input arguments.");
       endif
-      errmsg = checkpts (P);
-      if (! isempty (errmsg))
-        error ("draw.Drawing.polyline: P %s", errmsg);
+      if (! isa (PL, 'geom.Polyline') || ! isscalar (PL))
+        error ("draw.Drawing.polyline: PL must be a geom.Polyline object.");
       endif
-      if (rows (P) < 2)
-        error (strcat ("draw.Drawing.polyline: P must contain at least 2", ...
-                       " vertices."));
-      endif
-      if (! (islogical (CLOSED) || isnumeric (CLOSED)) || ! isscalar (CLOSED))
-        error ("draw.Drawing.polyline: CLOSED must be a logical scalar.");
+      if (abs (PL.Normal(3)) < 1 - 1e-9 || abs (PL.Origin(3)) > 1e-9)
+        error ("draw.Drawing.polyline: PL must lie in the xy plane.");
       endif
 
+      ## Into the drawing's coordinates; a plane facing down is mirrored seen
+      ## from above, which reverses the sense of every arc
+      V = PL.Vertices;
+      W = PL.Origin(1:2) + V(:,1) * PL.XAxis(1:2) + V(:,2) * PL.YAxis(1:2);
+      b = V(:,3)' * sign (PL.Normal(3));
       e = makeentity ('polyline', this.Layer, this.Linetype, this.Colour);
-      e.pts = double (P);
-      e.closed = logical (CLOSED);
-      if (! isempty (BULGE))
-        if (! isnumeric (BULGE) || ! isreal (BULGE) || ! isvector (BULGE) ...
-            || numel (BULGE) != rows (P) || ! all (isfinite (BULGE)))
-          error (strcat ("draw.Drawing.polyline: BULGE must hold one real", ...
-                         " finite value per vertex."));
-        endif
-        e.bulge = BULGE(:)';
+      e.pts = W;
+      e.closed = PL.Closed;
+      if (any (b != 0))
+        e.bulge = b;
       endif
       this.Entities(end+1) = e;
 

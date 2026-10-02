@@ -78,7 +78,7 @@ endfunction
 %! L = [0, 0; 60, 0; 60, 15; 20, 15; 20, 50; 0, 50];
 %! C = geom.centroid (L)
 %!
-%! D = draw.Drawing ().polyline (L, true);
+%! D = draw.Drawing ().polyline (geom.Polyline (L, 'Closed', true));
 %! D.Colour = 'red';
 %! D.Linetype = 'CENTER';
 %! D = D.centremark (C, 8);
