@@ -2185,6 +2185,263 @@ topieces (const vector<piece>& pieces)
   return c;
 }
 
+
+// The convex hull of points and circular arcs
+
+// A point, or an arc of the circle about C of radius R running anticlockwise
+// from the angle A0 to A1
+struct prim
+{
+  pt c;
+  double r = 0;
+  double a0 = 0, a1 = 0;
+  bool arc = false;
+};
+
+double
+wrap (double a)
+{
+  a = std::fmod (a, 2 * M_PI);
+  return (a < 0) ? a + 2 * M_PI : a;
+}
+
+pt
+dirn (double t)
+{
+  return pt {std::cos (t), std::sin (t)};
+}
+
+// Whether the arc K holds the direction T
+bool
+holds (const prim& k, double t)
+{
+  return ! k.arc || wrap (t - k.a0) <= (k.a1 - k.a0) + 1e-12;
+}
+
+double
+support (const prim& k, double t)
+{
+  return dot (k.c, dirn (t)) + k.r;
+}
+
+pt
+touch (const prim& k, double t)
+{
+  return k.c + k.r * dirn (t);
+}
+
+// The first direction after T at which J comes to reach further than K
+double
+overtakes (const prim& k, const prim& j, double t)
+{
+  const pt d = j.c - k.c;
+  const double D = len (d);
+  const double dr = k.r - j.r;
+  if (D <= 1e-14 * (1 + len (k.c)) || std::abs (dr) > D * (1 + 1e-12))
+  {
+    return INFINITY;
+  }
+  const double b = std::acos (std::min (1.0, std::max (-1.0, dr / D)));
+  double th = std::atan2 (d.y, d.x) - b;
+  th = t + wrap (th - t);
+  if (th <= t + 1e-12)
+  {
+    th += 2 * M_PI;
+  }
+  return holds (j, th) ? th : INFINITY;
+}
+
+// The points P that the hull of them passes through, by Andrew's monotone
+// chain, those in a line with their neighbours left out
+vector<pt>
+pointhull (vector<pt> P)
+{
+  std::sort (P.begin (), P.end (), [] (const pt& a, const pt& b)
+             { return a.x < b.x || (a.x == b.x && a.y < b.y); });
+  if (P.size () < 3)
+  {
+    return P;
+  }
+  vector<pt> H (2 * P.size ());
+  size_t k = 0;
+  for (size_t i = 0; i < P.size (); i++)
+  {
+    while (k >= 2 && cross (H[k-1] - H[k-2], P[i] - H[k-2]) <= 0)
+    {
+      k--;
+    }
+    H[k++] = P[i];
+  }
+  for (size_t i = P.size () - 1, t = k + 1; i-- > 0; )
+  {
+    while (k >= t && cross (H[k-1] - H[k-2], P[i] - H[k-2]) <= 0)
+    {
+      k--;
+    }
+    H[k++] = P[i];
+  }
+  H.resize (k - 1);
+  return H;
+}
+
+// The hull of the points P and the arcs A, its boundary anticlockwise as
+// pieces: lines from one point to the next, and arcs through three points,
+// none of more than half a turn
+vector<piece>
+hull (const vector<pt>& P, const vector<prim>& A)
+{
+  vector<prim> K;
+  vector<pt> Q = P;
+  for (const prim& a : A)
+  {
+    Q.push_back (touch (a, a.a0));
+    Q.push_back (touch (a, a.a1));
+  }
+  for (const pt& p : pointhull (Q))
+  {
+    prim k;
+    k.c = p;
+    K.push_back (k);
+  }
+  K.insert (K.end (), A.begin (), A.end ());
+  vector<piece> out;
+  if (K.empty ())
+  {
+    return out;
+  }
+  double scale = 1;
+  for (const prim& k : K)
+  {
+    scale = std::max (scale, len (k.c) + k.r);
+  }
+
+  // Whichever reaches furthest just after the direction T, of those in IDX;
+  // of two that reach as far, the arc, which goes on reaching further
+  auto best = [&] (const vector<size_t>& idx, double t)
+  {
+    size_t b = idx[0];
+    double hb = -INFINITY;
+    for (size_t i : idx)
+    {
+      if (! holds (K[i], t + 1e-9))
+      {
+        continue;
+      }
+      const double h = support (K[i], t + 1e-9);
+      if (h > hb + 1e-12 * scale
+          || (h >= hb - 1e-12 * scale && K[i].r > K[b].r))
+      {
+        hb = std::max (h, hb);
+        b = i;
+      }
+    }
+    return b;
+  };
+  vector<size_t> all (K.size ());
+  for (size_t i = 0; i < K.size (); i++)
+  {
+    all[i] = i;
+  }
+
+  // Turn the direction round once from T0, following whichever reaches
+  // furthest: along an arc while it does, then by a line to the next
+  const double t0 = 0;
+  size_t cur = best (all, t0);
+  double t = t0;
+  const pt start = touch (K[cur], t0);
+  pt from = start;
+  auto arcto = [&] (const prim& k, double a, double b)
+  {
+    // The arc of K from the direction A to B, in halves over half a turn
+    const int n = (b - a > M_PI + 1e-9) ? 2 : 1;
+    for (int i = 0; i < n; i++)
+    {
+      const double u = a + (b - a) * i / n, v = a + (b - a) * (i + 1) / n;
+      if (v - u > 1e-12)
+      {
+        const pt e = touch (k, v);
+        out.push_back (piece {1, {from, touch (k, (u + v) / 2), e}, {}});
+        from = e;
+      }
+    }
+  };
+  for (size_t guard = 0; guard < 4 * K.size () + 8; guard++)
+  {
+    // The next direction at which another takes over, or the arc ends; the
+    // next is then whichever reaches furthest just after it
+    double tn = INFINITY;
+    if (K[cur].arc)
+    {
+      const double end = t + wrap (K[cur].a1 - t);
+      if (end > t + 1e-12)
+      {
+        tn = end;
+      }
+    }
+    for (size_t j = 0; j < K.size (); j++)
+    {
+      if (j == cur)
+      {
+        continue;
+      }
+      tn = std::min (tn, overtakes (K[cur], K[j], t));
+    }
+    const bool last = tn >= t0 + 2 * M_PI - 1e-12;
+    const double te = last ? t0 + 2 * M_PI : tn;
+    if (K[cur].arc)
+    {
+      arcto (K[cur], t, te);
+    }
+    else
+    {
+      from = K[cur].c;
+    }
+    if (last)
+    {
+      if (len (start - from) > 1e-12 * scale)
+      {
+        out.push_back (piece {0, {from, start}, {}});
+      }
+      else if (! out.empty ())
+      {
+        out.back ().P.back () = start;
+      }
+      break;
+    }
+    const size_t nxt = best (all, tn);
+    const pt b = touch (K[nxt], tn);
+    if (len (b - from) > 1e-12 * scale)
+    {
+      out.push_back (piece {0, {from, b}, {}});
+      from = b;
+    }
+    cur = nxt;
+    t = tn;
+  }
+  return out;
+}
+
+Cell
+hullpieces (const vector<piece>& pieces)
+{
+  Cell c (1, pieces.size ());
+  for (size_t i = 0; i < pieces.size (); i++)
+  {
+    const piece& p = pieces[i];
+    octave_scalar_map m;
+    m.assign ("type", p.type == 0 ? "line" : "arc");
+    Matrix P (p.P.size (), 3, 0.0);
+    for (size_t k = 0; k < p.P.size (); k++)
+    {
+      P(k,0) = p.P[k].x;
+      P(k,1) = p.P[k].y;
+    }
+    m.assign ("points", P);
+    c(i) = m;
+  }
+  return c;
+}
+
 }
 
 DEFUN_DLD (__mesh__, args, ,
@@ -2234,6 +2491,30 @@ Undocumented internal function.\n\
                                       args(5).double_value (),
                                       args(6).double_value (),
                                       args(7).double_value ())));
+  }
+
+  // PIECES = __mesh__ ('hull', caller, P, A): the hull of the points P,
+  // N-by-2, and the arcs A, rows of centre, radius and the angles they run
+  // between anticlockwise, as lines and arcs anticlockwise
+  else if (cmd == "hull")
+  {
+    const Matrix P = args(2).matrix_value ();
+    const Matrix A = args(3).matrix_value ();
+    vector<pt> q (P.rows ());
+    for (octave_idx_type i = 0; i < P.rows (); i++)
+    {
+      q[i] = pt {P(i,0), P(i,1)};
+    }
+    vector<prim> a (A.rows ());
+    for (octave_idx_type i = 0; i < A.rows (); i++)
+    {
+      a[i].c = pt {A(i,0), A(i,1)};
+      a[i].r = A(i,2);
+      a[i].a0 = wrap (A(i,3));
+      a[i].a1 = a[i].a0 + std::min (2 * M_PI, A(i,4) - A(i,3));
+      a[i].arc = true;
+    }
+    return ovl (hullpieces (hull (q, a)));
   }
 
   error ("__mesh__: unknown command '%s'.", cmd.c_str ());

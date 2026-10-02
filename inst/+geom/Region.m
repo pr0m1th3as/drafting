@@ -582,6 +582,90 @@ classdef Region
 
     endfunction
 
+    ## -*- texinfo -*-
+    ## @deftypefn {geom.Region} {@var{R} =} hull (@var{R1}, @var{R2}, @dots{})
+    ##
+    ## The convex hull of regions and points.
+    ##
+    ## @code{@var{R} = hull (@var{R1}, @var{R2}, @dots{})} returns the
+    ## smallest convex region that holds every region and point given, the
+    ## shape a band stretched round them takes, as a @code{geom.Region} in the
+    ## @code{geom.UCS} of @var{R1}.  Each argument after the first is a
+    ## region, a cell array of regions, such as @code{geom.Region.union}
+    ## returns, or an @math{N}-by-2 matrix of points in the coordinates of that
+    ## UCS.  Every region must lie in the plane of the first; only outlines
+    ## count, since a hole cannot reach the hull.
+    ##
+    ## The hull is exact where the regions are made of lines and arcs: where
+    ## it passes from one to the next its edge is a straight line truly
+    ## tangent to the arcs it leaves and meets, and where an arc reaches
+    ## furthest the hull follows the arc.  This is OpenSCAD's @code{hull} of
+    ## 2-D shapes, which there are polygons of facets: the outline of a lever
+    ## from the circles at its ends, of a bracket from its bosses, or of a
+    ## plate rounded from four circles.  A spline is taken as points along
+    ## it, the curve turning a tenth of a degree from one to the next.
+    ##
+    ## @example
+    ## @group
+    ## ## A lever: bosses of radius 10 and 5, 40 apart, and its bores
+    ## C = @@(x, r) geom.Region ([x - r, 0, 1; x + r, 0, 1]);
+    ## L = hull (C (0, 10), C (40, 5));
+    ## L = subtract (L, C (0, 5), C (40, 2.5));
+    ## @end group
+    ## @end example
+    ##
+    ## It is computed without Open CASCADE.
+    ##
+    ## @seealso{geom.Region.union, geom.Region.offset}
+    ## @end deftypefn
+    function R = hull (varargin)
+
+      ## Input validation
+      if (nargin < 1)
+        error ("geom.Region.hull: invalid number of input arguments.");
+      endif
+      L = {};
+      P = zeros (0, 2);
+      for k = 1:nargin
+        a = varargin{k};
+        if (isa (a, 'geom.Region') && isscalar (a))
+          L{end+1} = a;
+        elseif (iscell (a) && all (cellfun (@(r) isa (r, 'geom.Region') ...
+                                             && isscalar (r), a(:)')))
+          L = [L, a(:)'];
+        elseif (k > 1 && isnumeric (a) && isreal (a) && ismatrix (a) ...
+                && columns (a) == 2 && all (isfinite (a(:))))
+          P = [P; double(a)];
+        else
+          error (strcat ("geom.Region.hull: every argument must be a", ...
+                         " geom.Region object, a cell array of them, or", ...
+                         " after the first an N-by-2 matrix of points."));
+        endif
+      endfor
+      U = L{1}.UCS;
+      A = zeros (0, 5);
+      for k = 1:numel (L)
+        V = L{k}.UCS;
+        scale = max ([1, abs(U.Origin), abs(V.Origin)]);
+        if (abs (V.Normal * U.Normal') < 1 - 1e-9 ...
+            || abs ((V.Origin - U.Origin) * U.Normal') > 1e-9 * scale)
+          error (strcat ("geom.Region.hull: every region must lie in the", ...
+                         " plane of the first."));
+        endif
+        [p, a] = parts (__into__ (L{k}.Outline, U));
+        P = [P; p];
+        A = [A; a];
+      endfor
+
+      ## Convex and anticlockwise by its making, so taken without the checks,
+      ## which take time quadratic in its vertices
+      R = geom.Region ([0, 0; 1, 0; 0, 1]);
+      R.Outline = geom.Path.__loop__ (__mesh__ ('hull', 'geom.Region.hull', ...
+                                                P, A));
+      R.UCS = U;
+
+    endfunction
+
     function this = Region (OUTLINE, HOLES = {})
 
       ## Input validation
@@ -709,6 +793,42 @@ function [errmsg, P] = toloop (ARG, NAME, IN)
   if (! flat (P))
     errmsg = sprintf ("%s must lie in the plane of OUTLINE.", NAME);
   endif
+
+endfunction
+
+## The points and arcs of the closed path Q for a hull: its vertices and the
+## points along its splines as rows of P, and each arc as a row of A, its
+## centre, its radius, and the angles it runs between anticlockwise
+function [P, A] = parts (Q)
+
+  V = Q.Vertices(:,1:2);
+  M = Q.Midpoints;
+  n = rows (V);
+  P = V;
+  A = zeros (0, 5);
+  for i = find (! isnan (M(:,1)))'
+    a = V(i,:);
+    m = M(i,1:2);
+    b = V(mod (i, n) + 1,:);
+    u = a - m;
+    w = b - m;
+    d = 2 * (u(1) * w(2) - u(2) * w(1));
+    c = m + [w(2) * dot(u, u) - u(2) * dot(w, w), ...
+             u(1) * dot(w, w) - w(1) * dot(u, u)] / d;
+    r = norm (a - c);
+    ta = atan2 (a(2) - c(2), a(1) - c(1));
+    tb = atan2 (b(2) - c(2), b(1) - c(1));
+    ccw = (m(1) - a(1)) * (b(2) - m(2)) - (m(2) - a(2)) * (b(1) - m(1)) > 0;
+    if (! ccw)
+      [ta, tb] = deal (tb, ta);
+    endif
+    sweep = mod (tb - ta, 2 * pi);
+    A(end+1,:) = [c, r, ta, ta + sweep];
+  endfor
+  for i = find (! cellfun (@isempty, Q.Splines))'
+    S = __sample__ (Q.Splines{i}, 0.1);
+    P = [P; S(:,1:2)];
+  endfor
 
 endfunction
 
@@ -1226,6 +1346,63 @@ endfunction
 %! offset (geom.Region ([0, 0; 1, 0; 1, 1]), 1, 'Join', 'round')
 %!error<geom.Region.offset: Corners must be 'round', 'sharp' or 'chamfer'.> ...
 %! offset (geom.Region ([0, 0; 1, 0; 1, 1]), 1, 'Corners', 'square')
+
+## A disc of radius R about [X, Y], for the tests
+%!function D = disc (x, y, r)
+%!  D = geom.Region ([x - r, y, 1; x + r, y, 1]);
+%!endfunction
+
+%!test  # a lever from its two bosses, exact
+%! L = hull (disc (0, 0, 10), disc (40, 0, 5));
+%! a = asin (5 / 40);
+%! A = (pi + 2 * a) * 50 + (pi - 2 * a) * 12.5 + sqrt (40 ^ 2 - 25) * 15;
+%! assert_equal (__area__ (L.Outline), A, 1e-9);
+%! assert_equal (nnz (isnan (L.Outline.Midpoints(:,1))), 2);
+
+%!test  # a plate rounded from four circles
+%! H = hull (disc (0, 0, 3), disc (50, 0, 3), disc (50, 30, 3), ...
+%!           {disc(0, 30, 3)});
+%! assert_equal (__area__ (H.Outline), 1500 + 6 * 80 + 9 * pi, 1e-9);
+%! assert_equal (nnz (! isnan (H.Outline.Midpoints(:,1))), 4);
+
+%!test  # points: those inside and in a line with others left out
+%! H = hull (geom.Region ([2, 2; 3, 2; 3, 3]), ...
+%!           [0, 0; 10, 0; 10, 10; 0, 10; 5, 5; 5, 0; 10, 5]);
+%! assert_equal (sortrows (H.Outline.Vertices(:,1:2)), ...
+%!               [0, 0; 0, 10; 10, 0; 10, 10]);
+
+%!test  # a circle and points, against the hull of points along the circle
+%! P = [0, 0; 10, 0; 10, 10; 0, 10];
+%! H = hull (disc (20, 5, 1), P);
+%! t = linspace (0, 2 * pi, 20001)';
+%! Q = [P; 20 + cos(t), 5 + sin(t)];
+%! k = convhull (Q(:,1), Q(:,2));
+%! assert_equal (__area__ (H.Outline), polyarea (Q(k,1), Q(k,2)), -1e-7);
+
+%!test  # holes do not count; in the UCS of the first
+%! U = geom.UCS ([0, 1, 1], [1, 2, 3]);
+%! A = geom.Region ([0, 0; 10, 0; 10, 10; 0, 10], {[4, 4; 6, 4; 6, 6; 4, 6]});
+%! A.UCS = U;
+%! B = disc (15, 5, 2);
+%! B.UCS = U;
+%! H = hull (A, B);
+%! assert_equal (H.UCS, U);
+%! assert_equal (H.Holes, cell (1, 0));
+
+%!test  # a spline outline, to a tenth of a degree
+%! S = geom.Spline ([0, 0; 30, -5; 45, 15; 25, 30; 5, 20], 'Closed', true);
+%! H = hull (geom.Region (S));
+%! Q = points (S, 20001)(:,1:2);
+%! k = convhull (Q(:,1), Q(:,2));
+%! assert_equal (__area__ (H.Outline), polyarea (Q(k,1), Q(k,2)), -1e-6);
+
+%!error<geom.Region.hull: every argument must be a geom.Region object, a cell array of them, or after the first an N-by-2 matrix of points.> ...
+%! hull (geom.Region ([0, 0; 1, 0; 1, 1]), [0, 0, 0])
+%!error<geom.Region.hull: every region must lie in the plane of the first.>
+%! A = geom.Region ([0, 0; 1, 0; 1, 1]);
+%! B = A;
+%! B.UCS = geom.UCS ([0, 0, 1], [0, 0, 1]);
+%! hull (A, B);
 
 %!error<geom.Region.fit: MODE must be 'lines', 'arcs' or 'curves'.> ...
 %! fit (geom.Region ([0, 0; 1, 0; 1, 1]), 'splines')

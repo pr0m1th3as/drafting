@@ -767,25 +767,42 @@ classdef Path
     ## face lying in the plane z = 0
     function P = __loop__ (pieces)
 
-      Q = cell (1, numel (pieces));
+      ## Lines that follow one another make one polyline, so that a loop of
+      ## many short segments is joined in a few pieces
+      Q = {};
+      run = zeros (0, columns (pieces{1}.points));
       for i = 1:numel (pieces)
         c = pieces{i};
-        switch (c.type)
-          case 'line'
-            Q{i} = geom.Path (c.points);
-          case 'arc'
-            Q{i} = geom.Path.arc (c.points(1,:), c.points(2,:), ...
-                                  c.points(3,:));
-          otherwise
-            Q{i} = geom.Spline.nurbs (c.points, ...
-                                      repelem (c.knots', c.mults'), ...
-                                      c.weights);
-        endswitch
+        if (strcmp (c.type, 'line'))
+          if (isempty (run))
+            run = c.points;
+          else
+            run(end+1,:) = c.points(end,:);
+          endif
+          continue;
+        endif
+        if (! isempty (run))
+          Q{end+1} = geom.Path (run);
+          run = zeros (0, columns (c.points));
+        endif
+        if (strcmp (c.type, 'arc'))
+          Q{end+1} = geom.Path.arc (c.points(1,:), c.points(2,:), ...
+                                    c.points(3,:));
+        else
+          Q{end+1} = geom.Spline.nurbs (c.points, ...
+                                        repelem (c.knots', c.mults'), ...
+                                        c.weights);
+        endif
       endfor
-      if (numel (Q) == 1)
+      if (! isempty (run))
+        Q{end+1} = geom.Path (run);
+      endif
+      if (numel (Q) > 1)
+        P = join (Q{:}, 'Tangent', false);
+      elseif (isa (Q{1}, 'geom.Spline'))
         P = geom.Path (Q{1});
       else
-        P = join (Q{:}, 'Tangent', false);
+        P = geom.Path (run(1:end-1,:), 'Closed', true);
       endif
 
     endfunction

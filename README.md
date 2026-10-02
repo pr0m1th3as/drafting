@@ -11,7 +11,7 @@ exchanged as STEP, come through Open CASCADE when the package is built with it.
 
 Forty-six public functions across five namespaces plus the `draw.Drawing`,
 `geom.Polyline`, `geom.Spline`, `geom.Region`, `geom.Path`, `geom.UCS`,
-`solid.Shape` and `solid.Viewer` classes, 1546 built-in self-tests and 67 `%!demo` blocks, nearly all of which
+`solid.Shape` and `solid.Viewer` classes, 1554 built-in self-tests and 67 `%!demo` blocks, nearly all of which
 end in a `plot` call, so the documentation shows what a function does rather
 than only describing it.
 
@@ -48,7 +48,9 @@ and splines, checked to be valid; it is what a solid is made from. A
 which a region is swept; its corners are rounded into bends with `fillet`.
 Regions combine with `union`, `subtract` and `intersect` and grow or shrink
 with `offset`, round, sharp or chamfered at the corners: OpenSCAD's 2-D
-operations, with arcs exact, computed by Open CASCADE. Functions take the
+operations, with arcs exact, computed by Open CASCADE. `hull` wraps regions
+and points as OpenSCAD's `hull` does, its lines truly tangent to the arcs, so
+two circles make a lever and four a rounded plate. Functions take the
 classes; only their constructors take plain matrices.
 
 `draw.Drawing` is a value class carrying lines, polylines with per-vertex

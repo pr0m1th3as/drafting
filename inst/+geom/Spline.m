@@ -191,16 +191,16 @@ classdef Spline
     endfunction
 
     ## Points along the curve from its start to its end, both included, each
-    ## piece cut finely enough that the curve turns by at most 2 degrees from
-    ## one to the next
-    function Q = __sample__ (this)
+    ## piece cut finely enough that the curve turns by at most DEG degrees,
+    ## 2 by default, from one to the next
+    function Q = __sample__ (this, DEG = 2)
 
       u = unique (this.Knots);
       Q = cell (numel (u) - 1, 1);
       for j = 1:numel (u) - 1
         [~, D] = curve (this, [u(j); (u(j) + u(j+1)) / 2; u(j+1)]);
         a = turn (D(1,:), D(2,:)) + turn (D(2,:), D(3,:));
-        k = max (16, ceil (a / (pi / 90)));
+        k = max (16, ceil (a / (DEG * pi / 180)));
         s = u(j) + (u(j+1) - u(j)) * (0:k-1)' / k;
         Q{j} = curve (this, s);
       endfor
