@@ -11,7 +11,7 @@ exchanged as STEP, come through Open CASCADE when the package is built with it.
 
 Forty-four public functions across five namespaces plus the `draw.Drawing`,
 `geom.Polyline`, `geom.Region`, `geom.UCS`, `solid.Shape` and `solid.Viewer`
-classes, 1256 built-in self-tests and 67 `%!demo` blocks, nearly all of which
+classes, 1281 built-in self-tests and 67 `%!demo` blocks, nearly all of which
 end in a `plot` call, so the documentation shows what a function does rather
 than only describing it.
 
@@ -108,9 +108,10 @@ rotation, mirroring and scaling, and volume, area, centroid and bounding box;
 `solid.loft`, `solid.sweep` and `solid.helix` make a solid from a
 `geom.Region`, where the region's plane puts it, its arcs carried as true arcs
 and its holes right through. Methods drill holes (plain, counterbored,
-countersunk, tapping size), round and bevel edges and hollow a shape, on edges
-and faces chosen by kind, direction and position. `solid.read` reads STEP, and
-`solid.write` writes STEP for a CAD program or STL for a slicer:
+countersunk, tapping size), cut pockets, round and bevel edges and hollow a
+shape, on edges and faces chosen by kind, direction and position. `solid.read`
+reads STEP, and `solid.write` writes STEP for a CAD program or STL for a
+slicer:
 
 ```
 plate = solid.box (80, 40, 12);

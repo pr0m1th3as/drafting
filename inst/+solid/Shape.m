@@ -1186,6 +1186,100 @@ classdef Shape
 
     endfunction
 
+
+    ## -*- texinfo -*-
+    ## @deftypefn  {solid.Shape} {@var{S} =} pocket (@var{S}, @var{R}, @var{DEPTH})
+    ## @deftypefnx {solid.Shape} {@var{S} =} pocket (@dots{}, @qcode{'Taper'}, @var{A})
+    ##
+    ## Cut a pocket into a shape.
+    ##
+    ## @code{@var{S} = pocket (@var{S}, @var{R}, @var{DEPTH})} cuts the
+    ## @code{geom.Region} @var{R} into @var{S}, @var{DEPTH} millimetres deep
+    ## from the region's plane, against the normal of its @code{geom.UCS}:
+    ## a recess, a slot, a cavity.  Lay the region on a face with the face's
+    ## UCS, whose normal points out of the part, as @code{geom.UCS (@var{V})}
+    ## picks one.  An @code{Inf} @var{DEPTH} cuts right through.
+    ##
+    ## The holes of the region are left standing as islands, so a pocket round
+    ## a boss is one region with the boss as its hole, and @code{fillet} on
+    ## the region rounds the pocket's corners as a milling cutter leaves them.
+    ##
+    ## The cutter comes from outside, as for @code{solid.Shape.hole}:
+    ## everything inside the outline beyond the region's plane, on the side its
+    ## normal points to, is cleared too, so a pocket drawn on a sloping or
+    ## uneven face is clean all round.  A pocket drawn under material that its
+    ## outline passes through first cuts that material as well.
+    ##
+    ## @code{@var{S} = pocket (@dots{}, @qcode{'Taper'}, @var{A})} leans the
+    ## pocket's walls in by @var{A} degrees as they go deeper, the draft of a
+    ## moulded recess, as @code{solid.extrude} tapers a wall; the islands
+    ## widen to match.  @var{A} is in the range @math{(-90, 90)}.
+    ##
+    ## Pocketing the empty shape leaves it empty.
+    ##
+    ## @example
+    ## @group
+    ## ## A slot 30 by 8 with round ends, 4 deep in the top of a plate
+    ## S = solid.box (80, 40, 12);
+    ## R = geom.Region ([25, 16, 0; 55, 16, 1; 55, 24, 0; 25, 24, 1]);
+    ## R.UCS = geom.UCS ([0, 0, 1], [0, 0, 12]);
+    ## S = pocket (S, R, 4);
+    ## @end group
+    ## @end example
+    ##
+    ## @seealso{solid.Shape.hole, solid.extrude, geom.Region.fillet}
+    ## @end deftypefn
+    function this = pocket (this, R, DEPTH, varargin)
+
+      ## Input validation
+      if (nargin < 3)
+        error ("solid.Shape.pocket: invalid number of input arguments.");
+      endif
+      if (! isa (R, 'geom.Region') || ! isscalar (R))
+        error ("solid.Shape.pocket: R must be a geom.Region object.");
+      endif
+      if (! isnumeric (DEPTH) || ! isreal (DEPTH) || ! isscalar (DEPTH) ...
+          || ! (DEPTH > 0))
+        error (strcat ("solid.Shape.pocket: DEPTH must be positive, or Inf", ...
+                       " for a pocket right through."));
+      endif
+      [errmsg, opt] = options (varargin, struct ('Taper', 0));
+      if (isempty (errmsg) && (! isnumeric (opt.Taper) ...
+                               || ! isreal (opt.Taper) ...
+                               || ! isscalar (opt.Taper) ...
+                               || ! (abs (opt.Taper) < 90)))
+        errmsg = "Taper must be an angle in the range (-90, 90) degrees.";
+      endif
+      if (! isempty (errmsg))
+        error ("solid.Shape.pocket: %s", errmsg);
+      endif
+
+      if (isempty (this.Data))
+        return;
+      endif
+
+      ## How far the part reaches from the region's origin, which is how far
+      ## the cutter clears outwards and how deep a pocket through goes
+      B = bbox (this);
+      [X, Y, Z] = ndgrid (B([1, 4]), B([2, 5]), B([3, 6]));
+      reach = max (sqrt (sum (([X(:), Y(:), Z(:)] - R.UCS.Origin) .^ 2, ...
+                              2))) + 1;
+      if (isinf (DEPTH))
+        DEPTH = reach;
+      endif
+
+      ## The cutter: the region clearing outwards, tapering inwards
+      try
+        tool = solid.extrude (R, [reach, double(DEPTH)], ...
+                              'Taper', [0, double(opt.Taper)]);
+      catch err
+        error ("solid.Shape.pocket: %s", ...
+               regexprep (err.message, '^solid\\.extrude: ', ''));
+      end_try_catch
+      this = subtract (this, tool);
+
+    endfunction
+
   endmethods
 
 endclassdef
@@ -1693,6 +1787,50 @@ endfunction
 %!test  # drilling the empty shape
 %! assert_equal (isempty (hole (solid.Shape (), [0, 0, 0], 5, Inf)), true);
 
+%!testif ; exist ('__occt__') == 3  # a rectangle 4 deep in the top of a plate
+%! R = geom.Region ([30, 15; 50, 15; 50, 25; 30, 25]);
+%! R.UCS = geom.UCS ([0, 0, 1], [0, 0, 12]);
+%! S = pocket (solid.box (80, 40, 12), R, 4);
+%! assert_equal (volume (S), 38400 - 20 * 10 * 4, 1e-9);
+%! assert_equal (numfaces (S), 11);
+%! assert_equal (isvalid (S), true);
+
+%!testif ; exist ('__occt__') == 3  # right through, and an island left standing
+%! R = geom.Region ([30, 15; 50, 15; 50, 25; 30, 25], ...
+%!                  {[38, 18; 42, 18; 42, 22; 38, 22]});
+%! R.UCS = geom.UCS ([0, 0, 1], [0, 0, 12]);
+%! S = pocket (solid.box (80, 40, 12), R, Inf);
+%! assert_equal (volume (S), 38400 - (200 - 16) * 12, 1e-9);
+%! assert_equal (numsolids (S), 2);
+%! T = pocket (solid.box (80, 40, 12), R, 4);
+%! assert_equal (volume (T), 38400 - (200 - 16) * 4, 1e-9);
+%! assert_equal (numsolids (T), 1);
+
+%!testif ; exist ('__occt__') == 3  # tapered walls, a prismatoid
+%! R = geom.Region ([30, 15; 50, 15; 50, 25; 30, 25]);
+%! R.UCS = geom.UCS ([0, 0, 1], [0, 0, 12]);
+%! S = pocket (solid.box (80, 40, 12), R, 4, 'Taper', 10);
+%! d = 4 * tand (10);
+%! A2 = (20 - 2 * d) * (10 - 2 * d);
+%! Am = (20 - d) * (10 - d);
+%! assert_equal (volume (S), 38400 - 4 / 6 * (200 + A2 + 4 * Am), 1e-9);
+%! assert_equal (isvalid (S), true);
+
+%!testif ; exist ('__occt__') == 3  # in a sloping face, clean all round
+%! W = geom.Region ([0, 0; 80, 0; 80, 20; 0, 40]);
+%! W.UCS = geom.UCS ([0, -1, 0], [0, 40, 0]);
+%! B = solid.extrude (W, 40);
+%! U = geom.UCS ([20, 0, 80], [40, 20, 30], [80, 20, 20]);
+%! R = geom.Region ([-10, -5; 10, -5; 10, 5; -10, 5]);
+%! R.UCS = U;
+%! S = pocket (B, R, 3);
+%! assert_equal (volume (B) - volume (S), 200 * 3, -1e-9);
+%! assert_equal (isvalid (S), true);
+
+%!test  # pocketing the empty shape
+%! R = geom.Region ([0, 0; 1, 0; 1, 1]);
+%! assert_equal (isempty (pocket (solid.Shape (), R, 1)), true);
+
 %!error<solid.Shape: DATA must be a uint8 row vector.> solid.Shape ('abc')
 %!error<solid.Shape: DATA must be a uint8 row vector.> ...
 %! solid.Shape (uint8 ([1; 2]))
@@ -1868,3 +2006,17 @@ endfunction
 %! hole (solid.Shape (), [0, 0, 0], 5, 10, 'Tip', 0)
 %!error<solid.Shape.hole: Tip applies to blind holes only.> ...
 %! hole (solid.Shape (), [0, 0, 0], 5, Inf, 'Tip', 118)
+%!error<solid.Shape.pocket: invalid number of input arguments.> ...
+%! pocket (solid.Shape (), geom.Region ([0, 0; 1, 0; 1, 1]))
+%!error<solid.Shape.pocket: R must be a geom.Region object.> ...
+%! pocket (solid.Shape (), [0, 0; 1, 0; 1, 1], 1)
+%!error<solid.Shape.pocket: DEPTH must be positive, or Inf for a pocket right through.> ...
+%! pocket (solid.Shape (), geom.Region ([0, 0; 1, 0; 1, 1]), 0)
+%!error<solid.Shape.pocket: DEPTH must be positive, or Inf for a pocket right through.> ...
+%! pocket (solid.Shape (), geom.Region ([0, 0; 1, 0; 1, 1]), NaN)
+%!error<solid.Shape.pocket: Name/Value arguments must come in pairs.> ...
+%! pocket (solid.Shape (), geom.Region ([0, 0; 1, 0; 1, 1]), 1, 'Taper')
+%!error<solid.Shape.pocket: unknown parameter.> ...
+%! pocket (solid.Shape (), geom.Region ([0, 0; 1, 0; 1, 1]), 1, 'Draft', 2)
+%!error<solid.Shape.pocket: Taper must be an angle in the range \(-90, 90\) degrees.> ...
+%! pocket (solid.Shape (), geom.Region ([0, 0; 1, 0; 1, 1]), 1, 'Taper', 90)
