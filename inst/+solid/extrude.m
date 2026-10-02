@@ -17,50 +17,43 @@
 
 
 ## -*- texinfo -*-
-## @deftypefn  {drafting} {@var{S} =} solid.extrude (@var{P}, @var{H})
-## @deftypefnx {drafting} {@var{S} =} solid.extrude (@var{P}, @var{H}, @var{BULGE})
+## @deftypefn {drafting} {@var{S} =} solid.extrude (@var{R}, @var{H})
 ##
-## A solid of uniform section, extruded from a profile.
+## A solid of uniform section, extruded from a region.
 ##
-## @code{@var{S} = solid.extrude (@var{P}, @var{H})} returns a
-## @code{solid.Shape} whose section is the closed profile @var{P}, drawn in
-## the @math{xy} plane, and which rises from that plane along the positive
-## @math{z} axis to the height @var{H} millimetres.  This is how a plate of
-## any outline, a bracket or a key is modelled: draw its outline, then give
-## it a thickness.
+## @code{@var{S} = solid.extrude (@var{R}, @var{H})} returns a
+## @code{solid.Shape} whose section is the @code{geom.Region} @var{R}, rising
+## from the region's plane along its normal to the height @var{H}
+## millimetres.  This is how a plate of any outline, a bracket or a key is
+## modelled: draw its outline, then give it a thickness.  The holes of the
+## region go right through.
 ##
-## @var{P} is an @math{N}-by-2 matrix of vertices in millimetres, closed
-## implicitly from the last vertex back to the first; a repeated first vertex
-## at the end is accepted and dropped.  The profile may run either way round,
-## but it must enclose an area and must not cross or touch itself.
-##
-## @var{BULGE} gives one value per vertex, turning the segment that leaves
-## that vertex into a circular arc, as in @code{draw.Drawing.polyline}: the
-## tangent of a quarter of the arc's included angle, zero for a straight
-## segment and 1 for a semicircle, positive for an arc that runs
-## anticlockwise.  The arcs become true circular edges and cylindrical faces,
-## so a rounded end extruded from a profile is exactly round.
+## A region in the default @math{xy} plane rises along @math{+z}.  A region on
+## another plane rises square to it, so a boss on a sloping face is a region
+## in the plane of that face, extruded.  Arcs in the outlines become true
+## circular edges and cylindrical faces, so a rounded end or a round hole is
+## exact.
 ##
 ## @example
 ## @group
-## ## A slot-ended link, 40 between centres and 12 wide, 5 thick
-## P = [0, -6; 40, -6; 40, 6; 0, 6];
-## S = solid.extrude (P, 5, [0, 1, 0, 1]);
-## volume (S)
-## @result{} 2965.5
+## ## A flange 3 thick: rounded ends, a bore of 20 and two holes of 6
+## R = geom.Region ([-20, -20, 0; 20, -20, 1; 20, 20, 0; -20, 20, 1], ...
+##                  @{[10, 0, 1; -10, 0, 1], [-22, 0, 1; -28, 0, 1], ...
+##                   [28, 0, 1; 22, 0, 1]@});
+## S = solid.extrude (R, 3);
 ## @end group
 ## @end example
 ##
-## @seealso{solid.revolve, solid.loft, draw.Drawing.polyline}
+## @seealso{geom.Region, solid.revolve, solid.loft, solid.sweep}
 ## @end deftypefn
 
-function S = extrude (P, H, BULGE = [])
+function S = extrude (R, H)
 
   ## Input validation
-  if (nargin < 2 || nargin > 3)
+  if (nargin != 2)
     error ("solid.extrude: invalid number of input arguments.");
   endif
-  [errmsg, P, BULGE] = solid.__checkprofile__ (P, BULGE, 'P', 'BULGE');
+  [errmsg, D] = solid.__region__ (R, 'R');
   if (isempty (errmsg))
     errmsg = solid.__checkpos__ (H, 'H');
   endif
@@ -71,69 +64,66 @@ function S = extrude (P, H, BULGE = [])
     error ("solid.extrude: %s", errmsg);
   endif
 
-  S = solid.Shape (__occt__ ('extrude', 'solid.extrude', P, BULGE, ...
-                             double (H)));
+  S = solid.Shape (__occt__ ('extrude', 'solid.extrude', D, double (H)));
 
 endfunction
 
 %!testif ; exist ('__occt__') == 3
-%! S = solid.extrude ([0, 0; 10, 0; 10, 20; 0, 20], 5);
+%! S = solid.extrude (geom.Region ([0, 0; 10, 0; 10, 20; 0, 20]), 5);
 %! assert_equal (volume (S), 1000, 1e-9);
 %! assert_equal (bbox (S), [0, 0, 0, 10, 20, 5], 1e-9);
 %! assert_equal (numfaces (S), 6);
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # clockwise, explicitly closed
-%! S = solid.extrude ([0, 0; 0, 20; 10, 20; 10, 0; 0, 0], 5);
-%! assert_equal (volume (S), 1000, 1e-9);
-%! assert_equal (isvalid (S), true);
-
 %!testif ; exist ('__occt__') == 3  # an L-shaped bracket
-%! S = solid.extrude ([0, 0; 30, 0; 30, 5; 5, 5; 5, 20; 0, 20], 10);
+%! R = geom.Region ([0, 0; 30, 0; 30, 5; 5, 5; 5, 20; 0, 20]);
+%! S = solid.extrude (R, 10);
 %! assert_equal (volume (S), (150 + 75) * 10, 1e-9);
 %! assert_equal (numfaces (S), 8);
 
 %!testif ; exist ('__occt__') == 3  # a slot-ended link
-%! S = solid.extrude ([0, -6; 40, -6; 40, 6; 0, 6], 5, [0, 1, 0, 1]);
+%! R = geom.Region ([0, -6, 0; 40, -6, 1; 40, 6, 0; 0, 6, 1]);
+%! S = solid.extrude (R, 5);
 %! assert_equal (volume (S), (480 + 36 * pi) * 5, 1e-9);
 %! assert_equal (bbox (S), [-6, -6, 0, 46, 6, 5], 1e-9);
 %! assert_equal (numfaces (S), 6);
 %! assert_equal (isvalid (S), true);
 
 %!testif ; exist ('__occt__') == 3  # a disc from two vertices
-%! S = solid.extrude ([0, 0; 10, 0], 2, [1, 1]);
+%! S = solid.extrude (geom.Region ([0, 0, 1; 10, 0, 1]), 2);
 %! assert_equal (volume (S), 50 * pi, 1e-9);
 %! assert_equal (area (S), 50 * pi + 20 * pi, 1e-9);
 %! assert_equal (isvalid (S), true);
 
 %!testif ; exist ('__occt__') == 3  # a negative bulge rounds inwards
-%! S = solid.extrude ([0, 0; 20, 0; 20, 20; 0, 20], 1, [0, 0, -1, 0]);
+%! R = geom.Region ([0, 0, 0; 20, 0, 0; 20, 20, -1; 0, 20, 0]);
+%! S = solid.extrude (R, 1);
 %! assert_equal (volume (S), 400 - 50 * pi, 1e-9);
 %! assert_equal (isvalid (S), true);
 
+%!testif ; exist ('__occt__') == 3  # holes of any shape go right through
+%! R = geom.Region ([0, 0; 60, 0; 60, 40; 0, 40], ...
+%!                  {[20, 20, 1; 40, 20, 1], [4, 4; 10, 4; 10, 10; 4, 10]});
+%! S = solid.extrude (R, 3);
+%! assert_equal (volume (S), (2400 - 100 * pi - 36) * 3, 1e-9);
+%! assert_equal (numfaces (S), 6 + 2 + 4);   # a bore of two arcs, two faces
+%! assert_equal (isvalid (S), true);
+
+%!testif ; exist ('__occt__') == 3  # square to a sloping plane
+%! n = [0, -0.6, 0.8];
+%! PL = geom.Polyline ([0, 0; 10, 0; 10, 10; 0, 10], 'Closed', true, ...
+%!                     'Origin', [0, 0, 5], 'Normal', n);
+%! S = solid.extrude (geom.Region (PL), 4);
+%! assert_equal (volume (S), 400, 1e-9);
+%! c = [0, 0, 5] + 5 * PL.XAxis + 5 * PL.YAxis + 2 * n;
+%! assert_equal (centroid (S), c, 1e-9);
+%! assert_equal (isvalid (S), true);
+
 %!error<solid.extrude: invalid number of input arguments.> ...
-%! solid.extrude ([0, 0; 1, 0; 1, 1])
-%!error<solid.extrude: P must be an N-by-2 real matrix of finite values.> ...
-%! solid.extrude ([0, 0, 0; 1, 0, 0; 1, 1, 0], 1)
-%!error<solid.extrude: P must be an N-by-2 real matrix of finite values.> ...
-%! solid.extrude ([0, 0], 1)
-%!error<solid.extrude: P must be an N-by-2 real matrix of finite values.> ...
-%! solid.extrude ([0, 0; 1, NaN; 1, 1], 1)
-%!error<solid.extrude: P must be an N-by-2 real matrix of finite values.> ...
-%! solid.extrude ({[0, 0; 1, 0; 1, 1]}, 1)
-%!error<solid.extrude: BULGE must hold one finite real value per row of P.> ...
-%! solid.extrude ([0, 0; 1, 0; 1, 1], 1, [0, 0])
-%!error<solid.extrude: BULGE must hold one finite real value per row of P.> ...
-%! solid.extrude ([0, 0; 1, 0; 1, 1], 1, [0, Inf, 0])
-%!error<solid.extrude: P must not repeat a vertex consecutively.> ...
-%! solid.extrude ([0, 0; 1, 0; 1, 0; 1, 1], 1)
-%!error<solid.extrude: P must enclose a nonzero area.> ...
-%! solid.extrude ([0, 0; 1, 0; 2, 0], 1)
-%!error<solid.extrude: P must enclose a nonzero area.> ...
-%! solid.extrude ([0, 0; 10, 0], 1)
-%!error<solid.extrude: P must not cross or touch itself.> ...
-%! solid.extrude ([0, 0; 1, 1; 1, 0; 0, 1], 1)
-%!error<solid.extrude: P must not cross or touch itself.> ...
-%! solid.extrude ([0, 0; 10, 0; 10, 10; 0, 10], 1, [-2, 0, 0, 0])
+%! solid.extrude (geom.Region ([0, 0; 1, 0; 1, 1]))
+%!error<solid.extrude: R must be a geom.Region object.> ...
+%! solid.extrude ([0, 0; 1, 0; 1, 1], 1)
+%!error<solid.extrude: R must be a geom.Region object.> ...
+%! solid.extrude (geom.Polyline ([0, 0; 1, 0; 1, 1], 'Closed', true), 1)
 %!error<solid.extrude: H must be a positive and finite real scalar.> ...
-%! solid.extrude ([0, 0; 1, 0; 1, 1], 0)
+%! solid.extrude (geom.Region ([0, 0; 1, 0; 1, 1]), 0)

@@ -17,62 +17,51 @@
 
 
 ## -*- texinfo -*-
-## @deftypefn  {drafting} {@var{S} =} solid.sweep (@var{P}, @var{PATH})
-## @deftypefnx {drafting} {@var{S} =} solid.sweep (@var{P}, @var{PATH}, @var{BULGE})
+## @deftypefn {drafting} {@var{S} =} solid.sweep (@var{R}, @var{PATH})
 ##
-## A solid swept by a profile along a path.
+## A solid swept by a region along a path.
 ##
-## @code{@var{S} = solid.sweep (@var{P}, @var{PATH})} returns a
-## @code{solid.Shape} traced by the closed profile @var{P} as it travels
-## along the polyline @var{PATH}, keeping square to it.  This is how a bent
-## bar, a frame of welded sections or a pipe run is modelled.
+## @code{@var{S} = solid.sweep (@var{R}, @var{PATH})} returns a
+## @code{solid.Shape} traced by the @code{geom.Region} @var{R} as it travels
+## along the polyline @var{PATH}.  This is how a bent bar, a frame of welded
+## sections or a pipe run is modelled; a hole in the region makes a tube.
 ##
-## @var{PATH} is an @math{M}-by-3 matrix of vertices in millimetres, with at
-## least two rows.  At every intermediate vertex the path turns and the solid
-## keeps a sharp corner, mitred as two sawn lengths are joined.  The path
+## @var{PATH} is an @math{M}-by-3 matrix of points in model coordinates, with
+## at least two rows.  At every intermediate point the path turns and the
+## solid keeps a sharp corner, mitred as two sawn lengths are joined.  The path
 ## must not turn straight back on itself.
 ##
-## @var{P} is an @math{N}-by-2 matrix of vertices in millimetres, drawn in
-## the @math{xy} plane and closed implicitly from the last vertex back to the
-## first; a repeated first vertex at the end is accepted and dropped.  It must
-## enclose an area and must not cross or touch itself.  The profile is
-## carried to the first vertex of the path, its origin landing there, and
-## turned by the smallest rotation that takes the @math{z} axis onto the
-## first segment.  A path that starts up the @math{z} axis therefore sweeps
-## the profile as drawn, as @code{solid.extrude} does.
+## The region is swept from where it lies.  Normally its plane passes through
+## the first point of the path, square to the first segment; a region in the
+## default @math{xy} plane is swept as drawn along a path that starts at the
+## origin and runs up the @math{z} axis.  A region placed elsewhere is swept
+## beside the path, keeping its distance, as a rail follows a centre line:
 ##
-## @var{BULGE} gives one value per vertex of @var{P}, turning the segment
-## that leaves that vertex into a circular arc, as in
-## @code{draw.Drawing.polyline}: the tangent of a quarter of the arc's
-## included angle, zero for a straight segment and 1 for a semicircle,
-## positive for an arc that runs anticlockwise.
+## @example
+## @group
+## ## A tube of 2 bore and 0.5 wall, bent twice, its section at the start
+## ## of the path square to the first segment
+## R = geom.Region ([1.5, 0, 1; -1.5, 0, 1], @{[1, 0, 1; -1, 0, 1]@});
+## PATH = [0, 0, 0; 0, 0, 10; 10, 0, 20; 10, 0, 30];
+## S = solid.sweep (R, PATH);
+## @end group
+## @end example
 ##
 ## A section centred on the path keeps its area through every mitred corner,
 ## so its volume is its area times the length of the path.  A section far off
 ## the path, or a corner too tight for it, makes a solid that intersects
 ## itself; check such a result with @code{solid.Shape.isvalid}.
 ##
-## @example
-## @group
-## ## A round bar of diameter 2, bent twice
-## P = [1, 0; -1, 0];
-## PATH = [0, 0, 0; 0, 0, 10; 10, 0, 20; 10, 0, 30];
-## S = solid.sweep (P, PATH, [1, 1]);
-## volume (S)
-## @result{} 107.26
-## @end group
-## @end example
-##
-## @seealso{solid.extrude, solid.helix, draw.Drawing.polyline}
+## @seealso{geom.Region, solid.extrude, solid.helix}
 ## @end deftypefn
 
-function S = sweep (P, PATH, BULGE = [])
+function S = sweep (R, PATH)
 
   ## Input validation
-  if (nargin < 2 || nargin > 3)
+  if (nargin != 2)
     error ("solid.sweep: invalid number of input arguments.");
   endif
-  [errmsg, P, BULGE] = solid.__checkprofile__ (P, BULGE, 'P', 'BULGE');
+  [errmsg, D] = solid.__region__ (R, 'R');
   if (! isempty (errmsg))
     error ("solid.sweep: %s", errmsg);
   endif
@@ -82,12 +71,12 @@ function S = sweep (P, PATH, BULGE = [])
                    " finite values with at least two rows."));
   endif
   PATH = double (PATH);
-  D = diff (PATH);
-  L = sqrt (sum (D .^ 2, 2));
+  V = diff (PATH);
+  L = sqrt (sum (V .^ 2, 2));
   if (any (L == 0))
-    error ("solid.sweep: PATH must not repeat a vertex consecutively.");
+    error ("solid.sweep: PATH must not repeat a point consecutively.");
   endif
-  U = D ./ L;
+  U = V ./ L;
   if (any (sum (U(1:end-1,:) .* U(2:end,:), 2) <= -1 + 1e-12))
     error ("solid.sweep: PATH must not turn back on itself.");
   endif
@@ -96,28 +85,26 @@ function S = sweep (P, PATH, BULGE = [])
     error ("solid.sweep: %s", errmsg);
   endif
 
-  S = solid.Shape (__occt__ ('sweep', 'solid.sweep', P, BULGE, PATH));
+  S = solid.Shape (__occt__ ('sweep', 'solid.sweep', D, PATH));
 
 endfunction
 
 %!testif ; exist ('__occt__') == 3  # up the z axis, as extruded
-%! S = solid.sweep ([0, 0; 4, 0; 4, 2; 0, 2], [0, 0, 0; 0, 0, 10]);
+%! R = geom.Region ([0, 0; 4, 0; 4, 2; 0, 2]);
+%! S = solid.sweep (R, [0, 0, 0; 0, 0, 10]);
 %! assert_equal (volume (S), 80, 1e-9);
 %! assert_equal (bbox (S), [0, 0, 0, 4, 2, 10], 1e-9);
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # down the z axis, turned about x
-%! S = solid.sweep ([0, 0; 4, 0; 4, 2; 0, 2], [0, 0, 0; 0, 0, -10]);
-%! assert_equal (volume (S), 80, 1e-9);
-%! assert_equal (bbox (S), [0, -2, -10, 4, 0, 0], 1e-9);
-
-%!testif ; exist ('__occt__') == 3  # along x, from a point off the origin
-%! S = solid.sweep ([-1, -1; 1, -1; 1, 1; -1, 1], [5, 5, 5; 15, 5, 5]);
+%!testif ; exist ('__occt__') == 3  # along x, the region placed at the start
+%! P = geom.Polyline ([-1, -1; 1, -1; 1, 1; -1, 1], 'Closed', true, ...
+%!                    'Origin', [5, 5, 5], 'Normal', [1, 0, 0]);
+%! S = solid.sweep (geom.Region (P), [5, 5, 5; 15, 5, 5]);
 %! assert_equal (volume (S), 40, 1e-9);
 %! assert_equal (bbox (S), [5, 4, 4, 15, 6, 6], 1e-9);
 
 %!testif ; exist ('__occt__') == 3  # a mitred right angle
-%! S = solid.sweep ([-1, -1; 1, -1; 1, 1; -1, 1], ...
+%! S = solid.sweep (geom.Region ([-1, -1; 1, -1; 1, 1; -1, 1]), ...
 %!                  [0, 0, 0; 0, 0, 10; 10, 0, 10]);
 %! assert_equal (volume (S), 80, 1e-9);
 %! assert_equal (bbox (S), [-1, -1, 0, 10, 1, 11], 1e-9);
@@ -125,22 +112,28 @@ endfunction
 %! assert_equal (isvalid (S), true);
 
 %!testif ; exist ('__occt__') == 3  # a round bar bent twice
-%! S = solid.sweep ([1, 0; -1, 0], ...
-%!                  [0, 0, 0; 0, 0, 10; 10, 0, 20; 10, 0, 30], [1, 1]);
+%! S = solid.sweep (geom.Region ([1, 0, 1; -1, 0, 1]), ...
+%!                  [0, 0, 0; 0, 0, 10; 10, 0, 20; 10, 0, 30]);
 %! assert_equal (volume (S), pi * (20 + sqrt (200)), -1e-9);
 %! assert_equal (isvalid (S), true);
 
+%!testif ; exist ('__occt__') == 3  # a tube bent twice, its bore carried
+%! R = geom.Region ([1.5, 0, 1; -1.5, 0, 1], {[1, 0, 1; -1, 0, 1]});
+%! S = solid.sweep (R, [0, 0, 0; 0, 0, 10; 10, 0, 20; 10, 0, 30]);
+%! assert_equal (volume (S), (2.25 - 1) * pi * (20 + sqrt (200)), -1e-9);
+%! assert_equal (isvalid (S), true);
+
 %!error<solid.sweep: invalid number of input arguments.> ...
-%! solid.sweep ([0, 0; 1, 0; 1, 1])
-%!error<solid.sweep: P must enclose a nonzero area.> ...
-%! solid.sweep ([0, 0; 1, 0; 2, 0], [0, 0, 0; 0, 0, 1])
+%! solid.sweep (geom.Region ([0, 0; 1, 0; 1, 1]))
+%!error<solid.sweep: R must be a geom.Region object.> ...
+%! solid.sweep ([0, 0; 1, 0; 1, 1], [0, 0, 0; 0, 0, 1])
 %!error<solid.sweep: PATH must be an M-by-3 real matrix of finite values with at least two rows.> ...
-%! solid.sweep ([0, 0; 1, 0; 1, 1], [0, 0, 1])
+%! solid.sweep (geom.Region ([0, 0; 1, 0; 1, 1]), [0, 0, 1])
 %!error<solid.sweep: PATH must be an M-by-3 real matrix of finite values with at least two rows.> ...
-%! solid.sweep ([0, 0; 1, 0; 1, 1], [0, 0; 0, 1])
+%! solid.sweep (geom.Region ([0, 0; 1, 0; 1, 1]), [0, 0; 0, 1])
 %!error<solid.sweep: PATH must be an M-by-3 real matrix of finite values with at least two rows.> ...
-%! solid.sweep ([0, 0; 1, 0; 1, 1], [0, 0, 0; 0, 0, NaN])
-%!error<solid.sweep: PATH must not repeat a vertex consecutively.> ...
-%! solid.sweep ([0, 0; 1, 0; 1, 1], [0, 0, 0; 0, 0, 0; 0, 0, 1])
+%! solid.sweep (geom.Region ([0, 0; 1, 0; 1, 1]), [0, 0, 0; 0, 0, NaN])
+%!error<solid.sweep: PATH must not repeat a point consecutively.> ...
+%! solid.sweep (geom.Region ([0, 0; 1, 0; 1, 1]), [0, 0, 0; 0, 0, 0; 0, 0, 1])
 %!error<solid.sweep: PATH must not turn back on itself.> ...
-%! solid.sweep ([0, 0; 1, 0; 1, 1], [0, 0, 0; 0, 0, 5; 0, 0, 2])
+%! solid.sweep (geom.Region ([0, 0; 1, 0; 1, 1]), [0, 0, 0; 0, 0, 5; 0, 0, 2])

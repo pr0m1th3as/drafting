@@ -15,76 +15,65 @@
 ## You should have received a copy of the GNU General Public License along with
 ## this program; if not, see <http://www.gnu.org/licenses/>.
 
-## -*- texinfo -*-
-## @deftypefn  {drafting} {@var{S} =} solid.Shape ()
-## @deftypefnx {drafting} {@var{S} =} solid.Shape (@var{DATA})
-##
-## A solid in millimetres, modelled through Open CASCADE.
-##
-## @code{solid.Shape} holds the exact boundary of one or more solids: every
-## face a plane, cylinder, cone, sphere, torus or spline surface, every edge a
-## line, circle or curve, with nothing approximated by facets.  It is what the
-## functions of the @code{solid} namespace create, what the boolean operators
-## combine, and what @code{solid.write} saves as STEP for exchange or STL for
-## printing.
-##
-## @code{@var{S} = solid.Shape ()} returns the empty shape, which holds
-## nothing.  Shapes are made by @code{solid.box}, @code{solid.cylinder},
-## @code{solid.cone}, @code{solid.sphere} and @code{solid.torus}, from
-## profiles by @code{solid.extrude}, @code{solid.revolve}, @code{solid.loft},
-## @code{solid.sweep} and @code{solid.helix}, and from files by
-## @code{solid.read}, and combined by three methods, each taking any number
-## of shapes:
-##
-## @multitable @columnfractions 0.25 0.75
-## @headitem Method @tab Result
-## @item @code{union} @tab the material of any of them
-## @item @code{subtract} @tab the material of the first that is in none of
-## the others
-## @item @code{intersect} @tab the material common to all of them
-## @end multitable
-##
-## @example
-## @group
-## plate = solid.box (80, 40, 12);
-## bore = translate (solid.cylinder (4, 12), [20, 20, 0]);
-## part = subtract (plate, bore);
-## volume (part)
-## @result{} 3.7797e+04
-## @end group
-## @end example
-##
-## Features are worked on a shape by methods: @code{hole} drills plain,
-## counterbored, countersunk and tapping holes, @code{fillet} and
-## @code{chamfer} round or bevel edges, and @code{shell} hollows the shape.
-## The edges and faces they act on are chosen by @code{edges} and
-## @code{faces}, by the kind of curve or surface, by direction and by
-## position.
-##
-## The class is a @emph{value} class.  Every operation returns a new shape and
-## leaves its operands unchanged, and a copy is independent of the original.
-## The empty shape adds nothing to a union and empties an intersection, and a
-## boolean whose result holds no material, such as the intersection of two
-## solids that do not meet, returns it.
-##
-## A shape is saved and loaded with @code{save} and @code{load} like any
-## other value.
-##
-## @code{@var{S} = solid.Shape (@var{DATA})} wraps @var{DATA}, the bytes of a
-## shape in Open CASCADE's binary format.  This is how the functions of the
-## @code{solid} namespace return what Open CASCADE computed, and it is not for
-## direct use: bytes that do not begin with that format's signature are
-## refused.
-##
-## The @code{solid} namespace needs Open CASCADE, which the package uses where
-## it is found when the package is built.  On a build without it, the empty
-## shape can still be made, but every function and method that needs the
-## library raises an error saying so.
-##
-## @seealso{solid.box, solid.read, solid.write, solid.show}
-## @end deftypefn
-
 classdef Shape
+  ## -*- texinfo -*-
+  ## @deftp {drafting} solid.Shape
+  ##
+  ## A solid in millimetres, modelled through Open CASCADE.
+  ##
+  ## @code{solid.Shape} holds the exact boundary of one or more solids: every
+  ## face a plane, cylinder, cone, sphere, torus or spline surface, every edge
+  ## a line, circle or curve, with nothing approximated by facets.  It is what
+  ## the functions of the @code{solid} namespace create, what the boolean
+  ## operators combine, and what @code{solid.write} saves as STEP for exchange
+  ## or STL for printing.
+  ##
+  ## Shapes are made by @code{solid.box}, @code{solid.cylinder},
+  ## @code{solid.cone}, @code{solid.sphere} and @code{solid.torus}, from
+  ## regions by @code{solid.extrude}, @code{solid.revolve}, @code{solid.loft},
+  ## @code{solid.sweep} and @code{solid.helix}, and from files by
+  ## @code{solid.read}, and combined by three methods, each taking any number
+  ## of shapes:
+  ##
+  ## @multitable @columnfractions 0.25 0.75
+  ## @headitem Method @tab Result
+  ## @item @code{union} @tab the material of any of them
+  ## @item @code{subtract} @tab the material of the first that is in none of
+  ## the others
+  ## @item @code{intersect} @tab the material common to all of them
+  ## @end multitable
+  ##
+  ## @example
+  ## @group
+  ## plate = solid.box (80, 40, 12);
+  ## bore = translate (solid.cylinder (4, 12), [20, 20, 0]);
+  ## part = subtract (plate, bore);
+  ## volume (part)
+  ## @result{} 3.7797e+04
+  ## @end group
+  ## @end example
+  ##
+  ## Features are worked on a shape by methods: @code{hole} drills plain,
+  ## counterbored, countersunk and tapping holes, @code{fillet} and
+  ## @code{chamfer} round or bevel edges, and @code{shell} hollows the shape.
+  ## The edges and faces they act on are chosen by @code{edges} and
+  ## @code{faces}, by the kind of curve or surface, by direction and by
+  ## position.
+  ##
+  ## The class is a @emph{value} class.  Every operation returns a new shape
+  ## and leaves its operands unchanged, and a copy is independent of the
+  ## original.  The empty shape adds nothing to a union and empties an
+  ## intersection, and a boolean whose result holds no material, such as the
+  ## intersection of two solids that do not meet, returns it.  A shape is
+  ## saved and loaded with @code{save} and @code{load} like any other value.
+  ##
+  ## The @code{solid} namespace needs Open CASCADE, which the package uses
+  ## where it is found when the package is built.  On a build without it, the
+  ## empty shape can still be made, but every function and method that needs
+  ## the library raises an error saying so.
+  ##
+  ## @seealso{solid.box, solid.read, solid.write, solid.show}
+  ## @end deftp
 
   properties (SetAccess = private, Hidden)
 
@@ -111,6 +100,22 @@ classdef Shape
 
   methods (Access = public)
 
+    ## -*- texinfo -*-
+    ## @deftypefn  {solid.Shape} {@var{S} =} solid.Shape ()
+    ## @deftypefnx {solid.Shape} {@var{S} =} solid.Shape (@var{DATA})
+    ##
+    ## Make a shape.
+    ##
+    ## @code{@var{S} = solid.Shape ()} returns the empty shape, which holds
+    ## nothing.
+    ##
+    ## @code{@var{S} = solid.Shape (@var{DATA})} wraps @var{DATA}, the bytes of
+    ## a shape in Open CASCADE's binary format.  This is how the functions of
+    ## the @code{solid} namespace return what Open CASCADE computed, and it is
+    ## not for direct use: bytes that do not begin with that format's signature
+    ## are refused.
+    ##
+    ## @end deftypefn
     function this = Shape (DATA)
 
       if (nargin == 0)
@@ -1071,8 +1076,8 @@ function errmsg = checkvec (V, name, nonzero = false)
   errmsg = '';
   if (! isnumeric (V) || ! isreal (V) || numel (V) != 3 ...
       || ! isvector (V) || ! all (isfinite (V)))
-    errmsg = sprintf ("%s must be a real 3-element vector of finite values.", ...
-                      name);
+    errmsg = sprintf (strcat ("%s must be a real 3-element vector of", ...
+                              " finite values."), name);
   elseif (nonzero && all (V == 0))
     errmsg = sprintf ("%s must not be the zero vector.", name);
   endif
@@ -1369,7 +1374,8 @@ endfunction
 %! assert_equal (numel (faces (C, 'Type', 'cylinder')), 1);
 %! assert_equal (faces (C, 'Axis', [0, 0, -1]), faces (C, 'Type', 'cylinder'));
 %! assert_equal (numel (faces (C, 'Within', [-4, -4, 12, 4, 4, 12])), 1);
-%! S = solid.revolve ([0, 0; 10, 0; 10, 30; 6, 30; 6, 49; 5, 50; 0, 50]);
+%! S = solid.revolve (geom.Region ([0, 0; 10, 0; 10, 30; 6, 30; 6, 49; ...
+%!                                  5, 50; 0, 50]));
 %! assert_equal (numel (faces (S, 'Type', {'cylinder', 'cone'})), 3);
 
 %!testif ; exist ('__occt__') == 3  # four parallel edges rounded

@@ -17,82 +17,69 @@
 
 
 ## -*- texinfo -*-
-## @deftypefn  {drafting} {@var{S} =} solid.loft (@var{P}, @var{Z})
-## @deftypefnx {drafting} {@var{S} =} solid.loft (@var{P}, @var{Z}, @var{BULGE})
-## @deftypefnx {drafting} {@var{S} =} solid.loft (@dots{}, @qcode{'Ruled'}, @var{TF})
+## @deftypefn  {drafting} {@var{S} =} solid.loft (@var{REGIONS})
+## @deftypefnx {drafting} {@var{S} =} solid.loft (@var{REGIONS}, @qcode{'Ruled'}, @var{TF})
 ##
-## A solid passing through profiles at increasing heights.
+## A solid passing through regions.
 ##
-## @code{@var{S} = solid.loft (@var{P}, @var{Z})} returns a
-## @code{solid.Shape} whose section is the profile @code{@var{P}@{@var{k}@}}
-## at the height @code{@var{Z}(@var{k})} millimetres, with a smooth surface
-## between them.  This is how a transition is modelled: a duct from a
-## rectangle to a circle, a tapering arm, a handle that swells in the middle.
+## @code{@var{S} = solid.loft (@var{REGIONS})} returns a @code{solid.Shape}
+## that passes through every @code{geom.Region} in the cell array
+## @var{REGIONS}, in order, with a smooth surface between them.  This is how a
+## transition is modelled: a duct from a rectangle to a circle, a tapering
+## arm, a handle that swells in the middle.
 ##
-## @var{P} is a cell array of at least two profiles and @var{Z} a vector of
-## as many heights, strictly increasing.  Each profile is an @math{N}-by-2
-## matrix of vertices in millimetres, drawn in the plane parallel to
-## @math{xy} at its height, closed implicitly from the last vertex back to the
-## first; it must enclose an area and must not cross or touch itself.  The
-## profiles need not have the same number of vertices.  Their first vertices
+## Each region is a section and lies where its plane puts it, so the sections
+## are placed by giving the regions' planes their origins and normals.  They
+## need not be parallel: a duct can turn a corner as it changes shape.  The
+## outlines need not have the same number of vertices.  Their first vertices
 ## are joined to one another, and so are the vertices that follow, so a loft
-## twists when its profiles do not start at corresponding points or do not
-## run the same way round.
+## twists when its sections do not start at corresponding points.
 ##
-## @var{BULGE} is a cell array with one entry per profile, each giving one
-## value per vertex as in @code{draw.Drawing.polyline}: the tangent of a
-## quarter of the arc's included angle, zero for a straight segment and 1 for
-## a semicircle, positive for an arc that runs anticlockwise.  An empty entry
-## leaves that profile straight-sided.
+## Every region must have the same number of holes, and hole @var{k} of one
+## section flows into hole @var{k} of the next, so a duct of uniform wall is a
+## loft of regions with one hole each.
 ##
 ## @code{@var{S} = solid.loft (@dots{}, @qcode{'Ruled'}, @var{TF})} joins
-## consecutive profiles by straight lines when @var{TF} is @code{true}, so a
+## consecutive sections by straight lines when @var{TF} is @code{true}, so a
 ## loft between polygons has flat faces and a crease at every intermediate
-## profile.  It is @code{false} by default, which passes one smooth surface
-## through every profile.  With two profiles both give the same solid.
+## section.  It is @code{false} by default, which passes one smooth surface
+## through every section.  With two sections both give the same solid.
 ##
 ## @example
 ## @group
 ## ## A square of 20 at the base becoming a circle of diameter 12 at 30
-## base = [-10, -10; 10, -10; 10, 10; -10, 10];
-## top = [6, 0; -6, 0];
-## S = solid.loft (@{base, top@}, [0, 30], @{[], [1, 1]@});
+## base = geom.Region ([-10, -10; 10, -10; 10, 10; -10, 10]);
+## top = geom.Region (geom.Polyline ([6, 0, 1; -6, 0, 1], 'Closed', true, ...
+##                                   'Origin', [0, 0, 30]));
+## S = solid.loft (@{base, top@});
 ## @end group
 ## @end example
 ##
-## @seealso{solid.extrude, solid.revolve, draw.Drawing.polyline}
+## @seealso{geom.Region, solid.extrude, solid.sweep}
 ## @end deftypefn
 
-function S = loft (P, Z, varargin)
+function S = loft (REGIONS, varargin)
 
   ## Input validation
-  if (nargin < 2)
+  if (nargin < 1)
     error ("solid.loft: invalid number of input arguments.");
   endif
-  if (! iscell (P) || ! isvector (P) || numel (P) < 2)
-    error ("solid.loft: P must be a cell array of at least two profiles.");
+  if (! iscell (REGIONS) || ! isvector (REGIONS) || numel (REGIONS) < 2 ...
+      || ! all (cellfun (@(r) isa (r, 'geom.Region') && isscalar (r), ...
+                         REGIONS)))
+    error (strcat ("solid.loft: REGIONS must be a cell array of at least", ...
+                   " two geom.Region objects."));
   endif
-  if (! isnumeric (Z) || ! isreal (Z) || ! isvector (Z) ...
-      || numel (Z) != numel (P) || ! all (isfinite (Z)))
-    error ("solid.loft: Z must hold one finite real height per profile.");
+  if (numel (unique (cellfun (@(r) numel (r.Holes), REGIONS))) != 1)
+    error ("solid.loft: every region must have the same number of holes.");
   endif
-  if (any (diff (Z) <= 0))
-    error ("solid.loft: Z must be strictly increasing.");
-  endif
-  BULGE = cell (size (P));
   if (mod (numel (varargin), 2) != 0)
-    BULGE = varargin{1};
-    varargin(1) = [];
-    if (! iscell (BULGE) || numel (BULGE) != numel (P))
-      error (strcat ("solid.loft: BULGE must be a cell array with one", ...
-                     " entry per profile."));
-    endif
+    error ("solid.loft: Name/Value arguments must come in pairs.");
   endif
   opt = struct ('Ruled', false);
-  known = fieldnames (opt);
   for k = 1:2:numel (varargin)
     name = varargin{k};
-    if (! ischar (name) || ! isrow (name) || ! any (strcmp (name, known)))
+    if (! ischar (name) || ! isrow (name) || ! any (strcmp (name, {'Ruled'})))
       error ("solid.loft: unknown parameter.");
     endif
     opt.(name) = varargin{k+1};
@@ -101,80 +88,94 @@ function S = loft (P, Z, varargin)
       || ! isscalar (opt.Ruled) || ! any (opt.Ruled == [0, 1]))
     error ("solid.loft: Ruled must be a logical scalar.");
   endif
-  for k = 1:numel (P)
-    [errmsg, P{k}, BULGE{k}] = solid.__checkprofile__ ...
-                                 (P{k}, BULGE{k}, sprintf ("P{%d}", k), ...
-                                  sprintf ("BULGE{%d}", k));
-    if (! isempty (errmsg))
-      error ("solid.loft: %s", errmsg);
-    endif
-  endfor
   errmsg = solid.__checkocct__ ();
   if (! isempty (errmsg))
     error ("solid.loft: %s", errmsg);
   endif
 
-  S = solid.Shape (__occt__ ('loft', 'solid.loft', P(:)', BULGE(:)', ...
-                             double (Z), logical (opt.Ruled)));
+  D = cell (1, numel (REGIONS));
+  for k = 1:numel (REGIONS)
+    [~, D{k}] = solid.__region__ (REGIONS{k}, 'REGIONS');
+  endfor
+  S = solid.Shape (__occt__ ('loft', 'solid.loft', D, logical (opt.Ruled)));
 
 endfunction
 
+## A region of the outline P lifted to the height Z, for the tests
+%!function R = at (P, z)
+%!  R = geom.Region (geom.Polyline (P, 'Closed', true, 'Origin', [0, 0, z]));
+%!endfunction
+
 %!testif ; exist ('__occt__') == 3  # a frustum of a square pyramid
-%! P = {[0, 0; 10, 0; 10, 10; 0, 10], [2.5, 2.5; 7.5, 2.5; 7.5, 7.5; 2.5, 7.5]};
-%! S = solid.loft (P, [0, 10]);
+%! S = solid.loft ({at([0, 0; 10, 0; 10, 10; 0, 10], 0), ...
+%!                  at([2.5, 2.5; 7.5, 2.5; 7.5, 7.5; 2.5, 7.5], 10)});
 %! assert_equal (volume (S), 10 / 3 * (100 + 25 + 50), 1e-9);
 %! assert_equal (bbox (S), [0, 0, 0, 10, 10, 10], 1e-6);
 %! assert_equal (isvalid (S), true);
 
 %!testif ; exist ('__occt__') == 3  # ruled through three, two frustums
 %! sq = @(a) [-a, -a; a, -a; a, a; -a, a];
-%! S = solid.loft ({sq(5), sq(3), sq(5)}, [0, 5, 10], 'Ruled', true);
+%! S = solid.loft ({at(sq (5), 0), at(sq (3), 5), at(sq (5), 10)}, ...
+%!                 'Ruled', true);
 %! assert_equal (volume (S), 2 * 5 / 3 * (100 + 36 + 60), 1e-9);
 %! assert_equal (numfaces (S), 10);
 %! assert_equal (isvalid (S), true);
 
 %!testif ; exist ('__occt__') == 3  # smooth through three, bulging outwards
 %! sq = @(a) [-a, -a; a, -a; a, a; -a, a];
-%! S = solid.loft ({sq(3), sq(5), sq(3)}, [0, 5, 10]);
+%! S = solid.loft ({at(sq (3), 0), at(sq (5), 5), at(sq (3), 10)});
 %! assert_equal (volume (S) > 2 * 5 / 3 * (36 + 100 + 60), true);
 %! assert_equal (numfaces (S), 6);
 %! assert_equal (isvalid (S), true);
 
 %!testif ; exist ('__occt__') == 3  # equal circles give a cylinder
-%! c = [5, 0; -5, 0];
-%! S = solid.loft ({c, c, c}, [0, 10, 20], {[1, 1], [1, 1], [1, 1]});
+%! c = [5, 0, 1; -5, 0, 1];
+%! S = solid.loft ({at(c, 0), at(c, 10), at(c, 20)});
 %! assert_equal (volume (S), 500 * pi, -1e-8);
 %! assert_equal (bbox (S), [-5, -5, 0, 5, 5, 20], 1e-6);
 %! assert_equal (isvalid (S), true);
 
 %!testif ; exist ('__occt__') == 3  # a square becoming a circle
-%! S = solid.loft ({[-10, -10; 10, -10; 10, 10; -10, 10], [6, 0; -6, 0]}, ...
-%!                 [0, 30], {[], [1, 1]});
+%! S = solid.loft ({at([-10, -10; 10, -10; 10, 10; -10, 10], 0), ...
+%!                  at([6, 0, 1; -6, 0, 1], 30)});
 %! assert_equal (bbox (S), [-10, -10, 0, 10, 10, 30], 1e-6);
 %! assert_equal (volume (S) > 30 / 3 * (400 + 36 * pi), true);
 %! assert_equal (volume (S) < 30 * 400, true);
 %! assert_equal (isvalid (S), true);
 
-%!error<solid.loft: invalid number of input arguments.> solid.loft ({})
-%!error<solid.loft: P must be a cell array of at least two profiles.> ...
-%! solid.loft ([0, 0; 1, 0; 1, 1], [0, 1])
-%!error<solid.loft: P must be a cell array of at least two profiles.> ...
-%! solid.loft ({[0, 0; 1, 0; 1, 1]}, 0)
-%!error<solid.loft: Z must hold one finite real height per profile.> ...
-%! solid.loft ({[0, 0; 1, 0; 1, 1], [0, 0; 1, 0; 1, 1]}, [0, 1, 2])
-%!error<solid.loft: Z must hold one finite real height per profile.> ...
-%! solid.loft ({[0, 0; 1, 0; 1, 1], [0, 0; 1, 0; 1, 1]}, [0, Inf])
-%!error<solid.loft: Z must be strictly increasing.> ...
-%! solid.loft ({[0, 0; 1, 0; 1, 1], [0, 0; 1, 0; 1, 1]}, [1, 1])
-%!error<solid.loft: BULGE must be a cell array with one entry per profile.> ...
-%! solid.loft ({[0, 0; 1, 0; 1, 1], [0, 0; 1, 0; 1, 1]}, [0, 1], {[]})
-%!error<solid.loft: BULGE must be a cell array with one entry per profile.> ...
-%! solid.loft ({[0, 0; 1, 0; 1, 1], [0, 0; 1, 0; 1, 1]}, [0, 1], [0, 0, 0])
+%!testif ; exist ('__occt__') == 3  # a duct of uniform wall, its hole lofted
+%! sq = @(a) [-a, -a; a, -a; a, a; -a, a];
+%! R = @(z) geom.Region (geom.Polyline (sq (5), 'Closed', true, ...
+%!                                      'Origin', [0, 0, z]), {sq(4)});
+%! S = solid.loft ({R(0), R(10)});
+%! assert_equal (volume (S), (100 - 64) * 10, 1e-9);
+%! assert_equal (isvalid (S), true);
+
+%!testif ; exist ('__occt__') == 3  # sections that are not parallel
+%! B = at ([-5, -5; 5, -5; 5, 5; -5, 5], 0);
+%! T = geom.Region (geom.Polyline ([-5, -5; 5, -5; 5, 5; -5, 5], ...
+%!                                 'Closed', true, 'Origin', [0, 0, 20], ...
+%!                                 'Normal', [1, 0, 1]));
+%! S = solid.loft ({B, T});
+%! assert_equal (isvalid (S), true);
+%! assert_equal (volume (S) > 0, true);
+
+%!error<solid.loft: invalid number of input arguments.> solid.loft ()
+%!error<solid.loft: REGIONS must be a cell array of at least two geom.Region objects.> ...
+%! solid.loft (geom.Region ([0, 0; 1, 0; 1, 1]))
+%!error<solid.loft: REGIONS must be a cell array of at least two geom.Region objects.> ...
+%! solid.loft ({geom.Region([0, 0; 1, 0; 1, 1])})
+%!error<solid.loft: REGIONS must be a cell array of at least two geom.Region objects.> ...
+%! solid.loft ({geom.Region([0, 0; 1, 0; 1, 1]), [0, 0; 1, 0; 1, 1]})
+%!error<solid.loft: every region must have the same number of holes.> ...
+%! solid.loft ({geom.Region([0, 0; 9, 0; 9, 9; 0, 9], {[1, 1; 2, 1; 2, 2]}), ...
+%!              geom.Region([0, 0; 9, 0; 9, 9; 0, 9])})
+%!error<solid.loft: Name/Value arguments must come in pairs.> ...
+%! solid.loft ({geom.Region([0, 0; 1, 0; 1, 1]), ...
+%!              geom.Region([0, 0; 1, 0; 1, 1])}, 'Ruled')
 %!error<solid.loft: unknown parameter.> ...
-%! solid.loft ({[0, 0; 1, 0; 1, 1], [0, 0; 1, 0; 1, 1]}, [0, 1], 'Smooth', 1)
+%! solid.loft ({geom.Region([0, 0; 1, 0; 1, 1]), ...
+%!              geom.Region([0, 0; 1, 0; 1, 1])}, 'Smooth', 1)
 %!error<solid.loft: Ruled must be a logical scalar.> ...
-%! solid.loft ({[0, 0; 1, 0; 1, 1], [0, 0; 1, 0; 1, 1]}, [0, 1], 'Ruled', 2)
-%!error<solid.loft: P\{2\} must enclose a nonzero area.> ...
-%! solid.loft ({[0, 0; 1, 0; 1, 1], [0, 0; 1, 0; 2, 0]}, [0, 1])
-%!error<solid.loft: BULGE\{1\} must hold one finite real value per row of P\{1\}.> ...
-%! solid.loft ({[0, 0; 1, 0; 1, 1], [0, 0; 1, 0; 1, 1]}, [0, 1], {[1, 1], []})
+%! solid.loft ({geom.Region([0, 0; 1, 0; 1, 1]), ...
+%!              geom.Region([0, 0; 1, 0; 1, 1])}, 'Ruled', 2)

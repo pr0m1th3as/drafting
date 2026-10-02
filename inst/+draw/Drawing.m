@@ -15,59 +15,58 @@
 ## You should have received a copy of the GNU General Public License along with
 ## this program; if not, see <http://www.gnu.org/licenses/>.
 
-## -*- texinfo -*-
-## @deftypefn  {drafting} {@var{D} =} draw.Drawing ()
-## @deftypefnx {drafting} {@var{D} =} draw.Drawing (@var{NAME})
-##
-## A two-dimensional drawing in model space.
-##
-## @code{draw.Drawing} holds an ordered list of drawing entities in
-## millimetres, each assigned to a named layer, together with the machinery to
-## append more.  It is the single geometry model behind every output format:
-## the CAD file, the report figure and the screen preview are three renderings
-## of one @code{draw.Drawing}.
-##
-## The class is a @emph{value} class, so every method that appends an entity
-## returns a new object and the original is unchanged.  Append methods are
-## written to chain:
-##
-## @example
-## @group
-## D = draw.Drawing ('plate');
-## D.Layer = 'outline';
-## D = D.polyline ([0, 0; 160, 0; 160, 180; 0, 180], true);
-## D = D.circle ([80, 90], 25).text ([0, -20], 'PLATE', 3.5);
-## @end group
-## @end example
-##
-## New entities take the layer, line type and colour that are current when
-## they are appended, exactly as a CAD application draws on its current layer
-## with its current pen.  Set @code{Layer}, @code{Linetype} or @code{Colour}
-## first and then draw; no append method takes any of the three as an argument.
-## Each governs what follows it and never what came before.
-##
-## Properties rather than arguments is what lets a caller state a drawing
-## convention once and then draw against it, which is how a draughtsman works
-## and how CAD is built.  It is also why a dimension's exploded parts inherit
-## all three: the rule has no exceptions.
-##
-## Dimensions are stored @strong{semantically} --- the two measured points, a
-## perpendicular offset and a direction --- and are turned into lines,
-## arrowheads and text by whichever backend renders them.  Nothing about how a
-## dimension looks is decided here, which is what keeps a dimension truthful
-## when the geometry it measures moves.
-##
-## A drawing reports what it holds through @code{numentities}, @code{layers}
-## and @code{bbox}, and hands its contents to a backend through
-## @code{entities}, which lowers them to the primitives a file can carry.  That
-## lowered list is what @code{plot}, @code{print}, @code{tikz} and
-## @code{dxf.write} all consume, so a figure shows the entities the file will
-## contain rather than a more flattering rendering of them.
-##
-## @seealso{dxf.write, geom.bbox}
-## @end deftypefn
-
 classdef Drawing
+  ## -*- texinfo -*-
+  ## @deftp {drafting} draw.Drawing
+  ##
+  ## A two-dimensional drawing in model space.
+  ##
+  ## @code{draw.Drawing} holds an ordered list of drawing entities in
+  ## millimetres, each assigned to a named layer, together with the machinery to
+  ## append more.  It is the single geometry model behind every output format:
+  ## the CAD file, the report figure and the screen preview are three renderings
+  ## of one @code{draw.Drawing}.
+  ##
+  ## The class is a @emph{value} class, so every method that appends an entity
+  ## returns a new object and the original is unchanged.  Append methods are
+  ## written to chain:
+  ##
+  ## @example
+  ## @group
+  ## D = draw.Drawing ('plate');
+  ## D.Layer = 'outline';
+  ## D = D.polyline ([0, 0; 160, 0; 160, 180; 0, 180], true);
+  ## D = D.circle ([80, 90], 25).text ([0, -20], 'PLATE', 3.5);
+  ## @end group
+  ## @end example
+  ##
+  ## New entities take the layer, line type and colour that are current when
+  ## they are appended, exactly as a CAD application draws on its current layer
+  ## with its current pen.  Set @code{Layer}, @code{Linetype} or
+  ## @code{Colour} first and then draw; no append method takes any of the
+  ## three as an argument.  Each governs what follows it and never what came
+  ## before.
+  ##
+  ## Properties rather than arguments is what lets a caller state a drawing
+  ## convention once and then draw against it, which is how a draughtsman works
+  ## and how CAD is built.  It is also why a dimension's exploded parts inherit
+  ## all three: the rule has no exceptions.
+  ##
+  ## Dimensions are stored @strong{semantically} --- the two measured points, a
+  ## perpendicular offset and a direction --- and are turned into lines,
+  ## arrowheads and text by whichever backend renders them.  Nothing about how a
+  ## dimension looks is decided here, which is what keeps a dimension truthful
+  ## when the geometry it measures moves.
+  ##
+  ## A drawing reports what it holds through @code{numentities}, @code{layers}
+  ## and @code{bbox}, and hands its contents to a backend through
+  ## @code{entities}, which lowers them to the primitives a file can carry.
+  ## That lowered list is what @code{plot}, @code{print}, @code{tikz} and
+  ## @code{dxf.write} all consume, so a figure shows the entities the file will
+  ## contain rather than a more flattering rendering of them.
+  ##
+  ## @seealso{dxf.write, geom.bbox}
+  ## @end deftp
 
   properties
 

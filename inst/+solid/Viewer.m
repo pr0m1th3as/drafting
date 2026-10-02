@@ -15,80 +15,65 @@
 ## You should have received a copy of the GNU General Public License along with
 ## this program; if not, see <http://www.gnu.org/licenses/>.
 
-
-## -*- texinfo -*-
-## @deftypefn  {drafting} {@var{V} =} solid.Viewer ()
-## @deftypefnx {drafting} {@var{V} =} solid.Viewer (@qcode{'Hidden'}, @var{TF})
-##
-## A window showing a solid, in which edges and faces can be picked.
-##
-## @code{@var{V} = solid.Viewer ()} returns a viewer that shows nothing yet.
-## Assigning a @code{solid.Shape} to @code{@var{V}.Shape} opens its window,
-## even for the empty shape, or redraws it in place, keeping the camera where
-## it was:
-##
-## @example
-## @group
-## V = solid.Viewer ();
-## V.Shape = solid.box (80, 40, 12);
-## V.Shape = hole (V.Shape, [20, 20, 12], 8, Inf);
-## @end group
-## @end example
-##
-## @code{solid.show} keeps one viewer for you and is the usual way in; a
-## viewer of your own is for showing two shapes side by side.
-##
-## The window is drawn by Open CASCADE in a process of its own, so a complex
-## model turns smoothly and never holds up the Octave prompt.  The left mouse
-## button rotates, the middle one pans and the wheel zooms.  Keys:
-##
-## @multitable @columnfractions 0.15 0.85
-## @item @kbd{F} @tab fit the shape to the window
-## @item @kbd{0} @tab isometric view
-## @item @kbd{1} @tab front view, looking along @math{+y}
-## @item @kbd{2} @tab top view, looking down @math{z}
-## @item @kbd{3} @tab right view, looking along @math{-x}
-## @end multitable
-##
-## Closing the window ends the viewer; assigning a shape again opens a new
-## one.  The window closes with Octave.
-##
-## @code{solid.Viewer (@qcode{'Hidden'}, true)} never shows its window.  It
-## draws and picks all the same, which is how the viewer is tested.
-##
-## The viewer is built with the package when Open CASCADE and X11 are found,
-## and needs a display to run.  It runs on Linux.
-##
-## @seealso{solid.show, solid.Viewer.pick}
-## @end deftypefn
-
 classdef Viewer < handle
+  ## -*- texinfo -*-
+  ## @deftp {drafting} solid.Viewer
+  ##
+  ## A window showing a solid, in which edges and faces can be picked.
+  ##
+  ## Assigning a @code{solid.Shape} to the @code{Shape} of a viewer opens its
+  ## window, or redraws it in place, keeping the camera where it was.  Nothing
+  ## else redraws it.  @code{solid.show} keeps a viewer for each variable and
+  ## is the usual way in; a viewer of your own is for when you want to hold
+  ## it yourself.
+  ##
+  ## The window is drawn by Open CASCADE in a process of its own, so a complex
+  ## model turns smoothly and never holds up the Octave prompt.  The left mouse
+  ## button rotates, the middle one pans and the wheel zooms.  Keys:
+  ##
+  ## @multitable @columnfractions 0.15 0.85
+  ## @item @kbd{F} @tab fit the shape to the window
+  ## @item @kbd{0} @tab isometric view
+  ## @item @kbd{1} @tab front view, looking along @math{+y}
+  ## @item @kbd{2} @tab top view, looking down @math{z}
+  ## @item @kbd{3} @tab right view, looking along @math{-x}
+  ## @end multitable
+  ##
+  ## Closing the window ends the viewer; assigning a shape again opens a new
+  ## one.  The window closes with Octave.
+  ##
+  ## The viewer is built with the package when Open CASCADE and X11 are found,
+  ## and needs a display to run.  It runs on Linux.
+  ##
+  ## @seealso{solid.show, solid.Viewer.pick}
+  ## @end deftp
 
   properties (Dependent)
 
     ## -*- texinfo -*-
-    ## @deftypefn {solid.Viewer} {} Shape
+    ## @deftp {solid.Viewer} {property} Shape
     ##
-    ## The @code{solid.Shape} shown.
+    ## Shape shown
     ##
-    ## Assigning a shape opens the window if it is not open and redraws it in
-    ## place if it is.  The empty shape opens the window empty, or clears it
-    ## if it is open; the first shape shown after it is fitted to the window.
+    ## The @code{solid.Shape} shown.  Assigning a shape opens the window if it
+    ## is not open and redraws it in place if it is.  The empty shape opens
+    ## the window empty, or clears it if it is open; the first shape shown
+    ## after it is fitted to the window.
     ##
-    ## @end deftypefn
+    ## @end deftp
     Shape
 
     ## -*- texinfo -*-
-    ## @deftypefn {solid.Viewer} {} Name
+    ## @deftp {solid.Viewer} {property} Name
     ##
-    ## The name of the variable holding the shape shown.
+    ## Name of the shape shown
     ##
-    ## Setting it titles the window with the name, so that several viewers can
-    ## be told apart, and the queries @code{solid.Viewer.pick} prints use it.
-    ## Until it is set the window is titled @qcode{drafting} and the queries
-    ## use @qcode{'S'}.
+    ## The name of the variable holding the shape shown.  Setting it titles
+    ## the window with the name, so that several viewers can be told apart,
+    ## and the queries @code{solid.Viewer.pick} prints use it.  Until it is set
+    ## the window is titled @qcode{drafting} and the queries use @qcode{'S'}.
     ##
-    ## @end deftypefn
+    ## @end deftp
     Name
 
   endproperties
@@ -229,6 +214,29 @@ classdef Viewer < handle
 
   methods (Access = public)
 
+    ## -*- texinfo -*-
+    ## @deftypefn  {solid.Viewer} {@var{V} =} solid.Viewer ()
+    ## @deftypefnx {solid.Viewer} {@var{V} =} solid.Viewer (@qcode{'Hidden'}, @var{TF})
+    ##
+    ## Make a viewer.
+    ##
+    ## @code{@var{V} = solid.Viewer ()} returns a viewer that shows nothing
+    ## yet; its window opens when a shape, even the empty one, is assigned to
+    ## its @code{Shape}:
+    ##
+    ## @example
+    ## @group
+    ## V = solid.Viewer ();
+    ## V.Shape = solid.box (80, 40, 12);
+    ## V.Shape = hole (V.Shape, [20, 20, 12], 8, Inf);
+    ## @end group
+    ## @end example
+    ##
+    ## @code{@var{V} = solid.Viewer (@qcode{'Hidden'}, true)} never shows its
+    ## window.  It draws and picks all the same, which is how the viewer is
+    ## tested.
+    ##
+    ## @end deftypefn
     function this = Viewer (varargin)
 
       ## A wrapper over an existing viewer, for solid.show
@@ -322,10 +330,10 @@ classdef Viewer < handle
     ## @code{solid.Shape.edges} and @code{solid.Shape.faces} use.  A click
     ## selects what is under the pointer, which stays drawn in orange, a
     ## selected edge thick and a selected face filled, and a second click on
-    ## it lets it go; the shape can still be turned between clicks.  @kbd{Enter} finishes and
-    ## @kbd{Escape} cancels, returning nothing.  With @qcode{'edge'} or
-    ## @qcode{'face'} only that kind can be picked, and its indices are the one
-    ## output.
+    ## it lets it go; the shape can still be turned between clicks.
+    ## @kbd{Enter} finishes and @kbd{Escape} cancels, returning nothing.  With
+    ## @qcode{'edge'} or @qcode{'face'} only that kind can be picked, and its
+    ## indices are the one output.
     ##
     ## Indices belong to the shape they were picked on, and a script that holds
     ## them breaks as soon as an earlier step adds a feature.  So @code{pick}

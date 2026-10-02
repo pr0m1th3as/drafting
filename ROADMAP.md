@@ -47,6 +47,42 @@ are deliberate:
 
 Everything below is checked against those two lines.
 
+## Polylines and regions
+
+Two value classes in `+geom` are the package's one representation of planar
+outlines, used by drawings and solids alike. Functions take the classes and
+nothing else; only the constructors accept plain matrices. Point sets that
+carry no arcs, such as the input of `geom.offset` or `geom.curvature`, stay
+N-by-2 matrices.
+
+- **`geom.Polyline`**: the DXF polyline. `Vertices` is an N-by-3 matrix
+  `[x, y, bulge]` in the polyline's own plane; an N-by-2 matrix is accepted and
+  given zero bulges. It is open or `Closed`, and may cross itself. Its plane is
+  a user coordinate system, an `Origin`, an `XAxis` and a `Normal`, the xy plane
+  by default; a plane given by its normal alone takes its x axis from DXF's
+  arbitrary axis algorithm, so it reads and writes DXF exactly.
+- **`geom.Region`**: a closed planar area, one outline and any number of holes
+  of any shape, all `geom.Polyline` objects in one plane. It refuses an outline
+  or a hole that is open, crosses or touches itself or encloses no area, a hole
+  not strictly inside the outline, and holes that meet. It normalises the
+  outline anticlockwise and the holes clockwise. An island inside a hole is
+  not supported; a second region unioned onto the solid makes one.
+
+A region is what a solid is made from (`solid.extrude`, `revolve`, `sweep`,
+`loft`, `helix`), what a section of a solid is, and what a hatch fills, and the
+polygon booleans of milestone 6 act on regions. A solid is made where its
+region's plane puts it: `extrude` rises along the normal; `revolve` and `helix`
+turn about the plane's own y axis through its origin, local x the radius, so a
+region in the default xy plane turns about the model's y axis; `loft` takes
+each section where its plane lies, sections need not be parallel, and all have
+the same number of holes; `sweep` sweeps the region from where it lies along a
+path in model coordinates. A pocket, a recess of limited
+depth, is an operation on a solid, not part of a region.
+
+This replaces, before any of it is released, the matrix-and-bulge arguments
+of `+solid`, and breaks `draw.Drawing.polyline` from 0.1.0, which takes a
+`geom.Polyline` instead of vertices and a separate bulge vector.
+
 ## Milestone 1: close the package's own shape (0.2.0)
 
 Small, unglamorous work that removes asymmetries in what is already here. Each

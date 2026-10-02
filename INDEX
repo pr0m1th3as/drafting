@@ -1,4 +1,7 @@
 drafting >> Geometry, CAD Input/Output and Technical Drawing
+Polylines and regions
+ geom.Polyline
+ geom.Region
 Geometry primitives
  geom.signedarea
  geom.bbox

@@ -18,8 +18,10 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 */
 
 #include <cmath>
+#include <functional>
 #include <sstream>
 #include <string>
+#include <vector>
 
 #include <octave/oct.h>
 
@@ -178,13 +180,13 @@ todir (const octave_value& v)
   return gp_Dir (a(0), a(1), a(2));
 }
 
-// The closed wire of a profile: the rows of P are vertices in the plane through
-// O spanned by U and V, and B(i) is the bulge of the segment leaving vertex i,
-// the tangent of a quarter of its included angle, positive anticlockwise.  The
-// profile has been validated by the caller, so every segment has a length.
+// The closed wire through the rows of V, [x, y, bulge], in the plane through
+// O spanned by U and V.  The bulge of a vertex is that of the segment leaving
+// it, the tangent of a quarter of its included angle, positive anticlockwise.
+// The outline has been validated as a geom.Polyline, so every segment has a
+// length.
 static TopoDS_Wire
-profile (const Matrix& P, const NDArray& B, const gp_XYZ& o, const gp_XYZ& u,
-         const gp_XYZ& v)
+outline (const Matrix& P, const gp_XYZ& o, const gp_XYZ& u, const gp_XYZ& v)
 {
   const octave_idx_type n = P.rows ();
   auto at = [&] (double x, double y) { return gp_Pnt (o + u * x + v * y); };
@@ -194,7 +196,7 @@ profile (const Matrix& P, const NDArray& B, const gp_XYZ& o, const gp_XYZ& u,
     const octave_idx_type j = (i + 1) % n;
     const gp_Pnt p1 = at (P(i,0), P(i,1));
     const gp_Pnt p2 = at (P(j,0), P(j,1));
-    if (B(i) == 0)
+    if (P(i,2) == 0)
     {
       w.Add (BRepBuilderAPI_MakeEdge (p1, p2).Edge ());
     }
@@ -205,7 +207,7 @@ profile (const Matrix& P, const NDArray& B, const gp_XYZ& o, const gp_XYZ& u,
       // travel for a positive bulge
       const double dx = P(j,0) - P(i,0);
       const double dy = P(j,1) - P(i,1);
-      const double s = B(i) / 2;
+      const double s = P(i,2) / 2;
       const gp_Pnt pm = at ((P(i,0) + P(j,0)) / 2 + s * dy,
                             (P(i,1) + P(j,1)) / 2 - s * dx);
       const Handle (Geom_TrimmedCurve) arc
@@ -216,21 +218,55 @@ profile (const Matrix& P, const NDArray& B, const gp_XYZ& o, const gp_XYZ& u,
   return w.Wire ();
 }
 
-// A profile from its Octave arguments, in the plane through O spanned by U
-// and V
-static TopoDS_Wire
-profile (const octave_value& P, const octave_value& B, const gp_XYZ& o,
-         const gp_XYZ& u, const gp_XYZ& v)
+// A geom.Region as Octave hands it over: the outline's vertices, a cell of
+// the holes' vertices, and the frame of its plane, rows origin, x axis, y
+// axis and normal.  The outline runs anticlockwise and the holes clockwise.
+struct region
 {
-  return profile (P.matrix_value (), B.array_value (), o, u, v);
+  TopoDS_Wire outer;
+  vector<TopoDS_Wire> holes;
+  gp_Pnt origin;
+  gp_Dir x, y, normal;
+};
+
+static region
+toregion (const octave_value& v)
+{
+  const octave_scalar_map m = v.scalar_map_value ();
+  const Matrix f = m.contents ("frame").matrix_value ();
+  const gp_XYZ o (f(0,0), f(0,1), f(0,2));
+  const gp_XYZ u (f(1,0), f(1,1), f(1,2));
+  const gp_XYZ w (f(2,0), f(2,1), f(2,2));
+  region r;
+  r.origin = gp_Pnt (o);
+  r.x = gp_Dir (u);
+  r.y = gp_Dir (w);
+  r.normal = gp_Dir (f(3,0), f(3,1), f(3,2));
+  r.outer = outline (m.contents ("outline").matrix_value (), o, u, w);
+  const Cell h = m.contents ("holes").cell_value ();
+  for (octave_idx_type i = 0; i < h.numel (); i++)
+  {
+    r.holes.push_back (outline (h(i).matrix_value (), o, u, w));
+  }
+  return r;
 }
 
-// The planar face a profile bounds
+// The planar face a region bounds, its holes as inner wires
 static TopoDS_Face
-planarface (const TopoDS_Wire& w)
+planarface (const region& r)
 {
-  return BRepBuilderAPI_MakeFace (w, Standard_True).Face ();
+  BRepBuilderAPI_MakeFace f (r.outer, Standard_True);
+  for (const TopoDS_Wire& h : r.holes)
+  {
+    f.Add (h);
+  }
+  return f.Face ();
 }
+
+// S less every shape in TOOLS, in one operation
+static TopoDS_Shape
+cutall (const TopoDS_Shape& s, const vector<TopoDS_Shape>& tools,
+        const string& caller);
 
 // The sub-shapes of one kind picked by 1-based indices into the map of all of
 // them, which is the order in which the queries report them.  The indices have
@@ -421,6 +457,50 @@ boolean (BRepAlgoAPI_BooleanOperation& op, const string& caller,
   return op.Shape ();
 }
 
+static TopoDS_Shape
+cutall (const TopoDS_Shape& s, const vector<TopoDS_Shape>& tools,
+        const string& caller)
+{
+  if (tools.empty ())
+  {
+    return s;
+  }
+  TopTools_ListOfShape objects, list;
+  objects.Append (s);
+  for (const TopoDS_Shape& t : tools)
+  {
+    list.Append (t);
+  }
+  BRepAlgoAPI_Cut op;
+  op.SetArguments (objects);
+  op.SetTools (list);
+  return boolean (op, caller, "holes");
+}
+
+// A wire swept along SPINE into a solid, with sharp corners or, along a
+// helix, the Frenet frame
+static TopoDS_Shape
+pipe (const TopoDS_Wire& spine, const TopoDS_Wire& w, bool frenet,
+      const string& caller)
+{
+  BRepOffsetAPI_MakePipeShell op (spine);
+  if (frenet)
+  {
+    op.SetMode (Standard_True);
+  }
+  else
+  {
+    op.SetTransitionMode (BRepBuilderAPI_RightCorner);
+  }
+  op.Add (w);
+  op.Build ();
+  if (! op.IsDone () || ! op.MakeSolid ())
+  {
+    error ("%s: Open CASCADE could not compute the sweep.", caller.c_str ());
+  }
+  return op.Shape ();
+}
+
 static void
 writestep (const TopoDS_Shape& s, const string& file, const string& name,
            const string& caller)
@@ -522,7 +602,8 @@ function directly. \n\
     else if (cmd == "cylinder")
     {
       out = todata (BRepPrimAPI_MakeCylinder (args(2).double_value (),
-                                              args(3).double_value ()).Shape ());
+                                              args(3).double_value ())
+                    .Shape ());
     }
     else if (cmd == "cone")
     {
@@ -540,63 +621,71 @@ function directly. \n\
                                            args(3).double_value ()).Shape ());
     }
 
-    // Solids from profiles.  An extrusion rises along z from a profile in the
-    // xy plane; a revolution turns a profile drawn in the xz plane, with its
-    // columns the radius and the height, about the z axis; a loft passes
-    // through profiles at increasing heights.
+    // Solids from regions, each made where the region's plane puts it.  An
+    // extrusion rises along the normal; a revolution turns about the plane's
+    // y axis through its origin; a loft passes through regions where they
+    // lie; a sweep carries the region from where it lies along a path.
     else if (cmd == "extrude")
     {
-      const TopoDS_Face f = planarface (profile (args(2), args(3),
-                                                 gp_XYZ (0, 0, 0),
-                                                 gp_XYZ (1, 0, 0),
-                                                 gp_XYZ (0, 1, 0)));
+      const region r = toregion (args(2));
       out = todata (BRepPrimAPI_MakePrism
-                      (f, gp_Vec (0, 0, args(4).double_value ())).Shape ());
+                      (planarface (r),
+                       gp_Vec (r.normal) * args(3).double_value ()).Shape ());
     }
     else if (cmd == "revolve")
     {
-      const TopoDS_Face f = planarface (profile (args(2), args(3),
-                                                 gp_XYZ (0, 0, 0),
-                                                 gp_XYZ (1, 0, 0),
-                                                 gp_XYZ (0, 0, 1)));
-      const gp_Ax1 z (gp_Pnt (0, 0, 0), gp_Dir (0, 0, 1));
-      const double angle = args(4).double_value ();
+      const region r = toregion (args(2));
+      const gp_Ax1 axis (r.origin, r.y);
+      const double angle = args(3).double_value ();
       if (angle >= 360)
       {
-        out = todata (BRepPrimAPI_MakeRevol (f, z).Shape ());
+        out = todata (BRepPrimAPI_MakeRevol (planarface (r), axis).Shape ());
       }
       else
       {
-        out = todata (BRepPrimAPI_MakeRevol (f, z, angle * M_PI / 180)
-                      .Shape ());
+        out = todata (BRepPrimAPI_MakeRevol (planarface (r), axis,
+                                             angle * M_PI / 180).Shape ());
       }
     }
     else if (cmd == "loft")
     {
-      const Cell P = args(2).cell_value ();
-      const Cell B = args(3).cell_value ();
-      const NDArray z = args(4).array_value ();
-      BRepOffsetAPI_ThruSections op (Standard_True, args(5).bool_value ());
-      for (octave_idx_type i = 0; i < P.numel (); i++)
+      const Cell R = args(2).cell_value ();
+      const bool ruled = args(3).bool_value ();
+      vector<region> rs;
+      for (octave_idx_type i = 0; i < R.numel (); i++)
       {
-        op.AddWire (profile (P(i), B(i), gp_XYZ (0, 0, z(i)),
-                             gp_XYZ (1, 0, 0), gp_XYZ (0, 1, 0)));
+        rs.push_back (toregion (R(i)));
       }
-      op.Build ();
-      if (! op.IsDone ())
+      // The outlines lofted, less each hole lofted through its sections
+      auto loft = [&] (std::function<TopoDS_Wire (const region&)> pick)
       {
-        error ("%s: Open CASCADE could not compute the loft.",
-               caller.c_str ());
+        BRepOffsetAPI_ThruSections op (Standard_True, ruled);
+        for (const region& r : rs)
+        {
+          op.AddWire (pick (r));
+        }
+        op.Build ();
+        if (! op.IsDone ())
+        {
+          error ("%s: Open CASCADE could not compute the loft.",
+                 caller.c_str ());
+        }
+        return op.Shape ();
+      };
+      const TopoDS_Shape outer = loft ([] (const region& r)
+                                       { return r.outer; });
+      vector<TopoDS_Shape> holes;
+      for (size_t k = 0; k < rs[0].holes.size (); k++)
+      {
+        holes.push_back (loft ([k] (const region& r)
+                               { return r.holes[k]; }));
       }
-      out = todata (op.Shape ());
+      out = todata (cutall (outer, holes, caller));
     }
-
-    // A sweep carries a profile drawn in the xy plane along a polyline, turned
-    // by the smallest rotation that takes the z axis onto the first segment
-    // and placed at the first vertex.  Corners are kept sharp.
     else if (cmd == "sweep")
     {
-      const Matrix path = args(4).matrix_value ();
+      const region r = toregion (args(2));
+      const Matrix path = args(3).matrix_value ();
       BRepBuilderAPI_MakeWire spine;
       for (octave_idx_type i = 0; i + 1 < path.rows (); i++)
       {
@@ -604,66 +693,45 @@ function directly. \n\
                      (gp_Pnt (path(i,0), path(i,1), path(i,2)),
                       gp_Pnt (path(i+1,0), path(i+1,1), path(i+1,2))).Edge ());
       }
-      const gp_Vec t (path(1,0) - path(0,0), path(1,1) - path(0,1),
-                      path(1,2) - path(0,2));
-      const gp_Vec z (0, 0, 1);
-      gp_Trsf rot;
-      if (z.IsOpposite (t, 1e-12))
+      vector<TopoDS_Shape> holes;
+      for (const TopoDS_Wire& h : r.holes)
       {
-        rot.SetRotation (gp_Ax1 (gp_Pnt (0, 0, 0), gp_Dir (1, 0, 0)), M_PI);
+        holes.push_back (pipe (spine.Wire (), h, false, caller));
       }
-      else if (! z.IsParallel (t, 1e-12))
-      {
-        rot.SetRotation (gp_Ax1 (gp_Pnt (0, 0, 0), gp_Dir (z.Crossed (t))),
-                         z.Angle (t));
-      }
-      gp_Trsf move;
-      move.SetTranslation (gp_Vec (path(0,0), path(0,1), path(0,2)));
-      const TopoDS_Shape w = transform (profile (args(2), args(3),
-                                                 gp_XYZ (0, 0, 0),
-                                                 gp_XYZ (1, 0, 0),
-                                                 gp_XYZ (0, 1, 0)),
-                                        move * rot);
-      BRepOffsetAPI_MakePipeShell op (spine.Wire ());
-      op.SetTransitionMode (BRepBuilderAPI_RightCorner);
-      op.Add (w);
-      op.Build ();
-      if (! op.IsDone () || ! op.MakeSolid ())
-      {
-        error ("%s: Open CASCADE could not compute the sweep.",
-               caller.c_str ());
-      }
-      out = todata (op.Shape ());
+      out = todata (cutall (pipe (spine.Wire (), r.outer, false, caller),
+                            holes, caller));
     }
 
-    // A helix turns a profile drawn in the xz plane, with its columns the
-    // radius and the height, about the z axis while it rises by the pitch on
-    // every turn.  The spine is an exact helix on a cylinder of the given
-    // radius, and the Frenet frame keeps the profile in the plane through the
-    // axis, as a thread's profile is.
+    // A helix turns a region about its plane's y axis while it rises along
+    // it by the pitch on every turn.  The spine is an exact helix on a
+    // cylinder of the given radius, made about the z axis and carried onto
+    // the region's frame, and the Frenet frame keeps the region in the plane
+    // through the axis, as a thread's profile is.
     else if (cmd == "helix")
     {
-      const double pitch = args(4).double_value ();
-      const double turns = args(5).double_value ();
-      const double r = args(6).double_value ();
+      const region r = toregion (args(2));
+      const double pitch = args(3).double_value ();
+      const double turns = args(4).double_value ();
+      const double rad = args(5).double_value ();
       const gp_Dir2d d (2 * M_PI, pitch);
       const double len = turns * hypot (2 * M_PI, pitch);
       Handle (Geom_CylindricalSurface) cyl
-        = new Geom_CylindricalSurface (gp_Ax3 (gp::XOY ()), r);
+        = new Geom_CylindricalSurface (gp_Ax3 (gp::XOY ()), rad);
       Handle (Geom2d_Line) line = new Geom2d_Line (gp_Pnt2d (0, 0), d);
       TopoDS_Edge e = BRepBuilderAPI_MakeEdge (line, cyl, 0, len).Edge ();
       BRepLib::BuildCurves3d (e);
-      BRepOffsetAPI_MakePipeShell op (BRepBuilderAPI_MakeWire (e).Wire ());
-      op.SetMode (Standard_True);
-      op.Add (profile (args(2), args(3), gp_XYZ (0, 0, 0), gp_XYZ (1, 0, 0),
-                       gp_XYZ (0, 0, 1)));
-      op.Build ();
-      if (! op.IsDone () || ! op.MakeSolid ())
+      gp_Trsf place;
+      place.SetDisplacement (gp_Ax3 (gp::XOY ()),
+                             gp_Ax3 (r.origin, r.y, r.x));
+      const TopoDS_Wire spine = TopoDS::Wire (transform
+                                  (BRepBuilderAPI_MakeWire (e).Wire (), place));
+      vector<TopoDS_Shape> holes;
+      for (const TopoDS_Wire& h : r.holes)
       {
-        error ("%s: Open CASCADE could not compute the helix.",
-               caller.c_str ());
+        holes.push_back (pipe (spine, h, true, caller));
       }
-      out = todata (op.Shape ());
+      out = todata (cutall (pipe (spine, r.outer, true, caller), holes,
+                            caller));
     }
 
     // Features on chosen edges and faces

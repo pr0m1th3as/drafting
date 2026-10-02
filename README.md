@@ -10,8 +10,8 @@ a report, or as a figure on screen. Solids proper, built, combined and
 exchanged as STEP, come through Open CASCADE when the package is built with it.
 
 Forty-three public functions across five namespaces plus the
-`draw.Drawing`, `solid.Shape` and `solid.Viewer` classes, 1122 built-in
-self-tests and 67 `%!demo` blocks,
+`draw.Drawing`, `geom.Polyline`, `geom.Region`, `solid.Shape` and
+`solid.Viewer` classes, 1164 built-in self-tests and 67 `%!demo` blocks,
 nearly all of which end in a `plot` call, so the documentation shows what a
 function does rather than only describing it.
 
@@ -36,6 +36,13 @@ transform, offset, largest inscribed rectangle, triangulation), curve geometry
 (curvature, sampling, offsetting, self-intersection, arc length) and
 construction geometry (line and circle intersections, tangent points, fillets).
 Polylines can be resampled or simplified.
+
+Outlines with arcs are two value classes. A `geom.Polyline` is a DXF polyline,
+open or closed: vertices `[x, y, bulge]` in a plane of its own, an origin, an x
+axis and a normal, the xy plane unless told otherwise, so a sketch can be laid
+on any face. A `geom.Region` is a closed area, one outline with holes of any
+shape in it, checked to be valid; it is what a solid is made from. Functions
+take the classes; only their constructors take plain matrices.
 
 `draw.Drawing` is a value class carrying lines, polylines with per-vertex
 bulges, arcs, circles, ellipses, text, hatches, blocks and inserts, and a full
@@ -97,8 +104,9 @@ a solid, with the booleans `union`, `subtract` and `intersect`, translation,
 rotation, mirroring and scaling, and volume, area, centroid and bounding box;
 `solid.box`, `solid.cylinder`, `solid.cone`, `solid.sphere` and `solid.torus`
 make the primitives; `solid.extrude`, `solid.revolve`, `solid.loft`,
-`solid.sweep` and `solid.helix` make a solid from planar profiles, with
-bulges, as `draw.Drawing.polyline` takes them, carried as true arcs. Methods
+`solid.sweep` and `solid.helix` make a solid from a `geom.Region`, where the
+region's plane puts it, its arcs carried as true arcs and its holes right
+through. Methods
 drill holes (plain, counterbored, countersunk, tapping size), round and bevel
 edges and hollow a shape, on edges and faces chosen by kind, direction and
 position. `solid.read` reads STEP, and `solid.write` writes STEP for a CAD
@@ -112,7 +120,9 @@ plate = fillet (plate, edges (plate, 'Direction', [0, 0, 1], ...
 solid.write ('plate.step', plate);
 solid.write ('plate.stl', plate);
 
-shaft = solid.revolve ([0, 0; 10, 0; 10, 30; 6, 30; 6, 50; 0, 50]);
+section = geom.Polyline ([0, 0; 10, 0; 10, 30; 6, 30; 6, 50; 0, 50], ...
+                         'Closed', true, 'Normal', [0, -1, 0]);
+shaft = solid.revolve (geom.Region (section));    # turned about z
 ```
 
 `solid.show` shows a solid in a window Open CASCADE draws in a process of its
@@ -216,7 +226,7 @@ macOS are not yet.
 After installation, type:
 - `pkg load drafting` to load the **drafting** package.
 - `news drafting` to review all the user visible changes since last version.
-- `pkg test drafting` to run a test suite for all 46 functions and class
+- `pkg test drafting` to run a test suite for all 48 functions and class
   definitions currently available and ensure that they work properly on your
   system.
 
