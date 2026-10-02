@@ -844,6 +844,7 @@ classdef Shape
     ## -*- texinfo -*-
     ## @deftypefn  {solid.Shape} {@var{S} =} shell (@var{S}, @var{F}, @var{T})
     ## @deftypefnx {solid.Shape} {@var{S} =} shell (@dots{}, @qcode{'Outward'}, @var{TF})
+    ## @deftypefnx {solid.Shape} {@var{S} =} shell (@dots{}, @qcode{'Thickness'}, @{@var{FACES}, @var{T2}, @dots{}@})
     ##
     ## Hollow a shape to a uniform wall thickness.
     ##
@@ -859,6 +860,22 @@ classdef Shape
     ## walls outwards instead, so the inside keeps the size and shape of
     ## @var{S} and the outside grows by @var{T}: the way to make a box that a
     ## part of the shape of @var{S} fits into.  It is @code{false} by default.
+    ##
+    ## @code{@var{S} = shell (@dots{}, @qcode{'Thickness'}, @{@var{FACES},
+    ## @var{T2}, @dots{}@})} gives the faces indexed by @var{FACES} walls
+    ## @var{T2} thick instead of @var{T}, and so on for every pair in the cell
+    ## array: a thicker floor, a thinner lid.  The faces come from
+    ## @code{solid.Shape.faces}, none may be opened, and none may be given two
+    ## thicknesses:
+    ##
+    ## @example
+    ## @group
+    ## ## A box of 2 walls with a floor 4 thick, open at the top
+    ## B = solid.box (60, 40, 30);
+    ## B = shell (B, faces (B, 'Normal', [0, 0, 1]), 2, ...
+    ##            'Thickness', @{faces(B, 'Normal', [0, 0, -1]), 4@});
+    ## @end group
+    ## @end example
     ##
     ## Walls too thick for the shape, which would meet in the middle, cannot
     ## be built and raise an error.
@@ -881,7 +898,8 @@ classdef Shape
       if (nargin < 3)
         error ("solid.Shape.shell: invalid number of input arguments.");
       endif
-      [errmsg, opt] = options (varargin, struct ('Outward', false));
+      [errmsg, opt] = options (varargin, struct ('Outward', false, ...
+                                                 'Thickness', {{}}));
       if (isempty (errmsg) && (! (islogical (opt.Outward) ...
                                   || isnumeric (opt.Outward)) ...
                                || ! isscalar (opt.Outward) ...
@@ -891,9 +909,40 @@ classdef Shape
       if (! isempty (errmsg))
         error ("solid.Shape.shell: %s", errmsg);
       endif
+      ## The faces with walls of their own, and their thicknesses
+      C = opt.Thickness;
+      if (! iscell (C) || mod (numel (C), 2) != 0)
+        error (strcat ("solid.Shape.shell: Thickness must be a cell array", ...
+                       " of faces and thicknesses, in pairs."));
+      endif
+      TF = zeros (1, 0);
+      TT = zeros (1, 0);
+      for k = 1:2:numel (C)
+        if (! isnumeric (C{k}) || ! isreal (C{k}) || isempty (C{k}) ...
+            || ! isvector (C{k}) || any (C{k} != fix (C{k})))
+          error (strcat ("solid.Shape.shell: Thickness must give each set", ...
+                         " of faces as a vector of face indices."));
+        endif
+        if (! isempty (solid.__checkpos__ (C{k+1}, 'T')))
+          error (strcat ("solid.Shape.shell: Thickness must give each", ...
+                         " thickness as a positive and finite real scalar."));
+        endif
+        TF = [TF, double(C{k}(:)')];
+        TT = [TT, repmat(double (C{k+1}), 1, numel (C{k}))];
+      endfor
+      if (numel (unique (TF)) != numel (TF))
+        error ("solid.Shape.shell: Thickness gives a face two thicknesses.");
+      endif
+      if (isnumeric (F) && any (ismember (TF, F)))
+        error (strcat ("solid.Shape.shell: a face cannot be both opened", ...
+                       " and given a thickness."));
+      endif
       errmsg = checkindex (F, numfaces (this), 'F', 'face', true);
       if (isempty (errmsg))
         errmsg = solid.__checkpos__ (T, 'T');
+      endif
+      if (isempty (errmsg) && ! isempty (TF))
+        errmsg = checkindex (TF, numfaces (this), 'Thickness', 'face', false);
       endif
       if (isempty (errmsg) && isempty (this.Data))
         errmsg = "S is empty, so there is nothing to hollow.";
@@ -904,7 +953,7 @@ classdef Shape
 
       this.Data = occt ('solid.Shape.shell', 'shell', this.Data, ...
                         unique (double (F)), double (T), ...
-                        logical (opt.Outward));
+                        logical (opt.Outward), TF, TT);
 
     endfunction
 
@@ -1529,6 +1578,19 @@ endfunction
 %! assert_equal (volume (S), 12 * 22 * 32 - 6000, 1e-9);
 %! assert_equal (isvalid (S), true);
 
+%!testif ; exist ('__occt__') == 3  # a floor of its own thickness
+%! B = solid.box (10, 20, 30);
+%! top = faces (B, 'Normal', [0, 0, 1]);
+%! bot = faces (B, 'Normal', [0, 0, -1]);
+%! S = shell (B, top, 1, 'Thickness', {bot, 4});
+%! assert_equal (volume (S), 6000 - 8 * 18 * 26, 1e-9);
+%! S = shell (B, top, 1, 'Outward', true, 'Thickness', {bot, 4});
+%! assert_equal (volume (S), 12 * 22 * 34 - 6000, 1e-9);
+%! assert_equal (bbox (S), [-1, -1, -4, 11, 21, 30], 1e-9);
+%! S = shell (B, [], 1, 'Thickness', {bot, 3, top, 2});
+%! assert_equal (volume (S), 6000 - 8 * 18 * 25, 1e-9);
+%! assert_equal (isvalid (S), true);
+
 %!testif ; exist ('__occt__') == 3  # a cup
 %! C = solid.cylinder (4, 12);
 %! S = shell (C, faces (C, 'Normal', [0, 0, 1]), 1);
@@ -1695,6 +1757,21 @@ endfunction
 %! shell (solid.Shape (), [], 1, 'Inward', true)
 %!error<solid.Shape.shell: Outward must be a logical scalar.> ...
 %! shell (solid.Shape (), [], 1, 'Outward', 2)
+%!error<solid.Shape.shell: Thickness must be a cell array of faces and thicknesses, in pairs.> ...
+%! shell (solid.Shape (), [], 1, 'Thickness', {1})
+%!error<solid.Shape.shell: Thickness must be a cell array of faces and thicknesses, in pairs.> ...
+%! shell (solid.Shape (), [], 1, 'Thickness', [1, 2])
+%!error<solid.Shape.shell: Thickness must give each set of faces as a vector of face indices.> ...
+%! shell (solid.Shape (), [], 1, 'Thickness', {1.5, 2})
+%!error<solid.Shape.shell: Thickness must give each thickness as a positive and finite real scalar.> ...
+%! shell (solid.Shape (), [], 1, 'Thickness', {1, 0})
+%!error<solid.Shape.shell: Thickness gives a face two thicknesses.> ...
+%! shell (solid.Shape (), [], 1, 'Thickness', {[1, 2], 3, 2, 4})
+%!error<solid.Shape.shell: a face cannot be both opened and given a thickness.> ...
+%! shell (solid.Shape (), [1, 2], 1, 'Thickness', {2, 4})
+%!error<solid.Shape.shell: Thickness must be a vector of face indices of S.>
+%! B = solid.Shape ();
+%! shell (B, [], 1, 'Thickness', {1, 4})
 %!error<solid.Shape.shell: F must be a vector of face indices of S.> ...
 %! shell (solid.Shape (), 1, 1)
 %!error<solid.Shape.shell: T must be a positive and finite real scalar.> ...

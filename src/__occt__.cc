@@ -46,9 +46,9 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <BRepTools_ReShape.hxx>
 #include <BRepLib.hxx>
 #include <BRepMesh_IncrementalMesh.hxx>
+#include <BRepOffset_MakeOffset.hxx>
 #include <BRepOffsetAPI_MakeOffset.hxx>
 #include <BRepOffsetAPI_MakePipeShell.hxx>
-#include <BRepOffsetAPI_MakeThickSolid.hxx>
 #include <BRepOffsetAPI_ThruSections.hxx>
 #include <BRepPrimAPI_MakeBox.hxx>
 #include <BRepPrimAPI_MakeCone.hxx>
@@ -999,14 +999,30 @@ function directly. \n\
       const TopoDS_Shape s = toshape (args(2), caller);
       const TopTools_ListOfShape open
         = picked (s, TopAbs_FACE, args(3).array_value ());
-      // The walls grow inwards, or outwards when asked
+      // The walls grow inwards, or outwards when asked, each the default
+      // thickness unless given one of its own
       const bool outward = (args.length () > 5 && args(5).bool_value ());
+      const double sign = outward ? 1 : -1;
       const double t = args(4).double_value ();
-      BRepOffsetAPI_MakeThickSolid op;
-      op.MakeThickSolidByJoin (s, open, outward ? t : -t, 1e-6,
-                               BRepOffset_Skin, Standard_False,
-                               Standard_False, GeomAbs_Intersection);
-      op.Build ();
+      BRepOffset_MakeOffset op;
+      op.Initialize (s, sign * t, 1e-6, BRepOffset_Skin, Standard_False,
+                     Standard_False, GeomAbs_Intersection);
+      for (const TopoDS_Shape& f : open)
+      {
+        op.AddFace (TopoDS::Face (f));
+      }
+      if (args.length () > 7)
+      {
+        const NDArray fi = args(6).array_value ();
+        const NDArray ft = args(7).array_value ();
+        const TopTools_ListOfShape thick = picked (s, TopAbs_FACE, fi);
+        octave_idx_type k = 0;
+        for (const TopoDS_Shape& f : thick)
+        {
+          op.SetOffsetOnFace (TopoDS::Face (f), sign * ft(k++));
+        }
+      }
+      op.MakeThickSolid ();
       TopoDS_Shape r;
       if (op.IsDone ())
       {
