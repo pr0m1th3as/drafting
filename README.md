@@ -10,7 +10,7 @@ a report, or as a figure on screen. Solids proper, built, combined and
 exchanged as STEP, come through Open CASCADE when the package is built with it.
 
 Forty-three public functions across five namespaces plus the
-`draw.Drawing`, `solid.Shape` and `solid.Viewer` classes, 1119 built-in
+`draw.Drawing`, `solid.Shape` and `solid.Viewer` classes, 1120 built-in
 self-tests and 67 `%!demo` blocks,
 nearly all of which end in a `plot` call, so the documentation shows what a
 function does rather than only describing it.
@@ -116,9 +116,10 @@ shaft = solid.revolve ([0, 0; 10, 0; 10, 30; 6, 30; 6, 50; 0, 50]);
 ```
 
 `solid.show` shows a solid in a window Open CASCADE draws in a process of its
-own, so a complex part turns smoothly and never holds up the prompt. Each call
-redraws the same window and keeps the camera, as does assigning to the `Shape`
-of the viewer it returns. `pick` on the viewer returns the edges and faces
+own, so a complex part turns smoothly and never holds up the prompt. Every
+variable gets a window of its own, titled with its name; showing it again
+redraws that window and keeps the camera, as does assigning to the `Shape` of
+the viewer it returns. `pick` on the viewer returns the edges and faces
 clicked, and prints the `edges` or `faces` query that finds them again, for the
 script to use in place of the numbers:
 

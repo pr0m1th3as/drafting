@@ -20,17 +20,24 @@
 ## @deftypefn  {drafting} {} solid.show (@var{S})
 ## @deftypefnx {drafting} {@var{V} =} solid.show (@var{S})
 ##
-## Show a solid, redrawing in place.
+## Show a solid in a viewer of its own, redrawing in place.
 ##
-## @code{solid.show (@var{S})} shows the @code{solid.Shape} @var{S} in the
-## viewer, a window drawn by Open CASCADE in a process of its own.  The first
-## call opens it.  Every later call redraws the same window in place and keeps
-## the camera where it was, so a script that ends by showing its part can be
-## run again and again, @code{clear all} and all, and the part changes before
-## your eyes.  Drag with the left mouse button to rotate, the middle one to
-## pan, and turn the wheel to zoom; @kbd{F} fits the part to the window and
-## @kbd{0}, @kbd{1}, @kbd{2} and @kbd{3} turn it to the isometric, front, top
-## and right views.
+## @code{solid.show (@var{S})} shows the @code{solid.Shape} @var{S} in a
+## viewer, a window drawn by Open CASCADE in a process of its own.  Every
+## variable gets a viewer of its own, titled with its name: the first
+## @code{solid.show (part)} opens the window for @code{part}, and every later
+## one redraws that window in place and keeps the camera where it was, while
+## @code{solid.show (tool)} uses another.  So a script that ends by showing
+## its parts can be run again and again, @code{clear all} and all, and each
+## part changes in its own window.  A shape given as an expression rather than
+## a variable, such as @code{solid.show (fillet (part, E, 3))}, has no name,
+## and all such shapes share one window.
+##
+## Drag with the left mouse button to rotate, the middle one to pan, and turn
+## the wheel to zoom; @kbd{F} fits the part to the window and @kbd{0},
+## @kbd{1}, @kbd{2} and @kbd{3} turn it to the isometric, front, top and right
+## views.  Closing a window ends its viewer, and the next
+## @code{solid.show} of that variable opens a new one.
 ##
 ## @code{@var{V} = solid.show (@var{S})} also returns the viewer, a
 ## @code{solid.Viewer}.  Assigning to @code{@var{V}.Shape} redraws it at once,
@@ -46,8 +53,8 @@
 ## @end example
 ##
 ## Calling @code{solid.show (@var{S})} is the same as assigning @var{S} to the
-## @code{Shape} of that one viewer.  Nothing else redraws it: changing the
-## variable that was shown does not, until it is shown again.
+## @code{Shape} of the variable's viewer.  Nothing else redraws it: changing
+## the variable that was shown does not, until it is shown again.
 ##
 ## The viewer is built with the package when Open CASCADE and X11 are found,
 ## and needs a display to run.  It runs on Linux.
@@ -65,21 +72,31 @@ function V = show (S)
     error ("solid.show: S must be a solid.Shape object.");
   endif
 
-  ## The one viewer solid.show keeps, its state in the graphics root where it
-  ## outlasts clear all
-  id = getappdata (0, 'drafting_solid_show');
-  if (isempty (id) || isempty (getappdata (0, sprintf ...
-                                           ('drafting_solid_viewer_%d', id))))
-    viewer = solid.Viewer ();
-    setappdata (0, 'drafting_solid_show', viewer.Id);
-  else
-    viewer = solid.Viewer ('__id__', id);
-  endif
+  ## A viewer for each variable name, and one for shapes without a name, kept
+  ## in the graphics root where they outlast clear all
   name = inputname (1, false);
   if (isempty (name) || ! isvarname (name))
-    name = 'S';
+    name = '';
+    key = 'unnamed';
+  else
+    key = ['v_' name];
   endif
-  viewer.Name = name;
+  ids = getappdata (0, 'drafting_solid_show');
+  if (! isstruct (ids))
+    ids = struct ();
+  endif
+  if (isfield (ids, key)
+      && ! isempty (getappdata (0, sprintf ('drafting_solid_viewer_%d', ...
+                                            ids.(key)))))
+    viewer = solid.Viewer ('__id__', ids.(key));
+  else
+    viewer = solid.Viewer ();
+    ids.(key) = viewer.Id;
+    setappdata (0, 'drafting_solid_show', ids);
+  endif
+  if (! isempty (name))
+    viewer.Name = name;
+  endif
   viewer.Shape = S;
 
   if (nargout > 0)
@@ -89,23 +106,39 @@ function V = show (S)
 endfunction
 
 %!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
-%! ## Every call redraws the same viewer, under the variable's name
+%! ## Each variable has a viewer of its own, titled with its name, and shapes
+%! ## without a name share one
 %! old = getappdata (0, 'drafting_solid_show');
-%! V = solid.Viewer ('Hidden', true);
-%! setappdata (0, 'drafting_solid_show', V.Id);
+%! VA = solid.Viewer ('Hidden', true);
+%! VB = solid.Viewer ('Hidden', true);
+%! VU = solid.Viewer ('Hidden', true);
+%! setappdata (0, 'drafting_solid_show', struct ('v_part_a', VA.Id, ...
+%!                                               'v_part_b', VB.Id, ...
+%!                                               'unnamed', VU.Id));
 %! unwind_protect
-%!   part = solid.box (10, 20, 30);
-%!   W = solid.show (part);
-%!   assert_equal (W.Id, V.Id);
-%!   assert_equal (V.Name, 'part');
-%!   assert_equal (volume (V.Shape), 6000, 1e-9);
-%!   solid.show (solid.cylinder (4, 12));
-%!   assert_equal (V.Name, 'S');
-%!   assert_equal (volume (V.Shape), 192 * pi, 1e-9);
-%!   W.Shape = solid.sphere (2);
-%!   assert_equal (volume (V.Shape), 32 / 3 * pi, 1e-9);
+%!   part_a = solid.box (10, 20, 30);
+%!   part_b = solid.cylinder (4, 12);
+%!   W = solid.show (part_a);
+%!   assert_equal (W.Id, VA.Id);
+%!   solid.show (part_b);
+%!   solid.show (solid.sphere (2));
+%!   assert_equal (volume (VA.Shape), 6000, 1e-9);
+%!   assert_equal (volume (VB.Shape), 192 * pi, 1e-9);
+%!   assert_equal (volume (VU.Shape), 32 / 3 * pi, 1e-9);
+%!   assert_equal (VA.Name, 'part_a');
+%!   assert_equal (VA.__title__ (), 'part_a (drafting)');
+%!   assert_equal (VB.__title__ (), 'part_b (drafting)');
+%!   assert_equal (VU.Name, 'S');
+%!   assert_equal (VU.__title__ (), 'drafting');
+%!   ## Showing a variable again redraws its own window
+%!   part_a = solid.box (10, 20, 40);
+%!   solid.show (part_a);
+%!   assert_equal (volume (VA.Shape), 8000, 1e-9);
+%!   assert_equal (volume (VB.Shape), 192 * pi, 1e-9);
 %! unwind_protect_cleanup
-%!   close (V);
+%!   close (VA);
+%!   close (VB);
+%!   close (VU);
 %!   setappdata (0, 'drafting_solid_show', old);
 %! end_unwind_protect
 

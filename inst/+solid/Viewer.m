@@ -79,8 +79,12 @@ classdef Viewer < handle
     ## -*- texinfo -*-
     ## @deftypefn {solid.Viewer} {} Name
     ##
-    ## The name of the variable holding the shape shown, used in the queries
-    ## @code{solid.Viewer.pick} prints; @qcode{'S'} when it is not known.
+    ## The name of the variable holding the shape shown.
+    ##
+    ## Setting it titles the window with the name, so that several viewers can
+    ## be told apart, and the queries @code{solid.Viewer.pick} prints use it.
+    ## Until it is set the window is titled @qcode{drafting} and the queries
+    ## use @qcode{'S'}.
     ##
     ## @end deftypefn
     Name
@@ -112,6 +116,14 @@ classdef Viewer < handle
       send (this, sprintf ("project %.17g %.17g %.17g", P));
       r = strsplit (receive (this, 10));
       PX = str2double (r(2:3));
+
+    endfunction
+
+    ## The title the window carries
+    function T = __title__ (this)
+
+      send (this, "gettitle");
+      T = receive (this, 10)(7:end);
 
     endfunction
 
@@ -219,7 +231,8 @@ classdef Viewer < handle
       this.Id = id;
       setstate (this, struct ('pid', -1, 'in', -1, 'out', -1, ...
                               'hidden', logical (hidden), ...
-                              'data', uint8 ([]), 'name', 'S'));
+                              'data', uint8 ([]), 'name', 'S', ...
+                              'named', false));
 
     endfunction
 
@@ -260,7 +273,11 @@ classdef Viewer < handle
       endif
       st = state (this);
       st.name = N;
+      st.named = true;
       setstate (this, st);
+      if (isopen (this))
+        send (this, ["title " title(st)]);
+      endif
 
     endfunction
 
@@ -443,6 +460,7 @@ classdef Viewer < handle
         close (this);
         error ("solid.Viewer: the viewer could not start: %s", r);
       endif
+      send (this, ["title " title(st)]);
 
     endfunction
 
@@ -483,6 +501,17 @@ classdef Viewer < handle
   endmethods
 
 endclassdef
+
+## The window's title: the name of the variable shown, once it is known
+function T = title (st)
+
+  if (st.named)
+    T = sprintf ("%s (drafting)", st.name);
+  else
+    T = "drafting";
+  endif
+
+endfunction
 
 ## True when every row of D is a direction parallel to the first, either way
 function TF = alike (D)
@@ -578,6 +607,19 @@ endfunction
 %! [Q, N] = solid.Viewer.__query__ (C, 'face', 1:3, 'C');
 %! assert_equal (Q, "faces (C, 'Within', [-4, -4, 0, 4, 4, 12])");
 %! assert_equal (N, 3);
+
+%!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
+%! ## The window is titled with the name, before it opens and after
+%! V = solid.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Name = 'plate';
+%!   V.Shape = solid.box (10, 20, 30);
+%!   assert_equal (V.__title__ (), 'plate (drafting)');
+%!   V.Name = 'bracket';
+%!   assert_equal (V.__title__ (), 'bracket (drafting)');
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
 
 %!test
 %! V = solid.Viewer ();

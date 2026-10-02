@@ -29,6 +29,8 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 //                  Enter, which replies with "edge K" and "face K" lines and
 //                  then "done", or Escape, which replies "cancel"
 //   cancel         ends a pick as Escape does
+//   title TEXT     sets the window's title
+//   gettitle       replies "title TEXT", the title the window carries
 //   project X Y Z  replies "point PX PY", the pixel the model point lands on
 //   pickat KIND PX PY
 //                  replies "edge K", "face K" or "none", what lies at a pixel
@@ -132,8 +134,7 @@ public:
     m_viewer->SetDefaultLights ();
     m_viewer->SetLightOn ();
     m_context = new AIS_InteractiveContext (m_viewer);
-    m_window = new Xw_Window (m_display, "drafting: solid.show", 0, 0, 900,
-                              700);
+    m_window = new Xw_Window (m_display, "drafting", 0, 0, 900, 700);
     m_view = m_viewer->CreateView ();
     m_view->SetWindow (m_window);
     m_view->SetBgGradientColors (Quantity_Color (0.85, 0.87, 0.9,
@@ -246,6 +247,24 @@ public:
       m_context->ClearDetected (Standard_False);
       activate (m_pick);
       reply (r.empty () ? "none" : r);
+    }
+    else if (cmd == "title")
+    {
+      string text;
+      getline (in, text);
+      m_window->SetTitle (TCollection_AsciiString (text.empty () ? text.c_str ()
+                                                   : text.c_str () + 1));
+    }
+    else if (cmd == "gettitle")
+    {
+      char *name = nullptr;
+      XFetchName ((Display *) m_display->GetDisplayAspect (),
+                  static_cast<Window> (m_window->NativeHandle ()), &name);
+      reply (string ("title ") + (name != nullptr ? name : ""));
+      if (name != nullptr)
+      {
+        XFree (name);
+      }
     }
     else if (cmd == "close")
     {
