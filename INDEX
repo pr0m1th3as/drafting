@@ -45,5 +45,8 @@ Solid modelling
  solid.cone
  solid.sphere
  solid.torus
+ solid.extrude
+ solid.revolve
+ solid.loft
  solid.read
  solid.write

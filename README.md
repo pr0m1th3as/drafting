@@ -9,8 +9,8 @@ CAD program or a CNC machine will accept, as a solid for a slicer, as LaTeX for
 a report, or as a figure on screen. Solids proper, built, combined and
 exchanged as STEP, come through Open CASCADE when the package is built with it.
 
-Thirty-seven public functions across five namespaces plus the `draw.Drawing`
-and `solid.Shape` classes, 965 built-in self-tests and 67 `%!demo` blocks,
+Forty public functions across five namespaces plus the `draw.Drawing` and
+`solid.Shape` classes, 1018 built-in self-tests and 67 `%!demo` blocks,
 nearly all of which end in a `plot` call, so the documentation shows what a
 function does rather than only describing it.
 
@@ -27,8 +27,8 @@ src           the compiled interface to Open CASCADE
 ```
 
 Dependencies point downward only: `+draw` builds on `+geom` and emits through
-`+dxf`; `+geom`, `+dxf` and `+stl` know nothing of drawings. `+solid` needs
-nothing else in the package, only Open CASCADE.
+`+dxf`; `+geom`, `+dxf` and `+stl` know nothing of drawings. `+solid` builds
+on `+geom` and on Open CASCADE.
 
 `+geom` covers primitives (signed area, bounding box, centroid, affine
 transform, offset, largest inscribed rectangle, triangulation), curve geometry
@@ -95,8 +95,10 @@ the kernel FreeCAD is built on, so curved faces stay exact. `solid.Shape` holds
 a solid, with the booleans `union`, `subtract` and `intersect`, translation,
 rotation, mirroring and scaling, and volume, area, centroid and bounding box;
 `solid.box`, `solid.cylinder`, `solid.cone`, `solid.sphere` and `solid.torus`
-make the primitives; `solid.read` reads STEP, and `solid.write` writes STEP for
-a CAD program or STL for a slicer:
+make the primitives; `solid.extrude`, `solid.revolve` and `solid.loft` make a
+solid from planar profiles, with bulges, as `draw.Drawing.polyline` takes
+them, carried as true arcs; `solid.read` reads STEP, and `solid.write` writes
+STEP for a CAD program or STL for a slicer:
 
 ```
 plate = subtract (solid.box (80, 40, 12), ...
@@ -104,6 +106,8 @@ plate = subtract (solid.box (80, 40, 12), ...
                   translate (solid.cylinder (4, 12), [60, 20, 0]));
 solid.write ('plate.step', plate);
 solid.write ('plate.stl', plate);
+
+shaft = solid.revolve ([0, 0; 10, 0; 10, 30; 6, 30; 6, 50; 0, 50]);
 ```
 
 Open CASCADE is optional: a package built without it works as before, and
@@ -189,7 +193,7 @@ macOS are not yet.
 After installation, type:
 - `pkg load drafting` to load the **drafting** package.
 - `news drafting` to review all the user visible changes since last version.
-- `pkg test drafting` to run a test suite for all 39 functions and class
+- `pkg test drafting` to run a test suite for all 42 functions and class
   definitions currently available and ensure that they work properly on your
   system.
 

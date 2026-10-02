@@ -30,9 +30,10 @@
 ##
 ## @code{@var{S} = solid.Shape ()} returns the empty shape, which holds
 ## nothing.  Shapes are made by @code{solid.box}, @code{solid.cylinder},
-## @code{solid.cone}, @code{solid.sphere}, @code{solid.torus} and
-## @code{solid.read}, and combined by three methods, each taking any number
-## of shapes:
+## @code{solid.cone}, @code{solid.sphere} and @code{solid.torus}, from
+## profiles by @code{solid.extrude}, @code{solid.revolve} and
+## @code{solid.loft}, and from files by @code{solid.read}, and combined by
+## three methods, each taking any number of shapes:
 ##
 ## @multitable @columnfractions 0.25 0.75
 ## @headitem Method @tab Result

@@ -29,17 +29,24 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <BRepAlgoAPI_Cut.hxx>
 #include <BRepAlgoAPI_Fuse.hxx>
 #include <BRepBndLib.hxx>
+#include <BRepBuilderAPI_MakeEdge.hxx>
+#include <BRepBuilderAPI_MakeFace.hxx>
+#include <BRepBuilderAPI_MakeWire.hxx>
 #include <BRepBuilderAPI_Transform.hxx>
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepGProp.hxx>
 #include <BRepMesh_IncrementalMesh.hxx>
+#include <BRepOffsetAPI_ThruSections.hxx>
 #include <BRepPrimAPI_MakeBox.hxx>
 #include <BRepPrimAPI_MakeCone.hxx>
 #include <BRepPrimAPI_MakeCylinder.hxx>
+#include <BRepPrimAPI_MakePrism.hxx>
+#include <BRepPrimAPI_MakeRevol.hxx>
 #include <BRepPrimAPI_MakeSphere.hxx>
 #include <BRepPrimAPI_MakeTorus.hxx>
 #include <BinTools.hxx>
 #include <Bnd_Box.hxx>
+#include <GC_MakeArcOfCircle.hxx>
 #include <GProp_GProps.hxx>
 #include <Interface_Static.hxx>
 #include <Message.hxx>
@@ -51,7 +58,10 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <TCollection_HAsciiString.hxx>
 #include <TopExp.hxx>
 #include <TopTools_IndexedMapOfShape.hxx>
+#include <TopoDS.hxx>
+#include <TopoDS_Face.hxx>
 #include <TopoDS_Shape.hxx>
+#include <TopoDS_Wire.hxx>
 #include <gp_Ax1.hxx>
 #include <gp_Ax2.hxx>
 #include <gp_Trsf.hxx>
@@ -154,6 +164,60 @@ todir (const octave_value& v)
 {
   const NDArray a = v.array_value ();
   return gp_Dir (a(0), a(1), a(2));
+}
+
+// The closed wire of a profile: the rows of P are vertices in the plane through
+// O spanned by U and V, and B(i) is the bulge of the segment leaving vertex i,
+// the tangent of a quarter of its included angle, positive anticlockwise.  The
+// profile has been validated by the caller, so every segment has a length.
+static TopoDS_Wire
+profile (const Matrix& P, const NDArray& B, const gp_XYZ& o, const gp_XYZ& u,
+         const gp_XYZ& v)
+{
+  const octave_idx_type n = P.rows ();
+  auto at = [&] (double x, double y) { return gp_Pnt (o + u * x + v * y); };
+  BRepBuilderAPI_MakeWire w;
+  for (octave_idx_type i = 0; i < n; i++)
+  {
+    const octave_idx_type j = (i + 1) % n;
+    const gp_Pnt p1 = at (P(i,0), P(i,1));
+    const gp_Pnt p2 = at (P(j,0), P(j,1));
+    if (B(i) == 0)
+    {
+      w.Add (BRepBuilderAPI_MakeEdge (p1, p2).Edge ());
+    }
+    else
+    {
+      // The arc's midpoint lies off the middle of the chord by the sagitta,
+      // half the chord times the bulge, to the right of the direction of
+      // travel for a positive bulge
+      const double dx = P(j,0) - P(i,0);
+      const double dy = P(j,1) - P(i,1);
+      const double s = B(i) / 2;
+      const gp_Pnt pm = at ((P(i,0) + P(j,0)) / 2 + s * dy,
+                            (P(i,1) + P(j,1)) / 2 - s * dx);
+      const Handle (Geom_TrimmedCurve) arc
+        = GC_MakeArcOfCircle (p1, pm, p2).Value ();
+      w.Add (BRepBuilderAPI_MakeEdge (arc).Edge ());
+    }
+  }
+  return w.Wire ();
+}
+
+// A profile from its Octave arguments, in the plane through O spanned by U
+// and V
+static TopoDS_Wire
+profile (const octave_value& P, const octave_value& B, const gp_XYZ& o,
+         const gp_XYZ& u, const gp_XYZ& v)
+{
+  return profile (P.matrix_value (), B.array_value (), o, u, v);
+}
+
+// The planar face a profile bounds
+static TopoDS_Face
+planarface (const TopoDS_Wire& w)
+{
+  return BRepBuilderAPI_MakeFace (w, Standard_True).Face ();
 }
 
 // A transformed copy of a shape
@@ -296,6 +360,57 @@ function directly. \n\
     {
       out = todata (BRepPrimAPI_MakeTorus (args(2).double_value (),
                                            args(3).double_value ()).Shape ());
+    }
+
+    // Solids from profiles.  An extrusion rises along z from a profile in the
+    // xy plane; a revolution turns a profile drawn in the xz plane, with its
+    // columns the radius and the height, about the z axis; a loft passes
+    // through profiles at increasing heights.
+    else if (cmd == "extrude")
+    {
+      const TopoDS_Face f = planarface (profile (args(2), args(3),
+                                                 gp_XYZ (0, 0, 0),
+                                                 gp_XYZ (1, 0, 0),
+                                                 gp_XYZ (0, 1, 0)));
+      out = todata (BRepPrimAPI_MakePrism
+                      (f, gp_Vec (0, 0, args(4).double_value ())).Shape ());
+    }
+    else if (cmd == "revolve")
+    {
+      const TopoDS_Face f = planarface (profile (args(2), args(3),
+                                                 gp_XYZ (0, 0, 0),
+                                                 gp_XYZ (1, 0, 0),
+                                                 gp_XYZ (0, 0, 1)));
+      const gp_Ax1 z (gp_Pnt (0, 0, 0), gp_Dir (0, 0, 1));
+      const double angle = args(4).double_value ();
+      if (angle >= 360)
+      {
+        out = todata (BRepPrimAPI_MakeRevol (f, z).Shape ());
+      }
+      else
+      {
+        out = todata (BRepPrimAPI_MakeRevol (f, z, angle * M_PI / 180)
+                      .Shape ());
+      }
+    }
+    else if (cmd == "loft")
+    {
+      const Cell P = args(2).cell_value ();
+      const Cell B = args(3).cell_value ();
+      const NDArray z = args(4).array_value ();
+      BRepOffsetAPI_ThruSections op (Standard_True, args(5).bool_value ());
+      for (octave_idx_type i = 0; i < P.numel (); i++)
+      {
+        op.AddWire (profile (P(i), B(i), gp_XYZ (0, 0, z(i)),
+                             gp_XYZ (1, 0, 0), gp_XYZ (0, 1, 0)));
+      }
+      op.Build ();
+      if (! op.IsDone ())
+      {
+        error ("%s: Open CASCADE could not compute the loft.",
+               caller.c_str ());
+      }
+      out = todata (op.Shape ());
     }
 
     // Booleans.  A union and a difference take every shape after the first
