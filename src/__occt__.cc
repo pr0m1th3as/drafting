@@ -783,6 +783,18 @@ function directly. \n\
       out = todata (BRepPrimAPI_MakeTorus (args(2).double_value (),
                                            args(3).double_value ()).Shape ());
     }
+    // A primitive put in a UCS: its own axes laid on the frame's, whose rows
+    // are the origin, x axis, y axis and normal
+    else if (cmd == "place")
+    {
+      const Matrix f = args(3).matrix_value ();
+      gp_Trsf t;
+      t.SetDisplacement (gp_Ax3 (gp::XOY ()),
+                         gp_Ax3 (gp_Pnt (f(0,0), f(0,1), f(0,2)),
+                                 gp_Dir (f(3,0), f(3,1), f(3,2)),
+                                 gp_Dir (f(1,0), f(1,1), f(1,2))));
+      out = todata (transform (toshape (args(2), caller), t));
+    }
 
     // Solids from regions, each made where the region's plane puts it.  An
     // extrusion rises along the normal; a revolution turns about the plane's

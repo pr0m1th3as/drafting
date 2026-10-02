@@ -19,6 +19,8 @@
 ## -*- texinfo -*-
 ## @deftypefn  {drafting} {@var{S} =} solid.wedge (@var{DX}, @var{DY}, @var{DZ}, @var{TX})
 ## @deftypefnx {drafting} {@var{S} =} solid.wedge (@var{DX}, @var{DY}, @var{DZ}, @var{TOP})
+## @deftypefnx {drafting} {@var{S} =} solid.wedge (@dots{}, @var{U})
+## @deftypefnx {drafting} {@var{S} =} solid.wedge (@dots{}, 'Anchor', @var{A})
 ##
 ## A wedge: a block whose top is smaller than its base.
 ##
@@ -35,6 +37,16 @@
 ## dovetail, a frustum of a pyramid or a pyramid itself when the rectangle
 ## is a point.
 ##
+## @code{@var{S} = solid.wedge (@dots{}, @var{U})} places the wedge in the
+## @code{geom.UCS} @var{U}: @var{DX} runs along its @math{x} axis, @var{DY}
+## along its @math{y} axis and @var{DZ} along its normal, with the corner on
+## its origin.
+##
+## The option @qcode{'Anchor'} chooses the point of the wedge that lands on
+## the origin, of @var{U} or of the world when @var{U} is left out:
+## @qcode{'corner'}, the corner of the base at the least @math{x} and
+## @math{y}, the default, or @qcode{'base'}, the centre of the base.
+##
 ## @example
 ## @group
 ## ## A ramp 40 long, 20 wide and 10 high
@@ -44,13 +56,13 @@
 ## @end group
 ## @end example
 ##
-## @seealso{solid.box, solid.Shape}
+## @seealso{solid.box, solid.Shape, geom.UCS}
 ## @end deftypefn
 
-function S = wedge (DX, DY, DZ, TOP)
+function S = wedge (DX, DY, DZ, TOP, varargin)
 
   ## Input validation
-  if (nargin != 4)
+  if (nargin < 4 || nargin > 7)
     error ("solid.wedge: invalid number of input arguments.");
   endif
   errmsg = solid.__checkpos__ (DX, 'DX');
@@ -77,13 +89,18 @@ function S = wedge (DX, DY, DZ, TOP)
   elseif (TOP(1) > TOP(3) || TOP(2) > TOP(4))
     error ("solid.wedge: TOP must have XMIN <= XMAX and YMIN <= YMAX.");
   endif
-  errmsg = solid.__checkocct__ ();
+  [frame, errmsg] = solid.__place__ (varargin, {'corner', 'base'}, ...
+                                     [0, 0, 0; double([DX, DY]) / 2, 0]);
+  if (isempty (errmsg))
+    errmsg = solid.__checkocct__ ();
+  endif
   if (! isempty (errmsg))
     error ("solid.wedge: %s", errmsg);
   endif
 
-  S = solid.Shape (__occt__ ('wedge', 'solid.wedge', double (DX), ...
-                             double (DY), double (DZ), TOP));
+  S = __occt__ ('wedge', 'solid.wedge', double (DX), double (DY), ...
+                double (DZ), TOP);
+  S = solid.Shape (__occt__ ('place', 'solid.wedge', S, frame));
 
 endfunction
 
@@ -107,7 +124,15 @@ endfunction
 %! S = solid.wedge (10, 20, 8, [5, 5, 5, 5]);
 %! assert_equal (volume (S), 10 * 20 * 8 / 3, 1e-9);
 
+%!testif ; exist ('__occt__') == 3  # on the centre of its base in a UCS
+%! U = geom.UCS ([0, 0, 1], [1, 2, 3], [1, 3, 3]);
+%! S = solid.wedge (10, 20, 8, 4, U, 'Anchor', 'base');
+%! assert_equal (bbox (S), [-9, -3, 3, 11, 7, 11], 1e-9);
+%! assert_equal (numel (faces (S, 'Normal', [0, -1, 0])), 1);
+
 %!error<solid.wedge: invalid number of input arguments.> solid.wedge (1, 2, 3)
+%!error<solid.wedge: invalid number of input arguments.> ...
+%! solid.wedge (1, 2, 3, 1, geom.UCS (), 'Anchor', 'base', 4)
 %!error<solid.wedge: DX must be a positive and finite real scalar.> ...
 %! solid.wedge (0, 2, 3, 1)
 %!error<solid.wedge: DY must be a positive and finite real scalar.> ...
@@ -119,3 +144,10 @@ endfunction
 %!error<solid.wedge: TX must not be negative.> solid.wedge (1, 2, 3, -1)
 %!error<solid.wedge: TOP must have XMIN <= XMAX and YMIN <= YMAX.> ...
 %! solid.wedge (10, 20, 8, [5, 3, 2, 5])
+%!error<solid.wedge: U must be a geom.UCS object.> solid.wedge (1, 2, 3, 1, 5)
+%!error<solid.wedge: Name/Value arguments must come in pairs.> ...
+%! solid.wedge (1, 2, 3, 1, 'Anchor')
+%!error<solid.wedge: unknown parameter.> ...
+%! solid.wedge (1, 2, 3, 1, geom.UCS (), 'Base', 'corner')
+%!error<solid.wedge: Anchor must be 'corner' or 'base'.> ...
+%! solid.wedge (1, 2, 3, 1, 'Anchor', 'centroid')

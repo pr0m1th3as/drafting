@@ -16,7 +16,9 @@
 ## this program; if not, see <http://www.gnu.org/licenses/>.
 
 ## -*- texinfo -*-
-## @deftypefn {drafting} {@var{S} =} solid.cylinder (@var{R}, @var{H})
+## @deftypefn  {drafting} {@var{S} =} solid.cylinder (@var{R}, @var{H})
+## @deftypefnx {drafting} {@var{S} =} solid.cylinder (@var{R}, @var{H}, @var{U})
+## @deftypefnx {drafting} {@var{S} =} solid.cylinder (@dots{}, 'Anchor', @var{A})
 ##
 ## A right circular cylinder.
 ##
@@ -26,18 +28,31 @@
 ## origin.  Its curved side is a true cylinder, so a hole cut with it is
 ## exactly round.
 ##
-## @seealso{solid.Shape, solid.cone, solid.box}
+## @code{@var{S} = solid.cylinder (@var{R}, @var{H}, @var{U})} places the
+## cylinder in the @code{geom.UCS} @var{U}, its axis along the normal of
+## @var{U} and the centre of its base on the origin of @var{U}.
+##
+## The option @qcode{'Anchor'} chooses the point of the cylinder that lands
+## on the origin, of @var{U} or of the world when @var{U} is left out:
+## @qcode{'base'}, the centre of its base, the default, or
+## @qcode{'centroid'}, the point on its axis half way up, its centre of mass.
+##
+## @seealso{solid.Shape, solid.cone, solid.box, geom.UCS}
 ## @end deftypefn
 
-function S = cylinder (R, H)
+function S = cylinder (R, H, varargin)
 
   ## Input validation
-  if (nargin != 2)
+  if (nargin < 2 || nargin > 5)
     error ("solid.cylinder: invalid number of input arguments.");
   endif
   errmsg = solid.__checkpos__ (R, 'R');
   if (isempty (errmsg))
     errmsg = solid.__checkpos__ (H, 'H');
+  endif
+  if (isempty (errmsg))
+    [frame, errmsg] = solid.__place__ (varargin, {'base', 'centroid'}, ...
+                                       [0, 0, 0; 0, 0, double(H) / 2]);
   endif
   if (isempty (errmsg))
     errmsg = solid.__checkocct__ ();
@@ -46,8 +61,8 @@ function S = cylinder (R, H)
     error ("solid.cylinder: %s", errmsg);
   endif
 
-  S = solid.Shape (__occt__ ('cylinder', 'solid.cylinder', double (R), ...
-                             double (H)));
+  S = __occt__ ('cylinder', 'solid.cylinder', double (R), double (H));
+  S = solid.Shape (__occt__ ('place', 'solid.cylinder', S, frame));
 
 endfunction
 
@@ -59,8 +74,28 @@ endfunction
 %! assert_equal (numfaces (S), 3);
 %! assert_equal (isvalid (S), true);
 
+%!testif ; exist ('__occt__') == 3  # lying along x, centred on a point
+%! U = geom.UCS ([1, 0, 0], [5, 6, 7]);
+%! S = solid.cylinder (2, 10, U, 'Anchor', 'centroid');
+%! assert_equal (bbox (S), [0, 4, 5, 10, 8, 9], 1e-9);
+%! assert_equal (centroid (S), [5, 6, 7], 1e-9);
+
+%!testif ; exist ('__occt__') == 3  # standing on a point of a UCS
+%! U = geom.UCS ([0, 0, -1], [1, 2, 3]);
+%! S = solid.cylinder (2, 10, U);
+%! assert_equal (bbox (S), [-1, 0, -7, 3, 4, 3], 1e-9);
+
 %!error<solid.cylinder: invalid number of input arguments.> solid.cylinder (1)
+%!error<solid.cylinder: invalid number of input arguments.> ...
+%! solid.cylinder (1, 2, geom.UCS (), 'Anchor', 'base', 3)
 %!error<solid.cylinder: R must be a positive and finite real scalar.> ...
 %! solid.cylinder (0, 2)
 %!error<solid.cylinder: H must be a positive and finite real scalar.> ...
 %! solid.cylinder (1, NaN)
+%!error<solid.cylinder: U must be a geom.UCS object.> solid.cylinder (1, 2, 3)
+%!error<solid.cylinder: Name/Value arguments must come in pairs.> ...
+%! solid.cylinder (1, 2, geom.UCS (), 'Anchor')
+%!error<solid.cylinder: unknown parameter.> ...
+%! solid.cylinder (1, 2, 'Axis', 'base')
+%!error<solid.cylinder: Anchor must be 'base' or 'centroid'.> ...
+%! solid.cylinder (1, 2, 'Anchor', 'corner')

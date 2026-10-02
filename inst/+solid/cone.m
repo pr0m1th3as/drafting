@@ -16,7 +16,8 @@
 ## this program; if not, see <http://www.gnu.org/licenses/>.
 
 ## -*- texinfo -*-
-## @deftypefn {drafting} {@var{S} =} solid.cone (@var{R1}, @var{R2}, @var{H})
+## @deftypefn  {drafting} {@var{S} =} solid.cone (@var{R1}, @var{R2}, @var{H})
+## @deftypefnx {drafting} {@var{S} =} solid.cone (@var{R1}, @var{R2}, @var{H}, @var{U})
 ##
 ## A right circular cone or truncated cone.
 ##
@@ -30,13 +31,17 @@
 ## The radii must differ: a cone with equal radii is a cylinder, and
 ## @code{solid.cylinder} makes it.
 ##
-## @seealso{solid.Shape, solid.cylinder}
+## @code{@var{S} = solid.cone (@var{R1}, @var{R2}, @var{H}, @var{U})} places
+## the cone in the @code{geom.UCS} @var{U}, its axis along the normal of
+## @var{U} and the centre of its base on the origin of @var{U}.
+##
+## @seealso{solid.Shape, solid.cylinder, geom.UCS}
 ## @end deftypefn
 
-function S = cone (R1, R2, H)
+function S = cone (R1, R2, H, varargin)
 
   ## Input validation
-  if (nargin != 3)
+  if (nargin < 3 || nargin > 4)
     error ("solid.cone: invalid number of input arguments.");
   endif
   errmsg = checkradius (R1, 'R1');
@@ -51,14 +56,17 @@ function S = cone (R1, R2, H)
                      " is a cylinder.");
   endif
   if (isempty (errmsg))
+    [frame, errmsg] = solid.__place__ (varargin, {'base'}, [0, 0, 0]);
+  endif
+  if (isempty (errmsg))
     errmsg = solid.__checkocct__ ();
   endif
   if (! isempty (errmsg))
     error ("solid.cone: %s", errmsg);
   endif
 
-  S = solid.Shape (__occt__ ('cone', 'solid.cone', double (R1), ...
-                             double (R2), double (H)));
+  S = __occt__ ('cone', 'solid.cone', double (R1), double (R2), double (H));
+  S = solid.Shape (__occt__ ('place', 'solid.cone', S, frame));
 
 endfunction
 
@@ -89,7 +97,16 @@ endfunction
 %! assert_equal (volume (S), pi * 6 * (25 + 10 + 4) / 3, 1e-9);
 %! assert_equal (numfaces (S), 3);
 
+%!testif ; exist ('__occt__') == 3  # pointing along -y from a point
+%! U = geom.UCS ([0, -1, 0], [1, 2, 3]);
+%! S = solid.cone (3, 0, 10, U);
+%! assert_equal (bbox (S), [-2, -8, 0, 4, 2, 6], 1e-9);
+%! assert_equal (centroid (S), [1, -0.5, 3], 1e-9);
+
 %!error<solid.cone: invalid number of input arguments.> solid.cone (1, 2)
+%!error<solid.cone: invalid number of input arguments.> ...
+%! solid.cone (1, 2, 3, geom.UCS (), 'Anchor')
+%!error<solid.cone: U must be a geom.UCS object.> solid.cone (1, 2, 3, 'base')
 %!error<solid.cone: R1 must be a non-negative and finite real scalar.> ...
 %! solid.cone (-1, 2, 3)
 %!error<solid.cone: R2 must be a non-negative and finite real scalar.> ...

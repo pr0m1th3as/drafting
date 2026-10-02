@@ -16,23 +16,30 @@
 ## this program; if not, see <http://www.gnu.org/licenses/>.
 
 ## -*- texinfo -*-
-## @deftypefn {drafting} {@var{S} =} solid.sphere (@var{R})
+## @deftypefn  {drafting} {@var{S} =} solid.sphere (@var{R})
+## @deftypefnx {drafting} {@var{S} =} solid.sphere (@var{R}, @var{U})
 ##
 ## A sphere.
 ##
 ## @code{@var{S} = solid.sphere (@var{R})} returns a @code{solid.Shape} of
 ## radius @var{R} millimetres centred on the origin.
 ##
-## @seealso{solid.Shape, solid.torus}
+## @code{@var{S} = solid.sphere (@var{R}, @var{U})} centres it on the origin
+## of the @code{geom.UCS} @var{U}, with its poles on the normal of @var{U}.
+##
+## @seealso{solid.Shape, solid.torus, geom.UCS}
 ## @end deftypefn
 
-function S = sphere (R)
+function S = sphere (R, varargin)
 
   ## Input validation
-  if (nargin != 1)
+  if (nargin < 1 || nargin > 2)
     error ("solid.sphere: invalid number of input arguments.");
   endif
   errmsg = solid.__checkpos__ (R, 'R');
+  if (isempty (errmsg))
+    [frame, errmsg] = solid.__place__ (varargin, {'centroid'}, [0, 0, 0]);
+  endif
   if (isempty (errmsg))
     errmsg = solid.__checkocct__ ();
   endif
@@ -40,7 +47,8 @@ function S = sphere (R)
     error ("solid.sphere: %s", errmsg);
   endif
 
-  S = solid.Shape (__occt__ ('sphere', 'solid.sphere', double (R)));
+  S = __occt__ ('sphere', 'solid.sphere', double (R));
+  S = solid.Shape (__occt__ ('place', 'solid.sphere', S, frame));
 
 endfunction
 
@@ -52,6 +60,15 @@ endfunction
 %! assert_equal (bbox (S), [-5, -5, -5, 5, 5, 5], 1e-9);
 %! assert_equal (isvalid (S), true);
 
+%!testif ; exist ('__occt__') == 3  # centred on the origin of a UCS
+%! U = geom.UCS ([1, 1, 0], [4, 5, 6]);
+%! S = solid.sphere (2, U);
+%! assert_equal (centroid (S), [4, 5, 6], 1e-9);
+%! assert_equal (volume (S), 32 / 3 * pi, 1e-9);
+
 %!error<solid.sphere: invalid number of input arguments.> solid.sphere ()
+%!error<solid.sphere: invalid number of input arguments.> ...
+%! solid.sphere (1, geom.UCS (), 'Anchor')
+%!error<solid.sphere: U must be a geom.UCS object.> solid.sphere (1, [0, 0, 1])
 %!error<solid.sphere: R must be a positive and finite real scalar.> ...
 %! solid.sphere (-5)

@@ -104,7 +104,8 @@ the kernel FreeCAD is built on, so curved faces stay exact. `solid.Shape` holds
 a solid, with the booleans `union`, `subtract` and `intersect`, translation,
 rotation, mirroring and scaling, and volume, area, centroid and bounding box;
 `solid.box`, `solid.wedge`, `solid.cylinder`, `solid.cone`, `solid.sphere` and
-`solid.torus` make the primitives; `solid.extrude`, `solid.revolve`,
+`solid.torus` make the primitives, placed in a `geom.UCS` by a corner, the
+centre of the base or the centroid; `solid.extrude`, `solid.revolve`,
 `solid.loft`, `solid.sweep` and `solid.helix` make a solid from a
 `geom.Region`, where the region's plane puts it, its arcs carried as true arcs
 and its holes right through. Methods drill holes (plain, counterbored,

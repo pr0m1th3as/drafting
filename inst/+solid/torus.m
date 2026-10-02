@@ -16,7 +16,8 @@
 ## this program; if not, see <http://www.gnu.org/licenses/>.
 
 ## -*- texinfo -*-
-## @deftypefn {drafting} {@var{S} =} solid.torus (@var{R1}, @var{R2})
+## @deftypefn  {drafting} {@var{S} =} solid.torus (@var{R1}, @var{R2})
+## @deftypefnx {drafting} {@var{S} =} solid.torus (@var{R1}, @var{R2}, @var{U})
 ##
 ## A torus, the solid of a ring.
 ##
@@ -28,13 +29,17 @@
 ## @var{R2} must be smaller than @var{R1}.  A tube as wide as its circle or
 ## wider would pass through the axis and the solid would intersect itself.
 ##
-## @seealso{solid.Shape, solid.sphere}
+## @code{@var{S} = solid.torus (@var{R1}, @var{R2}, @var{U})} centres it on
+## the origin of the @code{geom.UCS} @var{U}, its tube circling the normal of
+## @var{U} in the plane of @var{U}.
+##
+## @seealso{solid.Shape, solid.sphere, geom.UCS}
 ## @end deftypefn
 
-function S = torus (R1, R2)
+function S = torus (R1, R2, varargin)
 
   ## Input validation
-  if (nargin != 2)
+  if (nargin < 2 || nargin > 3)
     error ("solid.torus: invalid number of input arguments.");
   endif
   errmsg = solid.__checkpos__ (R1, 'R1');
@@ -45,14 +50,17 @@ function S = torus (R1, R2)
     errmsg = "R2 must be smaller than R1.";
   endif
   if (isempty (errmsg))
+    [frame, errmsg] = solid.__place__ (varargin, {'centroid'}, [0, 0, 0]);
+  endif
+  if (isempty (errmsg))
     errmsg = solid.__checkocct__ ();
   endif
   if (! isempty (errmsg))
     error ("solid.torus: %s", errmsg);
   endif
 
-  S = solid.Shape (__occt__ ('torus', 'solid.torus', double (R1), ...
-                             double (R2)));
+  S = __occt__ ('torus', 'solid.torus', double (R1), double (R2));
+  S = solid.Shape (__occt__ ('place', 'solid.torus', S, frame));
 
 endfunction
 
@@ -63,7 +71,16 @@ endfunction
 %! assert_equal (bbox (S), [-12, -12, -2, 12, 12, 2], 1e-6);
 %! assert_equal (isvalid (S), true);
 
+%!testif ; exist ('__occt__') == 3  # in the xz plane through a point
+%! U = geom.UCS ([0, 1, 0], [1, 2, 3]);
+%! S = solid.torus (10, 2, U);
+%! assert_equal (bbox (S), [-11, 0, -9, 13, 4, 15], 1e-6);
+%! assert_equal (centroid (S), [1, 2, 3], 1e-9);
+
 %!error<solid.torus: invalid number of input arguments.> solid.torus (1)
+%!error<solid.torus: invalid number of input arguments.> ...
+%! solid.torus (2, 1, geom.UCS (), 'Anchor')
+%!error<solid.torus: U must be a geom.UCS object.> solid.torus (2, 1, 3)
 %!error<solid.torus: R1 must be a positive and finite real scalar.> ...
 %! solid.torus (0, 1)
 %!error<solid.torus: R2 must be a positive and finite real scalar.> ...
