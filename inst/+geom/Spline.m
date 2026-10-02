@@ -214,9 +214,10 @@ classdef Spline
 
       u = unique (this.Knots);
       G = 0;
+      tol = 1e-14 * max ([1; abs(this.ControlPoints(:))]) ^ 2;
       for j = 1:numel (u) - 1
         G += integral (@(s) green (this, s), u(j), u(j+1), ...
-                       'RelTol', 1e-13, 'AbsTol', 1e-14);
+                       'RelTol', 1e-12, 'AbsTol', tol);
       endfor
 
     endfunction
@@ -419,9 +420,10 @@ classdef Spline
 
       u = unique (this.Knots);
       L = 0;
+      tol = 1e-14 * max ([1; abs(this.ControlPoints(:))]);
       for j = 1:numel (u) - 1
         L += integral (@(s) speed (this, s), u(j), u(j+1), ...
-                       'RelTol', 1e-13, 'AbsTol', 1e-14);
+                       'RelTol', 1e-12, 'AbsTol', tol);
       endfor
 
     endfunction

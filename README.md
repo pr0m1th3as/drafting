@@ -9,9 +9,9 @@ CAD program or a CNC machine will accept, as a solid for a slicer, as LaTeX for
 a report, or as a figure on screen. Solids proper, built, combined and
 exchanged as STEP, come through Open CASCADE when the package is built with it.
 
-Forty-six public functions across five namespaces plus the `draw.Drawing`,
+Forty-seven public functions across five namespaces plus the `draw.Drawing`,
 `geom.Polyline`, `geom.Spline`, `geom.Region`, `geom.Path`, `geom.UCS`,
-`solid.Shape` and `solid.Viewer` classes, 1554 built-in self-tests and 67 `%!demo` blocks, nearly all of which
+`solid.Shape` and `solid.Viewer` classes, 1571 built-in self-tests and 67 `%!demo` blocks, nearly all of which
 end in a `plot` call, so the documentation shows what a function does rather
 than only describing it.
 
@@ -50,7 +50,9 @@ Regions combine with `union`, `subtract` and `intersect` and grow or shrink
 with `offset`, round, sharp or chamfered at the corners: OpenSCAD's 2-D
 operations, with arcs exact, computed by Open CASCADE. `hull` wraps regions
 and points as OpenSCAD's `hull` does, its lines truly tangent to the arcs, so
-two circles make a lever and four a rounded plate. Functions take the
+two circles make a lever and four a rounded plate. `geom.text` gives the
+outlines of text in any installed font as regions, to extrude, engrave or
+emboss. Functions take the
 classes; only their constructors take plain matrices.
 
 `draw.Drawing` is a value class carrying lines, polylines with per-vertex
@@ -260,7 +262,8 @@ built only where its headers are found, by default in
   `sudo apt install libocct-foundation-dev libocct-modeling-data-dev libocct-modeling-algorithms-dev libocct-data-exchange-dev`
 
 The viewer behind `solid.show` is a program of its own, built where the X11
-headers are found as well, and needs Open CASCADE's visualization libraries:
+headers are found as well, and needs Open CASCADE's visualization libraries,
+which `geom.text` needs too:
 
   `sudo apt install libocct-visualization-dev libx11-dev`
 

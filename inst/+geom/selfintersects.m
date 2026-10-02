@@ -109,8 +109,16 @@ function [TF, IDX] = selfintersects (P, CLOSED = false)
 
     hit = false (numel (j), 1);
 
+    ## Segments are parallel when the sine of the angle between them is below
+    ## 1e-12, and in line too when the gap between their lines is: comparing
+    ## rounding residue with rounding residue says nothing
+    lr = norm (r);
+    ls = sqrt (sum (s .^ 2, 2));
+    par = abs (rxs) <= 1e-12 * lr * ls;
+    inline = par & abs (qpxr) <= 1e-12 * lr * (lr + sqrt (sum (qp .^ 2, 2)));
+
     ## Non-parallel segments cross when both parameters lie in [0, 1]
-    np = (rxs != 0);
+    np = ! par;
     if (any (np))
       t = qpxs(np) ./ rxs(np);
       u = qpxr(np) ./ rxs(np);
@@ -118,7 +126,7 @@ function [TF, IDX] = selfintersects (P, CLOSED = false)
     endif
 
     ## Collinear segments cross when their parameter ranges overlap
-    col = (rxs == 0 & qpxr == 0);
+    col = inline;
     if (any (col))
       rr = dot (r, r);
       if (rr > 0)
@@ -157,6 +165,11 @@ endfunction
 %! t = linspace (0, 2*pi, 181)(1:180)';
 %! P = (30 + 4 * cos (5 * t)) .* [cos(t), sin(t)];
 %! geom.selfintersects (P, true)
+
+%!test  # pieces of one straight edge, far apart in a fine sampling
+%! t = linspace (0, 1, 101)';
+%! P = [[2.0161 - 1.9 * t, 5 - 4.9786 * t]; 0.1, 0.02; 9, 0.02; 5.5, 10];
+%! assert_equal (geom.selfintersects (P, true), false);
 
 %!test  # a convex polygon does not cross itself
 %! assert_equal (geom.selfintersects ([0, 0; 4, 0; 4, 3; 0, 3], true), false);

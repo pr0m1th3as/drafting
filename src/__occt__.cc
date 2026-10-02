@@ -646,6 +646,32 @@ sectionedge (const TopoDS_Edge& e, vector<octave_value>& out)
       bs->Reverse ();
     }
     const int n = bs->NbPoles ();
+    if (bs->Degree () == 1)
+    {
+      // A polyline made a spline is lines from pole to pole
+      bool even = true;
+      for (int i = 2; i <= n && even; i++)
+      {
+        even = (bs->Weight (i) == bs->Weight (1));
+      }
+      if (even)
+      {
+        gp_Pnt a = p0;
+        for (int i = 2; i <= n; i++)
+        {
+          const gp_Pnt b = (i == n) ? p1 : bs->Pole (i);
+          if (a.Distance (b) > Precision::Confusion ())
+          {
+            Matrix m (2, 3);
+            m.insert (flat (a), 0, 0);
+            m.insert (flat (b), 1, 0);
+            out.push_back (sectionpiece ("line", m));
+            a = b;
+          }
+        }
+        return;
+      }
+    }
     bs->SetPole (1, p0);
     bs->SetPole (n, p1);
     Matrix poles (n, 3);
@@ -1586,6 +1612,80 @@ function directly. \n\
       {
         out = Cell (1, 0);
       }
+    }
+
+    // The faces of a flat shape, such as the outlines of text, read in the
+    // frame given as the faces of a section are.  Filled as a font is when
+    // asked: a face for every loop, those running as the largest does
+    // united and the others cut out, so that loops that cross or overlap,
+    // as the strokes of a bold letter may, make clean faces.
+    else if (cmd == "faces2d")
+    {
+      TopoDS_Shape c = transform (toshape (args(2), caller),
+                                  intoframe (args(3).matrix_value ()));
+      if (args.length () > 4 && args(4).bool_value ())
+      {
+        vector<TopoDS_Wire> W;
+        vector<double> A;
+        double big = 0;
+        for (TopExp_Explorer x (c, TopAbs_WIRE); x.More (); x.Next ())
+        {
+          W.push_back (TopoDS::Wire (x.Current ()));
+          A.push_back (wirearea (W.back ()));
+          if (std::abs (A.back ()) > std::abs (big))
+          {
+            big = A.back ();
+          }
+        }
+        TopTools_ListOfShape pos, neg;
+        for (size_t i = 0; i < W.size (); i++)
+        {
+          const bool fill = (A[i] > 0) == (big > 0);
+          const TopoDS_Wire w = (A[i] > 0) ? W[i]
+                                           : TopoDS::Wire (W[i].Reversed ());
+          BRepBuilderAPI_MakeFace mf (w, Standard_True);
+          if (mf.IsDone ())
+          {
+            (fill ? pos : neg).Append (mf.Face ());
+          }
+        }
+        if (pos.IsEmpty ())
+        {
+          c = TopoDS_Shape ();
+        }
+        else
+        {
+          TopoDS_Shape u = pos.First ();
+          if (pos.Extent () > 1)
+          {
+            TopTools_ListOfShape first, rest = pos;
+            first.Append (rest.First ());
+            rest.RemoveFirst ();
+            BRepAlgoAPI_Fuse b;
+            b.SetArguments (first);
+            b.SetTools (rest);
+            u = boolean (b, caller, "text");
+          }
+          if (! neg.IsEmpty ())
+          {
+            TopTools_ListOfShape first;
+            first.Append (u);
+            BRepAlgoAPI_Cut b;
+            b.SetArguments (first);
+            b.SetTools (neg);
+            u = boolean (b, caller, "text");
+          }
+          c = u;
+        }
+      }
+      Bnd_Box box;
+      BRepBndLib::Add (c, box);
+      double x0 = 0, y0 = 0, z0, x1 = 0, y1 = 0, z1;
+      if (! box.IsVoid ())
+      {
+        box.Get (x0, y0, z0, x1, y1, z1);
+      }
+      out = facesout (c, (x1 - x0) * (y1 - y0) + 1);
     }
 
     // Regions combined: the union, difference or intersection of regions

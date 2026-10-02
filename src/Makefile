@@ -14,6 +14,8 @@ OCCT_LIBS = -lTKernel -lTKMath -lTKG2d -lTKG3d -lTKGeomBase -lTKBRep \
             -lTKDESTEP -lTKXSBase -lTKDE -lTKDESTL
 VIEW_LIBS = -lTKernel -lTKMath -lTKG3d -lTKBRep -lTKTopAlgo -lTKMesh \
             -lTKService -lTKV3d -lTKOpenGl -lX11
+FONT_LIBS = -lTKernel -lTKMath -lTKG2d -lTKG3d -lTKGeomBase -lTKBRep \
+            -lTKTopAlgo -lTKService -lTKV3d
 
 # 7.8 is the first release with the data exchange libraries linked above
 OCCT_HDR = $(wildcard $(OCCT_INC)/Standard_Version.hxx)
@@ -31,6 +33,10 @@ OCTFILES = __mesh__.oct
 
 ifeq ($(OCCT_RECENT),yes)
 OCTFILES += __occt__.oct
+# The outlines of text come from Open CASCADE's visualization libraries
+ifneq ($(wildcard $(OCCT_INC)/StdPrs_BRepFont.hxx),)
+OCTFILES += __occtfont__.oct
+endif
 ifneq ($(wildcard $(X11_INC)/X11/Xlib.h),)
 PROGRAMS = __occtview__
 endif
@@ -55,6 +61,9 @@ endif
 
 __mesh__.oct: __mesh__.cc
 	$(MKOCTFILE) -O2 __mesh__.cc
+
+__occtfont__.oct: __occtfont__.cc
+	$(MKOCTFILE) -I$(OCCT_INC) __occtfont__.cc $(FONT_LIBS)
 
 __occt__.oct: __occt__.cc
 	$(MKOCTFILE) -I$(OCCT_INC) __occt__.cc $(OCCT_LIBS)

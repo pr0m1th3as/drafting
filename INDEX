@@ -4,6 +4,7 @@ Polylines and regions
  geom.Spline
  geom.Region
  geom.Path
+ geom.text
 Geometry primitives
  geom.signedarea
  geom.bbox
