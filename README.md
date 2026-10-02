@@ -9,8 +9,9 @@ CAD program or a CNC machine will accept, as a solid for a slicer, as LaTeX for
 a report, or as a figure on screen. Solids proper, built, combined and
 exchanged as STEP, come through Open CASCADE when the package is built with it.
 
-Forty-two public functions across five namespaces plus the `draw.Drawing`
-and `solid.Shape` classes, 1099 built-in self-tests and 67 `%!demo` blocks,
+Forty-three public functions across five namespaces plus the
+`draw.Drawing`, `solid.Shape` and `solid.Viewer` classes, 1123 built-in
+self-tests and 67 `%!demo` blocks,
 nearly all of which end in a `plot` call, so the documentation shows what a
 function does rather than only describing it.
 
@@ -114,6 +115,19 @@ solid.write ('plate.stl', plate);
 shaft = solid.revolve ([0, 0; 10, 0; 10, 30; 6, 30; 6, 50; 0, 50]);
 ```
 
+`solid.show` shows a solid in a window Open CASCADE draws in a process of its
+own, so a complex part turns smoothly and never holds up the prompt. Each call
+redraws the same window and keeps the camera, and `solid.show ('part.m')`
+runs a script again every time it is saved, as OpenSCAD's preview does.
+`pick` on the viewer returns the edges and faces clicked, and prints the
+`edges` or `faces` query that finds them again, for the script to use in place
+of the numbers:
+
+```
+V = solid.show (plate);
+E = pick (V, 'edge');     # click edges, then press Enter
+```
+
 Open CASCADE is optional: a package built without it works as before, and
 every `solid` function raises an error saying so.
 
@@ -189,6 +203,11 @@ built only where its headers are found, by default in
 
   `sudo apt install libocct-foundation-dev libocct-modeling-data-dev libocct-modeling-algorithms-dev libocct-data-exchange-dev`
 
+The viewer behind `solid.show` is a program of its own, built where the X11
+headers are found as well, and needs Open CASCADE's visualization libraries:
+
+  `sudo apt install libocct-visualization-dev libx11-dev`
+
 If the headers are elsewhere, name their directory before installing, for
 example `setenv ("OCCT_INC", "/opt/occt/include/opencascade")`; the libraries
 must be where the linker finds them. Linux is supported first; Windows and
@@ -197,7 +216,7 @@ macOS are not yet.
 After installation, type:
 - `pkg load drafting` to load the **drafting** package.
 - `news drafting` to review all the user visible changes since last version.
-- `pkg test drafting` to run a test suite for all 44 functions and class
+- `pkg test drafting` to run a test suite for all 46 functions and class
   definitions currently available and ensure that they work properly on your
   system.
 

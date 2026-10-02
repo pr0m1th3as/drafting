@@ -81,7 +81,7 @@
 ## shape can still be made, but every function and method that needs the
 ## library raises an error saying so.
 ##
-## @seealso{solid.box, solid.read, solid.write}
+## @seealso{solid.box, solid.read, solid.write, solid.show}
 ## @end deftypefn
 
 classdef Shape

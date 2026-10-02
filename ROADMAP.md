@@ -181,7 +181,7 @@ drawings through `+draw`, so dependencies still point downward only.
 | Features | fillet, chamfer, shell; holes plain, counterbored, countersunk and tapped, recorded as holes |
 | Queries | edges and faces selected by type, direction and position; volume, area, centre of mass, bounding box; validity |
 | Files | `solid.read` and `solid.write`, STEP and STL |
-| Viewing | `solid.show`, the solid in an Octave figure |
+| Viewing | `solid.show` and `solid.Viewer`: the solid in Open CASCADE's own viewer, run as a process of its own so that it turns smoothly and never blocks the prompt; redrawn in place, a script watched and re-run on save; edges and faces picked with the mouse, reported as indices and as the query that finds them again |
 | Drawings | views, sections and details laid out on a `draw.Sheet` |
 
 **Drawings.** OCCT projects a solid with hidden lines removed and every edge

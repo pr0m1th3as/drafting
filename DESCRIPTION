@@ -11,6 +11,7 @@ Description: Planar geometry primitives, ASCII DXF reading and writing,
  packages.
 Categories: Graphics
 Depends: octave (>= 11.1.0)
-SystemRequirements: Open CASCADE (>= 7.8.0), optional, for solid modelling
+SystemRequirements: Open CASCADE (>= 7.8.0), optional, for solid modelling;
+ X11, optional, for the solid viewer
 Url: https://github.com/pr0m1th3as/drafting
 Tracker: https://github.com/pr0m1th3as/drafting/issues

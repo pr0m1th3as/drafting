@@ -5,11 +5,15 @@ MKOCTFILE ?= mkoctfile
 # Open CASCADE is optional.  Where its headers are not found, or are older
 # than 7.8, nothing is built and the solid namespace reports that the package
 # was built without it; every other namespace works as before.  Set OCCT_INC
-# to use another location.
+# to use another location.  The viewer behind solid.show is a program of its
+# own, built where the X11 headers are found as well.
 OCCT_INC ?= /usr/include/opencascade
+X11_INC ?= /usr/include
 OCCT_LIBS = -lTKernel -lTKMath -lTKG2d -lTKG3d -lTKGeomBase -lTKBRep \
             -lTKTopAlgo -lTKPrim -lTKBO -lTKFillet -lTKOffset -lTKMesh \
             -lTKDESTEP -lTKXSBase -lTKDE -lTKDESTL
+VIEW_LIBS = -lTKernel -lTKMath -lTKG3d -lTKBRep -lTKTopAlgo -lTKMesh \
+            -lTKService -lTKV3d -lTKOpenGl -lX11
 
 # 7.8 is the first release with the data exchange libraries linked above
 OCCT_HDR = $(wildcard $(OCCT_INC)/Standard_Version.hxx)
@@ -24,10 +28,13 @@ endif
 
 ifeq ($(OCCT_RECENT),yes)
 OCTFILES = __occt__.oct
+ifneq ($(wildcard $(X11_INC)/X11/Xlib.h),)
+PROGRAMS = __occtview__
+endif
 endif
 
-.PHONY: all
-all: $(OCTFILES)
+.PHONY: all FILES
+all: $(OCTFILES) $(PROGRAMS) FILES
 ifeq ($(OCCT_HDR),)
 	@echo "drafting: Open CASCADE not found in $(OCCT_INC);" \
 	      "building without the solid namespace."
@@ -36,9 +43,24 @@ else ifneq ($(OCCT_RECENT),yes)
 	      "7.8 or later is needed; building without the solid namespace."
 endif
 
+ifeq ($(OCCT_RECENT),yes)
+ifeq ($(PROGRAMS),)
+	@echo "drafting: X11 not found in $(X11_INC);" \
+	      "building without the viewer behind solid.show."
+endif
+endif
+
 __occt__.oct: __occt__.cc
 	$(MKOCTFILE) -I$(OCCT_INC) __occt__.cc $(OCCT_LIBS)
 
+__occtview__: __occtview__.cc
+	$(shell $(MKOCTFILE) -p CXX) -O2 -I$(OCCT_INC) -I$(X11_INC) \
+	  -o __occtview__ __occtview__.cc $(VIEW_LIBS)
+
+# What pkg install copies: exactly what was built
+FILES:
+	@printf '%s\n' $(OCTFILES) $(PROGRAMS) > FILES
+
 .PHONY: clean
 clean:
-	rm -f *.o *.oct
+	rm -f *.o *.oct __occtview__ FILES

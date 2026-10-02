@@ -50,5 +50,7 @@ Solid modelling
  solid.loft
  solid.sweep
  solid.helix
+ solid.show
+ solid.Viewer
  solid.read
  solid.write
