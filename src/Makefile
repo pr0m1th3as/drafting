@@ -7,9 +7,9 @@ MKOCTFILE ?= mkoctfile
 # was built without it; every other namespace works as before.  Set OCCT_INC
 # to use another location.
 OCCT_INC ?= /usr/include/opencascade
-OCCT_LIBS = -lTKernel -lTKMath -lTKG3d -lTKGeomBase -lTKBRep -lTKTopAlgo \
-            -lTKPrim -lTKBO -lTKOffset -lTKMesh -lTKDESTEP -lTKXSBase -lTKDE \
-            -lTKDESTL
+OCCT_LIBS = -lTKernel -lTKMath -lTKG2d -lTKG3d -lTKGeomBase -lTKBRep \
+            -lTKTopAlgo -lTKPrim -lTKBO -lTKFillet -lTKOffset -lTKMesh \
+            -lTKDESTEP -lTKXSBase -lTKDE -lTKDESTL
 
 # 7.8 is the first release with the data exchange libraries linked above
 OCCT_HDR = $(wildcard $(OCCT_INC)/Standard_Version.hxx)

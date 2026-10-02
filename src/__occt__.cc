@@ -24,6 +24,8 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <octave/oct.h>
 
 #include <APIHeaderSection_MakeHeader.hxx>
+#include <BRepAdaptor_Curve.hxx>
+#include <BRepAdaptor_Surface.hxx>
 #include <BRepAlgoAPI_BooleanOperation.hxx>
 #include <BRepAlgoAPI_Common.hxx>
 #include <BRepAlgoAPI_Cut.hxx>
@@ -34,8 +36,13 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <BRepBuilderAPI_MakeWire.hxx>
 #include <BRepBuilderAPI_Transform.hxx>
 #include <BRepCheck_Analyzer.hxx>
+#include <BRepFilletAPI_MakeChamfer.hxx>
+#include <BRepFilletAPI_MakeFillet.hxx>
 #include <BRepGProp.hxx>
+#include <BRepLib.hxx>
 #include <BRepMesh_IncrementalMesh.hxx>
+#include <BRepOffsetAPI_MakePipeShell.hxx>
+#include <BRepOffsetAPI_MakeThickSolid.hxx>
 #include <BRepOffsetAPI_ThruSections.hxx>
 #include <BRepPrimAPI_MakeBox.hxx>
 #include <BRepPrimAPI_MakeCone.hxx>
@@ -44,9 +51,12 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <BRepPrimAPI_MakeRevol.hxx>
 #include <BRepPrimAPI_MakeSphere.hxx>
 #include <BRepPrimAPI_MakeTorus.hxx>
+#include <BRep_Tool.hxx>
 #include <BinTools.hxx>
 #include <Bnd_Box.hxx>
 #include <GC_MakeArcOfCircle.hxx>
+#include <Geom2d_Line.hxx>
+#include <Geom_CylindricalSurface.hxx>
 #include <GProp_GProps.hxx>
 #include <Interface_Static.hxx>
 #include <Message.hxx>
@@ -57,8 +67,10 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <StlAPI_Writer.hxx>
 #include <TCollection_HAsciiString.hxx>
 #include <TopExp.hxx>
+#include <TopTools_IndexedDataMapOfShapeListOfShape.hxx>
 #include <TopTools_IndexedMapOfShape.hxx>
 #include <TopoDS.hxx>
+#include <TopoDS_Edge.hxx>
 #include <TopoDS_Face.hxx>
 #include <TopoDS_Shape.hxx>
 #include <TopoDS_Wire.hxx>
@@ -218,6 +230,172 @@ static TopoDS_Face
 planarface (const TopoDS_Wire& w)
 {
   return BRepBuilderAPI_MakeFace (w, Standard_True).Face ();
+}
+
+// The sub-shapes of one kind picked by 1-based indices into the map of all of
+// them, which is the order in which the queries report them.  The indices have
+// been checked against the count by the caller.
+static TopTools_ListOfShape
+picked (const TopoDS_Shape& s, TopAbs_ShapeEnum type, const NDArray& idx)
+{
+  TopTools_IndexedMapOfShape map;
+  TopExp::MapShapes (s, type, map);
+  TopTools_ListOfShape list;
+  for (octave_idx_type i = 0; i < idx.numel (); i++)
+  {
+    list.Append (map (static_cast<int> (idx(i))));
+  }
+  return list;
+}
+
+// The bounding box of a sub-shape as a row of a matrix
+static void
+boxrow (const TopoDS_Shape& s, Matrix& m, octave_idx_type i)
+{
+  Bnd_Box b;
+  BRepBndLib::AddOptimal (s, b, Standard_False, Standard_False);
+  double x0, y0, z0, x1, y1, z1;
+  b.Get (x0, y0, z0, x1, y1, z1);
+  m(i,0) = x0;
+  m(i,1) = y0;
+  m(i,2) = z0;
+  m(i,3) = x1;
+  m(i,4) = y1;
+  m(i,5) = z1;
+}
+
+static void
+dirrow (const gp_Dir& d, Matrix& m, octave_idx_type i)
+{
+  m(i,0) = d.X ();
+  m(i,1) = d.Y ();
+  m(i,2) = d.Z ();
+}
+
+// The edges of a shape: the kind of curve each lies on, its direction (a
+// line's, or the axis of a circle or ellipse), its bounding box, and whether
+// it is a seam or a degenerate edge, which bounds a face without being a
+// feature of the part.
+static Cell
+edgeinfo (const TopoDS_Shape& s)
+{
+  TopTools_IndexedMapOfShape map;
+  TopExp::MapShapes (s, TopAbs_EDGE, map);
+  TopTools_IndexedDataMapOfShapeListOfShape faces;
+  TopExp::MapShapesAndAncestors (s, TopAbs_EDGE, TopAbs_FACE, faces);
+  const octave_idx_type n = map.Extent ();
+  Cell type (n, 1);
+  Matrix dir (n, 3, octave_NaN);
+  Matrix box (n, 6);
+  boolNDArray seam (dim_vector (n, 1), false);
+  for (octave_idx_type i = 0; i < n; i++)
+  {
+    const TopoDS_Edge e = TopoDS::Edge (map (i + 1));
+    boxrow (e, box, i);
+    if (BRep_Tool::Degenerated (e))
+    {
+      type(i) = "degenerate";
+      seam(i) = true;
+      continue;
+    }
+    const BRepAdaptor_Curve c (e);
+    switch (c.GetType ())
+    {
+      case GeomAbs_Line:
+        type(i) = "line";
+        dirrow (c.Line ().Direction (), dir, i);
+        break;
+      case GeomAbs_Circle:
+        type(i) = "circle";
+        dirrow (c.Circle ().Axis ().Direction (), dir, i);
+        break;
+      case GeomAbs_Ellipse:
+        type(i) = "ellipse";
+        dirrow (c.Ellipse ().Axis ().Direction (), dir, i);
+        break;
+      case GeomAbs_BSplineCurve:
+      case GeomAbs_BezierCurve:
+        type(i) = "bspline";
+        break;
+      default:
+        type(i) = "other";
+    }
+    const int k = faces.FindIndex (e);
+    if (k > 0)
+    {
+      for (const TopoDS_Shape& f : faces (k))
+      {
+        if (BRep_Tool::IsClosed (e, TopoDS::Face (f)))
+        {
+          seam(i) = true;
+        }
+      }
+    }
+  }
+  return Cell (ovl (type, dir, box, seam));
+}
+
+// The faces of a shape: the kind of surface each lies on, the outward normal
+// of a plane, the axis of a surface of revolution, and its bounding box
+static Cell
+faceinfo (const TopoDS_Shape& s)
+{
+  TopTools_IndexedMapOfShape map;
+  TopExp::MapShapes (s, TopAbs_FACE, map);
+  const octave_idx_type n = map.Extent ();
+  Cell type (n, 1);
+  Matrix normal (n, 3, octave_NaN);
+  Matrix axis (n, 3, octave_NaN);
+  Matrix box (n, 6);
+  for (octave_idx_type i = 0; i < n; i++)
+  {
+    const TopoDS_Face f = TopoDS::Face (map (i + 1));
+    boxrow (f, box, i);
+    const BRepAdaptor_Surface a (f);
+    switch (a.GetType ())
+    {
+      case GeomAbs_Plane:
+      {
+        type(i) = "plane";
+        gp_Dir d = a.Plane ().Axis ().Direction ();
+        if (f.Orientation () == TopAbs_REVERSED)
+        {
+          d.Reverse ();
+        }
+        dirrow (d, normal, i);
+        break;
+      }
+      case GeomAbs_Cylinder:
+        type(i) = "cylinder";
+        dirrow (a.Cylinder ().Axis ().Direction (), axis, i);
+        break;
+      case GeomAbs_Cone:
+        type(i) = "cone";
+        dirrow (a.Cone ().Axis ().Direction (), axis, i);
+        break;
+      case GeomAbs_Sphere:
+        type(i) = "sphere";
+        break;
+      case GeomAbs_Torus:
+        type(i) = "torus";
+        dirrow (a.Torus ().Axis ().Direction (), axis, i);
+        break;
+      case GeomAbs_SurfaceOfRevolution:
+        type(i) = "revolution";
+        dirrow (a.AxeOfRevolution ().Direction (), axis, i);
+        break;
+      case GeomAbs_SurfaceOfExtrusion:
+        type(i) = "extrusion";
+        break;
+      case GeomAbs_BSplineSurface:
+      case GeomAbs_BezierSurface:
+        type(i) = "bspline";
+        break;
+      default:
+        type(i) = "other";
+    }
+  }
+  return Cell (ovl (type, normal, axis, box));
 }
 
 // A transformed copy of a shape
@@ -413,6 +591,168 @@ function directly. \n\
       out = todata (op.Shape ());
     }
 
+    // A sweep carries a profile drawn in the xy plane along a polyline, turned
+    // by the smallest rotation that takes the z axis onto the first segment
+    // and placed at the first vertex.  Corners are kept sharp.
+    else if (cmd == "sweep")
+    {
+      const Matrix path = args(4).matrix_value ();
+      BRepBuilderAPI_MakeWire spine;
+      for (octave_idx_type i = 0; i + 1 < path.rows (); i++)
+      {
+        spine.Add (BRepBuilderAPI_MakeEdge
+                     (gp_Pnt (path(i,0), path(i,1), path(i,2)),
+                      gp_Pnt (path(i+1,0), path(i+1,1), path(i+1,2))).Edge ());
+      }
+      const gp_Vec t (path(1,0) - path(0,0), path(1,1) - path(0,1),
+                      path(1,2) - path(0,2));
+      const gp_Vec z (0, 0, 1);
+      gp_Trsf rot;
+      if (z.IsOpposite (t, 1e-12))
+      {
+        rot.SetRotation (gp_Ax1 (gp_Pnt (0, 0, 0), gp_Dir (1, 0, 0)), M_PI);
+      }
+      else if (! z.IsParallel (t, 1e-12))
+      {
+        rot.SetRotation (gp_Ax1 (gp_Pnt (0, 0, 0), gp_Dir (z.Crossed (t))),
+                         z.Angle (t));
+      }
+      gp_Trsf move;
+      move.SetTranslation (gp_Vec (path(0,0), path(0,1), path(0,2)));
+      const TopoDS_Shape w = transform (profile (args(2), args(3),
+                                                 gp_XYZ (0, 0, 0),
+                                                 gp_XYZ (1, 0, 0),
+                                                 gp_XYZ (0, 1, 0)),
+                                        move * rot);
+      BRepOffsetAPI_MakePipeShell op (spine.Wire ());
+      op.SetTransitionMode (BRepBuilderAPI_RightCorner);
+      op.Add (w);
+      op.Build ();
+      if (! op.IsDone () || ! op.MakeSolid ())
+      {
+        error ("%s: Open CASCADE could not compute the sweep.",
+               caller.c_str ());
+      }
+      out = todata (op.Shape ());
+    }
+
+    // A helix turns a profile drawn in the xz plane, with its columns the
+    // radius and the height, about the z axis while it rises by the pitch on
+    // every turn.  The spine is an exact helix on a cylinder of the given
+    // radius, and the Frenet frame keeps the profile in the plane through the
+    // axis, as a thread's profile is.
+    else if (cmd == "helix")
+    {
+      const double pitch = args(4).double_value ();
+      const double turns = args(5).double_value ();
+      const double r = args(6).double_value ();
+      const gp_Dir2d d (2 * M_PI, pitch);
+      const double len = turns * hypot (2 * M_PI, pitch);
+      Handle (Geom_CylindricalSurface) cyl
+        = new Geom_CylindricalSurface (gp_Ax3 (gp::XOY ()), r);
+      Handle (Geom2d_Line) line = new Geom2d_Line (gp_Pnt2d (0, 0), d);
+      TopoDS_Edge e = BRepBuilderAPI_MakeEdge (line, cyl, 0, len).Edge ();
+      BRepLib::BuildCurves3d (e);
+      BRepOffsetAPI_MakePipeShell op (BRepBuilderAPI_MakeWire (e).Wire ());
+      op.SetMode (Standard_True);
+      op.Add (profile (args(2), args(3), gp_XYZ (0, 0, 0), gp_XYZ (1, 0, 0),
+                       gp_XYZ (0, 0, 1)));
+      op.Build ();
+      if (! op.IsDone () || ! op.MakeSolid ())
+      {
+        error ("%s: Open CASCADE could not compute the helix.",
+               caller.c_str ());
+      }
+      out = todata (op.Shape ());
+    }
+
+    // Features on chosen edges and faces
+    else if (cmd == "fillet" || cmd == "chamfer")
+    {
+      const TopoDS_Shape s = toshape (args(2), caller);
+      const TopTools_ListOfShape edges
+        = picked (s, TopAbs_EDGE, args(3).array_value ());
+      const double size = args(4).double_value ();
+      TopoDS_Shape r;
+      if (cmd == "fillet")
+      {
+        BRepFilletAPI_MakeFillet op (s);
+        for (const TopoDS_Shape& e : edges)
+        {
+          op.Add (size, TopoDS::Edge (e));
+        }
+        op.Build ();
+        if (! op.IsDone () || ! BRepCheck_Analyzer (op.Shape ()).IsValid ())
+        {
+          error ("%s: Open CASCADE could not round the edges.",
+                 caller.c_str ());
+        }
+        r = op.Shape ();
+      }
+      else
+      {
+        BRepFilletAPI_MakeChamfer op (s);
+        for (const TopoDS_Shape& e : edges)
+        {
+          op.Add (size, TopoDS::Edge (e));
+        }
+        op.Build ();
+        if (! op.IsDone () || ! BRepCheck_Analyzer (op.Shape ()).IsValid ())
+        {
+          error ("%s: Open CASCADE could not chamfer the edges.",
+                 caller.c_str ());
+        }
+        r = op.Shape ();
+      }
+      out = todata (r);
+    }
+    else if (cmd == "shell")
+    {
+      const TopoDS_Shape s = toshape (args(2), caller);
+      const TopTools_ListOfShape open
+        = picked (s, TopAbs_FACE, args(3).array_value ());
+      BRepOffsetAPI_MakeThickSolid op;
+      op.MakeThickSolidByJoin (s, open, -args(4).double_value (), 1e-6,
+                               BRepOffset_Skin, Standard_False,
+                               Standard_False, GeomAbs_Intersection);
+      op.Build ();
+      TopoDS_Shape r;
+      if (op.IsDone ())
+      {
+        r = op.Shape ();
+        // With no face opened Open CASCADE returns the offset solid, which
+        // is the cavity, so the cavity is cut from the shape
+        if (open.IsEmpty ())
+        {
+          BRepAlgoAPI_Cut cut;
+          TopTools_ListOfShape objects, tools;
+          objects.Append (s);
+          tools.Append (r);
+          cut.SetArguments (objects);
+          cut.SetTools (tools);
+          cut.Build ();
+          r = (cut.HasErrors () || ! cut.IsDone ()) ? TopoDS_Shape ()
+                                                    : cut.Shape ();
+        }
+      }
+      // Walls too thick for the shape can leave it untouched rather than
+      // fail, so a result no smaller than the shape is a failure too
+      GProp_GProps before, after;
+      BRepGProp::VolumeProperties (s, before);
+      if (! r.IsNull ())
+      {
+        BRepGProp::VolumeProperties (r, after);
+      }
+      if (r.IsNull () || ! BRepCheck_Analyzer (r).IsValid ()
+          || after.Mass () <= 0
+          || after.Mass () >= before.Mass () * (1 - 1e-9))
+      {
+        error ("%s: Open CASCADE could not hollow the shape.",
+               caller.c_str ());
+      }
+      out = todata (r);
+    }
+
     // Booleans.  A union and a difference take every shape after the first
     // as a tool in one operation, which is several times faster than taking
     // them one at a time.  An intersection cannot: Open CASCADE intersects
@@ -526,6 +866,14 @@ function directly. \n\
       r(4) = y1;
       r(5) = z1;
       out = r;
+    }
+    else if (cmd == "edges")
+    {
+      out = edgeinfo (toshape (args(2), caller));
+    }
+    else if (cmd == "faces")
+    {
+      out = faceinfo (toshape (args(2), caller));
     }
     else if (cmd == "valid")
     {

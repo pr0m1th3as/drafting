@@ -48,5 +48,7 @@ Solid modelling
  solid.extrude
  solid.revolve
  solid.loft
+ solid.sweep
+ solid.helix
  solid.read
  solid.write
