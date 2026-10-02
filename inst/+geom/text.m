@@ -156,17 +156,7 @@ function R = text (STR, varargin)
   y = [0, B(2), (B(2) + B(4)) / 2, B(4)](strcmp (opt.VAlign, va));
   F = __occt__ ('faces2d', 'geom.text', D, ...
                 [x, y, 0; 1, 0, 0; 0, 1, 0; 0, 0, 1], true);
-  R = cell (1, numel (F));
-  A = zeros (1, numel (F));
-  for k = 1:numel (F)
-    O = geom.Path.__loop__ (F{k}.outline);
-    P = cellfun (@geom.Path.__loop__, F{k}.holes, 'UniformOutput', false);
-    R{k} = geom.Region (O, P);
-    A(k) = __area__ (R{k}.Outline) + sum (cellfun (@__area__, R{k}.Holes));
-    R{k}.UCS = opt.UCS;
-  endfor
-  [~, i] = sort (A, 'descend');
-  R = R(i);
+  R = geom.Region.__faces__ (F, opt.UCS);
 
 endfunction
 

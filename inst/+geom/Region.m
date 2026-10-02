@@ -599,7 +599,7 @@ classdef Region
                     double (D), find (strcmp (C, {'round', 'sharp', ...
                                                   'chamfer'})) - 1, ...
                     [U.Origin; U.XAxis; U.YAxis; U.Normal]);
-      R = regions (F, U);
+      R = geom.Region.__faces__ (F, U);
 
     endfunction
 
@@ -970,8 +970,15 @@ classdef Region
                  names{k});
         endif
       endfor
+      ## Holes whose boxes are apart can neither overlap nor touch, which
+      ## spares most pairs the polygon tests
+      B = cell2mat (cellfun (@(q) [min(q, [], 1), max(q, [], 1)], S(:), ...
+                             'UniformOutput', false));
       for j = 2:numel (S)
         for k = j+1:numel (S)
+          if (any (B(j,3:4) < B(k,1:2)) || any (B(k,3:4) < B(j,1:2)))
+            continue;
+          endif
           jink = inpolygon (S{j}(:,1), S{j}(:,2), S{k}(:,1), S{k}(:,2));
           kinj = inpolygon (S{k}(:,1), S{k}(:,2), S{j}(:,1), S{j}(:,2));
           if (meets (S{j}, S{k}) || any (jink) || any (kinj))
@@ -992,6 +999,48 @@ classdef Region
       endfor
       this.Outline = O;
       this.Holes = H;
+
+    endfunction
+
+  endmethods
+
+  methods (Static, Hidden)
+
+    ## The regions of the faces F that Open CASCADE hands back, each the outer
+    ## loop and the inner loops as geom.Path.__loop__ takes them, in the
+    ## frame of the UCS U where its plane is z = 0, laid in U, largest first.
+    ## Open CASCADE has made and checked the faces, so the checks a region is
+    ## made with, which take time growing with the square of the number of
+    ## holes, are not run again; the loops are only turned to run as a
+    ## region's do, the outline anticlockwise and the holes clockwise.
+    function R = __faces__ (F, U)
+
+      R = cell (1, numel (F));
+      A = zeros (1, numel (F));
+      for k = 1:numel (F)
+        O = geom.Path.__loop__ (F{k}.outline);
+        a = __area__ (O);
+        if (a < 0)
+          O = __reversed__ (O);
+        endif
+        A(k) = abs (a);
+        H = cell (1, numel (F{k}.holes));
+        for j = 1:numel (H)
+          H{j} = geom.Path.__loop__ (F{k}.holes{j});
+          h = __area__ (H{j});
+          if (h > 0)
+            H{j} = __reversed__ (H{j});
+          endif
+          A(k) -= abs (h);
+        endfor
+        Q = geom.Region ([0, 0; 1, 0; 0, 1]);
+        Q.Outline = O;
+        Q.Holes = H;
+        Q.UCS = U;
+        R{k} = Q;
+      endfor
+      [~, i] = sort (A, 'descend');
+      R = R(i);
 
     endfunction
 
@@ -1174,24 +1223,7 @@ function R = combine (op, caller, args)
   F = __occt__ ('region2d', caller, op, cellfun (@__data__, L, ...
                                                  'UniformOutput', false), ...
                 [U.Origin; U.XAxis; U.YAxis; U.Normal]);
-  R = regions (F, U);
-
-endfunction
-
-## The regions of the faces F that Open CASCADE hands back in the frame of the
-## UCS U, laid in U, largest first
-function R = regions (F, U)
-
-  R = cell (1, numel (F));
-  A = zeros (1, numel (F));
-  for k = 1:numel (F)
-    H = cellfun (@geom.Path.__loop__, F{k}.holes, 'UniformOutput', false);
-    R{k} = geom.Region (geom.Path.__loop__ (F{k}.outline), H);
-    A(k) = __area__ (R{k}.Outline) + sum (cellfun (@__area__, R{k}.Holes));
-    R{k}.UCS = U;
-  endfor
-  [~, i] = sort (A, 'descend');
-  R = R(i);
+  R = geom.Region.__faces__ (F, U);
 
 endfunction
 
@@ -1842,6 +1874,16 @@ endfunction
 %! assert_equal (numel (H), 6);
 %! P = subtract (geom.Region ([0, 0; 40, 0; 40, 30; 0, 30]), H);
 %! assert_equal (regionarea (P{1}), 1200 - 24 * pi, -1e-12);
+%! assert_equal (__area__ (P{1}.Outline) > 0, true);
+%! assert_equal (all (cellfun (@__area__, P{1}.Holes) < 0), true);
+
+%!test  # many holes apart, each pair settled by its boxes
+%! [x, y] = ndgrid (10:10:70);
+%! H = arrayfun (@(a, b) [a - 2, b, 1; a + 2, b, 1], x(:), y(:), ...
+%!               'UniformOutput', false);
+%! R = geom.Region ([0, 0; 80, 0; 80, 80; 0, 80], H);
+%! assert_equal (numel (R.Holes), 49);
+%! assert_equal (regionarea (R), 6400 - 196 * pi, -1e-12);
 
 %!testif ; exist ('__occt__') == 3  # a bolt circle, and a quarter turn
 %! H = polararray (geom.Region ([17, 0, 1; 23, 0, 1]), 6, 360);

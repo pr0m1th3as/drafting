@@ -1338,16 +1338,7 @@ classdef Shape
       endif
       F = occt ('solid.Shape.section', 'section', this.Data, ...
                 [U.Origin; U.XAxis; U.YAxis; U.Normal]);
-      A = zeros (1, numel (F));
-      for k = 1:numel (F)
-        H = cellfun (@geom.Path.__loop__, F{k}.holes, ...
-                     'UniformOutput', false);
-        R{k} = geom.Region (geom.Path.__loop__ (F{k}.outline), H);
-        R{k}.UCS = U;
-        A(k) = __area__ (R{k}.Outline) + sum (cellfun (@__area__, R{k}.Holes));
-      endfor
-      [~, i] = sort (A, 'descend');
-      R = R(i);
+      R = geom.Region.__faces__ (F, U);
 
     endfunction
 
