@@ -18,10 +18,9 @@
 
 ## -*- texinfo -*-
 ## @deftypefn  {drafting} {} solid.show (@var{S})
-## @deftypefnx {drafting} {} solid.show (@var{FILE})
-## @deftypefnx {drafting} {@var{V} =} solid.show (@dots{})
+## @deftypefnx {drafting} {@var{V} =} solid.show (@var{S})
 ##
-## Show a solid, redrawing in place as it changes.
+## Show a solid, redrawing in place.
 ##
 ## @code{solid.show (@var{S})} shows the @code{solid.Shape} @var{S} in the
 ## viewer, a window drawn by Open CASCADE in a process of its own.  The first
@@ -33,29 +32,22 @@
 ## @kbd{0}, @kbd{1}, @kbd{2} and @kbd{3} turn it to the isometric, front, top
 ## and right views.
 ##
-## @code{solid.show (@var{FILE})} watches the script @var{FILE}: it runs it
-## now, and again every time the file is saved, while Octave waits at its
-## prompt.  The script shows its result itself, by ending with a call such
-## as @code{solid.show (part)}.  Its variables are made in the base
-## workspace, as by @code{run}, so they are there to inspect and to pick on
-## between runs.  If a later run fails, the error is printed and shown in the
-## viewer, and the last part that built stays on screen until the script is
-## fixed.  Closing the viewer stops the watch; watching another script
-## replaces it.
-##
-## @code{@var{V} = solid.show (@dots{})} also returns the viewer, a
-## @code{solid.Viewer}, for picking edges and faces with
-## @code{solid.Viewer.pick}:
+## @code{@var{V} = solid.show (@var{S})} also returns the viewer, a
+## @code{solid.Viewer}.  Assigning to @code{@var{V}.Shape} redraws it at once,
+## and @code{solid.Viewer.pick} picks edges and faces with the mouse:
 ##
 ## @example
 ## @group
 ## part = solid.box (80, 40, 12);
 ## V = solid.show (part);
 ## E = pick (V, 'edge');     # click the edges, then press Enter
-## part = fillet (part, E, 3);
-## solid.show (part);
+## V.Shape = fillet (V.Shape, E, 3);
 ## @end group
 ## @end example
+##
+## Calling @code{solid.show (@var{S})} is the same as assigning @var{S} to the
+## @code{Shape} of that one viewer.  Nothing else redraws it: changing the
+## variable that was shown does not, until it is shown again.
 ##
 ## The viewer is built with the package when Open CASCADE and X11 are found,
 ## and needs a display to run.  It runs on Linux.
@@ -69,72 +61,29 @@ function V = show (S)
   if (nargin != 1)
     error ("solid.show: invalid number of input arguments.");
   endif
-
-  if (ischar (S))
-    if (! isrow (S) || isempty (S))
-      error ("solid.show: FILE must be a non-empty character vector.");
-    endif
-    [~, ~, ext] = fileparts (S);
-    if (! strcmp (ext, '.m'))
-      error ("solid.show: FILE must be an Octave script ending in .m.");
-    endif
-    if (! isfile (S))
-      error ("solid.show: cannot find file '%s'.", S);
-    endif
-    file = make_absolute_filename (S);
-
-    ## Run it now; its errors are raised as they would be by run
-    w = struct ('file', file, 'hash', hash ('md5', fileread (file)));
-    setappdata (0, 'drafting_solid_watch', w);
-    unwind_protect
-      evalin ('base', sprintf ("run ('%s');", strrep (file, "'", "''")));
-      ok = true;
-    unwind_protect_cleanup
-      if (! exist ('ok', 'var'))
-        rmappdata (0, 'drafting_solid_watch');
-      endif
-    end_unwind_protect
-    viewer = current ();
-    if (isempty (viewer) || ! isopen (viewer))
-      rmappdata (0, 'drafting_solid_watch');
-      error (strcat ("solid.show: FILE must show its result by calling", ...
-                     " solid.show itself."));
-    endif
-    if (isempty (getappdata (0, 'drafting_solid_watch_hook')))
-      setappdata (0, 'drafting_solid_watch_hook', ...
-                  add_input_event_hook (@solid.__watch__));
-    endif
-  elseif (isa (S, 'solid.Shape') && isscalar (S))
-    viewer = current ();
-    if (isempty (viewer))
-      viewer = solid.Viewer ();
-      setappdata (0, 'drafting_solid_show', viewer.Id);
-    endif
-    name = inputname (1, false);
-    if (isempty (name) || ! isvarname (name))
-      name = 'S';
-    endif
-    viewer.Name = name;
-    viewer.Shape = S;
-  else
-    error ("solid.show: S must be a solid.Shape object or a script name.");
+  if (! isa (S, 'solid.Shape') || ! isscalar (S))
+    error ("solid.show: S must be a solid.Shape object.");
   endif
 
-  if (nargout > 0)
-    V = viewer;
-  endif
-
-endfunction
-
-## The viewer solid.show keeps, or empty before the first call
-function V = current ()
-
+  ## The one viewer solid.show keeps, its state in the graphics root where it
+  ## outlasts clear all
   id = getappdata (0, 'drafting_solid_show');
   if (isempty (id) || isempty (getappdata (0, sprintf ...
                                            ('drafting_solid_viewer_%d', id))))
-    V = [];
+    viewer = solid.Viewer ();
+    setappdata (0, 'drafting_solid_show', viewer.Id);
   else
-    V = solid.Viewer ('__id__', id);
+    viewer = solid.Viewer ('__id__', id);
+  endif
+  name = inputname (1, false);
+  if (isempty (name) || ! isvarname (name))
+    name = 'S';
+  endif
+  viewer.Name = name;
+  viewer.Shape = S;
+
+  if (nargout > 0)
+    V = viewer;
   endif
 
 endfunction
@@ -153,78 +102,15 @@ endfunction
 %!   solid.show (solid.cylinder (4, 12));
 %!   assert_equal (V.Name, 'S');
 %!   assert_equal (volume (V.Shape), 192 * pi, 1e-9);
+%!   W.Shape = solid.sphere (2);
+%!   assert_equal (volume (V.Shape), 32 / 3 * pi, 1e-9);
 %! unwind_protect_cleanup
 %!   close (V);
 %!   setappdata (0, 'drafting_solid_show', old);
-%! end_unwind_protect
-
-%!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
-%! ## A watched script runs again when it changes, and a failing run leaves
-%! ## the last part on screen
-%! old = getappdata (0, 'drafting_solid_show');
-%! V = solid.Viewer ('Hidden', true);
-%! setappdata (0, 'drafting_solid_show', V.Id);
-%! f = [tempname(), '.m'];
-%! unwind_protect
-%!   fid = fopen (f, 'w');
-%!   fprintf (fid, "part_9f2c = solid.box (10, 20, 30);\n");
-%!   fprintf (fid, "solid.show (part_9f2c);\n");
-%!   fclose (fid);
-%!   solid.show (f);
-%!   assert_equal (volume (V.Shape), 6000, 1e-9);
-%!   assert_equal (V.Name, 'part_9f2c');
-%!   solid.__watch__ ();
-%!   assert_equal (volume (V.Shape), 6000, 1e-9);
-%!   fid = fopen (f, 'w');
-%!   fprintf (fid, "part_9f2c = solid.box (10, 20, 40);\n");
-%!   fprintf (fid, "solid.show (part_9f2c);\n");
-%!   fclose (fid);
-%!   solid.__watch__ ();
-%!   assert_equal (volume (V.Shape), 8000, 1e-9);
-%!   fid = fopen (f, 'w');
-%!   fprintf (fid, "part_9f2c = solid.box (10, 20, -1);\n");
-%!   fprintf (fid, "solid.show (part_9f2c);\n");
-%!   fclose (fid);
-%!   out = evalc ("solid.__watch__ ();");
-%!   assert_equal (strfind (out, 'DZ must be a positive') > 0, true);
-%!   assert_equal (volume (V.Shape), 8000, 1e-9);
-%!   ## Closing the viewer ends the watch
-%!   close (V);
-%!   solid.__watch__ ();
-%!   assert_equal (isempty (getappdata (0, 'drafting_solid_watch')), true);
-%!   assert_equal (isempty (getappdata (0, 'drafting_solid_watch_hook')), true);
-%! unwind_protect_cleanup
-%!   close (V);
-%!   unlink (f);
-%!   evalin ('base', 'clear part_9f2c');
-%!   setappdata (0, 'drafting_solid_show', old);
-%!   if (isappdata (0, 'drafting_solid_watch'))
-%!     rmappdata (0, 'drafting_solid_watch');
-%!   endif
-%!   if (isappdata (0, 'drafting_solid_watch_hook'))
-%!     remove_input_event_hook (getappdata (0, 'drafting_solid_watch_hook'));
-%!     rmappdata (0, 'drafting_solid_watch_hook');
-%!   endif
 %! end_unwind_protect
 
 %!error<solid.show: invalid number of input arguments.> solid.show ()
-%!error<solid.show: S must be a solid.Shape object or a script name.> ...
-%! solid.show (1)
-%!error<solid.show: S must be a solid.Shape object or a script name.> ...
+%!error<solid.show: S must be a solid.Shape object.> solid.show (1)
+%!error<solid.show: S must be a solid.Shape object.> solid.show ('part.m')
+%!error<solid.show: S must be a solid.Shape object.> ...
 %! solid.show ([solid.Shape(), solid.Shape()])
-%!error<solid.show: FILE must be a non-empty character vector.> solid.show ('')
-%!error<solid.show: FILE must be an Octave script ending in .m.> ...
-%! solid.show ('part.step')
-%!error<solid.show: cannot find file 'no_such_script_9f2c.m'.> ...
-%! solid.show ('no_such_script_9f2c.m')
-%!error<solid.show: FILE must show its result by calling solid.show itself.>
-%! f = [tempname(), '.m'];
-%! fid = fopen (f, 'w');
-%! fprintf (fid, "x_9f2c = 1;\n");
-%! fclose (fid);
-%! unwind_protect
-%!   solid.show (f);
-%! unwind_protect_cleanup
-%!   unlink (f);
-%!   evalin ('base', 'clear x_9f2c');
-%! end_unwind_protect

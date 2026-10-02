@@ -123,15 +123,6 @@ classdef Viewer < handle
 
     endfunction
 
-    ## Show TEXT at the foot of the view; empty TEXT clears it
-    function message (this, TEXT)
-
-      if (isopen (this))
-        send (this, strtrim (["message " strrep(TEXT, "\n", " ")]));
-      endif
-
-    endfunction
-
   endmethods
 
   methods (Static, Hidden)

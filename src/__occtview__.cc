@@ -29,7 +29,6 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 //                  Enter, which replies with "edge K" and "face K" lines and
 //                  then "done", or Escape, which replies "cancel"
 //   cancel         ends a pick as Escape does
-//   message TEXT   shows TEXT at the foot of the view; no TEXT clears it
 //   project X Y Z  replies "point PX PY", the pixel the model point lands on
 //   pickat KIND PX PY
 //                  replies "edge K", "face K" or "none", what lies at a pixel
@@ -223,12 +222,6 @@ public:
       {
         finish (false);
       }
-    }
-    else if (cmd == "message")
-    {
-      string text;
-      getline (in, text);
-      label (text.empty () ? text : text.substr (1));
     }
     else if (cmd == "project")
     {
