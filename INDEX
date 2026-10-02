@@ -31,7 +31,9 @@ Construction geometry
 DXF input and output
  dxf.read
  dxf.write
-STL output
+STL files
+ stl.read
+ stl.section
  stl.write
 Sheet composition
  draw.titleblock

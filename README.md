@@ -9,9 +9,9 @@ CAD program or a CNC machine will accept, as a solid for a slicer, as LaTeX for
 a report, or as a figure on screen. Solids proper, built, combined and
 exchanged as STEP, come through Open CASCADE when the package is built with it.
 
-Forty-four public functions across five namespaces plus the `draw.Drawing`,
+Forty-six public functions across five namespaces plus the `draw.Drawing`,
 `geom.Polyline`, `geom.Spline`, `geom.Region`, `geom.Path`, `geom.UCS`,
-`solid.Shape` and `solid.Viewer` classes, 1485 built-in self-tests and 67 `%!demo` blocks, nearly all of which
+`solid.Shape` and `solid.Viewer` classes, 1511 built-in self-tests and 67 `%!demo` blocks, nearly all of which
 end in a `plot` call, so the documentation shows what a function does rather
 than only describing it.
 
@@ -20,11 +20,11 @@ than only describing it.
 ```
 inst/+geom    planar geometry (no file formats, no drawing semantics)
 inst/+dxf     AutoCAD R12 (AC1009) ASCII DXF, both directions
-inst/+stl     binary STL from a stack of planar sections
+inst/+stl     STL meshes read and cut, and written from planar sections
 inst/+draw    format-agnostic drawing model, and the backends that render it
 inst/+solid   solids through Open CASCADE, STEP and STL
 inst/tests    classdef .m-tst suites
-src           the compiled interface to Open CASCADE
+src           compiled code: STL meshes, and the interface to Open CASCADE
 ```
 
 Dependencies point downward only: `+draw` builds on `+geom` and emits through
@@ -102,6 +102,18 @@ stl.write ('plate.stl', [-40, -40; 40, -40; 40, 40; -40, 40], [0, 6]);
 leaving the planar model. Each section is written as its own closed shell, so a
 single section is a closed manifold and a stack of several is not. Slicers
 union it without complaint; a tool demanding one closed surface will not.
+
+`stl.read` reads a binary or ASCII STL into the vertices and faces `patch`
+takes, welding the corners every triangle repeats. `stl.section` cuts the mesh
+with the plane of a `geom.UCS` into `geom.Region` objects, as
+`solid.Shape.section` cuts a solid, healing small gaps in the mesh to a
+tolerance and returning what will not close; the regions build solids like any
+others. Both are compiled and need nothing but Octave:
+
+```
+M = stl.read ('bracket.stl');
+R = stl.section (M, geom.UCS ([0, 0, 1], [0, 0, 5]));
+```
 
 `+solid` models solids through [Open CASCADE](https://dev.opencascade.org/),
 the kernel FreeCAD is built on, so curved faces stay exact. `solid.Shape` holds

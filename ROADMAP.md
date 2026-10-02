@@ -206,7 +206,13 @@ absence forces every downstream package to write them again, worse:
 
 **`stl.read`.** The `stl` namespace writes and cannot read. Both the ASCII and
 binary forms are an afternoon's work, and a package that emits meshes for other
-tools ought to be able to take them back.
+tools ought to be able to take them back. Reading, welding and slicing are
+compiled, in a file of their own that needs no Open CASCADE: an interpreted
+loop chains a cut's segments fifty times slower. With it comes slicing a mesh
+with a plane into `geom.Region` objects, as `solid.Shape.section` cuts a
+solid: the cut of a mesh is a polygon, healed to a tolerance where the mesh
+has gaps. Fitting arcs and splines to that polygon, so that a faceted bore
+becomes a circle again, follows in a later release.
 
 ## Milestone 2: the language of a technical drawing (0.3.0)
 

@@ -26,8 +26,11 @@ OCCT_RECENT := $(shell awk '/define OCC_VERSION_MAJOR/ {M = $$3} \
                  $(OCCT_HDR))
 endif
 
+# The triangle meshes behind the stl namespace need nothing but Octave
+OCTFILES = __mesh__.oct
+
 ifeq ($(OCCT_RECENT),yes)
-OCTFILES = __occt__.oct
+OCTFILES += __occt__.oct
 ifneq ($(wildcard $(X11_INC)/X11/Xlib.h),)
 PROGRAMS = __occtview__
 endif
@@ -49,6 +52,9 @@ ifeq ($(PROGRAMS),)
 	      "building without the viewer behind solid.show."
 endif
 endif
+
+__mesh__.oct: __mesh__.cc
+	$(MKOCTFILE) -O2 __mesh__.cc
 
 __occt__.oct: __occt__.cc
 	$(MKOCTFILE) -I$(OCCT_INC) __occt__.cc $(OCCT_LIBS)

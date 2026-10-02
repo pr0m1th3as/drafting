@@ -100,6 +100,19 @@ classdef Region
 
     endfunction
 
+    ## The region with the outline O and the holes in the cell H, N-by-2
+    ## vertices of straight segments in the xy plane, O anticlockwise and the
+    ## holes clockwise, already known to be valid, as a cut through a mesh
+    ## is: they are taken without the checks, which take time quadratic in the
+    ## number of vertices
+    function this = __trusted__ (this, O, H)
+
+      this.Outline = geom.Path (O, 'Closed', true);
+      this.Holes = cellfun (@(h) geom.Path (h, 'Closed', true), H, ...
+                            'UniformOutput', false);
+
+    endfunction
+
     ## The region scaled by the factor F about the origin of its UCS
     function this = __scaled__ (this, F)
 
