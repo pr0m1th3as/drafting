@@ -17,10 +17,12 @@ You should have received a copy of the GNU General Public License along with
 this program; if not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <array>
 #include <cmath>
 #include <functional>
 #include <sstream>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include <octave/oct.h>
@@ -38,6 +40,9 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <BRepBuilderAPI_MakeWire.hxx>
 #include <BRepBuilderAPI_Transform.hxx>
 #include <BRepCheck_Analyzer.hxx>
+#include <BRepClass3d_SolidClassifier.hxx>
+#include <BRep_Builder.hxx>
+#include <ShapeUpgrade_UnifySameDomain.hxx>
 #include <BRepFilletAPI_MakeChamfer.hxx>
 #include <BRepFilletAPI_MakeFillet.hxx>
 #include <BRepGProp.hxx>
@@ -69,6 +74,7 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <GeomLib_IsPlanarSurface.hxx>
 #include <Geom2d_Line.hxx>
 #include <Geom_CylindricalSurface.hxx>
+#include <Geom_Plane.hxx>
 #include <GProp_GProps.hxx>
 #include <Interface_Static.hxx>
 #include <TColStd_Array1OfInteger.hxx>
@@ -715,6 +721,289 @@ sectionloop (const TopoDS_Wire& w, const TopoDS_Face& f)
   return c;
 }
 
+
+// A closed triangle mesh as a solid: the vertices V, N-by-3, and the
+// triangles F, K-by-3 indices from 1, built from the mesh's own topology, a
+// vertex for each vertex, an edge for each edge two triangles share and a
+// flat face for each triangle.  Every edge must belong to two triangles.
+// Triangles turned the wrong way are turned to agree with their neighbours;
+// each closed piece is a solid, and a piece inside another, running the
+// other way, is a void in it; pieces that overlap are united.  With MERGE,
+// coplanar faces that meet become one.
+static TopoDS_Shape
+polyhedron (const Matrix& V, const Matrix& F, bool merge, const string& caller)
+{
+  const octave_idx_type nv = V.rows ();
+  vector<array<octave_idx_type, 3>> T;
+  for (octave_idx_type t = 0; t < F.rows (); t++)
+  {
+    array<octave_idx_type, 3> f = {static_cast<octave_idx_type> (F(t,0)) - 1,
+                                   static_cast<octave_idx_type> (F(t,1)) - 1,
+                                   static_cast<octave_idx_type> (F(t,2)) - 1};
+    const gp_Pnt a (V(f[0],0), V(f[0],1), V(f[0],2));
+    const gp_Pnt b (V(f[1],0), V(f[1],1), V(f[1],2));
+    const gp_Pnt c (V(f[2],0), V(f[2],1), V(f[2],2));
+    if (f[0] != f[1] && f[1] != f[2] && f[2] != f[0]
+        && gp_Vec (a, b).Crossed (gp_Vec (a, c)).Magnitude () > 0)
+    {
+      T.push_back (f);
+    }
+  }
+  const size_t nt = T.size ();
+  if (nt == 0)
+  {
+    error ("%s: the mesh has no triangles.", caller.c_str ());
+  }
+
+  // The triangles at each edge
+  auto key = [nv] (octave_idx_type a, octave_idx_type b)
+  {
+    return static_cast<int64_t> (std::min (a, b)) * nv + std::max (a, b);
+  };
+  unordered_map<int64_t, vector<size_t>> at;
+  at.reserve (2 * nt);
+  for (size_t t = 0; t < nt; t++)
+  {
+    for (int e = 0; e < 3; e++)
+    {
+      at[key (T[t][e], T[t][(e + 1) % 3])].push_back (t);
+    }
+  }
+  size_t open = 0, crowded = 0;
+  for (const auto& p : at)
+  {
+    open += (p.second.size () == 1);
+    crowded += (p.second.size () > 2);
+  }
+  if (open > 0)
+  {
+    error ("%s: the mesh is not closed: %zu %s to one triangle only.",
+           caller.c_str (), open, open == 1 ? "edge belongs" : "edges belong");
+  }
+  if (crowded > 0)
+  {
+    error ("%s: the mesh is not manifold: %zu %s to more than two triangles.",
+           caller.c_str (), crowded,
+           crowded == 1 ? "edge belongs" : "edges belong");
+  }
+
+  // Each piece turned one way, from a triangle of it outwards: a neighbour
+  // runs their shared edge the other way, or is turned over
+  auto runs = [&] (size_t t, octave_idx_type a, octave_idx_type b)
+  {
+    for (int e = 0; e < 3; e++)
+    {
+      if (T[t][e] == a && T[t][(e + 1) % 3] == b)
+      {
+        return true;
+      }
+    }
+    return false;
+  };
+  vector<int> piece (nt, -1);
+  int np = 0;
+  for (size_t s = 0; s < nt; s++)
+  {
+    if (piece[s] >= 0)
+    {
+      continue;
+    }
+    vector<size_t> stack = {s};
+    piece[s] = np;
+    while (! stack.empty ())
+    {
+      const size_t t = stack.back ();
+      stack.pop_back ();
+      for (int e = 0; e < 3; e++)
+      {
+        const octave_idx_type a = T[t][e], b = T[t][(e + 1) % 3];
+        for (size_t u : at[key (a, b)])
+        {
+          if (u == t)
+          {
+            continue;
+          }
+          if (piece[u] < 0)
+          {
+            if (runs (u, a, b))
+            {
+              std::swap (T[u][1], T[u][2]);
+            }
+            piece[u] = np;
+            stack.push_back (u);
+          }
+          else if (piece[u] == np && runs (u, a, b))
+          {
+            error ("%s: the mesh is one-sided, as a Klein bottle, and"
+                   " encloses no volume.", caller.c_str ());
+          }
+        }
+      }
+    }
+    np++;
+  }
+
+  // The vertices and edges, shared, and each piece's shell of flat faces
+  BRep_Builder bb;
+  vector<TopoDS_Vertex> vx (nv);
+  auto vertex = [&] (octave_idx_type i)
+  {
+    if (vx[i].IsNull ())
+    {
+      bb.MakeVertex (vx[i], gp_Pnt (V(i,0), V(i,1), V(i,2)),
+                     Precision::Confusion ());
+    }
+    return vx[i];
+  };
+  unordered_map<int64_t, TopoDS_Edge> ed;
+  ed.reserve (2 * nt);
+  vector<TopoDS_Shell> shells (np);
+  vector<double> vol (np, 0);
+  vector<Bnd_Box> box (np);
+  for (int p = 0; p < np; p++)
+  {
+    bb.MakeShell (shells[p]);
+  }
+  for (size_t t = 0; t < nt; t++)
+  {
+    TopoDS_Wire w;
+    bb.MakeWire (w);
+    for (int e = 0; e < 3; e++)
+    {
+      const octave_idx_type a = T[t][e], b = T[t][(e + 1) % 3];
+      const int64_t k = key (a, b);
+      auto it = ed.find (k);
+      if (it == ed.end ())
+      {
+        const octave_idx_type lo = std::min (a, b), hi = std::max (a, b);
+        it = ed.emplace (k, BRepBuilderAPI_MakeEdge (vertex (lo), vertex (hi))
+                              .Edge ()).first;
+      }
+      bb.Add (w, a < b ? it->second
+                       : TopoDS::Edge (it->second.Reversed ()));
+    }
+    w.Closed (Standard_True);
+    const gp_Pnt a (V(T[t][0],0), V(T[t][0],1), V(T[t][0],2));
+    const gp_Pnt b (V(T[t][1],0), V(T[t][1],1), V(T[t][1],2));
+    const gp_Pnt c (V(T[t][2],0), V(T[t][2],1), V(T[t][2],2));
+    const gp_Vec n = gp_Vec (a, b).Crossed (gp_Vec (a, c));
+    TopoDS_Face f;
+    bb.MakeFace (f, new Geom_Plane (a, gp_Dir (n)), Precision::Confusion ());
+    bb.Add (f, w);
+    bb.Add (shells[piece[t]], f);
+    box[piece[t]].Add (a);
+    box[piece[t]].Add (b);
+    box[piece[t]].Add (c);
+    vol[piece[t]] += gp_Vec (a.XYZ ()).Dot (gp_Vec (b.XYZ ())
+                                            .Crossed (gp_Vec (c.XYZ ()))) / 6;
+  }
+
+  // Pieces enclosing volume are solids; one running the other way is a void
+  // in the solid around it, or a solid turned inside out when none is
+  vector<TopoDS_Solid> solids;
+  vector<Bnd_Box> boxes;
+  for (int p = 0; p < np; p++)
+  {
+    shells[p].Closed (Standard_True);
+    if (vol[p] > 0)
+    {
+      TopoDS_Solid so;
+      bb.MakeSolid (so);
+      bb.Add (so, shells[p]);
+      solids.push_back (so);
+      boxes.push_back (box[p]);
+    }
+  }
+  for (int p = 0; p < np; p++)
+  {
+    if (vol[p] > 0)
+    {
+      continue;
+    }
+    gp_Pnt q;
+    for (size_t t = 0; t < nt; t++)
+    {
+      if (piece[t] == p)
+      {
+        q = gp_Pnt (V(T[t][0],0), V(T[t][0],1), V(T[t][0],2));
+        break;
+      }
+    }
+    bool held = false;
+    for (TopoDS_Solid& so : solids)
+    {
+      BRepClass3d_SolidClassifier cls (so, q, 1e-9);
+      if (cls.State () == TopAbs_IN)
+      {
+        bb.Add (so, shells[p]);
+        held = true;
+        break;
+      }
+    }
+    if (! held)
+    {
+      TopoDS_Solid so;
+      bb.MakeSolid (so);
+      bb.Add (so, TopoDS::Shell (shells[p].Reversed ()));
+      solids.push_back (so);
+      boxes.push_back (box[p]);
+    }
+  }
+
+  // Solids that may overlap are united; apart, they stay as they are, which
+  // spares a large mesh in one piece the boolean
+  bool apart = true;
+  for (size_t i = 0; i < solids.size () && apart; i++)
+  {
+    for (size_t j = i + 1; j < solids.size () && apart; j++)
+    {
+      apart = boxes[i].IsOut (boxes[j]);
+    }
+  }
+  TopoDS_Shape s;
+  if (solids.size () == 1)
+  {
+    s = solids[0];
+  }
+  else if (apart)
+  {
+    TopoDS_Compound c;
+    bb.MakeCompound (c);
+    for (const TopoDS_Solid& so : solids)
+    {
+      bb.Add (c, so);
+    }
+    s = c;
+  }
+  else
+  {
+    TopTools_ListOfShape objects, tools;
+    objects.Append (solids[0]);
+    for (size_t i = 1; i < solids.size (); i++)
+    {
+      tools.Append (solids[i]);
+    }
+    BRepAlgoAPI_Fuse op;
+    op.SetArguments (objects);
+    op.SetTools (tools);
+    op.Build ();
+    if (op.HasErrors () || ! op.IsDone ())
+    {
+      error ("%s: Open CASCADE could not unite the pieces of the mesh.",
+             caller.c_str ());
+    }
+    s = op.Shape ();
+  }
+  if (merge)
+  {
+    ShapeUpgrade_UnifySameDomain u (s, Standard_True, Standard_True,
+                                    Standard_False);
+    u.Build ();
+    s = u.Shape ();
+  }
+  return s;
+}
+
 // A transformed copy of a shape
 static TopoDS_Shape
 transform (const TopoDS_Shape& s, const gp_Trsf& t)
@@ -1204,6 +1493,12 @@ function directly. \n\
     }
     // A primitive put in a UCS: its own axes laid on the frame's, whose rows
     // are the origin, x axis, y axis and normal
+    else if (cmd == "polyhedron")
+    {
+      out = todata (polyhedron (args(2).matrix_value (),
+                                args(3).matrix_value (),
+                                args(4).bool_value (), caller));
+    }
     else if (cmd == "place")
     {
       const Matrix f = args(3).matrix_value ();

@@ -54,6 +54,7 @@ Solid modelling
  solid.cone
  solid.sphere
  solid.torus
+ solid.polyhedron
  solid.extrude
  solid.revolve
  solid.loft

@@ -168,7 +168,7 @@ projection (`section`) and STL in and out are here. These are not:
 | `offset (r)`, `offset (delta)`, `chamfer` | `offset` on `geom.Region`, its corners round, sharp or cut |
 | `hull ()` of 2-D shapes | the hull of regions, its arcs exact and its lines tangent to them |
 | `text ()` | the outlines of text as regions, from Open CASCADE's font builder |
-| `polyhedron ()`, an STL in a boolean | a watertight mesh sewn into a `solid.Shape` |
+| `polyhedron ()`, an STL in a boolean | a closed mesh as a `solid.Shape`, built from the mesh's own vertices, edges and triangles |
 | `multmatrix`, `resize`, `color` | a general affine transform, resizing to a box, colour carried to the viewer and to STEP |
 | `projection (cut = false)` | the outline of a solid on a plane, which milestone 4's views need as well |
 | `hull ()` of solids | the hull of a solid's points, as a faceted solid |

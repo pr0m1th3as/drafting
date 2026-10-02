@@ -9,9 +9,9 @@ CAD program or a CNC machine will accept, as a solid for a slicer, as LaTeX for
 a report, or as a figure on screen. Solids proper, built, combined and
 exchanged as STEP, come through Open CASCADE when the package is built with it.
 
-Forty-seven public functions across five namespaces plus the `draw.Drawing`,
+Forty-eight public functions across five namespaces plus the `draw.Drawing`,
 `geom.Polyline`, `geom.Spline`, `geom.Region`, `geom.Path`, `geom.UCS`,
-`solid.Shape` and `solid.Viewer` classes, 1571 built-in self-tests and 67 `%!demo` blocks, nearly all of which
+`solid.Shape` and `solid.Viewer` classes, 1594 built-in self-tests and 67 `%!demo` blocks, nearly all of which
 end in a `plot` call, so the documentation shows what a function does rather
 than only describing it.
 
@@ -139,8 +139,10 @@ and its holes right through. Methods drill holes (plain, counterbored,
 countersunk, tapping size), cut pockets, round and bevel edges and hollow a
 shape, on edges and faces chosen by kind, direction and position, and
 `section` cuts a solid with a plane into regions exact enough to build from
-again. `solid.read` reads STEP, and `solid.write` writes STEP for a CAD
-program or STL for a slicer:
+again. `solid.polyhedron` makes a solid of a closed triangle mesh, to take
+part in booleans like any other. `solid.read` reads STEP, or STL through
+`solid.polyhedron`, and `solid.write` writes STEP for a CAD program or STL for
+a slicer:
 
 ```
 plate = solid.box (80, 40, 12);

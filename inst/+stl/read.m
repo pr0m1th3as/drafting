@@ -44,7 +44,7 @@
 ## ASCII, the three numbers after each @qcode{vertex}, whatever the case and
 ## spacing.
 ##
-## @seealso{stl.section, stl.write}
+## @seealso{stl.section, stl.write, solid.polyhedron}
 ## @end deftypefn
 
 function M = read (FILE, varargin)
