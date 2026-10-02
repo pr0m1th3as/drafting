@@ -11,7 +11,7 @@ exchanged as STEP, come through Open CASCADE when the package is built with it.
 
 Forty-eight public functions across five namespaces plus the `draw.Drawing`,
 `geom.Polyline`, `geom.Spline`, `geom.Region`, `geom.Path`, `geom.UCS`,
-`solid.Shape` and `solid.Viewer` classes, 1594 built-in self-tests and 67 `%!demo` blocks, nearly all of which
+`solid.Shape` and `solid.Viewer` classes, 1603 built-in self-tests and 67 `%!demo` blocks, nearly all of which
 end in a `plot` call, so the documentation shows what a function does rather
 than only describing it.
 
@@ -129,7 +129,8 @@ R = fit (R{1}, 'arcs', 'AbsTol', 0.01);
 `+solid` models solids through [Open CASCADE](https://dev.opencascade.org/),
 the kernel FreeCAD is built on, so curved faces stay exact. `solid.Shape` holds
 a solid, with the booleans `union`, `subtract` and `intersect`, translation,
-rotation, mirroring and scaling, and volume, area, centroid and bounding box;
+rotation, mirroring and scaling, the convex hull of shapes and points, and
+volume, area, centroid and bounding box;
 `solid.box`, `solid.wedge`, `solid.cylinder`, `solid.cone`, `solid.sphere` and
 `solid.torus` make the primitives, placed in a `geom.UCS` by a corner, the
 centre of the base or the centroid; `solid.extrude`, `solid.revolve`,

@@ -43,6 +43,8 @@ classdef Shape
   ## @item @code{intersect} @tab the material common to all of them
   ## @end multitable
   ##
+  ## @code{hull} wraps shapes and points in their convex hull.
+  ##
   ## @example
   ## @group
   ## plate = solid.box (80, 40, 12);
@@ -1349,6 +1351,101 @@ classdef Shape
 
     endfunction
 
+    ## -*- texinfo -*-
+    ## @deftypefn  {solid.Shape} {@var{H} =} hull (@var{A}, @var{B}, @dots{})
+    ## @deftypefnx {solid.Shape} {@var{H} =} hull (@dots{}, @qcode{'Tolerance'}, @var{TOL})
+    ##
+    ## The convex hull of shapes and points.
+    ##
+    ## @code{@var{H} = hull (@var{A}, @var{B}, @dots{})} returns the smallest
+    ## convex solid that holds every shape and point given, the shape a sheet
+    ## shrunk round them takes.  Each argument is a @code{solid.Shape} or an
+    ## @math{N}-by-3 matrix of points.  This is OpenSCAD's @code{hull} of
+    ## solids: a slot from two cylinders, a rounded block from eight spheres
+    ## at its corners, a tapered arm from the bosses at its ends.  Empty
+    ## shapes add nothing, and the hull of nothing is the empty shape.
+    ##
+    ## The hull has flat faces.  The surface of each shape is taken as the
+    ## points of a triangulation that strays no further than @var{TOL} from
+    ## it, 0.01 by default, so the hull lies inside the exact one by at most
+    ## @var{TOL}; where the exact hull is flat, as between boxes, it is exact
+    ## and its triangles meet as whole faces.  Open CASCADE has no exact hull
+    ## of curved faces.
+    ##
+    ## @example
+    ## @group
+    ## ## A slot 30 long and 10 wide, 4 deep, cut through a plate
+    ## C = solid.cylinder (5, 4);
+    ## slot = hull (C, translate (C, [20, 0, 0]));
+    ## plate = subtract (translate (solid.box (50, 30, 4), [-15, -15, 0]), ...
+    ##                   slot);
+    ## @end group
+    ## @end example
+    ##
+    ## @seealso{geom.Region.hull, solid.polyhedron, solid.Shape.union}
+    ## @end deftypefn
+    function H = hull (varargin)
+
+      ## Input validation
+      TOL = 0.01;
+      k = find (cellfun (@ischar, varargin), 1);
+      args = {};
+      if (! isempty (k))
+        args = varargin(k:end);
+        varargin = varargin(1:k-1);
+      endif
+      if (mod (numel (args), 2) != 0)
+        error ("solid.Shape.hull: Name/Value arguments must come in pairs.");
+      endif
+      for i = 1:2:numel (args)
+        if (! ischar (args{i}) || ! strcmp (args{i}, 'Tolerance'))
+          error ("solid.Shape.hull: unknown parameter.");
+        endif
+        TOL = args{i+1};
+        errmsg = solid.__checkpos__ (TOL, 'Tolerance');
+        if (! isempty (errmsg))
+          error ("solid.Shape.hull: %s", errmsg);
+        endif
+      endfor
+      isshape = cellfun (@(x) isa (x, 'solid.Shape') && isscalar (x), ...
+                         varargin);
+      ispoints = cellfun (@(x) isnumeric (x) && isreal (x) && ismatrix (x) ...
+                               && columns (x) == 3 && all (isfinite (x(:))), ...
+                          varargin);
+      if (! all (isshape | ispoints))
+        error (strcat ("solid.Shape.hull: every operand must be a", ...
+                       " solid.Shape object or an N-by-3 matrix of points."));
+      endif
+
+      P = cellfun (@double, varargin(ispoints), 'UniformOutput', false);
+      for S = varargin(isshape)
+        if (! isempty (S{1}))
+          P{end+1} = occt ('solid.Shape.hull', 'points', S{1}.Data, ...
+                           double (TOL), 20);
+        endif
+      endfor
+      P = unique (vertcat (zeros (0, 3), P{:}), 'rows');
+      if (isempty (P))
+        H = solid.Shape ();
+        return;
+      endif
+      flat = 'solid.Shape.hull: the hull is flat and encloses no volume.';
+      if (rows (P) < 4)
+        error (flat);
+      endif
+      sv = svd (P - mean (P, 1));
+      if (sv(3) <= 1e-12 * sv(1))
+        error (flat);
+      endif
+      try
+        F = convhulln (P);
+      catch
+        error (flat);
+      end_try_catch
+      H = solid.polyhedron (P, F);
+
+    endfunction
+
   endmethods
 
 endclassdef
@@ -2180,3 +2277,42 @@ endfunction
 %! section (solid.Shape ())
 %!error<solid.Shape.section: U must be a geom.UCS object.> ...
 %! section (solid.Shape (), [0, 0, 1])
+
+%!testif ; exist ('__occt__') == 3  # boxes: exact, in whole faces
+%! A = solid.box (10, 10, 10);
+%! H = hull (A, translate (A, [20, 0, 0]));
+%! assert_equal (volume (H), 3000, -1e-12);
+%! assert_equal (numfaces (H), 6);
+%! assert_equal (isvalid (H), true);
+%! B = subtract (A, translate (solid.cylinder (2, 10), [5, 5, 0]));
+%! assert_equal (volume (hull (B)), 1000, -1e-12);
+
+%!testif ; exist ('__occt__') == 3  # a box and a point, a pyramid on it
+%! H = hull (solid.box (10, 10, 10), [5, 5, 20]);
+%! assert_equal (volume (H), 1000 + 1000 / 3, -1e-12);
+%! H = hull (solid.Shape (), [0, 0, 0; 6, 0, 0; 0, 6, 0; 0, 0, 6]);
+%! assert_equal (volume (H), 36, -1e-12);
+%! assert_equal (isempty (hull (solid.Shape (), zeros (0, 3))), true);
+
+%!testif ; exist ('__occt__') == 3  # a slot: inside the exact hull, within TOL
+%! C = solid.cylinder (5, 4);
+%! H = hull (C, translate (C, [20, 0, 0]));
+%! V = (25 * pi + 200) * 4;
+%! assert_equal (volume (H) <= V, true);
+%! assert_equal (volume (H) >= V - 0.01 * area (H), true);
+%! G = hull (C, translate (C, [20, 0, 0]), 'Tolerance', 0.5);
+%! assert_equal (volume (G) >= V - 0.5 * area (G), true);
+%! assert_equal (volume (G) < volume (H), true);
+
+%!error<solid.Shape.hull: Name/Value arguments must come in pairs.> ...
+%! hull (solid.Shape (), 'Tolerance')
+%!error<solid.Shape.hull: unknown parameter.> ...
+%! hull (solid.Shape (), 'Angle', 1)
+%!error<solid.Shape.hull: Tolerance must be a positive and finite real scalar.> ...
+%! hull (solid.Shape (), 'Tolerance', 0)
+%!error<solid.Shape.hull: every operand must be a solid.Shape object or an N-by-3 matrix of points.> ...
+%! hull (solid.Shape (), [0, 0])
+%!error<solid.Shape.hull: the hull is flat and encloses no volume.> ...
+%! hull (solid.Shape (), [0, 0, 0; 1, 0, 0; 0, 1, 0])
+%!error<solid.Shape.hull: the hull is flat and encloses no volume.> ...
+%! hull (solid.Shape (), [0, 0, 0; 1, 0, 0; 0, 1, 0; 1, 1, 0])

@@ -82,6 +82,7 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <TColgp_Array1OfPnt.hxx>
 #include <Message.hxx>
 #include <Message_Messenger.hxx>
+#include <Poly_Triangulation.hxx>
 #include <STEPControl_Reader.hxx>
 #include <STEPControl_Writer.hxx>
 #include <Standard_Failure.hxx>
@@ -1401,6 +1402,46 @@ writestl (const TopoDS_Shape& s, const string& file, double tol,
   }
 }
 
+// The points of the surface of S: the nodes of a triangulation that strays
+// no further than TOL from it, so the hull of the points lies within TOL of
+// the hull of S
+static Matrix
+surfacepoints (const TopoDS_Shape& s, double tol, double angle,
+               const string& caller)
+{
+  BRepMesh_IncrementalMesh mesh (s, tol, Standard_False, angle,
+                                 Standard_True);
+  if (! mesh.IsDone ())
+  {
+    error ("%s: Open CASCADE could not triangulate the shape.",
+           caller.c_str ());
+  }
+  vector<gp_Pnt> p;
+  for (TopExp_Explorer ex (s, TopAbs_FACE); ex.More (); ex.Next ())
+  {
+    TopLoc_Location loc;
+    Handle (Poly_Triangulation) T
+      = BRep_Tool::Triangulation (TopoDS::Face (ex.Current ()), loc);
+    if (T.IsNull ())
+    {
+      continue;
+    }
+    const gp_Trsf t = loc.Transformation ();
+    for (int i = 1; i <= T->NbNodes (); i++)
+    {
+      p.push_back (T->Node (i).Transformed (t));
+    }
+  }
+  Matrix P (p.size (), 3);
+  for (size_t i = 0; i < p.size (); i++)
+  {
+    P(i,0) = p[i].X ();
+    P(i,1) = p[i].Y ();
+    P(i,2) = p[i].Z ();
+  }
+  return P;
+}
+
 static TopoDS_Shape
 readstep (const string& file, const string& caller)
 {
@@ -2202,6 +2243,11 @@ function directly. \n\
       writestl (toshape (args(2), caller), args(3).string_value (),
                 args(4).double_value (),
                 args(5).double_value () * M_PI / 180, caller);
+    }
+    else if (cmd == "points")
+    {
+      out = surfacepoints (toshape (args(2), caller), args(3).double_value (),
+                           args(4).double_value () * M_PI / 180, caller);
     }
     else if (cmd == "readstep")
     {
