@@ -209,6 +209,50 @@ classdef Region
 
     endfunction
 
+    ## -*- texinfo -*-
+    ## @deftypefn  {geom.Region} {@var{R} =} chamfer (@var{R}, @var{D})
+    ## @deftypefnx {geom.Region} {@var{R} =} chamfer (@var{R}, [@var{D1}, @var{D2}])
+    ## @deftypefnx {geom.Region} {@var{R} =} chamfer (@var{R}, @var{D}, @qcode{'Angle'}, @var{A})
+    ##
+    ## Cut the corners of a region.
+    ##
+    ## @code{@var{R} = chamfer (@var{R}, @var{D})} cuts every corner of the
+    ## outline and of every hole where two straight segments meet, @var{D}
+    ## millimetres back along both segments, as @code{geom.Polyline.chamfer}
+    ## does.  Two distances or a distance and an angle are taken as there,
+    ## before and after each corner in the order the region stores its
+    ## vertices: anticlockwise round the outline, clockwise round the holes.
+    ## To cut only some corners, cut the outline or a hole as a polyline and
+    ## make the region again.
+    ##
+    ## @seealso{geom.Polyline.chamfer, geom.Region.fillet}
+    ## @end deftypefn
+    function this = chamfer (this, varargin)
+
+      ## Input validation
+      if (nargin < 2)
+        error ("geom.Region.chamfer: invalid number of input arguments.");
+      endif
+
+      try
+        O = chamfer (this.Outline, varargin{:});
+      catch err
+        error ("geom.Region.chamfer: OUTLINE: %s", ...
+               regexprep (err.message, '^geom\.Polyline\.chamfer: ', ''));
+      end_try_catch
+      H = this.Holes;
+      for k = 1:numel (H)
+        try
+          H{k} = chamfer (H{k}, varargin{:});
+        catch err
+          error ("geom.Region.chamfer: HOLES{%d}: %s", k, ...
+                 regexprep (err.message, '^geom\.Polyline\.chamfer: ', ''));
+        end_try_catch
+      endfor
+      this = geom.Region (O, H);
+
+    endfunction
+
     function this = Region (OUTLINE, HOLES = {})
 
       ## Input validation
@@ -465,6 +509,24 @@ endfunction
 %! assert_equal (rows (Q.Holes{1}.Vertices), 8);
 %! assert_equal (all (Q.Holes{1}.Vertices(1:2:end,3) < 0), true);
 %! assert_equal (Q.UCS, R.UCS);
+
+%!test  # every corner of the outline and of a hole cut
+%! R = geom.Region ([0, 0; 60, 0; 60, 40; 0, 40], ...
+%!                  {[20, 15; 40, 15; 40, 25; 20, 25]});
+%! Q = chamfer (R, 1);
+%! assert_equal (rows (Q.Outline.Vertices), 8);
+%! assert_equal (rows (Q.Holes{1}.Vertices), 8);
+%! ## The outline loses four corners, the hole gives four back
+%! A = @(P) polyarea (P(:,1), P(:,2));
+%! assert_equal (A (Q.Outline.Vertices) - A (Q.Holes{1}.Vertices), 2200, 1e-9);
+
+%!error<geom.Region.chamfer: invalid number of input arguments.> ...
+%! chamfer (geom.Region ([0, 0; 1, 0; 1, 1]))
+%!error<geom.Region.chamfer: OUTLINE: D must be one positive finite distance, or two.> ...
+%! chamfer (geom.Region ([0, 0; 1, 0; 1, 1]), 0)
+%!error<geom.Region.chamfer: HOLES\{1\}: the chamfer at vertex 1 does not fit its segments.> ...
+%! chamfer (geom.Region ([0, 0; 60, 0; 60, 40; 0, 40], ...
+%!                      {[20, 15; 24, 15; 24, 25; 20, 25]}), 3)
 
 %!error<geom.Region.fillet: invalid number of input arguments.> ...
 %! fillet (geom.Region ([0, 0; 1, 0; 1, 1]))

@@ -245,62 +245,126 @@ classdef Polyline
                        " and finite real scalar."));
       endif
       V = this.Vertices;
-      n = rows (V);
-      if (this.Closed)
-        prev = [n, 1:n-1];
-        next = [2:n, 1];
-        ends = false (1, n);
-      else
-        prev = [1, 1:n-1];
-        next = [2:n, n];
-        ends = [true, false(1, n - 2), true];
-      endif
-      ## A corner is where two straight segments meet at an angle
-      u = V(:,1:2) - V(prev,1:2);
-      v = V(next,1:2) - V(:,1:2);
-      th = atan2 (u(:,1) .* v(:,2) - u(:,2) .* v(:,1), sum (u .* v, 2))';
-      corner = ! ends & (V(prev,3) == 0)' & (V(:,3) == 0)' ...
-               & abs (th) > 1e-12;
-      if (isempty (IDX))
-        IDX = find (corner);
-      else
-        if (! isnumeric (IDX) || ! isreal (IDX) || ! isvector (IDX) ...
-            || any (IDX != fix (IDX)) || any (IDX < 1) || any (IDX > n))
-          error (strcat ("geom.Polyline.fillet: IDX must be a vector of", ...
-                         " vertex indices of PL."));
-        endif
-        IDX = unique (double (IDX));
-        bad = IDX(! corner(IDX));
-        if (! isempty (bad))
-          error (strcat ("geom.Polyline.fillet: vertex %d is not a corner", ...
-                         " between two straight segments."), bad(1));
-        endif
+      [errmsg, C] = corners (V, this.Closed, IDX);
+      if (! isempty (errmsg))
+        error ("geom.Polyline.fillet: %s", errmsg);
       endif
 
       ## How far back along each segment the round at either end reaches
-      t = zeros (1, n);
-      t(IDX) = RADIUS * tan (abs (th(IDX)) / 2);
-      len = sqrt (sum (v .^ 2, 2))';
-      for i = IDX
-        if (t(i) + t(next(i)) > len(i) * (1 + 1e-12) ...
-            || t(i) + t(prev(i)) > len(prev(i)) * (1 + 1e-12))
-          error (strcat ("geom.Polyline.fillet: the round at vertex %d", ...
-                         " does not fit its segments."), i);
-        endif
-      endfor
+      t = zeros (1, rows (V));
+      t(C.idx) = RADIUS * tan (abs (C.th(C.idx)) / 2);
+      errmsg = fits (C, t, t, "round");
+      if (! isempty (errmsg))
+        error ("geom.Polyline.fillet: %s", errmsg);
+      endif
 
       ## Each rounded corner becomes the arc between its tangent points
-      W = cell (n, 1);
-      for i = 1:n
-        if (any (IDX == i))
-          a = V(i,1:2) - t(i) * u(i,:) / norm (u(i,:));
-          b = V(i,1:2) + t(i) * v(i,:) / norm (v(i,:));
-          W{i} = [a, tan(th(i) / 4); b, 0];
-        else
-          W{i} = V(i,:);
+      this.Vertices = cut (V, C, t, t, tan (C.th / 4));
+
+    endfunction
+
+    ## -*- texinfo -*-
+    ## @deftypefn  {geom.Polyline} {@var{PL} =} chamfer (@var{PL}, @var{D})
+    ## @deftypefnx {geom.Polyline} {@var{PL} =} chamfer (@var{PL}, [@var{D1}, @var{D2}])
+    ## @deftypefnx {geom.Polyline} {@var{PL} =} chamfer (@dots{}, @var{IDX})
+    ## @deftypefnx {geom.Polyline} {@var{PL} =} chamfer (@dots{}, @qcode{'Angle'}, @var{A})
+    ##
+    ## Cut the corners of a polyline.
+    ##
+    ## @code{@var{PL} = chamfer (@var{PL}, @var{D})} cuts every corner where
+    ## two straight segments meet with a straight segment from @var{D}
+    ## millimetres back along the segment before the corner to @var{D} along
+    ## the segment after it.  Corners where an arc meets a segment are left as
+    ## they are, and so are the two ends of an open polyline.
+    ##
+    ## @code{@var{PL} = chamfer (@var{PL}, [@var{D1}, @var{D2}])} cuts back
+    ## @var{D1} along the segment before each corner and @var{D2} along the
+    ## segment after it, before and after in the order of the vertices.
+    ##
+    ## @code{@var{PL} = chamfer (@var{PL}, @var{D}, @qcode{'Angle'}, @var{A})}
+    ## cuts back @var{D} along the segment before each corner, with the cut at
+    ## @var{A} degrees to that segment, so a square corner is cut @code{@var{D}
+    ## x @var{A}}, reaching @code{@var{D} * tand (@var{A})} along the segment
+    ## after it.
+    ##
+    ## @code{@var{PL} = chamfer (@dots{}, @var{IDX})} cuts only the corners at
+    ## the vertices indexed by @var{IDX}, each of which must be a corner
+    ## between two straight segments.
+    ##
+    ## A cut that would run past the end of a segment, or into the cut or round
+    ## of the next corner, or an angle at which the cut misses the segment
+    ## after the corner, is refused.
+    ##
+    ## @example
+    ## @group
+    ## ## A plate 60 by 40 with its corners cut 5 by 45 degrees
+    ## PL = geom.Polyline ([0, 0; 60, 0; 60, 40; 0, 40], 'Closed', true);
+    ## PL = chamfer (PL, 5);
+    ## @end group
+    ## @end example
+    ##
+    ## @seealso{geom.Polyline.fillet, geom.Region.chamfer}
+    ## @end deftypefn
+    function this = chamfer (this, D, varargin)
+
+      ## Input validation
+      if (nargin < 2)
+        error ("geom.Polyline.chamfer: invalid number of input arguments.");
+      endif
+      if (! isnumeric (D) || ! isreal (D) || ! isvector (D) ...
+          || numel (D) > 2 || ! all (isfinite (D)) || ! all (D > 0))
+        error (strcat ("geom.Polyline.chamfer: D must be one positive", ...
+                       " finite distance, or two."));
+      endif
+      IDX = [];
+      if (mod (numel (varargin), 2) == 1)
+        IDX = varargin{1};
+        varargin(1) = [];
+      endif
+      A = [];
+      for k = 1:2:numel (varargin)
+        if (! ischar (varargin{k}) || ! strcmp (varargin{k}, 'Angle'))
+          error ("geom.Polyline.chamfer: unknown parameter.");
+        endif
+        A = varargin{k+1};
+        if (! isnumeric (A) || ! isreal (A) || ! isscalar (A) ...
+            || ! (A > 0) || ! (A < 180))
+          error (strcat ("geom.Polyline.chamfer: Angle must be in the", ...
+                         " range (0, 180) degrees."));
         endif
       endfor
-      this.Vertices = vertcat (W{:});
+      if (! isempty (A) && numel (D) == 2)
+        error ("geom.Polyline.chamfer: an angle goes with one distance D.");
+      endif
+      V = this.Vertices;
+      [errmsg, C] = corners (V, this.Closed, IDX);
+      if (! isempty (errmsg))
+        error ("geom.Polyline.chamfer: %s", errmsg);
+      endif
+
+      ## How far back along the segments before and after each corner
+      tin = zeros (1, rows (V));
+      tout = zeros (1, rows (V));
+      tin(C.idx) = D(1);
+      tout(C.idx) = D(end);
+      if (! isempty (A))
+        ## The angle at the corner, and so the triangle the cut makes
+        phi = pi - abs (C.th(C.idx));
+        far = pi - A * pi / 180 - phi;
+        bad = C.idx(far <= 1e-12);
+        if (! isempty (bad))
+          error (strcat ("geom.Polyline.chamfer: the chamfer at vertex %d", ...
+                         " misses the segment after it at that angle."), ...
+                 bad(1));
+        endif
+        tout(C.idx) = D * sind (A) ./ sin (far);
+      endif
+      errmsg = fits (C, tin, tout, "chamfer");
+      if (! isempty (errmsg))
+        error ("geom.Polyline.chamfer: %s", errmsg);
+      endif
+
+      this.Vertices = cut (V, C, tin, tout, zeros (1, rows (V)));
 
     endfunction
 
@@ -316,6 +380,81 @@ classdef Polyline
   endmethods
 
 endclassdef
+
+## The corners of the vertices V, closed or not, that IDX names, or all of
+## them where two straight segments meet when IDX is empty: their indices,
+## the directions into and out of every vertex, the angle the polyline turns
+## through there, and its neighbours.  Returns an error message body, empty
+## when IDX names only such corners.
+function [errmsg, C] = corners (V, closed, IDX)
+
+  errmsg = '';
+  n = rows (V);
+  if (closed)
+    prev = [n, 1:n-1];
+    next = [2:n, 1];
+    ends = false (1, n);
+  else
+    prev = [1, 1:n-1];
+    next = [2:n, n];
+    ends = [true, false(1, n - 2), true];
+  endif
+  u = V(:,1:2) - V(prev,1:2);
+  v = V(next,1:2) - V(:,1:2);
+  th = atan2 (u(:,1) .* v(:,2) - u(:,2) .* v(:,1), sum (u .* v, 2))';
+  corner = ! ends & (V(prev,3) == 0)' & (V(:,3) == 0)' & abs (th) > 1e-12;
+  if (isempty (IDX))
+    IDX = find (corner);
+  else
+    if (! isnumeric (IDX) || ! isreal (IDX) || ! isvector (IDX) ...
+        || any (IDX != fix (IDX)) || any (IDX < 1) || any (IDX > n))
+      errmsg = "IDX must be a vector of vertex indices of PL.";
+    else
+      IDX = unique (double (IDX(:)'));
+      bad = IDX(! corner(IDX));
+      if (! isempty (bad))
+        errmsg = sprintf (strcat ("vertex %d is not a corner between two", ...
+                                  " straight segments."), bad(1));
+      endif
+    endif
+  endif
+  C = struct ('idx', IDX, 'u', u, 'v', v, 'th', th, 'prev', prev, ...
+              'next', next, 'len', sqrt (sum (v .^ 2, 2))');
+
+endfunction
+
+## Whether the cuts TIN back along the segment into each corner and TOUT
+## along the segment out of it fit, the cut at one end of a segment clear of
+## the cut at the other.  Returns an error message body naming the first
+## corner, WHAT, that does not fit.
+function errmsg = fits (C, TIN, TOUT, WHAT)
+
+  errmsg = '';
+  for i = C.idx
+    if (TOUT(i) + TIN(C.next(i)) > C.len(i) * (1 + 1e-12) ...
+        || TIN(i) + TOUT(C.prev(i)) > C.len(C.prev(i)) * (1 + 1e-12))
+      errmsg = sprintf ("the %s at vertex %d does not fit its segments.", ...
+                        WHAT, i);
+      return;
+    endif
+  endfor
+
+endfunction
+
+## The vertices V with each corner of C replaced by the points TIN back along
+## the segment into it and TOUT along the segment out of it, the first given
+## the bulge B of the corner, the second none
+function W = cut (V, C, TIN, TOUT, B)
+
+  W = num2cell (V, 2);
+  for i = C.idx
+    a = V(i,1:2) - TIN(i) * C.u(i,:) / norm (C.u(i,:));
+    b = V(i,1:2) + TOUT(i) * C.v(i,:) / norm (C.v(i,:));
+    W{i} = [a, B(i); b, 0];
+  endfor
+  W = vertcat (W{:});
+
+endfunction
 
 %!test
 %! PL = geom.Polyline ([0, 0; 10, 0; 10, 5]);
@@ -384,6 +523,51 @@ endclassdef
 %!                        'Closed', true), 2, 3)
 %!error<geom.Polyline.fillet: the round at vertex 1 does not fit its segments.> ...
 %! fillet (geom.Polyline ([0, 0; 4, 0; 4, 10; 0, 10], 'Closed', true), 3)
+
+%!test  # every corner of a rectangle cut 5 by 45 degrees
+%! PL = geom.Polyline ([0, 0; 60, 0; 60, 40; 0, 40], 'Closed', true);
+%! Q = chamfer (PL, 5);
+%! assert_equal (Q.Vertices, [0, 5, 0; 5, 0, 0; 55, 0, 0; 60, 5, 0; ...
+%!                            60, 35, 0; 55, 40, 0; 5, 40, 0; 0, 35, 0], 1e-12);
+
+%!test  # two distances, before and after in the order of the vertices
+%! PL = geom.Polyline ([0, 0; 20, 0; 20, 10]);
+%! Q = chamfer (PL, [3, 2]);
+%! assert_equal (Q.Vertices(:,1:2), [0, 0; 17, 0; 20, 2; 20, 10], 1e-12);
+
+%!test  # a distance and an angle: D * tand (A) along the segment after
+%! PL = geom.Polyline ([0, 0; 20, 0; 20, 10]);
+%! Q = chamfer (PL, 3, 'Angle', 30);
+%! assert_equal (Q.Vertices(:,1:2), [0, 0; 17, 0; 20, 3 * tand(30); 20, 10], ...
+%!               1e-12);
+
+%!test  # chosen corners; an obtuse corner at an angle
+%! PL = geom.Polyline ([0, 0; 10, 0; 20, 10; 20, 20]);
+%! Q = chamfer (PL, 2, 2, 'Angle', 20);
+%! d = 2 * sind (20) / sind (180 - 20 - 135);
+%! assert_equal (Q.Vertices(3,1:2), [10, 0] + d * [1, 1] / sqrt (2), 1e-12);
+%! assert_equal (rows (Q.Vertices), 5);
+
+%!error<geom.Polyline.chamfer: invalid number of input arguments.> ...
+%! chamfer (geom.Polyline ([0, 0; 1, 0]))
+%!error<geom.Polyline.chamfer: D must be one positive finite distance, or two.> ...
+%! chamfer (geom.Polyline ([0, 0; 1, 0; 1, 1]), [1, 2, 3])
+%!error<geom.Polyline.chamfer: D must be one positive finite distance, or two.> ...
+%! chamfer (geom.Polyline ([0, 0; 1, 0; 1, 1]), -1)
+%!error<geom.Polyline.chamfer: unknown parameter.> ...
+%! chamfer (geom.Polyline ([0, 0; 1, 0; 1, 1]), 0.1, 'Slope', 30)
+%!error<geom.Polyline.chamfer: Angle must be in the range \(0, 180\) degrees.> ...
+%! chamfer (geom.Polyline ([0, 0; 1, 0; 1, 1]), 0.1, 'Angle', 180)
+%!error<geom.Polyline.chamfer: an angle goes with one distance D.> ...
+%! chamfer (geom.Polyline ([0, 0; 1, 0; 1, 1]), [0.1, 0.2], 'Angle', 30)
+%!error<geom.Polyline.chamfer: IDX must be a vector of vertex indices of PL.> ...
+%! chamfer (geom.Polyline ([0, 0; 1, 0; 1, 1]), 0.1, 7)
+%!error<geom.Polyline.chamfer: vertex 3 is not a corner between two straight segments.> ...
+%! chamfer (geom.Polyline ([0, 0; 1, 0; 1, 1]), 0.1, 3)
+%!error<geom.Polyline.chamfer: the chamfer at vertex 2 misses the segment after it at that angle.> ...
+%! chamfer (geom.Polyline ([0, 0; 1, 0; 1, 1]), 0.1, 'Angle', 95)
+%!error<geom.Polyline.chamfer: the chamfer at vertex 1 does not fit its segments.> ...
+%! chamfer (geom.Polyline ([0, 0; 4, 0; 4, 10; 0, 10], 'Closed', true), 3)
 
 %!error<geom.Polyline: invalid number of input arguments.> geom.Polyline ()
 %!error<geom.Polyline: P must be an N-by-2 or N-by-3 real matrix of finite values with at least two rows.> ...
