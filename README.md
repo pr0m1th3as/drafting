@@ -131,8 +131,8 @@ package_texi2html ("drafting")
 
 [`ROADMAP.md`](ROADMAP.md) sets out what is planned and why, ordered by what
 unblocks what. Just as usefully, it sets out what is deliberately out of
-scope: no CAM, no DWG, no solid-modelling kernel, no constraint solver, each
-with the reason it was ruled out.
+scope: no CAM, no DWG, no solid-modelling kernel of its own, no constraint
+solver, each with the reason it was ruled out.
 
 ## Install
 

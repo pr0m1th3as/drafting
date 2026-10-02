@@ -33,16 +33,17 @@ thinner, and most of this roadmap is about closing that gap.
 ## Scope
 
 The package covers **planar geometry, the drawing model built on it, the
-formats that model is emitted in, and the drawing of solids read from a
-file**. Two boundaries follow from that, and both are deliberate:
+formats that model is emitted in, and solids, modelled through Open CASCADE
+and drawn as technical drawings**. Two boundaries follow from that, and both
+are deliberate:
 
 - A drawing describes a part. It does not machine one. Toolpath generation,
   cutter compensation, feeds and speeds, and post-processor dialects belong to
   a CAM package that consumes this one.
-- The model is planar. Meshes are produced *from* planar profiles and written
-  out, and a solid read from a STEP file is projected into views, but the
-  package holds no solid-modelling kernel: it never builds, edits or combines
-  a boundary representation, it only reads one.
+- The kernel is not ours. Solids are built, combined and read through Open
+  CASCADE; the package writes no boolean, fillet or surface-intersection code
+  of its own. The planar model stays plain Octave code and needs nothing
+  compiled.
 
 Everything below is checked against those two lines.
 
@@ -147,64 +148,54 @@ reinforce each other rather than compete.
 there is nothing to confirm before starting: a sheet composed of viewports will
 print as vector, and the work can be built on that.
 
-## Milestone 4: drawings from solids (0.5.0)
+## Milestone 4: solids and their drawings (0.5.0)
 
-A part is designed as a solid, and the drawing that specifies it is a set of
-views of that solid. This milestone reads a solid from a STEP file and composes
-its drawing on a `draw.Sheet`: the orthographic and isometric views, hidden
-lines, sections and details, and the annotation that follows from the geometry
-alone. What is left to the author is the dimensioning that depends on design
-intent, which no model records.
+A part is designed as a solid, whether it is printed or machined, and a part
+made on a manual lathe or mill is made from a drawing. This milestone models
+solids in Octave code, writes them as STEP for exchange and STL for printing,
+and draws them on a `draw.Sheet` for the machinist. One script describes a
+part, whatever makes it.
 
-It needs milestone 3's sheet, with a viewport that can be clipped to a circle
-for a detail view, and milestone 2's section and detail marks. Nothing else in
-those two milestones is a prerequisite.
+**The kernel is Open CASCADE (OCCT), bound and not written.** Booleans on
+curved surfaces, fillets, and the tolerances where faces nearly meet are
+decades of work in OCCT, which CadQuery, build123d and FreeCAD all stand on.
+The package wraps it in compiled functions and writes none of that geometry
+itself. OCCT is LGPL 2.1 with an exception, which GPLv3 code may link, and
+Debian ships it as `libocct-*-dev`.
 
-**The input is STEP, analytic surfaces first.** A STEP file (ISO 10303-21,
-written by every mechanical CAD program) carries the exact boundary of a solid:
-each face a plane, cylinder, cone, sphere, torus or B-spline surface, each edge
-a line, circle, ellipse or B-spline. That exactness is what makes the output a
-technical drawing rather than a picture. A circular edge projects to a true
-circle or ellipse, and a cylindrical face can be recognised as a hole or a
-boss, so it can be given a centre line and a callout. A mesh has neither.
+**OCCT is optional at build time.** Only the new `+solid` namespace needs it.
+Where it is not found the package builds without it, everything else works as
+before, and every `+solid` function raises an error naming the missing
+library; its BISTs run under a runtime condition and skip on such a build.
+Linux comes first. Windows, which needs a MinGW build of OCCT since the MSVC
+binaries do not link against Octave, and macOS follow.
 
-The reader takes faces on planes, cylinders, cones, spheres and tori, with
-edges of every curve type, since the meeting of two cylinders is a B-spline
-edge even on a part with no B-spline face. B-spline surfaces follow. Units are
-read from the file and converted to millimetres, as `dxf.read` does for an inch
-drawing.
+`+solid` sits above `+draw`: it builds solids from `+geom` profiles and emits
+drawings through `+draw`, so dependencies still point downward only.
 
-| Namespace | Function | What it does |
-|---|---|---|
-| `+stp` | `stp.read` | a file's solids, as faces, edge loops, edges and vertices with exact geometry and units resolved |
-| `+views` | `views.project` | the visible and hidden edges of a solid seen from one direction, as a `Drawing` |
-| `+views` | `views.section` | the cut faces of a solid on a plane, hatched, with the material beyond the cut drawn |
-| `+views` | `views.compose` | the standard views of a solid, with sections, details and their annotation, laid out on a `draw.Sheet` |
+| Piece | Content |
+|---|---|
+| `solid.Shape` | a value class over an OCCT shape, with the booleans `union`, `subtract` and `intersect`, named as MATLAB's `polyshape` names them, each taking any number of shapes in one operation |
+| Primitives | box, cylinder, cone, sphere, torus |
+| From profiles | extrude, revolve, sweep and loft of `+geom` polylines, bulges carried as true arcs |
+| Features | fillet, chamfer, shell; holes plain, counterbored, countersunk and tapped, recorded as holes |
+| Queries | edges and faces selected by type, direction and position; volume, area, centre of mass, bounding box; validity |
+| Files | `solid.read` and `solid.write`, STEP and STL |
+| Viewing | `solid.show`, the solid in an Octave figure |
+| Drawings | views, sections and details laid out on a `draw.Sheet` |
 
-The namespaces are named so that no function can shadow them. A namespace
-loses to a function of the same name on the path: `view.project` would call
-core Octave's `view`, and `step.read` would call the `control` package's
-`step` whenever it is loaded. `stp` follows `dxf` and `stl` in taking the file
-extension.
+**Drawings.** OCCT projects a solid with hidden lines removed and every edge
+exact, and each edge becomes a `Drawing` entity: lines, arcs, circles and
+ellipses as themselves, a B-spline as a sampled polyline until milestone 5 adds
+the spline entity. Visible edges are drawn continuous and thick, hidden ones
+dashed and thin, per ISO 128. The seam edge of a cylinder or cone is never
+drawn, and an edge between tangent faces is drawn thin or omitted, never as an
+outline. A section is OCCT's planar cut, hatched. A section through a part with
+a hole is a region with an island, so `geom.hatchlines` and `Drawing.hatch`
+learn to fill a boundary with holes, by an even-odd scan that needs none of
+milestone 6's booleans.
 
-**Hidden lines.** Each projected edge is split where it crosses another edge or
-a silhouette, and each piece is tested for occlusion against a triangulation of
-the faces. The edges themselves stay exact; the triangulation decides only
-visibility. Each face is triangulated in its own parameter space with
-`geom.triangulate`, which already takes a polygon with holes. Visible edges are
-drawn continuous and thick, hidden ones dashed and thin, per ISO 128.
-
-Three details decide whether the result reads as a drawing, and each needs a
-test of its own:
-
-- the seam edge of a cylinder or cone is a bookkeeping edge in the file and is
-  never drawn;
-- an edge between tangent faces, such as the boundary of a fillet, is drawn
-  thin or omitted by convention, never as an outline;
-- an edge lying in a visible face is visible, which the occlusion test must not
-  defeat with its own tolerance.
-
-**Annotation from geometry.** Generated, not placed by hand:
+Annotation that follows from the geometry is generated, not placed by hand:
 
 - centre lines on every hole and boss seen side-on, centre marks seen end-on;
 - hole callouts, with a count when a pattern repeats (`4 × ⌀8`);
@@ -214,24 +205,32 @@ test of its own:
 - first-angle projection by default, per ISO 5456-2, third-angle on request;
 - the title block, through `draw.titleblock`.
 
-The section plane and the detail region are given by the caller. A part with an
-axis of rotation gets the section through that axis by default.
+**Dimensions from intent.** A solid built in code records what it was built
+from: a revolved profile its diameters and lengths, a hole its size and its
+position from a datum. The drawing dimensions those, which is what a machinist
+working by hand needs. A turned part is drawn as one view about its centre
+line, diameters taken from the profile and lengths from a face; a milled part
+carries ordinate dimensions from its datum corner. A solid read from a STEP
+file records no intent, so it gets the geometric annotation only.
 
-**Taken from later milestones.** `geom.bspline` evaluation moves here from
-milestone 5, because the reader cannot draw a B-spline edge without it; a
-projected B-spline edge is a sampled polyline until milestone 5 adds the spline
-entity. A section through a part with a hole is a region with an island, so
-`geom.hatchlines` and `Drawing.hatch` learn to fill a boundary with holes. That
-is an even-odd scan and needs none of milestone 6's booleans.
+**Order.** The first step is a spike that decides the rest: an oct-file linked
+against OCCT builds a box less a cylinder, writes it as STEP and STL, and
+reports its volume. Then the shape class, primitives, booleans and files; then
+profiles and features; then `show` and the checks. None of these needs
+milestones 1 to 3, so they may start before them. Drawings need milestone 3's
+sheet, with a viewport that can be clipped to a circle for a detail view.
+Dimensions from intent need milestone 2's tolerances and fits, ordinate
+dimensions, and section and detail marks.
 
-**Verifying it.** STEP files written by other programs, checked in under
-`inst/tests/fixtures/` with the values they were modelled to, as the DXF
-fixtures are, and from more than one exporter, since writers differ in how
-they lay out the same solid. The tests assert the drawing that comes out: the
-extent of each view, the centres and radii of projected holes, which edges are
-hidden. FreeCAD's TechDraw workbench draws views from the same files and is a
-useful comparison during development. It is not a gate: what it shows is
-verified once and written into BISTs as literal expectations.
+**Verifying it.** Every solid a test builds is checked by OCCT's validity check
+and by its exact volume, area and bounding box against values worked out by
+hand. STEP files written by other programs, checked in under
+`inst/tests/fixtures/` with the values they were modelled to, test reading.
+Drawings are asserted as the DXF output is: the extent of each view, the
+centres and radii of projected holes, which edges are hidden. OCCT reports most
+failures as exceptions, and every wrapper turns them into Octave errors; some
+bad input crashes it instead, so input is validated before it reaches the
+library.
 
 ## Milestone 5: analytic curves (0.6.0)
 
@@ -249,8 +248,7 @@ smooth profiles pay this cost on every part they draw.
 
 The work is a curve representation carried as a first-class entity:
 
-- `geom.bezier`, and derivatives and arc length for `geom.bspline`, whose
-  evaluation milestone 4 brings
+- `geom.bezier`, `geom.bspline`: evaluation, derivatives, arc length
 - `geom.splinefit`: interpolation through, and approximation of, a point set
 - `geom.splitcurve`, `geom.curveintersect`: subdivision and curve/curve meets
 - `draw.Drawing.spline`: the entity, lowered by `entities` for every backend
@@ -352,7 +350,7 @@ handled. The package's test suite remains `pkg test` and nothing else.
 |---|---|
 | G-code and CAM | a different discipline with a different failure mode; belongs to a package that consumes this one |
 | DWG | proprietary and undocumented; the only routes are a closed converter or an experimental writer |
-| Solid modelling | a kernel, not a package. Milestone 4 reads a solid to draw it and never builds, edits or combines one |
+| A solid-modelling kernel of our own | decades of work that Open CASCADE already holds; milestone 4 binds it instead |
 | Parametric constraint solving | genuinely valuable and genuinely a research project: degree-of-freedom analysis, conditioning, and useful diagnostics for under- and over-constrained sketches. Its own package if ever |
 
 ## Standing requirements

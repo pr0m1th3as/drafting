@@ -38,3 +38,12 @@ Line types and colours
 Drawing model
  draw.Drawing
  draw.fromentities
+Solid modelling
+ solid.Shape
+ solid.box
+ solid.cylinder
+ solid.cone
+ solid.sphere
+ solid.torus
+ solid.read
+ solid.write
