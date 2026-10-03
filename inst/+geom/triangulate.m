@@ -174,12 +174,9 @@ endfunction
 %!test  # several holes, as a cycloidal disc carries
 %! a = linspace (0, 2*pi, 145)(1:144)';
 %! P = 30 * [cos(a), sin(a)];
-%! H = cell (1, 6);
-%! for k = 1:6
-%!   c = 18 * [cos(2*pi*(k-1)/6), sin(2*pi*(k-1)/6)];
-%!   b = linspace (0, 2*pi, 25)(1:24)';
-%!   H{k} = c + 3 * [cos(b), sin(b)];
-%! endfor
+%! b = linspace (0, 2*pi, 25)(1:24)';
+%! H = arrayfun (@(t) 18 * [cos(t), sin(t)] + 3 * [cos(b), sin(b)], ...
+%!               2 * pi * (0:5) / 6, 'UniformOutput', false);
 %! [T, V, COVERAGE] = geom.triangulate (P, H);
 %! assert_equal (COVERAGE, 1, 1e-2);
 

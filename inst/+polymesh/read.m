@@ -135,11 +135,11 @@ endfunction
 %!function writebinary (file, V)
 %!  fid = fopen (file, 'w');
 %!  fwrite (fid, zeros (1, 80), 'uint8');
-%!  fwrite (fid, rows (V) / 3, 'uint32');
-%!  for t = 1:rows (V) / 3
-%!    fwrite (fid, [0, 0, 0, reshape(V(3*t-2:3*t,:)', 1, [])], 'single');
-%!    fwrite (fid, 0, 'uint16');
-%!  endfor
+%!  n = rows (V) / 3;
+%!  fwrite (fid, n, 'uint32');
+%!  C = typecast (single (reshape (V', [], 1)), 'uint8');
+%!  fwrite (fid, [zeros(12, n, 'uint8'); reshape(C, 36, n); ...
+%!                zeros(2, n, 'uint8')]);
 %!  fclose (fid);
 %!endfunction
 
@@ -164,11 +164,9 @@ endfunction
 %!   V = cube ();
 %!   fid = fopen (f, 'w');
 %!   fprintf (fid, "solid  cube\n");
-%!   for t = 1:12
-%!     fprintf (fid, "  facet  NORMAL 0 0 0\n   outer loop\n");
-%!     fprintf (fid, "\tVertex %g %g %g\n", V(3*t-2:3*t,:)');
-%!     fprintf (fid, "   endloop\n  endfacet\n");
-%!   endfor
+%!   fprintf (fid, ["  facet  NORMAL 0 0 0\n   outer loop\n", ...
+%!                  repmat("\tVertex %g %g %g\n", 1, 3), ...
+%!                  "   endloop\n  endfacet\n"], reshape (V', 9, []));
 %!   fprintf (fid, "endsolid cube\n");
 %!   fclose (fid);
 %!   M = polymesh.read (f);

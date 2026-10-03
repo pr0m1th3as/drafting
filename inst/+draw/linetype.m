@@ -172,11 +172,19 @@ endfunction
 %! assert_equal (P, [1.25, -0.25, 0.25, -0.25]);
 
 %!test  # every listed type resolves, and its pattern alternates in sign
-%! for n = draw.linetype ()
-%!   P = draw.linetype (n{1});
-%!   assert_equal (isempty (P) || all (P(1:2:end) >= 0), true);
-%!   assert_equal (isempty (P) || all (P(2:2:end) < 0), true);
-%! endfor
+%! assert_equal (draw.linetype ('CONTINUOUS'), []);
+%! P = draw.linetype ('HIDDEN');
+%! assert_equal ([all(P(1:2:end) >= 0), all(P(2:2:end) < 0)], [true, true]);
+%! P = draw.linetype ('CENTER');
+%! assert_equal ([all(P(1:2:end) >= 0), all(P(2:2:end) < 0)], [true, true]);
+%! P = draw.linetype ('PHANTOM');
+%! assert_equal ([all(P(1:2:end) >= 0), all(P(2:2:end) < 0)], [true, true]);
+%! P = draw.linetype ('DASHED');
+%! assert_equal ([all(P(1:2:end) >= 0), all(P(2:2:end) < 0)], [true, true]);
+%! P = draw.linetype ('DASHDOT');
+%! assert_equal ([all(P(1:2:end) >= 0), all(P(2:2:end) < 0)], [true, true]);
+%! P = draw.linetype ('DOT');
+%! assert_equal ([all(P(1:2:end) >= 0), all(P(2:2:end) < 0)], [true, true]);
 
 %!test  # names are matched without regard to case
 %! assert_equal (draw.linetype ('hidden'), draw.linetype ('HIDDEN'));

@@ -104,18 +104,14 @@ endfunction
 %!  V = [(R + r * cos(v(:))) .* cos(u(:)), ...
 %!       (R + r * cos(v(:))) .* sin(u(:)), r * sin(v(:))];
 %!  id = @(i, j) mod (i, N) + N * mod (j, M) + 1;
-%!  F = zeros (0, 3);
-%!  for i = 0:N-1
-%!    for j = 0:M-1
-%!      jj = j;
-%!      if (flip && i == N - 1)
-%!        jj = -j;
-%!      endif
-%!      a = id (i, j); b = id (i + 1, jj);
-%!      c = id (i + 1, jj + 1 - 2 * (flip && i == N - 1)); d = id (i, j + 1);
-%!      F(end+1:end+2,:) = [a, b, c; a, c, d];
-%!    endfor
-%!  endfor
+%!  [i, j] = ndgrid (0:N-1, 0:M-1);
+%!  last = flip & (i == N - 1);
+%!  jj = j .* (1 - 2 * last);
+%!  a = id (i, j);
+%!  b = id (i + 1, jj);
+%!  c = id (i + 1, jj + 1 - 2 * last);
+%!  d = id (i, j + 1);
+%!  F = [a(:), b(:), c(:); a(:), c(:), d(:)];
 %!endfunction
 ## The volume a closed mesh turned outwards encloses
 %!function vol = meshvolume (V, F)

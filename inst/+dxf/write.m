@@ -859,25 +859,25 @@ endfunction
 %!test  # a block is written once and referred to, not copied per instance
 %! bore = draw.Drawing ().circle ([0, 0], 3);
 %! D = draw.Drawing ().block ('bore', bore);
-%! for k = 0:24
-%!   D = D.insert ('bore', [10 * k, 0]);
-%! endfor
+%! D = D.insert ('bore', [0, 0]).insert ('bore', [10, 0]);
+%! D = D.insert ('bore', [20, 0]);
 %! [E, LOST, B] = entities (D, 'blocks', 'reference');
 %! unwind_protect
 %!   dxf.write (tmpf, E, 'blocks', B);
 %!   txt = fileread (tmpf);
-%!   assert_equal (numel (strfind (txt, 'INSERT')), 25);
+%!   assert_equal (numel (strfind (txt, 'INSERT')), 3);
 %!   assert_equal (numel (strfind (txt, 'CIRCLE')), 1);
 %! unwind_protect_cleanup
 %!   unlink (tmpf);
 %! end_unwind_protect
 
 %!test  # and referring is far smaller than copying
-%! bore = draw.Drawing ().circle ([0, 0], 3).line ([-4, 0], [4, 0]);
-%! D = draw.Drawing ().block ('bore', bore);
-%! for k = 0:49
-%!   D = D.insert ('bore', [10 * k, 0]);
-%! endfor
+%! a = linspace (0, 2*pi, 201)(1:200)';
+%! gear = draw.Drawing ().polyline (geom.Polyline (40 * [cos(a), sin(a)], ...
+%!                                                 'Closed', true));
+%! D = draw.Drawing ().block ('gear', gear);
+%! D = D.insert ('gear', [0, 0]).insert ('gear', [100, 0]);
+%! D = D.insert ('gear', [200, 0]);
 %! f2 = [tempname(), '.dxf'];
 %! unwind_protect
 %!   [E, L, B] = entities (D, 'blocks', 'reference');

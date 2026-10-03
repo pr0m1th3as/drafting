@@ -183,17 +183,13 @@ endfunction
 %! P = 10 * [cos(t), sin(t)];
 %! tol = 0.05;
 %! Q = geom.simplify (P, tol);
-%! worst = 0;
-%! for k = 1:rows (P)
-%!   d = inf;
-%!   for j = 1:rows (Q) - 1
-%!     A = Q(j,:);  B = Q(j+1,:);  e = B - A;  v = P(k,:) - A;
-%!     s = max (0, min (1, dot (v, e) / dot (e, e)));
-%!     d = min (d, norm (v - s * e));
-%!   endfor
-%!   worst = max (worst, d);
-%! endfor
-%! assert_equal (worst <= tol + 1e-9, true);
+%! A = Q(1:end-1,:);
+%! E = Q(2:end,:) - A;
+%! s = ((P(:,1) - A(:,1)') .* E(:,1)' + (P(:,2) - A(:,2)') .* E(:,2)') ...
+%!     ./ sum (E .^ 2, 2)';
+%! s = min (max (s, 0), 1);
+%! d = hypot (P(:,1) - A(:,1)' - s .* E(:,1)', P(:,2) - A(:,2)' - s .* E(:,2)');
+%! assert_equal (max (min (d, [], 2)) <= tol + 1e-9, true);
 
 %!test  # a looser tolerance keeps fewer points
 %! t = linspace (0, 2*pi, 400)';

@@ -164,10 +164,16 @@ endfunction
 %! assert_equal (numel (N), 10);
 
 %!test  # every name round-trips to a renderable index
-%! for n = draw.colour ()
-%!   rgb = draw.colour (draw.colour (n{1}));
-%!   assert_equal (numel (rgb), 3);
-%! endfor
+%! assert_equal (numel (draw.colour (draw.colour ('byBlock'))), 3);
+%! assert_equal (numel (draw.colour (draw.colour ('red'))), 3);
+%! assert_equal (numel (draw.colour (draw.colour ('yellow'))), 3);
+%! assert_equal (numel (draw.colour (draw.colour ('green'))), 3);
+%! assert_equal (numel (draw.colour (draw.colour ('cyan'))), 3);
+%! assert_equal (numel (draw.colour (draw.colour ('blue'))), 3);
+%! assert_equal (numel (draw.colour (draw.colour ('magenta'))), 3);
+%! assert_equal (numel (draw.colour (draw.colour ('white'))), 3);
+%! assert_equal (numel (draw.colour (draw.colour ('grey'))), 3);
+%! assert_equal (numel (draw.colour (draw.colour ('byLayer'))), 3);
 
 %!test  # names are matched without regard to case
 %! assert_equal (draw.colour ('RED'), draw.colour ('red'));

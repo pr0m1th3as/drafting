@@ -111,13 +111,10 @@ endfunction
 %!  fid = fopen (f, 'r', 'ieee-le');
 %!  fread (fid, 80, 'uint8');
 %!  n = fread (fid, 1, 'uint32');
-%!  V = zeros (3 * n, 3);
-%!  for k = 1:n
-%!    fread (fid, 3, 'single');
-%!    V(3*k-2:3*k,:) = fread (fid, [3, 3], 'single')';
-%!    fread (fid, 1, 'uint16');
-%!  endfor
+%!  B = fread (fid, [50, n], 'uint8=>uint8');
 %!  fclose (fid);
+%!  V = double (reshape (typecast (reshape (B(13:48,:), [], 1), 'single'), ...
+%!                       3, [])');
 %!endfunction
 
 %!testif ; exist ('__occt__') == 3  # STEP keeps the exact surfaces

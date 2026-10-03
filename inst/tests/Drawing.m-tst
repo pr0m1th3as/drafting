@@ -413,9 +413,10 @@
 %!test  # build once, place many: the whole point of the pair
 %! part = draw.Drawing ().circle ([0, 0], 3).line ([-5, 0], [5, 0]);
 %! sheet = draw.Drawing ('assembly');
-%! for k = 0:3
-%!   sheet = sheet.merge (part.transform ('translate', [20 * k, 0]));
-%! endfor
+%! sheet = sheet.merge (part.transform ('translate', [0, 0]));
+%! sheet = sheet.merge (part.transform ('translate', [20, 0]));
+%! sheet = sheet.merge (part.transform ('translate', [40, 0]));
+%! sheet = sheet.merge (part.transform ('translate', [60, 0]));
 %! assert_equal (numentities (sheet), 8);
 %! [B, W] = bbox (sheet);
 %! assert_equal (W, 70, 1e-9);
@@ -440,9 +441,9 @@
 %!test  # an insert is one entity however much geometry it stands for
 %! bore = draw.Drawing ().circle ([0, 0], 3).line ([-4, 0], [4, 0]);
 %! D = draw.Drawing ().block ('bore', bore);
-%! for k = 0:4
-%!   D = D.insert ('bore', [15 * k, 0]);
-%! endfor
+%! D = D.insert ('bore', [0, 0]).insert ('bore', [15, 0]);
+%! D = D.insert ('bore', [30, 0]).insert ('bore', [45, 0]);
+%! D = D.insert ('bore', [60, 0]);
 %! assert_equal (numentities (D), 5);
 %! assert_equal (numentities (D.expand ()), 10);
 
@@ -479,10 +480,11 @@
 
 %!test  # nesting several levels deep expands correctly
 %! D = draw.Drawing ().block ('L0', draw.Drawing ().circle ([0, 0], 1));
-%! for k = 1:5
-%!   inner = D.insert (sprintf ('L%d', k - 1), [10, 0]);
-%!   D = D.block (sprintf ('L%d', k), inner);
-%! endfor
+%! D = D.block ('L1', D.insert ('L0', [10, 0]));
+%! D = D.block ('L2', D.insert ('L1', [10, 0]));
+%! D = D.block ('L3', D.insert ('L2', [10, 0]));
+%! D = D.block ('L4', D.insert ('L3', [10, 0]));
+%! D = D.block ('L5', D.insert ('L4', [10, 0]));
 %! X = D.insert ('L5', [0, 0]).expand ();
 %! assert_equal (numentities (X), 1);
 %! assert_equal (X.Entities(1).pts, [50, 0], 1e-12);
@@ -826,11 +828,8 @@
 %!   D = draw.Drawing ();
 %!   D.Linetype = 'DASHED';
 %!   H = plot (D.line ([0, 0], [30, 0]), 'Axes', axes ('parent', f));
-%!   L = 0;
-%!   for h = H'
-%!     x = get (h, 'xdata');
-%!     L += abs (x(end) - x(1));
-%!   endfor
+%!   x = arrayfun (@(h) get (h, 'xdata'), H, 'UniformOutput', false);
+%!   L = sum (cellfun (@(v) abs (v(end) - v(1)), x));
 %!   pat = draw.linetype ('DASHED');
 %!   assert_equal (L / 30, sum (pat(pat > 0)) / sum (abs (pat)), 0.05);
 %! unwind_protect_cleanup
@@ -841,14 +840,15 @@
 %! f = figure ('visible', 'off');
 %! unwind_protect
 %!   ax = axes ('parent', f);
-%!   n = zeros (1, 3);
-%!   k = 0;
-%!   for lt = {'CENTER', 'DASHDOT', 'PHANTOM'}
-%!     k++;
-%!     D = draw.Drawing ();
-%!     D.Linetype = lt{1};
-%!     n(k) = numel (plot (D.line ([0, 0], [40, 0]), 'Axes', ax));
-%!   endfor
+%!   C = draw.Drawing ();
+%!   C.Linetype = 'CENTER';
+%!   D = draw.Drawing ();
+%!   D.Linetype = 'DASHDOT';
+%!   P = draw.Drawing ();
+%!   P.Linetype = 'PHANTOM';
+%!   n = [numel(plot (C.line ([0, 0], [40, 0]), 'Axes', ax)), ...
+%!        numel(plot (D.line ([0, 0], [40, 0]), 'Axes', ax)), ...
+%!        numel(plot (P.line ([0, 0], [40, 0]), 'Axes', ax))];
 %!   assert_equal (numel (unique (n)) > 1, true);
 %! unwind_protect_cleanup
 %!   close (f);

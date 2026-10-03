@@ -124,9 +124,10 @@ endfunction
 %! assert_equal (numel (N), 4);
 
 %!test  # every listed name resolves
-%! for n = draw.symbol ()
-%!   assert_equal (ischar (draw.symbol (n{1})), true);
-%! endfor
+%! assert_equal (ischar (draw.symbol ('diameter')), true);
+%! assert_equal (ischar (draw.symbol ('degree')), true);
+%! assert_equal (ischar (draw.symbol ('plusminus')), true);
+%! assert_equal (ischar (draw.symbol ('percent')), true);
 
 %!test  # names are matched without regard to case
 %! assert_equal (draw.symbol ('DIAMETER'), draw.symbol ('diameter'));

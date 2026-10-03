@@ -221,10 +221,10 @@ endfunction
 
 %!test  # four 90-degree rotations are the identity
 %! P = [0, 0; 4, 0; 4, 3; 0, 3];
-%! Q = P;
-%! for ii = 1:4
-%!   Q = geom.transform (Q, 'rotate', 90);
-%! endfor
+%! Q = geom.transform (P, 'rotate', 90);
+%! Q = geom.transform (Q, 'rotate', 90);
+%! Q = geom.transform (Q, 'rotate', 90);
+%! Q = geom.transform (Q, 'rotate', 90);
 %! assert_equal (Q, P, 1e-9);
 
 %!test  # isotropic and anisotropic scaling

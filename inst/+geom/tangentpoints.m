@@ -129,9 +129,7 @@ endfunction
 %!       # what makes it a tangent
 %! C = [1, 2];  R = 4;  Q = [9, 7];
 %! P = geom.tangentpoints (C, R, Q);
-%! for k = 1:2
-%!   assert_equal (dot (P(k,:) - C, Q - P(k,:)), 0, 1e-9);
-%! endfor
+%! assert_equal (dot (P - C, Q - P, 2), [0; 0], 1e-9);
 
 %!test  # the tangent length is the leg of the right triangle
 %! C = [0, 0];  R = 3;  Q = [5, 0];

@@ -173,10 +173,16 @@ endfunction
 %! assert_equal ([W, H], [420, 297], 1e-12);
 
 %!test  # every size is landscape, wider than tall
-%! for s = draw.titleblock ()
-%!   [B, W, H] = bbox (draw.titleblock (s{1}));
-%!   assert_equal (W > H, true);
-%! endfor
+%! [~, W, H] = bbox (draw.titleblock ('A4'));
+%! assert_equal (W > H, true);
+%! [~, W, H] = bbox (draw.titleblock ('A3'));
+%! assert_equal (W > H, true);
+%! [~, W, H] = bbox (draw.titleblock ('A2'));
+%! assert_equal (W > H, true);
+%! [~, W, H] = bbox (draw.titleblock ('A1'));
+%! assert_equal (W > H, true);
+%! [~, W, H] = bbox (draw.titleblock ('A0'));
+%! assert_equal (W > H, true);
 
 %!test  # everything sits on the frame layer, so it can be dropped
 %! D = draw.titleblock ('A4', struct ('title', 'BRACKET'));

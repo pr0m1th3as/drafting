@@ -164,11 +164,9 @@ endfunction
 %! unwind_protect
 %!   fid = fopen (f, 'w');
 %!   fprintf (fid, "solid box\n");
-%!   for t = 1:12
-%!     fprintf (fid, "facet normal 0 0 0\nouter loop\n");
-%!     fprintf (fid, "vertex %g %g %g\n", P(F(t,:),:)');
-%!     fprintf (fid, "endloop\nendfacet\n");
-%!   endfor
+%!   fprintf (fid, ["facet normal 0 0 0\nouter loop\n", ...
+%!                  repmat("vertex %g %g %g\n", 1, 3), ...
+%!                  "endloop\nendfacet\n"], reshape (P(F',:)', 9, []));
 %!   fprintf (fid, "endsolid box\n");
 %!   fclose (fid);
 %!   S = solid.read (f);

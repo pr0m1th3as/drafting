@@ -1484,16 +1484,12 @@ endfunction
 %!function d = gap (A, B)
 %!  E = B([2:end, 1],:) - B;
 %!  L2 = sum (E .^ 2, 2)';
-%!  d = 0;
-%!  for k = 1:500:rows (A)
-%!    P = A(k:min (k + 499, rows (A)),:);
-%!    t = ((P(:,1) - B(:,1)') .* E(:,1)' ...
-%!         + (P(:,2) - B(:,2)') .* E(:,2)') ./ L2;
-%!    t = min (max (t, 0), 1);
-%!    dx = P(:,1) - (B(:,1)' + t .* E(:,1)');
-%!    dy = P(:,2) - (B(:,2)' + t .* E(:,2)');
-%!    d = max (d, max (min (sqrt (dx .^ 2 + dy .^ 2), [], 2)));
-%!  endfor
+%!  t = ((A(:,1) - B(:,1)') .* E(:,1)' ...
+%!       + (A(:,2) - B(:,2)') .* E(:,2)') ./ L2;
+%!  t = min (max (t, 0), 1);
+%!  dx = A(:,1) - (B(:,1)' + t .* E(:,1)');
+%!  dy = A(:,2) - (B(:,2)' + t .* E(:,2)');
+%!  d = max (min (sqrt (dx .^ 2 + dy .^ 2), [], 2));
 %!endfunction
 ## A 60 by 40 rectangle whose corners are fillets of radius R, each N facets
 %!function P = rounded (R, N)
