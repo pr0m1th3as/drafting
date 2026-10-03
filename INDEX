@@ -62,5 +62,7 @@ Solid modelling
  solid.helix
  solid.read
  solid.write
-Viewing
+Assemblies and viewing
+ model.Assembly
+ model.read
  model.Viewer

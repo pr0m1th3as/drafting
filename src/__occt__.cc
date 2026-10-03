@@ -20,6 +20,7 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <array>
 #include <cmath>
 #include <functional>
+#include <map>
 #include <set>
 #include <sstream>
 #include <string>
@@ -32,6 +33,8 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <BRepAdaptor_Curve.hxx>
 #include <BRepAdaptor_Surface.hxx>
 #include <BRepAlgoAPI_BooleanOperation.hxx>
+#include <TopLoc_Location.hxx>
+#include <TDF_Tool.hxx>
 #include <BRepBuilderAPI_MakeShape.hxx>
 #include <TopTools_DataMapOfShapeInteger.hxx>
 #include <Quantity_Color.hxx>
@@ -1537,16 +1540,13 @@ struct xdedoc
   }
 };
 
-// S written to FILE as STEP, one part named NAME, each of its solids, in the
-// order a map of them gives, in its row of COLOURS, red, green and blue from
-// 0 to 1, unless the row is NaN or COLOURS has none
+// The solids of the part S at the label L of the document D, each in its
+// row of COLOURS, red, green and blue from 0 to 1, in the order a map of
+// them gives, unless the row is NaN or COLOURS has none
 static void
-writestep (const TopoDS_Shape& s, const string& file, const string& name,
-           const Matrix& colours, const string& caller)
+colourpart (const xdedoc& d, const TDF_Label& l, const TopoDS_Shape& s,
+            const Matrix& colours)
 {
-  xdedoc d;
-  const TDF_Label top = d.shapes ()->AddShape (s, Standard_False);
-  TDataStd_Name::Set (top, TCollection_ExtendedString (name.c_str (), true));
   TopTools_IndexedMapOfShape solids;
   TopExp::MapShapes (s, TopAbs_SOLID, solids);
   for (int i = 1; i <= solids.Extent () && i <= colours.rows (); i++)
@@ -1557,10 +1557,17 @@ writestep (const TopoDS_Shape& s, const string& file, const string& name,
     }
     const Quantity_Color c (colours(i-1,0), colours(i-1,1), colours(i-1,2),
                             Quantity_TOC_sRGB);
-    const TDF_Label l = solids (i).IsSame (s)
-                        ? top : d.shapes ()->AddSubShape (top, solids (i));
-    d.colours ()->SetColor (l, c, XCAFDoc_ColorGen);
+    const TDF_Label sub = solids (i).IsSame (s)
+                          ? l : d.shapes ()->AddSubShape (l, solids (i));
+    d.colours ()->SetColor (sub, c, XCAFDoc_ColorGen);
   }
+}
+
+// The document D written to FILE as STEP in millimetres, its file named NAME
+static void
+writedoc (const xdedoc& d, const string& file, const string& name,
+          const string& caller)
+{
   STEPCAFControl_Writer w;
   w.SetColorMode (Standard_True);
   w.SetNameMode (Standard_True);
@@ -1581,6 +1588,94 @@ writestep (const TopoDS_Shape& s, const string& file, const string& name,
   {
     error ("%s: cannot write '%s'.", caller.c_str (), file.c_str ());
   }
+}
+
+// S written to FILE as STEP, one part named NAME, its solids coloured as
+// colourpart colours them
+static void
+writestep (const TopoDS_Shape& s, const string& file, const string& name,
+           const Matrix& colours, const string& caller)
+{
+  xdedoc d;
+  const TDF_Label top = d.shapes ()->AddShape (s, Standard_False);
+  TDataStd_Name::Set (top, TCollection_ExtendedString (name.c_str (), true));
+  colourpart (d, top, s, colours);
+  writedoc (d, file, name, caller);
+}
+
+// The frame F, its origin, x axis, y axis and normal one after another, as
+// the displacement that carries a part from its own coordinates into it
+static gp_Trsf
+displacement (const double *f)
+{
+  gp_Trsf t;
+  t.SetDisplacement (gp_Ax3 (gp::XOY ()),
+                     gp_Ax3 (gp_Pnt (f[0], f[1], f[2]),
+                             gp_Dir (f[9], f[10], f[11]),
+                             gp_Dir (f[3], f[4], f[5])));
+  return t;
+}
+
+// The name a label carries, or empty
+static string
+labelname (const TDF_Label& l)
+{
+  Handle (TDataStd_Name) n;
+  if (! l.FindAttribute (TDataStd_Name::GetID (), n))
+  {
+    return "";
+  }
+  return TCollection_AsciiString (n->Get ()).ToCString ();
+}
+
+// An assembly written to FILE as STEP, given as definitions, those it places
+// before it and the whole last: each named in NAMES, a part by its bytes in
+// DATA and the colours of its solids in COLOURS, an assembly by an empty
+// DATA, its placed definitions in CHILDREN, a row for each of the index from
+// 1 of the definition and the frame it is placed in, as displacement takes
+// it, and the names of those placements in INSTANCES
+static void
+writeassembly (const string& file, const Cell& names, const Cell& data,
+               const Cell& colours, const Cell& children,
+               const Cell& instances, const string& caller)
+{
+  xdedoc d;
+  const octave_idx_type n = names.numel ();
+  vector<TDF_Label> label (n);
+  for (octave_idx_type i = 0; i < n; i++)
+  {
+    if (! data(i).isempty ())
+    {
+      const TopoDS_Shape s = toshape (data(i), caller);
+      label[i] = d.shapes ()->AddShape (s, Standard_False);
+      colourpart (d, label[i], s, colours(i).matrix_value ());
+    }
+    else
+    {
+      label[i] = d.shapes ()->NewShape ();
+      const Matrix C = children(i).matrix_value ();
+      const Cell inst = instances(i).cell_value ();
+      for (octave_idx_type k = 0; k < C.rows (); k++)
+      {
+        double f[12];
+        for (int j = 0; j < 12; j++)
+        {
+          f[j] = C(k,j+1);
+        }
+        const TDF_Label c
+          = d.shapes ()->AddComponent (label[i],
+                                       label[static_cast<int> (C(k,0)) - 1],
+                                       TopLoc_Location (displacement (f)));
+        TDataStd_Name::Set (c, TCollection_ExtendedString
+                                 (inst(k).string_value ().c_str (), true));
+      }
+    }
+    TDataStd_Name::Set (label[i], TCollection_ExtendedString
+                                    (names(i).string_value ().c_str (),
+                                     true));
+  }
+  d.shapes ()->UpdateAssemblies ();
+  writedoc (d, file, names(n-1).string_value (), caller);
 }
 
 // The triangles of a mesh of S that strays no further than TOL from its
@@ -1806,6 +1901,169 @@ readstep (const string& file, const string& caller)
   Cell out (1, 2);
   out(0) = todata (s);
   out(1) = any ? C : Matrix ();
+  return out;
+}
+
+// The frame a placement carries a part into, its origin, x axis, y axis
+// and normal one after another into F, as displacement gives them
+static void
+frameof (const TopLoc_Location& loc, double *f, const string& caller)
+{
+  const gp_Trsf t = loc.Transformation ();
+  if (t.IsNegative ())
+  {
+    error ("%s: the file places a part mirrored, which a model.Assembly "
+           "cannot.", caller.c_str ());
+  }
+  const gp_Pnt o = gp_Pnt (0, 0, 0).Transformed (t);
+  const gp_Dir axes[3] = {gp_Dir (1, 0, 0).Transformed (t),
+                          gp_Dir (0, 1, 0).Transformed (t),
+                          gp_Dir (0, 0, 1).Transformed (t)};
+  f[0] = o.X ();
+  f[1] = o.Y ();
+  f[2] = o.Z ();
+  for (int k = 0; k < 3; k++)
+  {
+    f[3 + 3 * k] = axes[k].X ();
+    f[4 + 3 * k] = axes[k].Y ();
+    f[5 + 3 * k] = axes[k].Z ();
+  }
+}
+
+// The assembly of the STEP file FILE, in millimetres, as writeassembly takes
+// one: a cell of NAMES, DATA, COLOURS, CHILDREN and INSTANCES, the whole
+// last.  A part placed several times is one definition.  Several shapes at
+// the top of the file are placed, where they are, in an assembly named
+// NAME; a single part is returned as it is.
+static Cell
+readassembly (const string& file, const string& name, const string& caller)
+{
+  xdedoc d;
+  STEPCAFControl_Reader r;
+  r.SetColorMode (Standard_True);
+  r.SetNameMode (Standard_True);
+  Interface_Static::SetCVal ("xstep.cascade.unit", "MM");
+  if (r.ReadFile (file.c_str ()) != IFSelect_RetDone)
+  {
+    error ("%s: cannot read '%s' as a STEP file.", caller.c_str (),
+           file.c_str ());
+  }
+  if (! r.Transfer (d.doc))
+  {
+    error ("%s: '%s' holds no shape.", caller.c_str (), file.c_str ());
+  }
+  vector<octave_value> names, data, colours, children, instances;
+  std::map<string, int> seen;
+  std::function<int (const TDF_Label&)> visit;
+  visit = [&] (const TDF_Label& l) -> int
+  {
+    TCollection_AsciiString entry;
+    TDF_Tool::Entry (l, entry);
+    const auto it = seen.find (entry.ToCString ());
+    if (it != seen.end ())
+    {
+      return it->second;
+    }
+    string nm = labelname (l);
+    if (XCAFDoc_ShapeTool::IsAssembly (l))
+    {
+      TDF_LabelSequence comps;
+      XCAFDoc_ShapeTool::GetComponents (l, comps);
+      Matrix C (comps.Length (), 13);
+      Cell inst (1, comps.Length ());
+      for (int k = 1; k <= comps.Length (); k++)
+      {
+        TDF_Label ref;
+        XCAFDoc_ShapeTool::GetReferredShape (comps (k), ref);
+        C(k-1,0) = visit (ref) + 1;
+        double f[12];
+        frameof (XCAFDoc_ShapeTool::GetLocation (comps (k)), f, caller);
+        for (int j = 0; j < 12; j++)
+        {
+          C(k-1,j+1) = f[j];
+        }
+        const string in = labelname (comps (k));
+        inst(k-1) = in.empty () ? labelname (ref) : in;
+      }
+      names.push_back (nm.empty () ? "assembly" : nm);
+      data.push_back (uint8NDArray (dim_vector (0, 0)));
+      colours.push_back (Matrix ());
+      children.push_back (C);
+      instances.push_back (inst);
+    }
+    else
+    {
+      const TopoDS_Shape s = XCAFDoc_ShapeTool::GetShape (l);
+      const TopTools_IndexedMapOfShape solids = solidsof (s);
+      Matrix C (solids.Extent (), 3, octave_NaN);
+      bool any = false;
+      for (int i = 1; i <= solids.Extent (); i++)
+      {
+        Quantity_Color c;
+        if (colourof (d, solids (i), c))
+        {
+          double rgb[3];
+          c.Values (rgb[0], rgb[1], rgb[2], Quantity_TOC_sRGB);
+          for (int k = 0; k < 3; k++)
+          {
+            C(i-1,k) = rgb[k];
+          }
+          any = true;
+        }
+      }
+      names.push_back (nm.empty () ? "part" : nm);
+      data.push_back (todata (s));
+      colours.push_back (any ? C : Matrix ());
+      children.push_back (Matrix ());
+      instances.push_back (Cell ());
+    }
+    const int k = names.size () - 1;
+    seen[entry.ToCString ()] = k;
+    return k;
+  };
+  TDF_LabelSequence roots;
+  d.shapes ()->GetFreeShapes (roots);
+  if (roots.Length () == 0)
+  {
+    error ("%s: '%s' holds no shape.", caller.c_str (), file.c_str ());
+  }
+  vector<int> top;
+  for (int i = 1; i <= roots.Length (); i++)
+  {
+    top.push_back (visit (roots (i)));
+  }
+  if (top.size () > 1)
+  {
+    // The shapes at the top of the file, placed where they are
+    Matrix C (top.size (), 13, 0.0);
+    Cell inst (1, top.size ());
+    for (size_t k = 0; k < top.size (); k++)
+    {
+      C(k,0) = top[k] + 1;
+      C(k,4) = C(k,8) = C(k,12) = 1;
+      inst(k) = names[top[k]];
+    }
+    names.push_back (name);
+    data.push_back (uint8NDArray (dim_vector (0, 0)));
+    colours.push_back (Matrix ());
+    children.push_back (C);
+    instances.push_back (inst);
+  }
+  auto tocell = [] (const vector<octave_value>& v)
+  {
+    Cell c (1, v.size ());
+    for (size_t i = 0; i < v.size (); i++)
+    {
+      c(i) = v[i];
+    }
+    return c;
+  };
+  Cell out (1, 5);
+  out(0) = tocell (names);
+  out(1) = tocell (data);
+  out(2) = tocell (colours);
+  out(3) = tocell (children);
+  out(4) = tocell (instances);
   return out;
 }
 
@@ -2671,6 +2929,17 @@ function directly. \n\
     {
       out = surfacepoints (toshape (args(2), caller), args(3).double_value (),
                            args(4).double_value () * M_PI / 180, caller);
+    }
+    else if (cmd == "writeassembly")
+    {
+      writeassembly (args(2).string_value (), args(3).cell_value (),
+                     args(4).cell_value (), args(5).cell_value (),
+                     args(6).cell_value (), args(7).cell_value (), caller);
+    }
+    else if (cmd == "readassembly")
+    {
+      out = readassembly (args(2).string_value (), args(3).string_value (),
+                          caller);
     }
     else if (cmd == "readstep")
     {

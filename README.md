@@ -9,11 +9,12 @@ CAD program or a CNC machine will accept, as a solid for a slicer, as LaTeX for
 a report, or as a figure on screen. Solids proper, built, combined and
 exchanged as STEP, come through Open CASCADE when the package is built with it.
 
-Forty-six public functions across five namespaces plus the `draw.Drawing`,
+Forty-seven public functions across six namespaces plus the `draw.Drawing`,
 `geom.Polyline`, `geom.Spline`, `geom.Region`, `geom.Path`, `geom.UCS`,
-`polymesh.Mesh`, `solid.Shape` and `model.Viewer` classes, 1783 built-in
-self-tests and 67 `%!demo` blocks, nearly all of which end in a `plot` call, so
-the documentation shows what a function does rather than only describing it.
+`polymesh.Mesh`, `solid.Shape`, `model.Assembly` and `model.Viewer` classes,
+1813 built-in self-tests and 67 `%!demo` blocks, nearly all of which end in a
+`plot` call, so the documentation shows what a function does rather than only
+describing it.
 
 ## Layout
 
@@ -150,6 +151,18 @@ solid.write ('plate.stl', plate);
 section = geom.Region ([0, 0; 10, 0; 10, 30; 6, 30; 6, 50; 0, 50]);
 section.UCS = geom.UCS ([0, -1, 0], [0, 0, 0]);  # the xz plane: y is world z
 shaft = solid.revolve (section);                  # turned about z
+```
+
+A `model.Assembly` places named parts in the frames of `geom.UCS` objects, a
+part defined once however often it is placed, and sub-assemblies the same
+way. `write` saves it to STEP with its structure, names and colours, so a CAD
+program opens the product as it was built, and `model.read` reads one back:
+
+```
+ring = model.Assembly ('ring');
+ring = add (ring, 'plate', plate, geom.UCS ());
+ring = add (ring, 'shaft', shaft, geom.UCS ([0, 0, 1], [20, 20, 12]));
+write (ring, 'ring.step');
 ```
 
 `show` shows a solid in a `model.Viewer`, a window Open CASCADE draws in a

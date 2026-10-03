@@ -33,10 +33,12 @@
 ## @file{.stp}, in either case, and open with the keyword
 ## @qcode{ISO-10303-21;}, which may follow white space and comments.
 ##
-## A triangle mesh, from an STL, OBJ or PLY file, is read by
-## @code{polymesh.read} and made a solid by @code{solid.polyhedron}.
+## @code{model.read} reads the same file as a @code{model.Assembly}, its
+## parts named and placed as the file has them.  A triangle mesh, from an
+## STL, OBJ or PLY file, is read by @code{polymesh.read} and made a solid by
+## @code{solid.polyhedron}.
 ##
-## @seealso{solid.write, solid.Shape, solid.polyhedron, polymesh.read}
+## @seealso{solid.write, solid.Shape, model.read, polymesh.read}
 ## @end deftypefn
 
 function S = read (FILE)
