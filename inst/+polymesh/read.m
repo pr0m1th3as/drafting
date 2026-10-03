@@ -16,17 +16,17 @@
 ## this program; if not, see <http://www.gnu.org/licenses/>.
 
 ## -*- texinfo -*-
-## @deftypefn  {drafting} {@var{M} =} stl.read (@var{FILE})
-## @deftypefnx {drafting} {@var{M} =} stl.read (@var{FILE}, @qcode{'Tolerance'}, @var{T})
+## @deftypefn  {drafting} {@var{M} =} polymesh.read (@var{FILE})
+## @deftypefnx {drafting} {@var{M} =} polymesh.read (@var{FILE}, @qcode{'Tolerance'}, @var{T})
 ##
 ## Read a triangle mesh from an STL file.
 ##
-## @code{@var{M} = stl.read (@var{FILE})} reads the binary or ASCII STL file
-## @var{FILE} and returns its mesh as a struct with the fields
+## @code{@var{M} = polymesh.read (@var{FILE})} reads the binary or ASCII STL
+## file @var{FILE} and returns its mesh as a struct with the fields
 ## @code{vertices}, an @math{N}-by-3 matrix of points, and @code{faces}, a
 ## @math{K}-by-3 matrix of the indices of each triangle's corners in
 ## @code{vertices}.  That is the form @code{patch} takes, and the form
-## @code{stl.section} cuts.
+## @code{polymesh.section} cuts.
 ##
 ## An STL file repeats every corner for every triangle that has it.  The
 ## corners are welded into vertices, each shared by every triangle that meets
@@ -34,48 +34,49 @@
 ## coordinates are taken as they are written; an STL file has no units, and
 ## most are in millimetres.
 ##
-## @code{@var{M} = stl.read (@var{FILE}, @qcode{'Tolerance'}, @var{T})} welds
-## corners that lie within @var{T} of one another, not only those that are
-## equal, which closes the hairline gaps some programs leave in a mesh.  The
-## default @var{T} is 0.
+## @code{@var{M} = polymesh.read (@var{FILE}, @qcode{'Tolerance'}, @var{T})}
+## welds corners that lie within @var{T} of one another, not only those that
+## are equal, which closes the hairline gaps some programs leave in a mesh.
+## The default @var{T} is 0.
 ##
 ## The format is told from the file: a binary file is exactly as long as the
 ## number of triangles it declares makes it, and anything else is read as
 ## ASCII, the three numbers after each @qcode{vertex}, whatever the case and
 ## spacing.
 ##
-## @seealso{stl.section, stl.write, solid.polyhedron}
+## @seealso{polymesh.section, polymesh.write, solid.polyhedron}
 ## @end deftypefn
 
 function M = read (FILE, varargin)
 
   ## Input validation
   if (nargin != 1 && nargin != 3)
-    error ("stl.read: invalid number of input arguments.");
+    error ("polymesh.read: invalid number of input arguments.");
   endif
   if (! ischar (FILE) || ! isrow (FILE))
-    error ("stl.read: FILE must be a character vector.");
+    error ("polymesh.read: FILE must be a character vector.");
   endif
   [~, ~, ext] = fileparts (FILE);
   if (! strcmpi (ext, '.stl'))
-    error ("stl.read: FILE must end in .stl.");
+    error ("polymesh.read: FILE must end in .stl.");
   endif
   T = 0;
   if (nargin == 3)
     if (! ischar (varargin{1}) || ! strcmp (varargin{1}, 'Tolerance'))
-      error ("stl.read: unknown parameter.");
+      error ("polymesh.read: unknown parameter.");
     endif
     T = varargin{2};
     if (! isnumeric (T) || ! isreal (T) || ! isscalar (T) || ! isfinite (T) ...
         || T < 0)
-      error ("stl.read: Tolerance must be a non-negative finite real scalar.");
+      error (strcat ("polymesh.read: Tolerance must be a non-negative", ...
+                     " finite real scalar."));
     endif
   endif
   if (! isfile (FILE))
-    error ("stl.read: FILE is not a readable STL file.");
+    error ("polymesh.read: FILE is not a readable STL file.");
   endif
 
-  [V, F] = __mesh__ ('read', 'stl.read', FILE, double (T));
+  [V, F] = __mesh__ ('read', 'polymesh.read', FILE, double (T));
   M = struct ('vertices', V, 'faces', F);
 
 endfunction
@@ -104,7 +105,7 @@ endfunction
 %! f = [tempname(), '.stl'];
 %! unwind_protect
 %!   writebinary (f, cube ());
-%!   M = stl.read (f);
+%!   M = polymesh.read (f);
 %!   assert_equal (size (M.vertices), [8, 3]);
 %!   assert_equal (size (M.faces), [12, 3]);
 %!   assert_equal (sortrows (M.vertices), [0, 0, 0; 0, 0, 1; 0, 1, 0; ...
@@ -128,7 +129,7 @@ endfunction
 %!   endfor
 %!   fprintf (fid, "endsolid cube\n");
 %!   fclose (fid);
-%!   M = stl.read (f);
+%!   M = polymesh.read (f);
 %!   assert_equal (size (M.vertices), [8, 3]);
 %!   assert_equal (M.vertices(M.faces',:), V);
 %! unwind_protect_cleanup
@@ -141,9 +142,9 @@ endfunction
 %!   V = cube ();
 %!   V(end,:) += 1e-7;
 %!   writebinary (f, V);
-%!   M = stl.read (f);
+%!   M = polymesh.read (f);
 %!   assert_equal (rows (M.vertices), 9);
-%!   M = stl.read (f, 'Tolerance', 1e-5);
+%!   M = polymesh.read (f, 'Tolerance', 1e-5);
 %!   assert_equal (rows (M.vertices), 8);
 %! unwind_protect_cleanup
 %!   delete (f);
@@ -153,43 +154,44 @@ endfunction
 %! f = [tempname(), '.stl'];
 %! unwind_protect
 %!   writebinary (f, [cube(); 0, 0, 0; 0, 0, 0; 1, 1, 1]);
-%!   M = stl.read (f);
+%!   M = polymesh.read (f);
 %!   assert_equal (rows (M.faces), 12);
 %!   writebinary (f, zeros (0, 3));
-%!   M = stl.read (f);
+%!   M = polymesh.read (f);
 %!   assert_equal (size (M.vertices), [0, 3]);
 %!   assert_equal (size (M.faces), [0, 3]);
 %! unwind_protect_cleanup
 %!   delete (f);
 %! end_unwind_protect
 
-%!error<stl.read: invalid number of input arguments.> stl.read ()
-%!error<stl.read: invalid number of input arguments.> stl.read ('a.stl', 1)
-%!error<stl.read: FILE must be a character vector.> stl.read (1)
-%!error<stl.read: FILE must end in .stl.> stl.read ('part.step')
-%!error<stl.read: unknown parameter.> stl.read ('a.stl', 'Weld', 1)
-%!error<stl.read: Tolerance must be a non-negative finite real scalar.> ...
-%! stl.read ('a.stl', 'Tolerance', -1)
-%!error<stl.read: FILE is not a readable STL file.> ...
-%! stl.read ([tempname(), '.stl'])
-%!error<stl.read: FILE is not a readable STL file.>
+%!error<polymesh.read: invalid number of input arguments.> polymesh.read ()
+%!error<polymesh.read: invalid number of input arguments.> ...
+%! polymesh.read ('a.stl', 1)
+%!error<polymesh.read: FILE must be a character vector.> polymesh.read (1)
+%!error<polymesh.read: FILE must end in .stl.> polymesh.read ('part.step')
+%!error<polymesh.read: unknown parameter.> polymesh.read ('a.stl', 'Weld', 1)
+%!error<polymesh.read: Tolerance must be a non-negative finite real scalar.> ...
+%! polymesh.read ('a.stl', 'Tolerance', -1)
+%!error<polymesh.read: FILE is not a readable STL file.> ...
+%! polymesh.read ([tempname(), '.stl'])
+%!error<polymesh.read: FILE is not a readable STL file.>
 %! f = [tempname(), '.stl'];
 %! fid = fopen (f, 'w');
 %! fprintf (fid, "not an STL file\n");
 %! fclose (fid);
 %! unwind_protect
-%!   stl.read (f);
+%!   polymesh.read (f);
 %! unwind_protect_cleanup
 %!   delete (f);
 %! end_unwind_protect
-%!error<stl.read: FILE is not a readable STL file.>
+%!error<polymesh.read: FILE is not a readable STL file.>
 %! f = [tempname(), '.stl'];
 %! fid = fopen (f, 'w');
 %! fprintf (fid, "solid x\nfacet normal 0 0 1\nouter loop\nvertex 0 0 0\n");
 %! fprintf (fid, "vertex 1 0\nendloop\nendfacet\nendsolid x\n");
 %! fclose (fid);
 %! unwind_protect
-%!   stl.read (f);
+%!   polymesh.read (f);
 %! unwind_protect_cleanup
 %!   delete (f);
 %! end_unwind_protect

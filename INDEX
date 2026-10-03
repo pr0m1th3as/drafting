@@ -32,10 +32,10 @@ Construction geometry
 DXF input and output
  dxf.read
  dxf.write
-STL files
- stl.read
- stl.section
- stl.write
+Meshes
+ polymesh.read
+ polymesh.section
+ polymesh.write
 Sheet composition
  draw.titleblock
  draw.coordtable

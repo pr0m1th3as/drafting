@@ -18,18 +18,18 @@ than only describing it.
 ## Layout
 
 ```
-inst/+geom    planar geometry (no file formats, no drawing semantics)
-inst/+dxf     AutoCAD R12 (AC1009) ASCII DXF, both directions
-inst/+stl     STL meshes read and cut, and written from planar sections
-inst/+draw    format-agnostic drawing model, and the backends that render it
-inst/+solid   solids through Open CASCADE, STEP and STL
-inst/tests    classdef .m-tst suites
-src           compiled code: STL meshes, and the interface to Open CASCADE
+inst/+geom      planar geometry (no file formats, no drawing semantics)
+inst/+dxf       AutoCAD R12 (AC1009) ASCII DXF, both directions
+inst/+polymesh  STL meshes read and cut, and written from planar sections
+inst/+draw      format-agnostic drawing model, and the backends that render it
+inst/+solid     solids through Open CASCADE, STEP and STL
+inst/tests      classdef .m-tst suites
+src             compiled code: STL meshes, and the interface to Open CASCADE
 ```
 
 Dependencies point downward only: `+draw` builds on `+geom` and emits through
-`+dxf`; `+geom`, `+dxf` and `+stl` know nothing of drawings. `+solid` builds
-on `+geom` and on Open CASCADE.
+`+dxf`; `+geom`, `+dxf` and `+polymesh` know nothing of drawings. `+solid`
+builds on `+geom` and on Open CASCADE.
 
 `+geom` covers primitives (signed area, bounding box, centroid, affine
 transform, offset, largest inscribed rectangle, triangulation), curve geometry
@@ -103,18 +103,18 @@ rather than a one-way door.
 Solids come from the same planar model:
 
 ```
-stl.write ('plate.stl', [-40, -40; 40, -40; 40, 40; -40, 40], [0, 6]);
+polymesh.write ('plate.stl', [-40, -40; 40, -40; 40, 40; -40, 40], [0, 6]);
 ```
 
-`stl.write` also takes a struct array of sections, each with its own profile,
-`z` range and holes, which expresses a stepped or eccentric shaft without
-leaving the planar model. Each section is written as its own closed shell, so a
+`polymesh.write` also takes a struct array of sections, each with its own
+profile, `z` range and holes, which expresses a stepped or eccentric shaft
+without leaving the planar model. Each section is written as its own closed shell, so a
 single section is a closed manifold and a stack of several is not. Slicers
 union it without complaint; a tool demanding one closed surface will not.
 
-`stl.read` reads a binary or ASCII STL into the vertices and faces `patch`
-takes, welding the corners every triangle repeats. `stl.section` cuts the mesh
-with the plane of a `geom.UCS` into `geom.Region` objects, as
+`polymesh.read` reads a binary or ASCII STL into the vertices and faces `patch`
+takes, welding the corners every triangle repeats. `polymesh.section` cuts the
+mesh with the plane of a `geom.UCS` into `geom.Region` objects, as
 `solid.Shape.section` cuts a solid, healing small gaps in the mesh to a
 tolerance and returning what will not close; the regions build solids like any
 others. `fit` on a region turns the cut's facets back into lines, arcs and
@@ -123,8 +123,8 @@ circle again and a filleted corner an arc. All three are compiled and need
 nothing but Octave:
 
 ```
-M = stl.read ('bracket.stl');
-R = stl.section (M, geom.UCS ([0, 0, 1], [0, 0, 5]));
+M = polymesh.read ('bracket.stl');
+R = polymesh.section (M, geom.UCS ([0, 0, 1], [0, 0, 5]));
 R = fit (R{1}, 'arcs', 'AbsTol', 0.01);
 ```
 
@@ -181,15 +181,15 @@ moves it there, so a profile drawn in the xy plane is laid on any face of a
 part. It is made from a normal and points, or picked with the mouse as above,
 and the pick prints the line that makes it again from coordinates.
 
-The viewer shows a triangle mesh from `stl.read` as well, millions of
+The viewer shows a triangle mesh from `polymesh.read` as well, millions of
 triangles shaded facet by facet, and a UCS picked on it, from a facet or three
 points snapped to corners and the middles of sides, is the plane to cut it
 with:
 
 ```
-M = stl.read ('bracket.stl');
+M = polymesh.read ('bracket.stl');
 V = solid.show (M);
-R = stl.section (M, pickucs (V));
+R = polymesh.section (M, pickucs (V));
 ```
 
 Open CASCADE is optional: a package built without it works as before, and

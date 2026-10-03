@@ -30,7 +30,7 @@
 ## @code{polyhedron}.
 ##
 ## @code{@var{S} = solid.polyhedron (@var{M})} takes the mesh as a struct with
-## the fields @code{vertices} and @code{faces}, as @code{stl.read} returns
+## the fields @code{vertices} and @code{faces}, as @code{polymesh.read} returns
 ## it.
 ##
 ## The mesh must be closed, every edge shared by exactly two triangles, or it
@@ -55,7 +55,7 @@
 ## @end group
 ## @end example
 ##
-## @seealso{stl.read, solid.read, solid.Shape}
+## @seealso{polymesh.read, solid.read, solid.Shape}
 ## @end deftypefn
 
 function S = polyhedron (varargin)

@@ -32,13 +32,13 @@
 ## @qcode{ISO-10303-21;}, which may follow white space and comments.
 ##
 ## A file ending in @file{.stl}, binary or ASCII, is read as a triangle mesh
-## by @code{stl.read} and made a solid by @code{solid.polyhedron}, as
+## by @code{polymesh.read} and made a solid by @code{solid.polyhedron}, as
 ## OpenSCAD's @code{import} does: the mesh must be closed, coplanar triangles
 ## that meet become one face, and the coordinates are taken as millimetres.
 ## A mesh whose corners need welding within a tolerance is read with
-## @code{stl.read} and passed to @code{solid.polyhedron}.
+## @code{polymesh.read} and passed to @code{solid.polyhedron}.
 ##
-## @seealso{solid.write, solid.Shape, solid.polyhedron, stl.read}
+## @seealso{solid.write, solid.Shape, solid.polyhedron, polymesh.read}
 ## @end deftypefn
 
 function S = read (FILE)

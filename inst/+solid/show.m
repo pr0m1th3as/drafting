@@ -55,17 +55,17 @@
 ## @end example
 ##
 ## @code{solid.show (@var{M})} shows the triangle mesh @var{M}, a struct
-## with the fields @code{vertices} and @code{faces} as @code{stl.read} returns
-## it, in the same way, shaded facet by facet.  A coordinate system picked on
+## with the fields @code{vertices} and @code{faces} as @code{polymesh.read}
+## returns it, in the same way, shaded facet by facet.  A coordinate system picked on
 ## it with @code{solid.Viewer.pickucs} is the plane to cut it with
-## @code{stl.section}:
+## @code{polymesh.section}:
 ##
 ## @example
 ## @group
-## M = stl.read ('bracket.stl');
+## M = polymesh.read ('bracket.stl');
 ## V = solid.show (M);
 ## U = pickucs (V);          # click a facet, then two points
-## R = stl.section (M, U);
+## R = polymesh.section (M, U);
 ## @end group
 ## @end example
 ##
@@ -76,7 +76,7 @@
 ## The viewer is built with the package when Open CASCADE and X11 are found,
 ## and needs a display to run.  It runs on Linux.
 ##
-## @seealso{solid.Viewer, solid.Viewer.pick, stl.read, stl.section}
+## @seealso{solid.Viewer, solid.Viewer.pick, polymesh.read, polymesh.section}
 ## @end deftypefn
 
 function V = show (S)

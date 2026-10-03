@@ -173,7 +173,9 @@ projection (`section`) and STL in and out are here. These are not:
 | `mirror` of 2-D shapes | `mirror` on `geom.Region`, about a line in its plane |
 | copies in a `for` loop | `copy`, `rectarray` and `polararray` on `solid.Shape` and `geom.Region`, the copies united |
 | an ellipse, an ellipsoid (`scale` of a circle or a sphere) | `geom.Spline.ellipse` and `solid.ellipsoid`, both exact |
-| `color` | colour carried to the viewer and to STEP |
+| `color` | one colour for a whole shape, shown in the viewer and carried through STEP out and in |
+| several objects in one file | multipart STEP out and in: named parts and assemblies of placed parts, through Open CASCADE's document framework (XDE) |
+| `import ()` of OBJ | an OBJ mesh read and made a solid by `solid.polyhedron` |
 | `projection (cut = false)` | the outline of a solid on a plane, which milestone 4's views need as well |
 | `hull ()` of solids | the hull of a solid's points, as a faceted solid |
 
@@ -198,14 +200,14 @@ ordinate, has no entity in the drawing model yet.
 *Units in the model.* `dxf.read` converts an inch file to millimetres and
 `dxf.write` declares millimetres, so nothing is mis-scaled; what is missing is
 working in anything else. A `Units` property on `Drawing`, honoured by
-`print`, `dxf.write` and `stl.write`, would let a drawing be authored in inches.
-It is ergonomic rather than a fix, and may slip to a later release.
+`print`, `dxf.write` and `polymesh.write`, would let a drawing be authored in
+inches. It is ergonomic rather than a fix, and may slip to a later release.
 
-**Meshes.** `stl.read` reads binary and ASCII STL, `stl.section` cuts a mesh
-with a plane into regions, healed to a tolerance where the mesh has gaps, and
-`geom.Region.fit` turns the cut's facets back into lines, arcs and splines, so
-that a faceted bore becomes a circle again. The viewer shows meshes and picks a
-UCS on them. Reading, welding, cutting and fitting are compiled, in a file of
+**Meshes.** `polymesh.read` reads binary and ASCII STL, `polymesh.section` cuts
+a mesh with a plane into regions, healed to a tolerance where the mesh has gaps,
+and `geom.Region.fit` turns the cut's facets back into lines, arcs and splines,
+so that a faceted bore becomes a circle again. The viewer shows meshes and picks
+a UCS on them. Reading, welding, cutting and fitting are compiled, in a file of
 their own that needs no Open CASCADE.
 
 General geometric queries (the distance to a curve, the nearest point on it,
@@ -391,9 +393,9 @@ A closed planar profile to a triangle mesh, entirely inside the package:
 - `geom.sweep`: profile along a path, once milestone 5 makes the path exact
 
 This completes a pipeline the package already half owns: geometry to profile to
-mesh to `stl.write`. Extrude and revolve are markedly easier than they sound
-once triangulation is in hand, and they are what lets a drawing produce a part
-rather than only describe one.
+mesh to `polymesh.write`. Extrude and revolve are markedly easier than they
+sound once triangulation is in hand, and they are what lets a drawing produce a
+part rather than only describe one.
 
 ## Format track: runs alongside, blocks nothing
 

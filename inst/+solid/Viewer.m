@@ -24,7 +24,7 @@ classdef Viewer < handle
   ##
   ## Assigning a @code{solid.Shape} to the @code{Shape} of a viewer opens its
   ## window, or redraws it in place, keeping the camera where it was.  Nothing
-  ## else redraws it.  A triangle mesh, as @code{stl.read} returns one, is
+  ## else redraws it.  A triangle mesh, as @code{polymesh.read} returns one, is
   ## shown the same way, shaded facet by facet, however many triangles it
   ## has.  @code{solid.show} keeps a viewer for each variable and
   ## is the usual way in; a viewer of your own is for when you want to hold
@@ -61,7 +61,7 @@ classdef Viewer < handle
     ## Shape shown
     ##
     ## The @code{solid.Shape} shown, or the triangle mesh: a struct with the
-    ## fields @code{vertices} and @code{faces}, as @code{stl.read} returns
+    ## fields @code{vertices} and @code{faces}, as @code{polymesh.read} returns
     ## it.  Assigning either opens the window if it is not open and redraws it
     ## in place if it is.  The empty shape opens the window empty, or clears
     ## it if it is open; the first shape shown after it is fitted to the
