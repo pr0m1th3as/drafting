@@ -11,7 +11,7 @@ exchanged as STEP, come through Open CASCADE when the package is built with it.
 
 Forty-six public functions across five namespaces plus the `draw.Drawing`,
 `geom.Polyline`, `geom.Spline`, `geom.Region`, `geom.Path`, `geom.UCS`,
-`polymesh.Mesh`, `solid.Shape` and `model.Viewer` classes, 1755 built-in
+`polymesh.Mesh`, `solid.Shape` and `model.Viewer` classes, 1752 built-in
 self-tests and 67 `%!demo` blocks, nearly all of which end in a `plot` call, so
 the documentation shows what a function does rather than only describing it.
 
@@ -118,25 +118,24 @@ R = section (M, geom.UCS ([0, 0, 1], [0, 0, 5]));
 R = fit (R{1}, 'arcs', 'AbsTol', 0.01);
 ```
 
-`+solid` models solids through [Open CASCADE](https://dev.opencascade.org/),
-the kernel FreeCAD is built on, so curved faces stay exact. `solid.Shape` holds
-a solid, with the booleans `union`, `subtract` and `intersect`, translation,
-rotation, mirroring and scaling, resizing to a box, evenly or stretched,
-copies in rows, columns and layers or round an axis, the convex hull of shapes
-and points, and volume, area, centroid and bounding box;
-`solid.box`, `solid.wedge`, `solid.cylinder`, `solid.cone`, `solid.sphere`,
-`solid.ellipsoid` and `solid.torus` make the primitives, placed in a `geom.UCS` by a corner, the
+`+solid` models solids through [Open CASCADE](https://dev.opencascade.org/), the
+kernel FreeCAD is built on, so curved faces stay exact. `solid.Shape` holds a
+solid, with the booleans `union`, `subtract` and `intersect`, translation,
+rotation, mirroring and scaling, resizing to a box, evenly or stretched, copies
+in rows, columns and layers or round an axis, the convex hull of shapes and
+points, and volume, area, centroid and bounding box; `solid.box`, `solid.wedge`,
+`solid.cylinder`, `solid.cone`, `solid.sphere`, `solid.ellipsoid` and
+`solid.torus` make the primitives, placed in a `geom.UCS` by a corner, the
 centre of the base or the centroid; `solid.extrude`, `solid.revolve`,
-`solid.loft`, `solid.sweep` and `solid.helix` make a solid from a
-`geom.Region`, where the region's plane puts it, its arcs carried as true arcs
-and its holes right through. Methods drill holes (plain, counterbored,
-countersunk, tapping size), cut pockets, round and bevel edges and hollow a
-shape, on edges and faces chosen by kind, direction and position, and
-`section` cuts a solid with a plane into regions exact enough to build from
-again. `solid.polyhedron` makes a solid of a closed triangle mesh, to take
-part in booleans like any other. `solid.read` reads STEP, or STL through
-`solid.polyhedron`, and `solid.write` writes STEP for a CAD program or STL for
-a slicer:
+`solid.loft`, `solid.sweep` and `solid.helix` make a solid from a `geom.Region`,
+where the region's plane puts it, its arcs carried as true arcs and its holes
+right through. Methods drill holes (plain, counterbored, countersunk, tapping
+size), cut pockets, round and bevel edges and hollow a shape, on edges and faces
+chosen by kind, direction and position, and `section` cuts a solid with a plane
+into regions exact enough to build from again. `solid.polyhedron` makes a solid
+of a closed `polymesh.Mesh`, so a mesh `polymesh.read` reads takes part in
+booleans like any other. `solid.read` reads STEP, and `solid.write` writes STEP
+for a CAD program or STL for a slicer:
 
 ```
 plate = solid.box (80, 40, 12);

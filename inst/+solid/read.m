@@ -18,7 +18,7 @@
 ## -*- texinfo -*-
 ## @deftypefn {drafting} {@var{S} =} solid.read (@var{FILE})
 ##
-## Read a solid from a STEP or STL file.
+## Read a solid from a STEP file.
 ##
 ## @code{@var{S} = solid.read (@var{FILE})} returns the shapes held by the
 ## STEP file @var{FILE} as one @code{solid.Shape}, in millimetres whatever
@@ -31,12 +31,8 @@
 ## @file{.stp}, in either case, and open with the keyword
 ## @qcode{ISO-10303-21;}, which may follow white space and comments.
 ##
-## A file ending in @file{.stl}, binary or ASCII, is read as a triangle mesh
-## by @code{polymesh.read} and made a solid by @code{solid.polyhedron}, as
-## OpenSCAD's @code{import} does: the mesh must be closed, coplanar triangles
-## that meet become one face, and the coordinates are taken as millimetres.
-## A mesh whose corners need welding within a tolerance is read with
-## @code{polymesh.read} and passed to @code{solid.polyhedron}.
+## A triangle mesh, from an STL, OBJ or PLY file, is read by
+## @code{polymesh.read} and made a solid by @code{solid.polyhedron}.
 ##
 ## @seealso{solid.write, solid.Shape, solid.polyhedron, polymesh.read}
 ## @end deftypefn
@@ -51,20 +47,11 @@ function S = read (FILE)
     error ("solid.read: FILE must be a non-empty character vector.");
   endif
   [~, ~, ext] = fileparts (FILE);
-  if (! any (strcmpi (ext, {'.step', '.stp', '.stl'})))
-    error ("solid.read: FILE must end in .step, .stp or .stl.");
+  if (! any (strcmpi (ext, {'.step', '.stp'})))
+    error ("solid.read: FILE must end in .step or .stp.");
   endif
   if (! isfile (FILE))
     error ("solid.read: cannot find file '%s'.", FILE);
-  endif
-  if (strcmpi (ext, '.stl'))
-    errmsg = solid.__checkocct__ ();
-    if (! isempty (errmsg))
-      error ("solid.read: %s", errmsg);
-    endif
-    [V, F] = __mesh__ ('read', 'solid.read', FILE, 0, 'stl');
-    S = solid.Shape (__occt__ ('polyhedron', 'solid.read', V, F, true));
-    return;
   endif
   if (! isstep (FILE))
     error ("solid.read: FILE is not a readable STEP file.");
@@ -155,56 +142,13 @@ endfunction
 %!   unlink (f);
 %! end_unwind_protect
 
-%!testif ; exist ('__occt__') == 3  # an STL file, as OpenSCAD imports it
-%! P = [0, 0, 0; 1, 0, 0; 1, 1, 0; 0, 1, 0; 0, 0, 1; 1, 0, 1; 1, 1, 1; ...
-%!      0, 1, 1] .* [4, 5, 6];
-%! F = [1, 3, 2; 1, 4, 3; 5, 6, 7; 5, 7, 8; 1, 2, 6; 1, 6, 5; ...
-%!      2, 3, 7; 2, 7, 6; 3, 4, 8; 3, 8, 7; 4, 1, 5; 4, 5, 8];
-%! f = [tempname(), '.STL'];
-%! unwind_protect
-%!   fid = fopen (f, 'w');
-%!   fprintf (fid, "solid box\n");
-%!   fprintf (fid, ["facet normal 0 0 0\nouter loop\n", ...
-%!                  repmat("vertex %g %g %g\n", 1, 3), ...
-%!                  "endloop\nendfacet\n"], reshape (P(F',:)', 9, []));
-%!   fprintf (fid, "endsolid box\n");
-%!   fclose (fid);
-%!   S = solid.read (f);
-%!   assert_equal (volume (S), 120, -1e-12);
-%!   assert_equal (numfaces (S), 6);
-%! unwind_protect_cleanup
-%!   unlink (f);
-%! end_unwind_protect
-
 %!error<solid.read: invalid number of input arguments.> solid.read ()
 %!error<solid.read: FILE must be a non-empty character vector.> solid.read ('')
 %!error<solid.read: FILE must be a non-empty character vector.> solid.read (1)
-%!error<solid.read: FILE must end in .step, .stp or .stl.> ...
-%! solid.read ('part.obj')
-%!error<solid.read: FILE must end in .step, .stp or .stl.> solid.read ('part')
+%!error<solid.read: FILE must end in .step or .stp.> solid.read ('part.stl')
+%!error<solid.read: FILE must end in .step or .stp.> solid.read ('part')
 %!error<solid.read: cannot find file 'no_such_part_9f2c.step'.> ...
 %! solid.read ('no_such_part_9f2c.step')
-%!error<solid.read: FILE is not a readable STL file.>
-%! f = [tempname(), '.stl'];
-%! fid = fopen (f, 'w');
-%! fprintf (fid, "not an STL file\n");
-%! fclose (fid);
-%! unwind_protect
-%!   solid.read (f);
-%! unwind_protect_cleanup
-%!   unlink (f);
-%! end_unwind_protect
-%!error<solid.read: the mesh is not closed: 3 edges belong to one triangle only.>
-%! f = [tempname(), '.stl'];
-%! fid = fopen (f, 'w');
-%! fprintf (fid, "solid t\nfacet normal 0 0 1\nouter loop\nvertex 0 0 0\n");
-%! fprintf (fid, "vertex 1 0 0\nvertex 0 1 0\nendloop\nendfacet\nendsolid t\n");
-%! fclose (fid);
-%! unwind_protect
-%!   solid.read (f);
-%! unwind_protect_cleanup
-%!   unlink (f);
-%! end_unwind_protect
 %!error<solid.read: FILE is not a readable STEP file.>
 %! f = [tempname(), '.step'];
 %! fid = fopen (f, 'w');
