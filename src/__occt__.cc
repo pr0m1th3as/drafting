@@ -31,6 +31,18 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <BRepAdaptor_Curve.hxx>
 #include <BRepAdaptor_Surface.hxx>
 #include <BRepAlgoAPI_BooleanOperation.hxx>
+#include <BRepBuilderAPI_MakeShape.hxx>
+#include <TopTools_DataMapOfShapeInteger.hxx>
+#include <Quantity_Color.hxx>
+#include <XCAFDoc_ShapeTool.hxx>
+#include <XCAFDoc_DocumentTool.hxx>
+#include <XCAFDoc_ColorTool.hxx>
+#include <XCAFApp_Application.hxx>
+#include <TDocStd_Document.hxx>
+#include <TDF_LabelSequence.hxx>
+#include <TDataStd_Name.hxx>
+#include <STEPCAFControl_Writer.hxx>
+#include <STEPCAFControl_Reader.hxx>
 #include <BRepAlgoAPI_Common.hxx>
 #include <BRepAlgoAPI_Cut.hxx>
 #include <BRepAlgoAPI_Fuse.hxx>
@@ -1188,6 +1200,113 @@ facesout (const TopoDS_Shape& c, double scale)
   return out;
 }
 
+// The solids of S, in the order a map of them gives
+static TopTools_IndexedMapOfShape
+solidsof (const TopoDS_Shape& s)
+{
+  TopTools_IndexedMapOfShape m;
+  TopExp::MapShapes (s, TopAbs_SOLID, m);
+  return m;
+}
+
+// Where each solid of R came from, a row of indices from 1 into the solids
+// of SOURCES, those of each in turn in the order a map of them gives: the
+// first solid that any face of R's is, or was made by OP from, a face or an
+// edge of; 0 for a solid none of whose faces came from one
+static Matrix
+lineage (BRepBuilderAPI_MakeShape& op, const vector<TopoDS_Shape>& sources,
+         const TopoDS_Shape& r)
+{
+  TopTools_DataMapOfShapeInteger owner;
+  auto claim = [&owner] (const TopoDS_Shape& f, int k)
+  {
+    if (f.ShapeType () == TopAbs_FACE
+        && (! owner.IsBound (f) || owner (f) > k))
+    {
+      owner.UnBind (f);
+      owner.Bind (f, k);
+    }
+  };
+  int k = 0;
+  for (const TopoDS_Shape& src : sources)
+  {
+    const TopTools_IndexedMapOfShape solids = solidsof (src);
+    for (int i = 1; i <= solids.Extent (); i++)
+    {
+      k++;
+      for (TopExp_Explorer x (solids (i), TopAbs_FACE); x.More (); x.Next ())
+      {
+        claim (x.Current (), k);
+        for (const TopoDS_Shape& f : op.Modified (x.Current ()))
+        {
+          claim (f, k);
+        }
+        for (const TopoDS_Shape& f : op.Generated (x.Current ()))
+        {
+          claim (f, k);
+        }
+      }
+      for (TopExp_Explorer x (solids (i), TopAbs_EDGE); x.More (); x.Next ())
+      {
+        for (const TopoDS_Shape& f : op.Generated (x.Current ()))
+        {
+          claim (f, k);
+        }
+      }
+    }
+  }
+  const TopTools_IndexedMapOfShape rs = solidsof (r);
+  Matrix L (1, rs.Extent (), 0.0);
+  for (int i = 1; i <= rs.Extent (); i++)
+  {
+    for (TopExp_Explorer x (rs (i), TopAbs_FACE); x.More (); x.Next ())
+    {
+      if (owner.IsBound (x.Current ())
+          && (L(0,i-1) == 0 || owner (x.Current ()) < L(0,i-1)))
+      {
+        L(0,i-1) = owner (x.Current ());
+      }
+    }
+  }
+  return L;
+}
+
+// Where each solid of R came from, as lineage gives it, for an operation
+// that keeps no history: the first solid of S whose box meets the solid's
+static Matrix
+overlap (const TopoDS_Shape& s, const TopoDS_Shape& r)
+{
+  const TopTools_IndexedMapOfShape from = solidsof (s);
+  const TopTools_IndexedMapOfShape rs = solidsof (r);
+  Matrix L (1, rs.Extent (), 0.0);
+  for (int i = 1; i <= rs.Extent (); i++)
+  {
+    Bnd_Box b;
+    BRepBndLib::Add (rs (i), b);
+    for (int j = 1; j <= from.Extent () && L(0,i-1) == 0; j++)
+    {
+      Bnd_Box a;
+      BRepBndLib::Add (from (j), a);
+      if (! a.IsOut (b))
+      {
+        L(0,i-1) = j;
+      }
+    }
+  }
+  return L;
+}
+
+// A shape's bytes and where its solids came from, as the commands that
+// change solids return them
+static Cell
+traced (const TopoDS_Shape& r, const Matrix& L)
+{
+  Cell c (1, 2);
+  c(0) = todata (r);
+  c(1) = L;
+  return c;
+}
+
 // The result of a boolean operation, its coplanar faces and collinear edges
 // merged so that a union of two blocks reads as one block.
 static TopoDS_Shape
@@ -1359,19 +1478,69 @@ taperedside (const region& r, double h, double a, const string& caller)
                             holes, caller));
 }
 
+// A document of Open CASCADE's framework for names and colours (XDE), in
+// millimetres, closed when it goes out of scope
+struct xdedoc
+{
+  Handle (XCAFApp_Application) app = XCAFApp_Application::GetApplication ();
+  Handle (TDocStd_Document) doc;
+
+  xdedoc ()
+  {
+    app->NewDocument ("MDTV-XCAF", doc);
+    XCAFDoc_DocumentTool::SetLengthUnit (doc, 0.001);
+  }
+
+  ~xdedoc ()
+  {
+    app->Close (doc);
+  }
+
+  Handle (XCAFDoc_ShapeTool) shapes () const
+  {
+    return XCAFDoc_DocumentTool::ShapeTool (doc->Main ());
+  }
+
+  Handle (XCAFDoc_ColorTool) colours () const
+  {
+    return XCAFDoc_DocumentTool::ColorTool (doc->Main ());
+  }
+};
+
+// S written to FILE as STEP, one part named NAME, each of its solids, in the
+// order a map of them gives, in its row of COLOURS, red, green and blue from
+// 0 to 1, unless the row is NaN or COLOURS has none
 static void
 writestep (const TopoDS_Shape& s, const string& file, const string& name,
-           const string& caller)
+           const Matrix& colours, const string& caller)
 {
-  STEPControl_Writer w;
+  xdedoc d;
+  const TDF_Label top = d.shapes ()->AddShape (s, Standard_False);
+  TDataStd_Name::Set (top, TCollection_ExtendedString (name.c_str (), true));
+  TopTools_IndexedMapOfShape solids;
+  TopExp::MapShapes (s, TopAbs_SOLID, solids);
+  for (int i = 1; i <= solids.Extent () && i <= colours.rows (); i++)
+  {
+    if (std::isnan (colours(i-1,0)))
+    {
+      continue;
+    }
+    const Quantity_Color c (colours(i-1,0), colours(i-1,1), colours(i-1,2),
+                            Quantity_TOC_sRGB);
+    const TDF_Label l = solids (i).IsSame (s)
+                        ? top : d.shapes ()->AddSubShape (top, solids (i));
+    d.colours ()->SetColor (l, c, XCAFDoc_ColorGen);
+  }
+  STEPCAFControl_Writer w;
+  w.SetColorMode (Standard_True);
+  w.SetNameMode (Standard_True);
   Interface_Static::SetCVal ("write.step.unit", "MM");
-  Interface_Static::SetCVal ("write.step.product.name", name.c_str ());
-  if (w.Transfer (s, STEPControl_AsIs) != IFSelect_RetDone)
+  if (! w.Transfer (d.doc, STEPControl_AsIs))
   {
     error ("%s: Open CASCADE could not translate the shape to STEP.",
            caller.c_str ());
   }
-  APIHeaderSection_MakeHeader header (w.Model ());
+  APIHeaderSection_MakeHeader header (w.ChangeWriter ().Model ());
   header.SetName (new TCollection_HAsciiString (name.c_str ()));
   header.SetAuthorValue (1, new TCollection_HAsciiString (""));
   header.SetOrganizationValue (1, new TCollection_HAsciiString (""));
@@ -1386,9 +1555,11 @@ writestep (const TopoDS_Shape& s, const string& file, const string& name,
 
 // The triangles of a mesh of S that strays no further than TOL from its
 // surface, nor spans more than ANGLE radians of it: a cell of the points,
-// N-by-3, and the triangles, K-by-3 indices into them from 1, each turned
-// outwards.  Every face keeps points of its own; those along an edge that
-// two faces share are equal, and are welded by the caller.
+// N-by-3, the triangles, K-by-3 indices into them from 1, each turned
+// outwards, and the solid each lies on, a K-by-1 index from 1 into a map of
+// them, 0 for a face of no solid.  Every face keeps points of its own; those
+// along an edge that two faces share are equal, and are welded by the
+// caller.
 static Cell
 tessellation (const TopoDS_Shape& s, double tol, double angle,
               const string& caller)
@@ -1400,11 +1571,31 @@ tessellation (const TopoDS_Shape& s, double tol, double angle,
     error ("%s: Open CASCADE could not triangulate the shape.",
            caller.c_str ());
   }
+  // Each face with the solid it bounds, the faces of no solid last
+  const TopTools_IndexedMapOfShape solids = solidsof (s);
+  vector<std::pair<TopoDS_Shape, int>> faces;
+  TopTools_IndexedMapOfShape seen;
+  for (int k = 1; k <= solids.Extent (); k++)
+  {
+    for (TopExp_Explorer x (solids (k), TopAbs_FACE); x.More (); x.Next ())
+    {
+      faces.push_back ({x.Current (), k});
+      seen.Add (x.Current ());
+    }
+  }
+  for (TopExp_Explorer x (s, TopAbs_FACE); x.More (); x.Next ())
+  {
+    if (! seen.Contains (x.Current ()))
+    {
+      faces.push_back ({x.Current (), 0});
+    }
+  }
   vector<gp_Pnt> p;
   vector<int> t;
-  for (TopExp_Explorer ex (s, TopAbs_FACE); ex.More (); ex.Next ())
+  vector<int> on;
+  for (const auto& fk : faces)
   {
-    const TopoDS_Face& f = TopoDS::Face (ex.Current ());
+    const TopoDS_Face& f = TopoDS::Face (fk.first);
     TopLoc_Location loc;
     Handle (Poly_Triangulation) T = BRep_Tool::Triangulation (f, loc);
     if (T.IsNull ())
@@ -1428,6 +1619,7 @@ tessellation (const TopoDS_Shape& s, double tol, double angle,
         std::swap (b, c);
       }
       t.insert (t.end (), {base + a, base + b, base + c});
+      on.push_back (fk.second);
     }
   }
   Matrix P (p.size (), 3);
@@ -1442,9 +1634,15 @@ tessellation (const TopoDS_Shape& s, double tol, double angle,
   {
     F(i / 3, i % 3) = t[i];
   }
-  Cell c (1, 2);
+  Matrix K (on.size (), 1);
+  for (size_t i = 0; i < on.size (); i++)
+  {
+    K(i) = on[i];
+  }
+  Cell c (1, 3);
   c(0) = P;
   c(1) = F;
+  c(2) = K;
   return c;
 }
 
@@ -1488,21 +1686,97 @@ surfacepoints (const TopoDS_Shape& s, double tol, double angle,
   return P;
 }
 
-static TopoDS_Shape
+// The colour the document D gives the solid S, its own or, failing that,
+// that of its first face with one; false when it has none
+static bool
+colourof (const xdedoc& d, const TopoDS_Shape& s, Quantity_Color& c)
+{
+  const Handle (XCAFDoc_ColorTool) ct = d.colours ();
+  for (const XCAFDoc_ColorType t : {XCAFDoc_ColorGen, XCAFDoc_ColorSurf})
+  {
+    if (ct->GetColor (s, t, c))
+    {
+      return true;
+    }
+  }
+  for (TopExp_Explorer x (s, TopAbs_FACE); x.More (); x.Next ())
+  {
+    for (const XCAFDoc_ColorType t : {XCAFDoc_ColorGen, XCAFDoc_ColorSurf})
+    {
+      if (ct->GetColor (x.Current (), t, c))
+      {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+// The shapes of the STEP file FILE as one shape, in millimetres, and the
+// colours of its solids, in the order a map of them gives: a cell of the
+// shape's bytes and an N-by-3 matrix of red, green and blue from 0 to 1, a
+// row of NaN for a solid without one, or empty when none has one
+static Cell
 readstep (const string& file, const string& caller)
 {
-  STEPControl_Reader r;
+  xdedoc d;
+  STEPCAFControl_Reader r;
+  r.SetColorMode (Standard_True);
+  r.SetNameMode (Standard_True);
   Interface_Static::SetCVal ("xstep.cascade.unit", "MM");
   if (r.ReadFile (file.c_str ()) != IFSelect_RetDone)
   {
     error ("%s: cannot read '%s' as a STEP file.", caller.c_str (),
            file.c_str ());
   }
-  if (r.TransferRoots () == 0)
+  if (! r.Transfer (d.doc))
   {
     error ("%s: '%s' holds no shape.", caller.c_str (), file.c_str ());
   }
-  return r.OneShape ();
+  TDF_LabelSequence roots;
+  d.shapes ()->GetFreeShapes (roots);
+  TopoDS_Shape s;
+  if (roots.Length () == 1)
+  {
+    s = XCAFDoc_ShapeTool::GetShape (roots (1));
+  }
+  else
+  {
+    TopoDS_Compound c;
+    BRep_Builder b;
+    b.MakeCompound (c);
+    for (int i = 1; i <= roots.Length (); i++)
+    {
+      b.Add (c, XCAFDoc_ShapeTool::GetShape (roots (i)));
+    }
+    s = c;
+  }
+  if (count (s, TopAbs_FACE) == 0)
+  {
+    error ("%s: '%s' holds no shape.", caller.c_str (), file.c_str ());
+  }
+  TopTools_IndexedMapOfShape solids;
+  TopExp::MapShapes (s, TopAbs_SOLID, solids);
+  Matrix C (solids.Extent (), 3, octave_NaN);
+  bool any = false;
+  for (int i = 1; i <= solids.Extent (); i++)
+  {
+    Quantity_Color c;
+    if (colourof (d, solids (i), c))
+    {
+      double rgb[3];
+      c.Values (rgb[0], rgb[1], rgb[2], Quantity_TOC_sRGB);
+      for (int k = 0; k < 3; k++)
+      {
+        C(i-1,k) = rgb[k];
+      }
+      any = true;
+    }
+  }
+  Cell out (1, 2);
+  out(0) = todata (s);
+  out(1) = any ? C : Matrix ();
+  return out;
 }
 
 DEFUN_DLD (__occt__, args, ,
@@ -1751,6 +2025,7 @@ function directly. \n\
         = picked (s, TopAbs_EDGE, args(3).array_value ());
       const double size = args(4).array_value ()(0);
       TopoDS_Shape r;
+      Matrix L;
       if (cmd == "fillet")
       {
         BRepFilletAPI_MakeFillet op (s);
@@ -1765,6 +2040,7 @@ function directly. \n\
                  caller.c_str ());
         }
         r = op.Shape ();
+        L = lineage (op, {s}, r);
       }
       else
       {
@@ -1812,8 +2088,9 @@ function directly. \n\
                  caller.c_str ());
         }
         r = op.Shape ();
+        L = lineage (op, {s}, r);
       }
-      out = todata (r);
+      out = traced (r, L);
     }
     else if (cmd == "shell")
     {
@@ -1888,7 +2165,7 @@ function directly. \n\
         error ("%s: Open CASCADE could not hollow the shape.",
                caller.c_str ());
       }
-      out = todata (r);
+      out = traced (r, overlap (s, r));
     }
 
     // Booleans.  A union and a difference take every shape after the first
@@ -1898,40 +2175,63 @@ function directly. \n\
     else if (cmd == "fuse" || cmd == "cut")
     {
       TopTools_ListOfShape objects, tools;
-      objects.Append (toshape (args(2), caller));
-      for (int i = 3; i < args.length (); i++)
+      vector<TopoDS_Shape> sources;
+      for (int i = 2; i < args.length (); i++)
       {
-        tools.Append (toshape (args(i), caller));
+        sources.push_back (toshape (args(i), caller));
+        (i == 2 ? objects : tools).Append (sources.back ());
       }
       if (cmd == "fuse")
       {
         BRepAlgoAPI_Fuse op;
         op.SetArguments (objects);
         op.SetTools (tools);
-        out = todata (boolean (op, caller, "union"));
+        const TopoDS_Shape r = boolean (op, caller, "union");
+        out = traced (r, lineage (op, sources, r));
       }
       else
       {
         BRepAlgoAPI_Cut op;
         op.SetArguments (objects);
         op.SetTools (tools);
-        out = todata (boolean (op, caller, "difference"));
+        const TopoDS_Shape r = boolean (op, caller, "difference");
+        out = traced (r, lineage (op, sources, r));
       }
     }
     else if (cmd == "common")
     {
+      // Pairwise, each step's lineage carried back to the operands' solids,
+      // numbered all in turn: SEEN of them before the shape intersected next
       TopoDS_Shape s = toshape (args(2), caller);
+      Matrix L (1, count (s, TopAbs_SOLID));
+      for (int j = 0; j < L.numel (); j++)
+      {
+        L(j) = j + 1;
+      }
+      int seen = L.numel ();
       for (int i = 3; i < args.length () && count (s, TopAbs_FACE) > 0; i++)
       {
+        const TopoDS_Shape t = toshape (args(i), caller);
         TopTools_ListOfShape objects, tools;
         objects.Append (s);
-        tools.Append (toshape (args(i), caller));
+        tools.Append (t);
         BRepAlgoAPI_Common op;
         op.SetArguments (objects);
         op.SetTools (tools);
-        s = boolean (op, caller, "intersection");
+        const TopoDS_Shape r = boolean (op, caller, "intersection");
+        const Matrix step = lineage (op, {s, t}, r);
+        const int ns = count (s, TopAbs_SOLID);
+        Matrix next (1, step.numel (), 0.0);
+        for (int j = 0; j < step.numel (); j++)
+        {
+          const int k = static_cast<int> (step(j));
+          next(j) = (k == 0) ? 0 : (k <= ns) ? L(k - 1) : seen + k - ns;
+        }
+        seen += count (t, TopAbs_SOLID);
+        L = next;
+        s = r;
       }
-      out = todata (s);
+      out = traced (s, L);
     }
 
     // Transformations
@@ -2002,7 +2302,12 @@ function directly. \n\
           bb.Add (c, it.Value ());
         }
       }
-      out = todata (c);
+      Matrix L (1, count (c, TopAbs_SOLID));
+      for (int j = 0; j < L.numel (); j++)
+      {
+        L(j) = j + 1;
+      }
+      out = traced (c, L);
     }
 
     // The cut through a shape by the plane of a frame, rows origin, x axis,
@@ -2325,7 +2630,7 @@ function directly. \n\
     else if (cmd == "writestep")
     {
       writestep (toshape (args(2), caller), args(3).string_value (),
-                 args(4).string_value (), caller);
+                 args(4).string_value (), args(5).matrix_value (), caller);
     }
     else if (cmd == "tessellate")
     {
@@ -2339,7 +2644,7 @@ function directly. \n\
     }
     else if (cmd == "readstep")
     {
-      out = todata (readstep (args(2).string_value (), caller));
+      out = readstep (args(2).string_value (), caller);
     }
     else
     {

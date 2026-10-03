@@ -29,13 +29,14 @@
 ## STEP (ISO 10303-21, application protocol 214), in millimetres.  The exact
 ## geometry is kept, so this is the file to send to a CAD program or to
 ## another manufacturer.  The part is named after the base name of
-## @var{FILE}.
+## @var{FILE}, and each solid carries its @code{solid.Shape.Colour}.
 ##
 ## @item @file{.stl}, @file{.obj}, @file{.ply}
 ## A mesh of triangles in millimetres, the mesh @code{solid.Shape.tessellate}
 ## makes, written by @code{polymesh.Mesh.write}: binary STL, which is what a
 ## slicer prints from, OBJ, or binary PLY.  The facets approximate every
-## curved surface; their vertices lie on it.
+## curved surface; their vertices lie on it.  OBJ and PLY carry the solids'
+## colours on their triangles; STL has none.
 ## @end table
 ##
 ## @code{solid.write (@dots{}, @qcode{'Tolerance'}, @var{TOL})} sets, for a
@@ -99,7 +100,7 @@ function write (FILE, S, varargin)
   endif
 
   if (isstep)
-    __occt__ ('writestep', 'solid.write', S.Data, FILE, base);
+    __occt__ ('writestep', 'solid.write', S.Data, FILE, base, S.Colour);
   else
     write (tessellate (S, opt.Tolerance), FILE);
   endif
@@ -125,6 +126,17 @@ endfunction
 %!   assert_equal (isempty (strfind (txt, 'CYLINDRICAL_SURFACE')), false);
 %!   assert_equal (isempty (strfind (txt, "'GNU Octave drafting package'")), ...
 %!                 false);
+%! unwind_protect_cleanup
+%!   unlink (f);
+%! end_unwind_protect
+
+%!testif ; exist ('__occt__') == 3  # STEP carries a solid's colour
+%! f = [tempname(), '.step'];
+%! S = solid.box (1, 2, 3);
+%! S.Colour = [0.2, 0.4, 0.6];
+%! unwind_protect
+%!   solid.write (f, S);
+%!   assert_equal (isempty (strfind (fileread (f), 'COLOUR_RGB')), false);
 %! unwind_protect_cleanup
 %!   unlink (f);
 %! end_unwind_protect
@@ -203,6 +215,18 @@ endfunction
 %!   M = polymesh.read (f);
 %!   assert_equal (isclosed (M), true);
 %!   assert_equal (volume (M), 6000, -1e-12);
+%! unwind_protect_cleanup
+%!   unlink (f);
+%! end_unwind_protect
+
+%!testif ; exist ('__occt__') == 3  # PLY: the triangles in the solid's colour
+%! f = [tempname(), '.ply'];
+%! S = solid.box (10, 20, 30);
+%! S.Colour = [0.2, 0.4, 0.6];
+%! unwind_protect
+%!   solid.write (f, S);
+%!   M = polymesh.read (f);
+%!   assert_equal (M.FaceColour, repmat ([0.2, 0.4, 0.6], 12, 1), 1e-9);
 %! unwind_protect_cleanup
 %!   unlink (f);
 %! end_unwind_protect

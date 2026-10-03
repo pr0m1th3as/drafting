@@ -23,7 +23,8 @@ classdef Viewer < handle
   ## coordinate systems can be picked.
   ##
   ## Assigning a @code{solid.Shape} to the @code{Shape} of a viewer opens its
-  ## window, or redraws it in place, keeping the camera where it was.  Nothing
+  ## window, or redraws it in place, keeping the camera where it was; each
+  ## solid is drawn in its colour, grey where it has none.  Nothing
   ## else redraws it.  A @code{polymesh.Mesh} is shown the same way, shaded
   ## facet by facet, however many triangles it has, in its faces' colours
   ## where it has them, else in its vertices', blended across each facet,
@@ -555,7 +556,17 @@ classdef Viewer < handle
         send (this, sprintf ("mesh %d %d %d", numvertices (S), ...
                              numfaces (S), CK), data);
       else
-        send (this, sprintf ("shape %d", numel (st.data)), st.data);
+        ## Each coloured solid after the shape: its index and its colour
+        C = [];
+        k = zeros (1, 0);
+        if (! ismesh && ! isempty (S.Colour))
+          C = S.Colour;
+          k = find (! isnan (C(:,1)))';
+        endif
+        rec = [reshape(typecast (uint32 (k), 'uint8'), 4, []);
+               uint8(255 * C(k,:)')];
+        send (this, sprintf ("shape %d %d", numel (st.data), numel (k)), ...
+              [st.data(:); rec(:)]);
       endif
 
     endfunction
@@ -1322,6 +1333,24 @@ endfunction
 %!   assert_equal (F, [3, 0, 0, 1; 4, 0, 0, 1; 7, 1, 0, 0], 1e-12);
 %!   V.Shape = solid.box (10, 20, 30);
 %!   assert_equal (volume (V.Shape), 6000, 1e-9);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
+%! ## Each solid is shown in its colour, one without a colour in grey
+%! B = solid.box (10, 10, 10);
+%! U = union (B, translate (B, [20, 0, 0]));
+%! U.Colour = [1, 0, 0; NaN, NaN, NaN];
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Shape = U;
+%!   I = double (V.__dump__ ());
+%!   p = round ([V.__project__([5, 5, 10]); V.__project__([25, 5, 10])]);
+%!   c = [squeeze(I(p(1,2), p(1,1), :))'; squeeze(I(p(2,2), p(2,1), :))'];
+%!   red = c(:,1) > 100 & c(:,2) < 40 & c(:,3) < 40;
+%!   grey = max (c, [], 2) - min (c, [], 2) < 30;
+%!   assert_equal (sort ([red, grey], 1), [false, false; true, true]);
 %! unwind_protect_cleanup
 %!   close (V);
 %! end_unwind_protect

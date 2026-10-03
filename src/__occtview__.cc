@@ -22,9 +22,11 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 // blocks Octave.  It reads commands from stdin and writes replies to stdout,
 // one line each:
 //
-//   shape N        followed by N bytes of a shape in Open CASCADE's binary
-//                  format; replaces the shape shown, keeping the camera, or
-//                  clears the view when N is zero
+//   shape N K      followed by N bytes of a shape in Open CASCADE's binary
+//                  format and K colours of its solids, each a uint32 index
+//                  from 1 into a map of them and three uint8; replaces the
+//                  shape shown, keeping the camera, or clears the view when N
+//                  is zero
 //   mesh NV NF CK  followed by NV vertices, three doubles each, NF
 //                  triangles, three 0-based uint32 indices each, and the
 //                  colours CK names, a sum of 1 for the vertices' and 2 for
@@ -82,6 +84,7 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <set>
 #include <sstream>
 #include <string>
@@ -91,6 +94,7 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <unistd.h>
 
 #include <AIS_InteractiveContext.hxx>
+#include <AIS_ColoredShape.hxx>
 #include <AIS_Point.hxx>
 #include <AIS_Shape.hxx>
 #include <AIS_TextLabel.hxx>
@@ -200,11 +204,11 @@ private:
 // untrimmed surface begins, not where the face lies: a bore cut by a cylinder
 // longer than the part is then picked in the air beside the part and missed
 // where it is.  Edges and vertices are picked as Open CASCADE does.
-class pickshape : public AIS_Shape
+class pickshape : public AIS_ColoredShape
 {
 public:
 
-  pickshape (const TopoDS_Shape& s) : AIS_Shape (s) { }
+  pickshape (const TopoDS_Shape& s) : AIS_ColoredShape (s) { }
 
   // A triangle mesh draws its own shading: each node of its triangulation
   // lit by its normal and, unless COLOURS is empty, painted its colour, and
@@ -219,7 +223,7 @@ public:
   {
     if (! mesh || mode != AIS_Shaded)
     {
-      AIS_Shape::Compute (mgr, prs, mode);
+      AIS_ColoredShape::Compute (mgr, prs, mode);
       return;
     }
     TopLoc_Location loc;
@@ -279,7 +283,7 @@ public:
   {
     if (mode != AIS_Shape::SelectionMode (TopAbs_FACE))
     {
-      AIS_Shape::ComputeSelection (sel, mode);
+      AIS_ColoredShape::ComputeSelection (sel, mode);
       return;
     }
     for (TopExp_Explorer x (myshape, TopAbs_FACE); x.More (); x.Next ())
@@ -408,11 +412,27 @@ public:
     in >> cmd;
     if (cmd == "shape")
     {
+      size_t n = 0, k = 0;
+      in >> n >> k;
       TopoDS_Shape s;
-      if (! data.empty ())
+      if (n > 0)
       {
-        istringstream is (data);
+        istringstream is (data.substr (0, n));
         BinTools::Read (s, is);
+      }
+      m_solidcolours.clear ();
+      for (size_t i = 0; i < k; i++)
+      {
+        const char *q = data.data () + n + 7 * i;
+        uint32_t j;
+        std::memcpy (&j, q, 4);
+        const unsigned char *rgb = reinterpret_cast<const unsigned char *>
+                                     (q + 4);
+        m_solidcolours.push_back ({static_cast<int> (j),
+                                   Quantity_Color (rgb[0] / 255.0,
+                                                   rgb[1] / 255.0,
+                                                   rgb[2] / 255.0,
+                                                   Quantity_TOC_sRGB)});
       }
       setshape (s, false);
     }
@@ -1120,6 +1140,18 @@ private:
     m_shape = ps;
     m_shape->SetColor (Quantity_Color (0.72, 0.74, 0.78, Quantity_TOC_sRGB));
     m_shape->SetMaterial (Graphic3d_NameOfMaterial_Plastified);
+    if (! mesh && ! m_solidcolours.empty ())
+    {
+      TopTools_IndexedMapOfShape solids;
+      TopExp::MapShapes (s, TopAbs_SOLID, solids);
+      for (const auto& c : m_solidcolours)
+      {
+        if (c.first >= 1 && c.first <= solids.Extent ())
+        {
+          ps->SetCustomColor (solids (c.first), c.second);
+        }
+      }
+    }
     // Displayed selectable, which no later activation can make it if it is
     // not, then left with nothing active until a pick asks for something
     m_context->Display (m_shape, AIS_Shaded,
@@ -1278,6 +1310,7 @@ private:
     gp_Dir n;
   };
   vector<meshpoint> m_points;
+  vector<std::pair<int, Quantity_Color>> m_solidcolours;
   vector<Quantity_Color> m_vcolours;
   vector<Quantity_Color> m_fcolours;
   Handle (Graphic3d_ArrayOfSegments) m_edgelines;
@@ -1341,7 +1374,9 @@ main (int argc, char **argv)
       size_t need = 0;
       if (line.compare (0, 6, "shape ") == 0)
       {
-        need = strtoul (line.c_str () + 6, nullptr, 10);
+        char *q;
+        need = strtoul (line.c_str () + 6, &q, 10);
+        need += 7 * strtoul (q, nullptr, 10);
       }
       else if (line.compare (0, 5, "mesh ") == 0)
       {

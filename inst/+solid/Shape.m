@@ -84,6 +84,25 @@ classdef Shape
 
   endproperties
 
+  properties
+
+    ## -*- texinfo -*-
+    ## @deftp {solid.Shape} {property} Colour
+    ##
+    ## Colour of each solid
+    ##
+    ## An @math{N}-by-3 matrix of red, green and blue from 0 to 1, a row for
+    ## each of the shape's @math{N} solids in the order
+    ## @code{solid.Shape.numsolids} counts them, a row of @code{NaN} for a
+    ## solid without a colour, or empty when none has one.  Assigning a single
+    ## row colours every solid.  The viewer shows it, and a STEP file carries
+    ## it out and in.  A transform keeps it.
+    ##
+    ## @end deftp
+    Colour = [];
+
+  endproperties
+
   methods (Hidden)
 
     function disp (this)
@@ -93,8 +112,12 @@ classdef Shape
       elseif (! isempty (solid.__checkocct__ ()))
         printf ("  solid.Shape: Open CASCADE not available\n");
       else
-        printf ("  solid.Shape: %d solid(s), %d faces, %d edges\n", ...
-                numsolids (this), numfaces (this), numedges (this));
+        c = '';
+        if (! isempty (this.Colour))
+          c = ", coloured";
+        endif
+        printf ("  solid.Shape: %d solid(s), %d faces, %d edges%s\n", ...
+                numsolids (this), numfaces (this), numedges (this), c);
       endif
 
     endfunction
@@ -169,7 +192,9 @@ classdef Shape
         C = S{1};
       else
         data = cellfun (@(x) x.Data, S, 'UniformOutput', false);
-        C = solid.Shape (occt ('solid.Shape.union', 'fuse', data{:}));
+        r = occt ('solid.Shape.union', 'fuse', data{:});
+        C = solid.Shape (r{1});
+        C.Colour = inherit (r{2}, S{:});
       endif
 
     endfunction
@@ -204,8 +229,10 @@ classdef Shape
       tools = tools(! cellfun (@isempty, tools));
       if (! isempty (C) && ! isempty (tools))
         data = cellfun (@(x) x.Data, tools, 'UniformOutput', false);
-        C = solid.Shape (occt ('solid.Shape.subtract', 'cut', C.Data, ...
-                               data{:}));
+        r = occt ('solid.Shape.subtract', 'cut', C.Data, data{:});
+        A = C;
+        C = solid.Shape (r{1});
+        C.Colour = inherit (r{2}, A, tools{:});
       endif
 
     endfunction
@@ -236,7 +263,9 @@ classdef Shape
         C = varargin{1};
       else
         data = cellfun (@(x) x.Data, varargin, 'UniformOutput', false);
-        C = solid.Shape (occt ('solid.Shape.intersect', 'common', data{:}));
+        r = occt ('solid.Shape.intersect', 'common', data{:});
+        C = solid.Shape (r{1});
+        C.Colour = inherit (r{2}, varargin{:});
       endif
 
     endfunction
@@ -252,8 +281,10 @@ classdef Shape
     ## corners lie on it and which stray from it by at most @var{TOL}
     ## millimetres, 0.01 by default, nor span more than 20 degrees of a
     ## curved face.  The triangles meet edge to edge, sharing their corners,
-    ## and are turned outwards, so the mesh of a solid is closed.  The empty
-    ## shape gives the empty mesh.
+    ## and are turned outwards, so the mesh of a solid is closed.  A coloured
+    ## shape gives each triangle the colour of its solid as the mesh's
+    ## @code{FaceColour}, and the grey @code{[0.72, 0.74, 0.78]} where its
+    ## solid has none.  The empty shape gives the empty mesh.
     ##
     ## This is the mesh @code{solid.write} writes to STL, OBJ and PLY, and it
     ## can be shown, cut, measured, coloured and written as any other.
@@ -286,8 +317,16 @@ classdef Shape
       ## corners become one is dropped
       [V, ~, j] = unique (c{1}, 'rows', 'stable');
       F = reshape (j(c{2}), size (c{2}));
-      F = F(F(:,1) != F(:,2) & F(:,2) != F(:,3) & F(:,3) != F(:,1),:);
-      M = polymesh.Mesh (V, F);
+      keep = F(:,1) != F(:,2) & F(:,2) != F(:,3) & F(:,3) != F(:,1);
+      M = polymesh.Mesh (V, F(keep,:));
+
+      ## Each triangle in the colour of its solid, grey where it has none
+      if (! isempty (this.Colour))
+        C = [NaN, NaN, NaN; this.Colour](c{3}(keep) + 1,:);
+        C(isnan (C(:,1)),:) = repmat ([0.72, 0.74, 0.78], ...
+                                      nnz (isnan (C(:,1))), 1);
+        M.FaceColour = C;
+      endif
 
     endfunction
 
@@ -885,8 +924,11 @@ classdef Shape
         error ("solid.Shape.fillet: %s", errmsg);
       endif
 
-      this.Data = occt ('solid.Shape.fillet', 'fillet', this.Data, ...
-                        unique (double (E)), double (R));
+      r = occt ('solid.Shape.fillet', 'fillet', this.Data, ...
+                unique (double (E)), double (R));
+      A = this;
+      this.Data = r{1};
+      this.Colour = inherit (r{2}, A);
 
     endfunction
 
@@ -984,8 +1026,11 @@ classdef Shape
       if (isempty (A))
         A = 0;
       endif
-      this.Data = occt ('solid.Shape.chamfer', 'chamfer', this.Data, ...
-                        unique (double (E)), double (D), F0, double (A));
+      r = occt ('solid.Shape.chamfer', 'chamfer', this.Data, ...
+                unique (double (E)), double (D), F0, double (A));
+      A = this;
+      this.Data = r{1};
+      this.Colour = inherit (r{2}, A);
 
     endfunction
 
@@ -1099,9 +1144,11 @@ classdef Shape
         error ("solid.Shape.shell: %s", errmsg);
       endif
 
-      this.Data = occt ('solid.Shape.shell', 'shell', this.Data, ...
-                        unique (double (F)), double (T), ...
-                        logical (opt.Outward), TF, TT);
+      r = occt ('solid.Shape.shell', 'shell', this.Data, ...
+                unique (double (F)), double (T), logical (opt.Outward), TF, TT);
+      A = this;
+      this.Data = r{1};
+      this.Colour = inherit (r{2}, A);
 
     endfunction
 
@@ -1768,6 +1815,33 @@ classdef Shape
 
   endmethods
 
+
+  methods
+
+    function this = set.Colour (this, C)
+
+      if (isempty (C))
+        this.Colour = [];
+        return;
+      endif
+      n = numsolids (this);
+      if (! isfloat (C) || ! isreal (C) || ! ismatrix (C) || columns (C) != 3 ||
+          ! any (rows (C) == [1, n]) || n == 0 ||
+          ! all (all (isnan (C), 2) | all (C >= 0 & C <= 1, 2)))
+        error (strcat ("solid.Shape: Colour must be empty or a 1-by-3 or", ...
+                       " N-by-3 matrix of values from 0 to 1, N the number", ...
+                       " of solids, a row of NaN for no colour."));
+      endif
+      C = repmat (double (C), n / rows (C), 1);
+      if (all (isnan (C(:))))
+        C = [];
+      endif
+      this.Colour = C;
+
+    endfunction
+
+  endmethods
+
 endclassdef
 
 ## Run an Open CASCADE operation on behalf of CALLER, which names any error
@@ -1824,10 +1898,39 @@ function C = copies (S, D, A, K, P, caller)
   apart(1:n+1:end) = true;
   if (n == 1)
     C = solid.Shape (data{1});
+    C.Colour = S.Colour;
+    return;
   elseif (all (apart(:)))
-    C = solid.Shape (occt (caller, 'compound', data{:}));
+    r = occt (caller, 'compound', data{:});
   else
-    C = solid.Shape (occt (caller, 'fuse', data{:}));
+    r = occt (caller, 'fuse', data{:});
+  endif
+  C = solid.Shape (r{1});
+  C.Colour = inherit (r{2}, repmat ({S}, 1, n){:});
+
+endfunction
+
+## The colours of a result's solids, from the solids they came from: L a row
+## of indices from 1 into the solids of the shapes SRC, those of each in
+## turn, 0 for none
+function C = inherit (L, varargin)
+
+  C = [];
+  if (all (cellfun (@(s) isempty (s.Colour), varargin)))
+    return;
+  endif
+  P = cellfun (@colours, varargin, 'UniformOutput', false);
+  P = [NaN, NaN, NaN; vertcat(P{:})];
+  C = P(L + 1,:);
+
+endfunction
+
+## The colour of each solid of S, a row of NaN where it has none
+function C = colours (S)
+
+  C = S.Colour;
+  if (isempty (C))
+    C = NaN (numsolids (S), 3);
   endif
 
 endfunction
@@ -2452,8 +2555,92 @@ endfunction
 %! assert_equal (dot (V(F(:,1),:), cross (V(F(:,2),:), V(F(:,3),:), 2), ...
 %!                    2)' * ones (rows (F), 1) > 0, true);
 
+%!testif ; exist ('__occt__') == 3  # tessellate: each triangle its colour
+%! B = solid.box (1, 1, 1);
+%! U = union (B, translate (B, [5, 0, 0]));
+%! U.Colour = [1, 0, 0; NaN, NaN, NaN];
+%! M = tessellate (U);
+%! assert_equal (sortrows (unique (M.FaceColour, 'rows')), ...
+%!               [0.72, 0.74, 0.78; 1, 0, 0]);
+%! assert_equal (nnz (M.FaceColour(:,1) == 1), 12);
+
 %!test  # tessellate: the empty shape gives the empty mesh
 %! assert_equal (isempty (tessellate (solid.Shape ())), true);
+
+%!testif ; exist ('__occt__') == 3  # Colour: one row colours every solid
+%! B = solid.box (1, 1, 1);
+%! U = union (B, translate (B, [5, 0, 0]));
+%! U.Colour = [1, 0.5, 0];
+%! assert_equal (U.Colour, [1, 0.5, 0; 1, 0.5, 0]);
+
+%!testif ; exist ('__occt__') == 3  # Colour: a NaN row leaves a solid bare
+%! B = solid.box (1, 1, 1);
+%! U = union (B, translate (B, [5, 0, 0]));
+%! U.Colour = [NaN, NaN, NaN; 0, 0, 1];
+%! assert_equal (U.Colour, [NaN, NaN, NaN; 0, 0, 1]);
+%! U.Colour = [NaN, NaN, NaN];
+%! assert_equal (U.Colour, []);
+
+%!testif ; exist ('__occt__') == 3  # Colour: overlapping, the first operand's
+%! A = solid.box (10, 10, 10);
+%! A.Colour = [1, 0, 0];
+%! B = translate (solid.box (10, 10, 10), [5, 5, 5]);
+%! B.Colour = [0, 0, 1];
+%! assert_equal (union (A, B).Colour, [1, 0, 0]);
+%! assert_equal (union (B, A).Colour, [0, 0, 1]);
+
+%!testif ; exist ('__occt__') == 3  # Colour: parts apart keep their own
+%! A = solid.box (10, 10, 10);
+%! A.Colour = [1, 0, 0];
+%! B = translate (solid.box (10, 10, 10), [30, 0, 0]);
+%! B.Colour = [0, 0, 1];
+%! assert_equal (sortrows (union (A, B).Colour), [0, 0, 1; 1, 0, 0]);
+
+%!testif ; exist ('__occt__') == 3  # Colour: an uncoloured first operand
+%! A = solid.box (10, 10, 10);
+%! B = translate (solid.box (10, 10, 10), [5, 5, 5]);
+%! B.Colour = [0, 0, 1];
+%! assert_equal (union (A, B).Colour, []);
+
+%!testif ; exist ('__occt__') == 3  # Colour: subtract keeps the part's
+%! A = solid.box (10, 10, 10);
+%! A.Colour = [1, 0, 0];
+%! B = translate (solid.box (10, 10, 10), [5, 5, 5]);
+%! B.Colour = [0, 0, 1];
+%! assert_equal (subtract (A, B).Colour, [1, 0, 0]);
+
+%!testif ; exist ('__occt__') == 3  # Colour: intersect, the first operand's
+%! A = solid.box (10, 10, 10);
+%! A.Colour = [1, 0, 0];
+%! B = translate (solid.box (10, 10, 10), [5, 5, 5]);
+%! B.Colour = [0, 0, 1];
+%! assert_equal (intersect (B, A).Colour, [0, 0, 1]);
+
+%!testif ; exist ('__occt__') == 3  # Colour: a fillet keeps it
+%! A = solid.box (10, 10, 10);
+%! A.Colour = [0, 1, 0];
+%! F = fillet (A, edges (A, 'Direction', [0, 0, 1]), 1);
+%! assert_equal (F.Colour, [0, 1, 0]);
+
+%!testif ; exist ('__occt__') == 3  # Colour: a shell keeps it
+%! A = solid.box (10, 10, 10);
+%! A.Colour = [0, 1, 0];
+%! H = shell (A, faces (A, 'Normal', [0, 0, 1]), 1);
+%! assert_equal (H.Colour, [0, 1, 0]);
+
+%!testif ; exist ('__occt__') == 3  # Colour: copies keep it
+%! A = solid.box (10, 10, 10);
+%! A.Colour = [0, 1, 0];
+%! assert_equal (rectarray (A, [3, 1, 1], [20, 0, 0]).Colour, ...
+%!               repmat ([0, 1, 0], 3, 1));
+
+%!testif ; exist ('__occt__') == 3  # Colour: transforms keep it
+%! S = solid.box (1, 2, 3);
+%! S.Colour = [0.2, 0.4, 0.6];
+%! assert_equal (translate (S, [1, 2, 3]).Colour, [0.2, 0.4, 0.6]);
+%! assert_equal (rotate (S, 30, [0, 0, 1]).Colour, [0.2, 0.4, 0.6]);
+%! assert_equal (mirror (S, [1, 0, 0]).Colour, [0.2, 0.4, 0.6]);
+%! assert_equal (scale (S, 2).Colour, [0.2, 0.4, 0.6]);
 
 %!error<solid.Shape.pocket: Taper cannot be applied to a region with splines.> ...
 %! R = geom.Region (geom.Spline ([20, 10; 50, 8; 35, 32], 'Closed', true));
@@ -2866,3 +3053,15 @@ endfunction
 %! polararray (solid.Shape (), 3, 90, 'Turn', true)
 %!error<solid.Shape.tessellate: TOL must be a positive and finite real scalar.> ...
 %! tessellate (solid.Shape (), 0)
+%!error<solid.Shape: Colour must be empty or a 1-by-3 or N-by-3 matrix of values from 0 to 1, N the number of solids, a row of NaN for no colour.>
+%! S = solid.Shape ();
+%! S.Colour = [1, 0, 0];
+%!error<solid.Shape: Colour must be empty or a 1-by-3 or N-by-3 matrix of values from 0 to 1, N the number of solids, a row of NaN for no colour.>
+%! S = solid.box (1, 1, 1);
+%! S.Colour = [1.5, 0, 0];
+%!error<solid.Shape: Colour must be empty or a 1-by-3 or N-by-3 matrix of values from 0 to 1, N the number of solids, a row of NaN for no colour.>
+%! S = solid.box (1, 1, 1);
+%! S.Colour = [1, 0, 0; 0, 1, 0];
+%!error<solid.Shape: Colour must be empty or a 1-by-3 or N-by-3 matrix of values from 0 to 1, N the number of solids, a row of NaN for no colour.>
+%! S = solid.box (1, 1, 1);
+%! S.Colour = 'red';

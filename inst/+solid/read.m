@@ -23,7 +23,9 @@
 ## @code{@var{S} = solid.read (@var{FILE})} returns the shapes held by the
 ## STEP file @var{FILE} as one @code{solid.Shape}, in millimetres whatever
 ## unit the file was written in.  A file holding several parts returns them
-## together, and @code{solid.Shape.numsolids} counts them.
+## together, and @code{solid.Shape.numsolids} counts them.  The colour the
+## file gives a solid, or failing that the first of its faces with one, is
+## its row of @code{solid.Shape.Colour}.
 ##
 ## STEP (ISO 10303-21) is the format every mechanical CAD program exchanges
 ## solids in, and it keeps their exact geometry: a hole read from it is a true
@@ -61,7 +63,9 @@ function S = read (FILE)
     error ("solid.read: %s", errmsg);
   endif
 
-  S = solid.Shape (__occt__ ('readstep', 'solid.read', FILE));
+  c = __occt__ ('readstep', 'solid.read', FILE);
+  S = solid.Shape (c{1});
+  S.Colour = c{2};
 
 endfunction
 
@@ -138,6 +142,35 @@ endfunction
 %!   fprintf (fid, "/* exported */\n%s", txt);
 %!   fclose (fid);
 %!   assert_equal (volume (solid.read (f)), 6, 1e-12);
+%! unwind_protect_cleanup
+%!   unlink (f);
+%! end_unwind_protect
+
+%!testif ; exist ('__occt__') == 3  # the colours of the solids come back
+%! B = solid.box (10, 10, 10);
+%! U = union (B, translate (B, [20, 0, 0]));
+%! U.Colour = [1, 0, 0; 0, 0.5, 1];
+%! f = [tempname(), '.step'];
+%! unwind_protect
+%!   solid.write (f, U);
+%!   R = solid.read (f);
+%!   assert_equal (R.Colour, U.Colour, 1e-6);
+%! unwind_protect_cleanup
+%!   unlink (f);
+%! end_unwind_protect
+
+%!testif ; exist ('__occt__') == 3  # a solid without a colour comes back bare
+%! B = solid.box (10, 10, 10);
+%! U = union (B, translate (B, [20, 0, 0]));
+%! U.Colour = [NaN, NaN, NaN; 0, 1, 0];
+%! f = [tempname(), '.step'];
+%! unwind_protect
+%!   solid.write (f, U);
+%!   R = solid.read (f);
+%!   assert_equal (R.Colour, U.Colour, 1e-6);
+%!   solid.write (f, B);
+%!   R = solid.read (f);
+%!   assert_equal (R.Colour, []);
 %! unwind_protect_cleanup
 %!   unlink (f);
 %! end_unwind_protect
