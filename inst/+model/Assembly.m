@@ -276,16 +276,21 @@ classdef Assembly
     ## @deftypefn  {model.Assembly} {} write (@var{A}, @var{FILE})
     ## @deftypefnx {model.Assembly} {} write (@var{A}, @var{FILE}, @qcode{'Tolerance'}, @var{TOL})
     ##
-    ## Write an assembly to a STEP, STL, OBJ or PLY file.
+    ## Write an assembly to a STEP, 3MF, STL, OBJ or PLY file.
     ##
     ## @code{write (@var{A}, @var{FILE})} writes the assembly in the format
     ## the extension of @var{FILE} names, in either case.  A STEP file,
     ## @file{.step} or @file{.stp}, keeps its structure: each part once, with
     ## its name and colours, placed by its placements, which carry their
     ## names, and each sub-assembly the same way, so that a CAD program opens
-    ## the product as it was built.  An STL, OBJ or PLY file holds the mesh
-    ## of @code{shape (@var{A})}, as @code{solid.write} writes it, and takes
-    ## its @qcode{'Tolerance'}.
+    ## the product as it was built.  A 3MF file, the archive slicers take,
+    ## keeps the same structure, each part a mesh written once and placed as
+    ## a component, in its colours.  An STL, OBJ or PLY file holds the mesh
+    ## of @code{shape (@var{A})}, as @code{solid.write} writes it.
+    ##
+    ## @code{write (@dots{}, @qcode{'Tolerance'}, @var{TOL})} sets, for a
+    ## mesh, how far its facets may stray from the parts' surfaces, as
+    ## @code{solid.Shape.tessellate} takes it, 0.01 by default.
     ##
     ## @seealso{model.read, solid.write}
     ## @end deftypefn
@@ -300,13 +305,29 @@ classdef Assembly
                        " character vector."));
       endif
       [~, ~, ext] = fileparts (FILE);
-      if (! any (strcmpi (ext, {'.step', '.stp'})))
+      fmt = lower (ext);
+      if (any (strcmp (fmt, {'.stl', '.obj', '.ply'})))
         S = shape (this);
         solid.write (FILE, S, varargin{:});
         return;
       endif
+      if (! any (strcmp (fmt, {'.step', '.stp', '.3mf'})))
+        error (strcat ("model.Assembly.write: FILE must end in .step,", ...
+                       " .stp, .3mf, .stl, .obj or .ply."));
+      endif
+      TOL = 0.01;
       if (nargin == 4)
-        error ("model.Assembly.write: Tolerance applies to meshes only.");
+        if (! ischar (varargin{1}) || ! strcmp (varargin{1}, 'Tolerance'))
+          error ("model.Assembly.write: unknown parameter.");
+        endif
+        if (! strcmp (fmt, '.3mf'))
+          error ("model.Assembly.write: Tolerance applies to meshes only.");
+        endif
+        TOL = varargin{2};
+        errmsg = solid.__checkpos__ (TOL, 'TOL');
+        if (! isempty (errmsg))
+          error ("model.Assembly.write: %s", errmsg);
+        endif
       endif
       if (isempty (this.Instances))
         error ("model.Assembly.write: the assembly places nothing.");
@@ -316,11 +337,29 @@ classdef Assembly
         error ("model.Assembly.write: %s", errmsg);
       endif
 
-      T = struct ('names', {{}}, 'data', {{}}, 'colours', {{}}, ...
-                  'children', {{}}, 'instances', {{}});
+      T = struct ('names', {{}}, 'parts', {{}}, 'children', {{}}, ...
+                  'instances', {{}});
       T = definitions (this, T);
-      __occt__ ('writeassembly', 'model.Assembly.write', FILE, T.names, ...
-                T.data, T.colours, T.children, T.instances);
+      ispart = ! cellfun (@isempty, T.parts);
+      if (strcmp (fmt, '.3mf'))
+        n = numel (T.names);
+        [V, F, FC] = deal (cell (1, n));
+        for k = find (ispart)
+          M = tessellate (T.parts{k}, TOL);
+          [V{k}, F{k}, FC{k}] = deal (M.Vertices, M.Faces, M.FaceColour);
+        endfor
+        __mesh__ ('write3mf', 'model.Assembly.write', FILE, T.names, V, ...
+                  F, FC, T.children);
+      else
+        data = repmat ({uint8([])}, 1, numel (T.names));
+        colours = cell (1, numel (T.names));
+        data(ispart) = cellfun (@(p) p.Data, T.parts(ispart), ...
+                                'UniformOutput', false);
+        colours(ispart) = cellfun (@(p) p.Colour, T.parts(ispart), ...
+                                   'UniformOutput', false);
+        __occt__ ('writeassembly', 'model.Assembly.write', FILE, T.names, ...
+                  data, colours, T.children, T.instances);
+      endif
 
     endfunction
 
@@ -430,8 +469,11 @@ function TF = same (X, Y)
 
 endfunction
 
-## T with the definitions of the assembly A added, as writeassembly takes
-## them: the parts and sub-assemblies it places first, then A itself
+## T with the definitions of the assembly A added, the parts and
+## sub-assemblies it places first, then A itself: each its name, its
+## solid.Shape or [] for an assembly, and for an assembly the rows of its
+## placements, the index from 1 of the definition placed and its frame,
+## origin, x axis, y axis and normal, and the names of the placements
 function T = definitions (A, T)
 
   idx = zeros (1, numel (A.Parts));
@@ -442,8 +484,7 @@ function T = definitions (A, T)
       T.names{end} = A.Parts(k).name;
     else
       T.names{end+1} = A.Parts(k).name;
-      T.data{end+1} = X.Data;
-      T.colours{end+1} = X.Colour;
+      T.parts{end+1} = X;
       T.children{end+1} = [];
       T.instances{end+1} = {};
     endif
@@ -457,8 +498,7 @@ function T = definitions (A, T)
               U.Origin, U.XAxis, U.YAxis, U.Normal];
   endfor
   T.names{end+1} = A.Name;
-  T.data{end+1} = uint8 ([]);
-  T.colours{end+1} = [];
+  T.parts{end+1} = [];
   T.children{end+1} = C;
   T.instances{end+1} = {A.Instances.name};
 
@@ -529,6 +569,34 @@ endfunction
 %!   unlink (f);
 %! end_unwind_protect
 
+## The model of the 3MF file F, its XML
+%!function t = ringxml (f)
+%!  d = tempname ();
+%!  unwind_protect
+%!    unzip (f, d);
+%!    t = fileread (fullfile (d, '3D', '3dmodel.model'));
+%!  unwind_protect_cleanup
+%!    confirm_recursive_rmdir (false, 'local');
+%!    rmdir (d, 's');
+%!  end_unwind_protect
+%!endfunction
+
+%!testif ; exist ('__occt__') == 3 && (! isempty (file_in_path (getenv ('PATH'), 'unzip')) || ! isempty (file_in_path (getenv ('PATH'), 'unzip.exe')))
+%! ## write: 3MF, each part one object, placed as components
+%! f = [tempname(), '.3mf'];
+%! unwind_protect
+%!   write (pinring (), f);
+%!   t = ringxml (f);
+%!   assert_equal (numel (strfind (t, '<object ')), 3);
+%!   assert_equal (numel (strfind (t, '<mesh>')), 2);
+%!   assert_equal (numel (strfind (t, '<component ')), 4);
+%!   assert_equal (numel (strfind (t, '<base ')), 2);
+%!   m = 'transform="0 1 0 0 0 1 1 0 0 0 20 6"';
+%!   assert_equal (! isempty (strfind (t, m)), true);
+%! unwind_protect_cleanup
+%!   unlink (f);
+%! end_unwind_protect
+
 %!testif ; exist ('__occt__') == 3  # write: an STL of every part placed
 %! f = [tempname(), '.stl'];
 %! unwind_protect
@@ -571,5 +639,11 @@ endfunction
 %! write (model.Assembly (), 1)
 %!error<model.Assembly.write: Tolerance applies to meshes only.> ...
 %! write (model.Assembly (), 'a.step', 'Tolerance', 0.1)
+%!error<model.Assembly.write: FILE must end in .step, .stp, .3mf, .stl, .obj or .ply.> ...
+%! write (model.Assembly (), 'a.dxf')
+%!error<model.Assembly.write: unknown parameter.> ...
+%! write (model.Assembly (), 'a.3mf', 'Angle', 0.1)
+%!error<model.Assembly.write: TOL must be a positive and finite real scalar.> ...
+%! write (model.Assembly (), 'a.3mf', 'Tolerance', 0)
 %!error<model.Assembly.write: the assembly places nothing.> ...
 %! write (model.Assembly (), 'a.step')

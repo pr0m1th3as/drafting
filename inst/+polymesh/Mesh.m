@@ -306,12 +306,12 @@ classdef Mesh
     ## @deftypefn  {polymesh.Mesh} {} write (@var{M}, @var{FILE})
     ## @deftypefnx {polymesh.Mesh} {} write (@var{M}, @var{FILE}, @qcode{'Encoding'}, @var{E})
     ##
-    ## Write a mesh to an STL, OBJ or PLY file.
+    ## Write a mesh to an STL, OBJ, PLY or 3MF file.
     ##
     ## @code{write (@var{M}, @var{FILE})} writes the mesh @var{M} to
     ## @var{FILE}, in the format the extension of @var{FILE} names,
-    ## @file{.stl}, @file{.obj} or @file{.ply} in any case, with its colours
-    ## where the format holds them.
+    ## @file{.stl}, @file{.obj}, @file{.ply} or @file{.3mf} in any case, with
+    ## its colours where the format holds them.
     ##
     ## @itemize
     ## @item
@@ -331,17 +331,24 @@ classdef Mesh
     ## Colours are the properties @qcode{red}, @qcode{green} and
     ## @qcode{blue} of its vertices and of its faces, as @qcode{uchar} from 0
     ## to 255.
+    ##
+    ## @item
+    ## A 3MF file is the archive slicers take, in millimetres: one object
+    ## named after @var{FILE}, each coordinate in the fewest digits that read
+    ## back as the same number, and the colours of the triangles as base
+    ## materials.  It holds no vertex colours.  The empty mesh cannot be
+    ## written to it.
     ## @end itemize
     ##
     ## @code{write (@var{M}, @var{FILE}, @qcode{'Encoding'}, @var{E})}
     ## writes a PLY file as text, each coordinate in the fewest digits that
     ## read back as the same number, when @var{E} is @qcode{'ascii'}, or
-    ## binary when it is @qcode{'binary'}, the default.  STL is always
-    ## binary and OBJ always text, so neither takes it.
+    ## binary when it is @qcode{'binary'}, the default; no other format
+    ## takes it.
     ##
-    ## So OBJ and PLY keep every coordinate exactly, and STL keeps a few
+    ## So OBJ, PLY and 3MF keep every coordinate exactly, and STL keeps a few
     ## microns on a part tens of millimetres across.  @code{polymesh.read}
-    ## reads all three back.
+    ## reads STL, OBJ and PLY back.
     ##
     ## @seealso{polymesh.read}
     ## @end deftypefn
@@ -356,8 +363,9 @@ classdef Mesh
       endif
       [~, ~, ext] = fileparts (FILE);
       fmt = lower (ext);
-      if (! any (strcmp (fmt, {'.stl', '.obj', '.ply'})))
-        error ("polymesh.Mesh.write: FILE must end in .stl, .obj or .ply.");
+      if (! any (strcmp (fmt, {'.stl', '.obj', '.ply', '.3mf'})))
+        error (strcat ("polymesh.Mesh.write: FILE must end in .stl, .obj,", ...
+                       " .ply or .3mf."));
       endif
       binary = true;
       if (nargin == 4)
@@ -375,9 +383,18 @@ classdef Mesh
         binary = strcmp (E, 'binary');
       endif
 
-      __mesh__ ('write', 'polymesh.Mesh.write', FILE, this.Vertices, ...
-                this.Faces, this.VertexColour, this.FaceColour, fmt(2:end), ...
-                binary);
+      if (strcmp (fmt, '.3mf'))
+        if (isempty (this))
+          error ("polymesh.Mesh.write: a 3MF file cannot hold the empty mesh.");
+        endif
+        [~, base] = fileparts (FILE);
+        __mesh__ ('write3mf', 'polymesh.Mesh.write', FILE, {base}, ...
+                  {this.Vertices}, {this.Faces}, {this.FaceColour}, {[]});
+      else
+        __mesh__ ('write', 'polymesh.Mesh.write', FILE, this.Vertices, ...
+                  this.Faces, this.VertexColour, this.FaceColour, ...
+                  fmt(2:end), binary);
+      endif
 
     endfunction
 
@@ -1050,6 +1067,50 @@ endfunction
 %!               0.5 / 255);
 %! assert_equal (R.FaceColour, M.FaceColour, 0.5 / 255);
 
+## The model of the 3MF file F, its XML
+%!function t = modelxml (f)
+%!  d = tempname ();
+%!  unwind_protect
+%!    unzip (f, d);
+%!    t = fileread (fullfile (d, '3D', '3dmodel.model'));
+%!  unwind_protect_cleanup
+%!    confirm_recursive_rmdir (false, 'local');
+%!    rmdir (d, 's');
+%!  end_unwind_protect
+%!endfunction
+
+%!testif ; ! isempty (file_in_path (getenv ('PATH'), 'unzip')) || ! isempty (file_in_path (getenv ('PATH'), 'unzip.exe'))
+%! ## write: 3MF, one object named after the file, in millimetres
+%! f = [tempname(), '.3mf'];
+%! [~, base] = fileparts (f);
+%! unwind_protect
+%!   write (oddtetra (), f);
+%!   t = modelxml (f);
+%!   assert_equal (! isempty (strfind (t, 'unit="millimeter"')), true);
+%!   assert_equal (! isempty (strfind (t, ['name="', base, '"'])), true);
+%!   assert_equal (numel (strfind (t, '<vertex ')), 4);
+%!   assert_equal (numel (strfind (t, '<triangle ')), 4);
+%!   v = '<vertex x="0.1" y="0.2" z="0.3"/>';
+%!   assert_equal (! isempty (strfind (t, v)), true);
+%! unwind_protect_cleanup
+%!   unlink (f);
+%! end_unwind_protect
+
+%!testif ; ! isempty (file_in_path (getenv ('PATH'), 'unzip')) || ! isempty (file_in_path (getenv ('PATH'), 'unzip.exe'))
+%! ## write: 3MF face colours as base materials
+%! M = oddtetra ();
+%! M.FaceColour = [1, 0, 0; 1, 0, 0; 0, 0, 1; 0.2, 0.4, 0.6];
+%! f = [tempname(), '.3mf'];
+%! unwind_protect
+%!   write (M, f);
+%!   t = modelxml (f);
+%!   assert_equal (numel (strfind (t, '<base ')), 3);
+%!   assert_equal (! isempty (strfind (t, 'displaycolor="#336699"')), true);
+%!   assert_equal (numel (strfind (t, 'pid="1" p1=')), 4);
+%! unwind_protect_cleanup
+%!   unlink (f);
+%! end_unwind_protect
+
 %!test  # write: STL has no colours
 %! M = oddtetra ();
 %! M.FaceColour = repmat ([1, 0, 0], 4, 1);
@@ -1150,7 +1211,7 @@ endfunction
 %! write (polymesh.Mesh (), 'a.ply', 'Encoding')
 %!error<polymesh.Mesh.write: FILE must be a character vector.> ...
 %! write (polymesh.Mesh (), 42)
-%!error<polymesh.Mesh.write: FILE must end in .stl, .obj or .ply.> ...
+%!error<polymesh.Mesh.write: FILE must end in .stl, .obj, .ply or .3mf.> ...
 %! write (polymesh.Mesh (), 'a.off')
 %!error<polymesh.Mesh.write: unknown parameter.> ...
 %! write (polymesh.Mesh (), 'a.ply', 'Format', 'ascii')
@@ -1160,3 +1221,5 @@ endfunction
 %! write (polymesh.Mesh (), 'a.obj', 'Encoding', 'ascii')
 %!error<polymesh.Mesh.write: cannot open '.*' for writing.> ...
 %! write (polymesh.Mesh (), fullfile (tempname (), 'a.obj'))
+%!error<polymesh.Mesh.write: a 3MF file cannot hold the empty mesh.> ...
+%! write (polymesh.Mesh (), 'a.3mf')

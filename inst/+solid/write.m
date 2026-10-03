@@ -19,7 +19,7 @@
 ## @deftypefn  {drafting} {} solid.write (@var{FILE}, @var{S})
 ## @deftypefnx {drafting} {} solid.write (@var{FILE}, @var{S}, @qcode{'Tolerance'}, @var{TOL})
 ##
-## Write a solid to a STEP, STL, OBJ or PLY file.
+## Write a solid to a STEP, STL, OBJ, PLY or 3MF file.
 ##
 ## @code{solid.write (@var{FILE}, @var{S})} writes the @code{solid.Shape}
 ## @var{S} in the format named by the extension of @var{FILE}, in either case:
@@ -31,12 +31,12 @@
 ## another manufacturer.  The part is named after the base name of
 ## @var{FILE}, and each solid carries its @code{solid.Shape.Colour}.
 ##
-## @item @file{.stl}, @file{.obj}, @file{.ply}
+## @item @file{.stl}, @file{.obj}, @file{.ply}, @file{.3mf}
 ## A mesh of triangles in millimetres, the mesh @code{solid.Shape.tessellate}
-## makes, written by @code{polymesh.Mesh.write}: binary STL, which is what a
-## slicer prints from, OBJ, or binary PLY.  The facets approximate every
-## curved surface; their vertices lie on it.  OBJ and PLY carry the solids'
-## colours on their triangles; STL has none.
+## makes, written by @code{polymesh.Mesh.write}: binary STL, OBJ, binary
+## PLY, or 3MF, the archive slicers take.  The facets approximate every
+## curved surface; their vertices lie on it.  OBJ, PLY and 3MF carry the
+## solids' colours on their triangles; STL has none.
 ## @end table
 ##
 ## @code{solid.write (@dots{}, @qcode{'Tolerance'}, @var{TOL})} sets, for a
@@ -75,11 +75,12 @@ function write (FILE, S, varargin)
   endfor
   [folder, base, ext] = fileparts (FILE);
   isstep = any (strcmpi (ext, {'.step', '.stp'}));
-  if (! isstep && ! any (strcmpi (ext, {'.stl', '.obj', '.ply'})))
-    error ("solid.write: FILE must end in .step, .stp, .stl, .obj or .ply.");
+  if (! isstep && ! any (strcmpi (ext, {'.stl', '.obj', '.ply', '.3mf'})))
+    error (strcat ("solid.write: FILE must end in .step, .stp, .stl, .obj,", ...
+                   " .ply or .3mf."));
   endif
   if (isstep && ! isempty (opt.Tolerance))
-    error ("solid.write: Tolerance applies to STL, OBJ and PLY files only.");
+    error ("solid.write: Tolerance applies to meshes only.");
   endif
   if (isempty (opt.Tolerance))
     opt.Tolerance = 0.01;
@@ -231,6 +232,24 @@ endfunction
 %!   unlink (f);
 %! end_unwind_protect
 
+%!testif ; exist ('__occt__') == 3 && (! isempty (file_in_path (getenv ('PATH'), 'unzip')) || ! isempty (file_in_path (getenv ('PATH'), 'unzip.exe')))
+%! ## 3MF: the solid's mesh in its colour
+%! f = [tempname(), '.3mf'];
+%! d = tempname ();
+%! S = solid.box (10, 20, 30);
+%! S.Colour = [0.2, 0.4, 0.6];
+%! unwind_protect
+%!   solid.write (f, S);
+%!   unzip (f, d);
+%!   t = fileread (fullfile (d, '3D', '3dmodel.model'));
+%!   assert_equal (numel (strfind (t, '<triangle ')), 12);
+%!   assert_equal (! isempty (strfind (t, 'displaycolor="#336699"')), true);
+%! unwind_protect_cleanup
+%!   unlink (f);
+%!   confirm_recursive_rmdir (false, 'local');
+%!   rmdir (d, 's');
+%! end_unwind_protect
+
 %!error<solid.write: invalid number of input arguments.> solid.write ('a.stl')
 %!error<solid.write: FILE must be a non-empty character vector.> ...
 %! solid.write ('', solid.Shape ())
@@ -239,9 +258,9 @@ endfunction
 %! solid.write ('a.stl', solid.Shape (), 'Tolerance')
 %!error<solid.write: unknown parameter.> ...
 %! solid.write ('a.stl', solid.Shape (), 'Angle', 5)
-%!error<solid.write: FILE must end in .step, .stp, .stl, .obj or .ply.> ...
+%!error<solid.write: FILE must end in .step, .stp, .stl, .obj, .ply or .3mf.> ...
 %! solid.write ('a.dxf', solid.Shape ())
-%!error<solid.write: Tolerance applies to STL, OBJ and PLY files only.> ...
+%!error<solid.write: Tolerance applies to meshes only.> ...
 %! solid.write ('a.step', solid.Shape (), 'Tolerance', 0.1)
 %!error<solid.write: Tolerance must be a positive and finite real scalar.> ...
 %! solid.write ('a.stl', solid.Shape (), 'Tolerance', 0)

@@ -60,7 +60,7 @@ endif
 endif
 
 __mesh__.oct: __mesh__.cc
-	$(MKOCTFILE) -O2 __mesh__.cc
+	$(MKOCTFILE) -O2 __mesh__.cc -lz
 
 __occtfont__.oct: __occtfont__.cc
 	$(MKOCTFILE) -I$(OCCT_INC) __occtfont__.cc $(FONT_LIBS)

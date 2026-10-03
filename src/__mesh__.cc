@@ -39,6 +39,8 @@
 #include <utility>
 #include <vector>
 
+#include <zlib.h>
+
 using std::string;
 using std::vector;
 
@@ -3501,6 +3503,258 @@ writemesh (const string& file, const string& caller, const Matrix& V,
   putfile (file, caller, out);
 }
 
+
+// The bytes of TEXT compressed by deflate, as a ZIP archive holds them
+string
+deflated (const string& text, const string& caller)
+{
+  z_stream z = {};
+  if (deflateInit2 (&z, Z_DEFAULT_COMPRESSION, Z_DEFLATED, -15, 8,
+                    Z_DEFAULT_STRATEGY) != Z_OK)
+  {
+    error ("%s: zlib could not compress.", caller.c_str ());
+  }
+  string out (deflateBound (&z, text.size ()), '\0');
+  z.next_in = reinterpret_cast<Bytef *> (const_cast<char *> (text.data ()));
+  z.avail_in = text.size ();
+  z.next_out = reinterpret_cast<Bytef *> (&out[0]);
+  z.avail_out = out.size ();
+  const int r = deflate (&z, Z_FINISH);
+  deflateEnd (&z);
+  if (r != Z_STREAM_END)
+  {
+    error ("%s: zlib could not compress.", caller.c_str ());
+  }
+  out.resize (z.total_out);
+  return out;
+}
+
+// FILES, each a name and its bytes, written to FILE as a ZIP archive, each
+// deflated and dated the first day ZIP can date
+void
+putzip (const string& file, const vector<std::pair<string, string>>& files,
+        const string& caller)
+{
+  string out, dir;
+  for (const auto& f : files)
+  {
+    const string data = deflated (f.second, caller);
+    if (f.second.size () > 0xFFFFFFFFu || out.size () > 0xFFFFFFFFu)
+    {
+      error ("%s: the file is too large for ZIP without its 64-bit form.",
+             caller.c_str ());
+    }
+    const uint32_t crc = crc32 (0, reinterpret_cast<const Bytef *>
+                                     (f.second.data ()), f.second.size ());
+    const uint32_t at = out.size ();
+    putle<uint32_t> (out, 0x04034b50);
+    putle<uint16_t> (out, 20);
+    putle<uint16_t> (out, 0);
+    putle<uint16_t> (out, 8);
+    putle<uint16_t> (out, 0);
+    putle<uint16_t> (out, 0x21);
+    putle<uint32_t> (out, crc);
+    putle<uint32_t> (out, data.size ());
+    putle<uint32_t> (out, f.second.size ());
+    putle<uint16_t> (out, f.first.size ());
+    putle<uint16_t> (out, 0);
+    out += f.first + data;
+    putle<uint32_t> (dir, 0x02014b50);
+    putle<uint16_t> (dir, 20);
+    putle<uint16_t> (dir, 20);
+    putle<uint16_t> (dir, 0);
+    putle<uint16_t> (dir, 8);
+    putle<uint16_t> (dir, 0);
+    putle<uint16_t> (dir, 0x21);
+    putle<uint32_t> (dir, crc);
+    putle<uint32_t> (dir, data.size ());
+    putle<uint32_t> (dir, f.second.size ());
+    putle<uint16_t> (dir, f.first.size ());
+    putle<uint16_t> (dir, 0);
+    putle<uint16_t> (dir, 0);
+    putle<uint16_t> (dir, 0);
+    putle<uint16_t> (dir, 0);
+    putle<uint32_t> (dir, 0);
+    putle<uint32_t> (dir, at);
+    dir += f.first;
+  }
+  string end;
+  putle<uint32_t> (end, 0x06054b50);
+  putle<uint16_t> (end, 0);
+  putle<uint16_t> (end, 0);
+  putle<uint16_t> (end, files.size ());
+  putle<uint16_t> (end, files.size ());
+  putle<uint32_t> (end, dir.size ());
+  putle<uint32_t> (end, out.size ());
+  putle<uint16_t> (end, 0);
+  putfile (file, caller, out + dir + end);
+}
+
+// TEXT with the characters XML gives a meaning written as entities
+string
+xmltext (const string& text)
+{
+  string out;
+  for (char c : text)
+  {
+    switch (c)
+    {
+      case '&': out += "&amp;"; break;
+      case '<': out += "&lt;"; break;
+      case '>': out += "&gt;"; break;
+      case '"': out += "&quot;"; break;
+      case '\'': out += "&apos;"; break;
+      default: out += c;
+    }
+  }
+  return out;
+}
+
+// A 3MF package written to FILE, its objects given as definitions, those an
+// object places before it and the whole last: each named in NAMES, a mesh by
+// its points VS, its triangles FS, indices from 1, and the colours FCS of
+// its triangles, empty for none, a group of placed objects by an empty VS
+// and its CHILDREN, a row for each of the index from 1 of the object placed
+// and the frame it is placed in, its origin, x axis, y axis and normal.
+// The colours are one group of base materials, which the core of 3MF has.
+void
+write3mf (const string& file, const Cell& names, const Cell& vs,
+          const Cell& fs, const Cell& fcs, const Cell& children,
+          const string& caller)
+{
+  const octave_idx_type n = names.numel ();
+  std::map<std::array<long, 3>, int> colour;
+  vector<std::array<long, 3>> bases;
+  auto key = [] (const Matrix& C, octave_idx_type t)
+  {
+    return std::array<long, 3> {std::lround (255 * C(t,0)),
+                                std::lround (255 * C(t,1)),
+                                std::lround (255 * C(t,2))};
+  };
+  for (octave_idx_type i = 0; i < n; i++)
+  {
+    const Matrix C = fcs(i).matrix_value ();
+    for (octave_idx_type t = 0; t < C.rows (); t++)
+    {
+      if (colour.emplace (key (C, t), bases.size ()).second)
+      {
+        bases.push_back (key (C, t));
+      }
+    }
+  }
+  const int first = bases.empty () ? 1 : 2;
+  string m = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+             "<model unit=\"millimeter\" xml:lang=\"en-US\" "
+             "xmlns=\"http://schemas.microsoft.com/3dmanufacturing/core/"
+             "2015/02\">\n"
+             " <metadata name=\"Application\">GNU Octave drafting package"
+             "</metadata>\n <resources>\n";
+  if (! bases.empty ())
+  {
+    m += "  <basematerials id=\"1\">\n";
+    for (size_t b = 0; b < bases.size (); b++)
+    {
+      char hex[8];
+      std::snprintf (hex, sizeof (hex), "#%02lX%02lX%02lX", bases[b][0],
+                     bases[b][1], bases[b][2]);
+      m += "   <base name=\"colour" + std::to_string (b + 1)
+           + "\" displaycolor=\"" + hex + "\"/>\n";
+    }
+    m += "  </basematerials>\n";
+  }
+  for (octave_idx_type i = 0; i < n; i++)
+  {
+    m += "  <object id=\"" + std::to_string (i + first)
+         + "\" type=\"model\" name=\"" + xmltext (names(i).string_value ())
+         + "\"";
+    if (! vs(i).isempty ())
+    {
+      const Matrix V = vs(i).matrix_value ();
+      const Matrix F = fs(i).matrix_value ();
+      const Matrix C = fcs(i).matrix_value ();
+      const bool coloured = C.rows () > 0;
+      if (coloured)
+      {
+        m += " pid=\"1\" pindex=\"" + std::to_string (colour[key (C, 0)])
+             + "\"";
+      }
+      m += ">\n   <mesh>\n    <vertices>\n";
+      for (octave_idx_type k = 0; k < V.rows (); k++)
+      {
+        m += "     <vertex x=\"";
+        puttext (m, V(k,0));
+        m += "\" y=\"";
+        puttext (m, V(k,1));
+        m += "\" z=\"";
+        puttext (m, V(k,2));
+        m += "\"/>\n";
+      }
+      m += "    </vertices>\n    <triangles>\n";
+      for (octave_idx_type t = 0; t < F.rows (); t++)
+      {
+        m += "     <triangle";
+        for (int c = 0; c < 3; c++)
+        {
+          m += " v" + std::to_string (c + 1) + "=\"";
+          puttext (m, static_cast<int64_t> (F(t,c)) - 1);
+          m += "\"";
+        }
+        if (coloured)
+        {
+          m += " pid=\"1\" p1=\"" + std::to_string (colour[key (C, t)])
+               + "\"";
+        }
+        m += "/>\n";
+      }
+      m += "    </triangles>\n   </mesh>\n  </object>\n";
+    }
+    else
+    {
+      const Matrix K = children(i).matrix_value ();
+      m += ">\n   <components>\n";
+      for (octave_idx_type k = 0; k < K.rows (); k++)
+      {
+        m += "    <component objectid=\""
+             + std::to_string (static_cast<int> (K(k,0)) - 1 + first)
+             + "\" transform=\"";
+        // Rows of 3MF's matrix: the x axis, the y axis, the normal, then
+        // the origin, a point's row of coordinates multiplied from the left
+        const int order[12] = {4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3};
+        for (int j = 0; j < 12; j++)
+        {
+          if (j > 0)
+          {
+            m += ' ';
+          }
+          puttext (m, K(k,order[j]));
+        }
+        m += "\"/>\n";
+      }
+      m += "   </components>\n  </object>\n";
+    }
+  }
+  m += " </resources>\n <build>\n  <item objectid=\""
+       + std::to_string (n - 1 + first) + "\"/>\n </build>\n</model>\n";
+  const string types
+    = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+      "<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/"
+      "content-types\">\n"
+      " <Default Extension=\"rels\" ContentType=\"application/"
+      "vnd.openxmlformats-package.relationships+xml\"/>\n"
+      " <Default Extension=\"model\" ContentType=\"application/"
+      "vnd.ms-package.3dmanufacturing-3dmodel+xml\"/>\n"
+      "</Types>\n";
+  const string rels
+    = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+      "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/"
+      "2006/relationships\">\n"
+      " <Relationship Target=\"/3D/3dmodel.model\" Id=\"rel0\" "
+      "Type=\"http://schemas.microsoft.com/3dmanufacturing/2013/01/"
+      "3dmodel\"/>\n"
+      "</Relationships>\n";
+  putzip (file, {{"[Content_Types].xml", types}, {"_rels/.rels", rels},
+                 {"3D/3dmodel.model", m}}, caller);
+}
 }
 
 DEFUN_DLD (__mesh__, args, ,
@@ -3602,6 +3856,20 @@ Undocumented internal function.\n\
     section (args(2).matrix_value (), args(3).matrix_value (),
              args(4).double_value (), pieces, open);
     return ovl (pieces, open);
+  }
+
+  // __mesh__ ('write3mf', caller, FILE, NAMES, VS, FS, FCS, CHILDREN): the
+  // objects of a 3MF package, as write3mf takes them, written to FILE
+  else if (cmd == "write3mf")
+  {
+    if (args.length () != 8)
+    {
+      print_usage ();
+    }
+    write3mf (args(2).string_value (), args(3).cell_value (),
+              args(4).cell_value (), args(5).cell_value (),
+              args(6).cell_value (), args(7).cell_value (), caller);
+    return ovl ();
   }
 
   // PIECES = __mesh__ ('fit', caller, P, CLOSED, MODE, TOL, CORNER, W): the
