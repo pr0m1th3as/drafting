@@ -33,9 +33,8 @@ DXF input and output
  dxf.read
  dxf.write
 Meshes
+ polymesh.Mesh
  polymesh.read
- polymesh.section
- polymesh.write
 Sheet composition
  draw.titleblock
  draw.coordtable
@@ -61,7 +60,7 @@ Solid modelling
  solid.loft
  solid.sweep
  solid.helix
- solid.show
- solid.Viewer
  solid.read
  solid.write
+Viewing
+ model.Viewer

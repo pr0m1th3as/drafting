@@ -15,20 +15,25 @@
 // You should have received a copy of the GNU General Public License along
 // with this program; if not, see <http://www.gnu.org/licenses/>.
 
-// Triangle meshes: reading STL files and cutting meshes with a plane.  It
-// needs nothing but Octave, so the stl namespace works on any build.
+// Triangle meshes: reading and writing STL, OBJ and PLY files, and cutting
+// meshes with a plane.  It needs nothing but Octave, so the polymesh
+// namespace works on any build.
 
 #include <octave/oct.h>
 
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <charconv>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <map>
+#include <sstream>
 #include <string>
+#include <set>
 #include <tuple>
 #include <unordered_map>
 #include <utility>
@@ -76,17 +81,15 @@ bits (double x)
   return b;
 }
 
-// The corners of every triangle of an STL file, three rows of x, y and z
-// for each triangle in turn.  A binary file is recognised by its size, which
-// its triangle count sets exactly; anything else must be ASCII, read as the
-// three numbers after every "vertex", in any case and with any spacing.
-vector<double>
-readstl (const string& file, const string& caller)
+// The bytes of FILE with a zero after them, or an error under CALLER that
+// FILE is not a readable file of the format WHAT
+vector<char>
+slurp (const string& file, const string& caller, const char *what)
 {
   FILE *f = std::fopen (file.c_str (), "rb");
   if (! f)
   {
-    error ("%s: FILE is not a readable STL file.", caller.c_str ());
+    error ("%s: FILE is not a readable %s file.", caller.c_str (), what);
   }
   std::fseek (f, 0, SEEK_END);
   const long size = std::ftell (f);
@@ -94,7 +97,20 @@ readstl (const string& file, const string& caller)
   vector<char> buf (size > 0 ? size + 1 : 1);
   const size_t got = (size > 0) ? std::fread (buf.data (), 1, size, f) : 0;
   std::fclose (f);
+  buf.resize (got + 1);
   buf[got] = 0;
+  return buf;
+}
+
+// The corners of every triangle of an STL file, three rows of x, y and z
+// for each triangle in turn.  A binary file is recognised by its size, which
+// its triangle count sets exactly; anything else must be ASCII, read as the
+// three numbers after every "vertex", in any case and with any spacing.
+vector<double>
+readstl (const string& file, const string& caller)
+{
+  const vector<char> buf = slurp (file, caller, "STL");
+  const size_t got = buf.size () - 1;
 
   vector<double> xyz;
   uint32_t n = 0;
@@ -163,13 +179,15 @@ readstl (const string& file, const string& caller)
 
 // The corners XYZ welded into vertices, exactly or within TOL, and the
 // triangles as indices into them from 1, those that two of whose corners
-// became one dropped
+// became one dropped; ID the vertex of each corner and KEEP the triangles
+// kept
 void
-weld (const vector<double>& xyz, double tol, Matrix& V, Matrix& F)
+weld (const vector<double>& xyz, double tol, Matrix& V, Matrix& F,
+      vector<octave_idx_type>& id, vector<octave_idx_type>& keep)
 {
   const size_t m = xyz.size () / 3;
   vector<double> verts;
-  vector<octave_idx_type> id (m);
+  id.assign (m, 0);
   std::unordered_map<key3, vector<octave_idx_type>, hash3> grid;
   grid.reserve (m);
   for (size_t i = 0; i < m; i++)
@@ -233,7 +251,7 @@ weld (const vector<double>& xyz, double tol, Matrix& V, Matrix& F)
     {
       V(i,c) = verts[3 * i + c];
     }
-  vector<octave_idx_type> keep;
+  keep.clear ();
   for (size_t t = 0; t < m / 3; t++)
   {
     const octave_idx_type a = id[3 * t], b = id[3 * t + 1], c = id[3 * t + 2];
@@ -2442,6 +2460,1047 @@ hullpieces (const vector<piece>& pieces)
   return c;
 }
 
+// The triangles of the polygon with the corners C, x, y and z of each in
+// turn, appended to T as indices into C, each turned as the polygon is.  It
+// is cut an ear at a time in the plane its Newell normal is nearest, so a
+// concave polygon is cut inside its outline; one with no area, or one that
+// crosses itself so that no ear is left, is cut as a fan from a corner.
+void
+earclip (const vector<double>& C, vector<size_t>& T)
+{
+  const size_t n = C.size () / 3;
+  vector<size_t> left (n);
+  for (size_t i = 0; i < n; i++)
+  {
+    left[i] = i;
+  }
+  double N[3] = {0, 0, 0};
+  for (size_t i = 0; i < n; i++)
+  {
+    const double *a = &C[3 * i];
+    const double *b = &C[3 * ((i + 1) % n)];
+    N[0] += (a[1] - b[1]) * (a[2] + b[2]);
+    N[1] += (a[2] - b[2]) * (a[0] + b[0]);
+    N[2] += (a[0] - b[0]) * (a[1] + b[1]);
+  }
+  int k = 0;
+  for (int j = 1; j < 3; j++)
+  {
+    if (std::abs (N[j]) > std::abs (N[k]))
+    {
+      k = j;
+    }
+  }
+  // In the plane of the two axes after K, in turn, the polygon runs
+  // anticlockwise where N points along K
+  const int u = (k + 1) % 3;
+  const int v = (k + 2) % 3;
+  const double s = (N[k] > 0) ? 1 : -1;
+  auto turn = [&] (size_t a, size_t b, size_t c)
+  {
+    const double *A = &C[3 * a], *B = &C[3 * b], *P = &C[3 * c];
+    return s * ((B[u] - A[u]) * (P[v] - A[v]) - (B[v] - A[v]) * (P[u] - A[u]));
+  };
+  while (N[k] != 0 && left.size () > 3)
+  {
+    const size_t m = left.size ();
+    bool cut = false;
+    for (size_t j = 0; j < m && ! cut; j++)
+    {
+      const size_t a = left[(j + m - 1) % m];
+      const size_t b = left[j];
+      const size_t c = left[(j + 1) % m];
+      if (turn (a, b, c) <= 0)
+      {
+        continue;
+      }
+      bool ear = true;
+      for (size_t r : left)
+      {
+        if (r != a && r != b && r != c && turn (a, b, r) >= 0
+            && turn (b, c, r) >= 0 && turn (c, a, r) >= 0)
+        {
+          ear = false;
+          break;
+        }
+      }
+      if (ear)
+      {
+        T.insert (T.end (), {a, b, c});
+        left.erase (left.begin () + j);
+        cut = true;
+      }
+    }
+    if (! cut)
+    {
+      break;
+    }
+  }
+  for (size_t j = 1; j + 1 < left.size (); j++)
+  {
+    T.insert (T.end (), {left[0], left[j], left[j + 1]});
+  }
+}
+
+// The grey, red, green and blue, a mesh is shown in without colours, which
+// a partly coloured file gives the faces and vertices it leaves bare
+const double grey[3] = {0.72, 0.74, 0.78};
+
+// A mesh as read from a file: the corners of its triangles, x, y and z of
+// each in turn; the vertex of the file each corner came from; the colour of
+// that vertex, red, green and blue for each corner in turn, or nothing; and
+// the colour of each triangle, or nothing
+struct meshread
+{
+  vector<double> xyz;
+  vector<int64_t> src;
+  vector<double> vcol;
+  vector<double> fcol;
+};
+
+// True for red, green and blue each from 0 to 1
+bool
+iscolour (const double *c)
+{
+  return c[0] >= 0 && c[0] <= 1 && c[1] >= 0 && c[1] <= 1 && c[2] >= 0
+         && c[2] <= 1;
+}
+
+// The mesh of the faces of an OBJ or PLY file: V the vertices, x, y and z
+// of each in turn, and VC their colours or nothing; face F the vertices
+// IDX(START(F)) to IDX(START(F+1)-1), from 0, and FC the colours of the
+// faces or nothing.  Each face is cut into triangles by earclip, and each
+// triangle takes the colour of its face.
+meshread
+facemesh (const vector<double>& V, const vector<double>& VC,
+          const vector<int64_t>& idx, const vector<size_t>& start,
+          const vector<double>& FC, const string& caller)
+{
+  const int64_t nv = V.size () / 3;
+  for (int64_t i : idx)
+  {
+    if (i < 0 || i >= nv)
+    {
+      error ("%s: a face of FILE refers to a vertex the file does not have.",
+             caller.c_str ());
+    }
+  }
+  if (start.size () == 1 && nv > 0)
+  {
+    error ("%s: FILE has vertices but no faces.", caller.c_str ());
+  }
+  meshread m;
+  vector<double> C;
+  vector<size_t> T;
+  for (size_t f = 0; f + 1 < start.size (); f++)
+  {
+    C.clear ();
+    T.clear ();
+    for (size_t j = start[f]; j < start[f + 1]; j++)
+    {
+      C.insert (C.end (), &V[3 * idx[j]], &V[3 * idx[j]] + 3);
+    }
+    earclip (C, T);
+    for (size_t t : T)
+    {
+      const int64_t v = idx[start[f] + t];
+      m.xyz.insert (m.xyz.end (), &V[3 * v], &V[3 * v] + 3);
+      m.src.push_back (v);
+      if (! VC.empty ())
+      {
+        m.vcol.insert (m.vcol.end (), &VC[3 * v], &VC[3 * v] + 3);
+      }
+    }
+    for (size_t t = 0; t < T.size () / 3 && ! FC.empty (); t++)
+    {
+      m.fcol.insert (m.fcol.end (), &FC[3 * f], &FC[3 * f] + 3);
+    }
+  }
+  return m;
+}
+
+// The next line of the text from P to END, joined to the lines after it
+// where it ends in a backslash, without its comment from "#"; P is left at
+// the line after it
+void
+nextline (const char *& p, const char *end, string& line)
+{
+  line.clear ();
+  while (p < end)
+  {
+    const char *e = static_cast<const char *> (std::memchr (p, '\n',
+                                                            end - p));
+    if (! e)
+    {
+      e = end;
+    }
+    const char *q = (e > p && e[-1] == '\r') ? e - 1 : e;
+    const bool join = (q > p && q[-1] == '\\');
+    line.append (p, join ? q - 1 : q);
+    p = (e < end) ? e + 1 : end;
+    if (! join)
+    {
+      break;
+    }
+    line.push_back (' ');
+  }
+  const size_t hash = line.find ('#');
+  if (hash != string::npos)
+  {
+    line.erase (hash);
+  }
+}
+
+bool
+isspacechar (char c)
+{
+  return std::isspace (static_cast<unsigned char> (c)) != 0;
+}
+
+// The first word of LINE, and in REST what follows it, its spaces trimmed
+string
+keyword (const string& line, string& rest)
+{
+  size_t a = 0;
+  while (a < line.size () && isspacechar (line[a]))
+  {
+    a++;
+  }
+  size_t b = a;
+  while (b < line.size () && ! isspacechar (line[b]))
+  {
+    b++;
+  }
+  size_t c = b;
+  while (c < line.size () && isspacechar (line[c]))
+  {
+    c++;
+  }
+  size_t d = line.size ();
+  while (d > c && isspacechar (line[d - 1]))
+  {
+    d--;
+  }
+  rest = line.substr (c, d - c);
+  return line.substr (a, b - a);
+}
+
+// The directory of FILE with its separator, or nothing
+string
+folder (const string& file)
+{
+  const size_t k = file.find_last_of ("/\\");
+  return (k == string::npos) ? "" : file.substr (0, k + 1);
+}
+
+// The colours of the materials of the library FILE, each "newmtl" and the
+// "Kd" after it, added to MAT; false when FILE cannot be opened
+bool
+readmtl (const string& file, const string& caller,
+         std::map<string, std::array<double, 3>>& mat)
+{
+  FILE *f = std::fopen (file.c_str (), "rb");
+  if (! f)
+  {
+    return false;
+  }
+  std::fclose (f);
+  const vector<char> buf = slurp (file, caller, "OBJ");
+  const char *p = buf.data ();
+  const char *end = p + buf.size () - 1;
+  string line, rest, name;
+  while (p < end)
+  {
+    nextline (p, end, line);
+    const string key = keyword (line, rest);
+    if (key == "newmtl")
+    {
+      name = rest;
+    }
+    else if (key == "Kd" && ! name.empty ())
+    {
+      double c[3];
+      const char *s = rest.c_str ();
+      int n = 0;
+      for (; n < 3; n++)
+      {
+        char *q;
+        c[n] = std::strtod (s, &q);
+        if (q == s)
+        {
+          break;
+        }
+        s = q;
+      }
+      if (n < 3)
+      {
+        continue;
+      }
+      if (! iscolour (c))
+      {
+        error ("%s: a colour in FILE is outside 0 to 1.", caller.c_str ());
+      }
+      mat[name] = {c[0], c[1], c[2]};
+    }
+  }
+  return true;
+}
+
+// The mesh of an OBJ file.  Only the lines "v", "f", "mtllib" and "usemtl"
+// are read: the first three numbers of a vertex and its colour when it has
+// six; for each corner of a face the index of its vertex, from 1, before
+// any slash, an index below 0 counting back from the last vertex read; and
+// the colour "Kd" of the material each face is given in the material
+// libraries beside the file.  A backslash at the end of a line joins the
+// next to it, and "#" starts a comment.
+meshread
+readobj (const string& file, const string& caller)
+{
+  const vector<char> buf = slurp (file, caller, "OBJ");
+  const char *p = buf.data ();
+  const char *end = p + buf.size () - 1;
+  auto bad = [&] ()
+  {
+    error ("%s: FILE is not a readable OBJ file.", caller.c_str ());
+  };
+  vector<double> V, VC;
+  vector<int64_t> idx;
+  vector<size_t> start = {0};
+  vector<string> libs, names;
+  vector<int> fmat;
+  bool coloured = false;
+  int current = -1;
+  string line, rest;
+  while (p < end)
+  {
+    nextline (p, end, line);
+    const string key = keyword (line, rest);
+    const char *s = rest.c_str ();
+    if (key == "v")
+    {
+      double x[6];
+      int n = 0;
+      for (; n < 6; n++)
+      {
+        char *q;
+        x[n] = std::strtod (s, &q);
+        if (q == s)
+        {
+          break;
+        }
+        if (! std::isfinite (x[n]))
+        {
+          bad ();
+        }
+        s = q;
+      }
+      if (n < 3)
+      {
+        bad ();
+      }
+      V.insert (V.end (), x, x + 3);
+      if (n == 6)
+      {
+        if (! iscolour (x + 3))
+        {
+          error ("%s: a colour in FILE is outside 0 to 1.", caller.c_str ());
+        }
+        VC.insert (VC.end (), x + 3, x + 6);
+        coloured = true;
+      }
+      else
+      {
+        VC.insert (VC.end (), grey, grey + 3);
+      }
+    }
+    else if (key == "f")
+    {
+      const int64_t nv = V.size () / 3;
+      size_t corners = 0;
+      while (true)
+      {
+        while (isspacechar (*s))
+        {
+          s++;
+        }
+        if (! *s)
+        {
+          break;
+        }
+        char *q;
+        const long long i = std::strtoll (s, &q, 10);
+        if (q == s || i == 0 || (*q && *q != '/' && ! isspacechar (*q)))
+        {
+          bad ();
+        }
+        idx.push_back (i < 0 ? nv + i : i - 1);
+        while (*q && ! isspacechar (*q))
+        {
+          q++;
+        }
+        s = q;
+        corners++;
+      }
+      if (corners < 3)
+      {
+        bad ();
+      }
+      start.push_back (idx.size ());
+      fmat.push_back (current);
+    }
+    else if (key == "mtllib" && ! rest.empty ())
+    {
+      libs.push_back (rest);
+    }
+    else if (key == "usemtl")
+    {
+      const auto it = std::find (names.begin (), names.end (), rest);
+      current = it - names.begin ();
+      if (it == names.end ())
+      {
+        names.push_back (rest);
+      }
+    }
+  }
+  if (! coloured)
+  {
+    VC.clear ();
+  }
+
+  // Each face the colour of its material, grey where it has none
+  vector<double> FC;
+  if (! names.empty ())
+  {
+    std::map<string, std::array<double, 3>> mat;
+    bool found = false;
+    for (const string& lib : libs)
+    {
+      // A library named with spaces in it, else several named on one line
+      bool one = readmtl (folder (file) + lib, caller, mat);
+      if (! one)
+      {
+        std::istringstream words (lib);
+        for (string w; words >> w; )
+        {
+          one = readmtl (folder (file) + w, caller, mat) || one;
+        }
+      }
+      found = found || one;
+    }
+    if (! found)
+    {
+      warning ("%s: the material library of FILE is missing, so its faces"
+               " have no colour.", caller.c_str ());
+    }
+    else
+    {
+      std::set<string> missing;
+      for (int m : fmat)
+      {
+        const auto it = (m < 0) ? mat.end () : mat.find (names[m]);
+        if (it == mat.end ())
+        {
+          FC.insert (FC.end (), grey, grey + 3);
+          if (m >= 0 && missing.insert (names[m]).second)
+          {
+            warning ("%s: FILE uses the material %s, which its library does"
+                     " not have, so its faces are grey.", caller.c_str (),
+                     names[m].c_str ());
+          }
+        }
+        else
+        {
+          FC.insert (FC.end (), it->second.begin (), it->second.end ());
+        }
+      }
+    }
+  }
+  return facemesh (V, VC, idx, start, FC, caller);
+}
+
+// A scalar type of PLY: its size in bytes, and 'f' for a float, 'i' for a
+// signed integer or 'u' for an unsigned one
+struct plytype
+{
+  int size = 0;
+  char kind = 0;
+};
+
+bool
+plytypeof (const string& name, plytype& t)
+{
+  static const std::pair<const char *, plytype> types[] = {
+    {"char", {1, 'i'}}, {"int8", {1, 'i'}}, {"uchar", {1, 'u'}},
+    {"uint8", {1, 'u'}}, {"short", {2, 'i'}}, {"int16", {2, 'i'}},
+    {"ushort", {2, 'u'}}, {"uint16", {2, 'u'}}, {"int", {4, 'i'}},
+    {"int32", {4, 'i'}}, {"uint", {4, 'u'}}, {"uint32", {4, 'u'}},
+    {"float", {4, 'f'}}, {"float32", {4, 'f'}}, {"double", {8, 'f'}},
+    {"float64", {8, 'f'}}};
+  for (const auto& e : types)
+  {
+    if (name == e.first)
+    {
+      t = e.second;
+      return true;
+    }
+  }
+  return false;
+}
+
+// A property of a PLY element: a scalar of type ITEM, or a list of them
+// preceded by its length, of type COUNT
+struct plyprop
+{
+  string name;
+  bool list = false;
+  plytype count, item;
+};
+
+struct plyelement
+{
+  string name;
+  size_t n = 0;
+  vector<plyprop> props;
+};
+
+// True where the bytes of a number are stored least significant first
+bool
+littleendian ()
+{
+  const uint16_t one = 1;
+  unsigned char b;
+  std::memcpy (&b, &one, 1);
+  return b == 1;
+}
+
+// The mesh of a PLY file, ASCII or binary in either byte order.  The
+// vertices are the properties x, y and z of the element "vertex", the faces
+// the list "vertex_indices", or "vertex_index", of the element "face", from
+// 0; red, green and blue on either element are its colour, an integer type
+// scaled from 0 to its largest value, a float from 0 to 1.  Every other
+// element and property is read past.
+meshread
+readply (const string& file, const string& caller)
+{
+  const vector<char> buf = slurp (file, caller, "PLY");
+  const char *p = buf.data ();
+  const char *end = p + buf.size () - 1;
+  auto bad = [&] ()
+  {
+    error ("%s: FILE is not a readable PLY file.", caller.c_str ());
+  };
+
+  // The header, a line at a time up to "end_header"; FORMAT is 0 for ASCII,
+  // 1 for binary little-endian and 2 for binary big-endian
+  int format = -1;
+  vector<plyelement> elems;
+  for (bool first = true; ; first = false)
+  {
+    const char *e = static_cast<const char *> (std::memchr (p, '\n',
+                                                            end - p));
+    if (! e)
+    {
+      bad ();
+    }
+    std::istringstream line (string (p, e));
+    p = e + 1;
+    vector<string> w;
+    for (string t; line >> t; )
+    {
+      w.push_back (t);
+    }
+    if (first)
+    {
+      if (w.size () != 1 || w[0] != "ply")
+      {
+        bad ();
+      }
+    }
+    else if (w.empty () || w[0] == "comment" || w[0] == "obj_info")
+    {
+      continue;
+    }
+    else if (w[0] == "end_header")
+    {
+      break;
+    }
+    else if (w[0] == "format" && w.size () == 3)
+    {
+      format = (w[1] == "ascii") ? 0 : (w[1] == "binary_little_endian") ? 1
+               : (w[1] == "binary_big_endian") ? 2 : -1;
+      if (format < 0)
+      {
+        bad ();
+      }
+    }
+    else if (w[0] == "element" && w.size () == 3)
+    {
+      char *q;
+      plyelement el;
+      el.name = w[1];
+      el.n = std::strtoull (w[2].c_str (), &q, 10);
+      if (*q || w[2][0] == '-')
+      {
+        bad ();
+      }
+      elems.push_back (el);
+    }
+    else if (w[0] == "property" && ! elems.empty ())
+    {
+      plyprop pr;
+      if (w.size () == 5 && w[1] == "list")
+      {
+        pr.list = true;
+        if (! plytypeof (w[2], pr.count) || pr.count.kind == 'f'
+            || ! plytypeof (w[3], pr.item))
+        {
+          bad ();
+        }
+        pr.name = w[4];
+      }
+      else if (w.size () == 3 && plytypeof (w[1], pr.item))
+      {
+        pr.name = w[2];
+      }
+      else
+      {
+        bad ();
+      }
+      elems.back ().props.push_back (pr);
+    }
+    else
+    {
+      bad ();
+    }
+  }
+  if (format < 0)
+  {
+    bad ();
+  }
+
+  // One number of the body, of type T
+  const bool swap = (format == 1) != littleendian ();
+  auto value = [&] (const plytype& t) -> double
+  {
+    if (format == 0)
+    {
+      char *q;
+      const double x = std::strtod (p, &q);
+      if (q == p)
+      {
+        bad ();
+      }
+      p = q;
+      return x;
+    }
+    if (end - p < t.size)
+    {
+      bad ();
+    }
+    unsigned char b[8];
+    std::memcpy (b, p, t.size);
+    p += t.size;
+    if (swap)
+    {
+      std::reverse (b, b + t.size);
+    }
+    if (t.kind == 'f')
+    {
+      if (t.size == 4)
+      {
+        float x;
+        std::memcpy (&x, b, 4);
+        return x;
+      }
+      double x;
+      std::memcpy (&x, b, 8);
+      return x;
+    }
+    if (t.size == 1)
+    {
+      return (t.kind == 'u') ? static_cast<double> (b[0])
+                             : static_cast<double> (static_cast<int8_t> (b[0]));
+    }
+    if (t.size == 2)
+    {
+      uint16_t x;
+      std::memcpy (&x, b, 2);
+      return (t.kind == 'u') ? static_cast<double> (x)
+                             : static_cast<double> (static_cast<int16_t> (x));
+    }
+    uint32_t x;
+    std::memcpy (&x, b, 4);
+    return (t.kind == 'u') ? static_cast<double> (x)
+                           : static_cast<double> (static_cast<int32_t> (x));
+  };
+
+  // A colour as read, of type T, scaled to 0 to 1
+  auto colour = [&] (double x, const plytype& t)
+  {
+    if (t.kind == 'f')
+    {
+      return x;
+    }
+    const int bits = 8 * t.size - ((t.kind == 'i') ? 1 : 0);
+    return x / (std::ldexp (1.0, bits) - 1);
+  };
+
+  vector<double> V, VC, FC;
+  vector<int64_t> idx;
+  vector<size_t> start = {0};
+  for (const plyelement& el : elems)
+  {
+    const bool isv = (el.name == "vertex");
+    const bool isf = (el.name == "face");
+    // Where x, y and z, and red, green and blue, are among the properties
+    int at[6] = {-1, -1, -1, -1, -1, -1};
+    const char *named[6] = {"x", "y", "z", "red", "green", "blue"};
+    int list = -1;
+    for (size_t j = 0; j < el.props.size (); j++)
+    {
+      const plyprop& pr = el.props[j];
+      for (int c = 0; c < 6 && (isv || isf) && ! pr.list; c++)
+      {
+        if (pr.name == named[c] && (isv || c >= 3))
+        {
+          at[c] = j;
+        }
+      }
+      if (isf && pr.list && (pr.name == "vertex_indices"
+                             || pr.name == "vertex_index"))
+      {
+        list = j;
+      }
+    }
+    if ((isv && (at[0] < 0 || at[1] < 0 || at[2] < 0)) || (isf && list < 0))
+    {
+      bad ();
+    }
+    const bool hascolour = at[3] >= 0 && at[4] >= 0 && at[5] >= 0;
+    for (size_t i = 0; i < el.n; i++)
+    {
+      double got[6] = {0, 0, 0, 0, 0, 0};
+      for (size_t j = 0; j < el.props.size (); j++)
+      {
+        const plyprop& pr = el.props[j];
+        if (! pr.list)
+        {
+          const double x = value (pr.item);
+          for (int c = 0; c < 6; c++)
+          {
+            if (at[c] == static_cast<int> (j))
+            {
+              got[c] = (c < 3) ? x : colour (x, pr.item);
+            }
+          }
+          continue;
+        }
+        const double m = value (pr.count);
+        const bool corners = (list == static_cast<int> (j));
+        if (m < 0 || m != std::floor (m) || (corners && m < 3))
+        {
+          bad ();
+        }
+        for (size_t r = 0; r < static_cast<size_t> (m); r++)
+        {
+          const double x = value (pr.item);
+          if (corners)
+          {
+            if (x != std::floor (x))
+            {
+              bad ();
+            }
+            idx.push_back (static_cast<int64_t> (x));
+          }
+        }
+        if (corners)
+        {
+          start.push_back (idx.size ());
+        }
+      }
+      if (hascolour && ! iscolour (got + 3))
+      {
+        error ("%s: a colour in FILE is outside 0 to 1.", caller.c_str ());
+      }
+      if (isv)
+      {
+        for (int c = 0; c < 3; c++)
+        {
+          if (! std::isfinite (got[c]))
+          {
+            bad ();
+          }
+        }
+        V.insert (V.end (), got, got + 3);
+        if (hascolour)
+        {
+          VC.insert (VC.end (), got + 3, got + 6);
+        }
+      }
+      if (isf && hascolour)
+      {
+        FC.insert (FC.end (), got + 3, got + 6);
+      }
+    }
+  }
+  if (VC.size () != V.size ())
+  {
+    VC.clear ();
+  }
+  if (FC.size () != 3 * (start.size () - 1))
+  {
+    FC.clear ();
+  }
+  return facemesh (V, VC, idx, start, FC, caller);
+}
+
+// X in the bytes of its little-endian form, appended to OUT
+template <typename T>
+void
+putle (string& out, T x)
+{
+  unsigned char b[sizeof (T)];
+  std::memcpy (b, &x, sizeof (T));
+  if (! littleendian ())
+  {
+    std::reverse (b, b + sizeof (T));
+  }
+  out.append (reinterpret_cast<const char *> (b), sizeof (T));
+}
+
+// X in text, appended to OUT: a double in the fewest digits that read back
+// as the same double, an integer in full
+template <typename T>
+void
+puttext (string& out, T x)
+{
+  char b[32];
+  const auto r = std::to_chars (b, b + sizeof (b), x);
+  out.append (b, r.ptr);
+}
+
+// TEXT written to FILE, or an error under CALLER
+void
+putfile (const string& file, const string& caller, const string& text)
+{
+  FILE *f = std::fopen (file.c_str (), "wb");
+  if (! f)
+  {
+    error ("%s: cannot open '%s' for writing.", caller.c_str (),
+           file.c_str ());
+  }
+  const bool put = std::fwrite (text.data (), 1, text.size (), f)
+                   == text.size ();
+  if (std::fclose (f) != 0 || ! put)
+  {
+    error ("%s: cannot write '%s'.", caller.c_str (), file.c_str ());
+  }
+}
+
+// The mesh V, F, its faces indices into V from 1, with the colours VC of
+// its vertices and FC of its faces, each empty for none, written to FILE as
+// FORMAT: "stl", always binary and without colours; "obj", always text, the
+// face colours as materials in a library beside it, FILE with the extension
+// ".mtl"; or "ply", BINARY little-endian or ASCII
+void
+writemesh (const string& file, const string& caller, const Matrix& V,
+           const Matrix& F, const Matrix& VC, const Matrix& FC,
+           const string& format, bool binary)
+{
+  const string stamp
+    = "Generated by the drafting package: polymesh.Mesh.write";
+  const octave_idx_type nv = V.rows ();
+  const octave_idx_type nf = F.rows ();
+  const bool vc = VC.rows () > 0;
+  const bool fc = FC.rows () > 0;
+  string out;
+  if (format == "stl")
+  {
+    out = stamp;
+    out.resize (80, '\0');
+    putle<uint32_t> (out, nf);
+    for (octave_idx_type t = 0; t < nf; t++)
+    {
+      double P[3][3];
+      for (int i = 0; i < 3; i++)
+        for (int c = 0; c < 3; c++)
+        {
+          P[i][c] = V(static_cast<octave_idx_type> (F(t,i)) - 1, c);
+        }
+      const double a[3] = {P[1][0] - P[0][0], P[1][1] - P[0][1],
+                           P[1][2] - P[0][2]};
+      const double b[3] = {P[2][0] - P[0][0], P[2][1] - P[0][1],
+                           P[2][2] - P[0][2]};
+      double n[3] = {a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2],
+                     a[0] * b[1] - a[1] * b[0]};
+      const double L = std::sqrt (n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
+      for (int c = 0; c < 3; c++)
+      {
+        putle<float> (out, (L > 0) ? n[c] / L : n[c]);
+      }
+      for (int i = 0; i < 3; i++)
+        for (int c = 0; c < 3; c++)
+        {
+          putle<float> (out, P[i][c]);
+        }
+      putle<uint16_t> (out, 0);
+    }
+  }
+  else if (format == "obj")
+  {
+    out = "# " + stamp + "\n";
+    string mtl;
+    if (fc)
+    {
+      const string lib = file.substr (0, file.find_last_of ('.')) + ".mtl";
+      const size_t k = lib.find_last_of ("/\\");
+      out += "mtllib " + lib.substr (k == string::npos ? 0 : k + 1) + "\n";
+      mtl = "# " + stamp + "\n";
+      std::map<std::array<double, 3>, int> id;
+      for (octave_idx_type t = 0; t < nf; t++)
+      {
+        const std::array<double, 3> c = {FC(t,0), FC(t,1), FC(t,2)};
+        if (id.count (c) == 0)
+        {
+          const int n = id.size () + 1;
+          id[c] = n;
+          mtl += "\nnewmtl colour" + std::to_string (n) + "\nKd";
+          for (int j = 0; j < 3; j++)
+          {
+            mtl += ' ';
+            puttext (mtl, c[j]);
+          }
+          mtl += '\n';
+        }
+      }
+      putfile (lib, caller, mtl);
+    }
+    for (octave_idx_type i = 0; i < nv; i++)
+    {
+      out += 'v';
+      for (int c = 0; c < 6 && (c < 3 || vc); c++)
+      {
+        out += ' ';
+        puttext (out, (c < 3) ? V(i,c) : VC(i,c-3));
+      }
+      out += '\n';
+    }
+    std::map<std::array<double, 3>, int> id;
+    int current = 0;
+    for (octave_idx_type t = 0; t < nf; t++)
+    {
+      if (fc)
+      {
+        const std::array<double, 3> c = {FC(t,0), FC(t,1), FC(t,2)};
+        if (id.count (c) == 0)
+        {
+          const int n = id.size () + 1;
+          id[c] = n;
+        }
+        if (id[c] != current)
+        {
+          current = id[c];
+          out += "usemtl colour" + std::to_string (current) + "\n";
+        }
+      }
+      out += 'f';
+      for (int c = 0; c < 3; c++)
+      {
+        out += ' ';
+        puttext (out, static_cast<int64_t> (F(t,c)));
+      }
+      out += '\n';
+    }
+  }
+  else
+  {
+    const string rgb = "property uchar red\nproperty uchar green\n"
+                       "property uchar blue\n";
+    out = "ply\nformat " + string (binary ? "binary_little_endian" : "ascii")
+          + " 1.0\ncomment " + stamp + "\nelement vertex "
+          + std::to_string (nv) + "\nproperty double x\nproperty double y\n"
+          + "property double z\n" + (vc ? rgb : "") + "element face "
+          + std::to_string (nf)
+          + "\nproperty list uchar int vertex_indices\n" + (fc ? rgb : "")
+          + "end_header\n";
+    auto putcolour = [&] (const Matrix& C, octave_idx_type i)
+    {
+      for (int c = 0; c < 3; c++)
+      {
+        const uint8_t u = static_cast<uint8_t> (std::lround (255 * C(i,c)));
+        if (binary)
+        {
+          putle<uint8_t> (out, u);
+        }
+        else
+        {
+          out += ' ';
+          puttext (out, static_cast<int> (u));
+        }
+      }
+    };
+    for (octave_idx_type i = 0; i < nv; i++)
+    {
+      for (int c = 0; c < 3; c++)
+      {
+        if (binary)
+        {
+          putle<double> (out, V(i,c));
+        }
+        else
+        {
+          if (c > 0)
+          {
+            out += ' ';
+          }
+          puttext (out, V(i,c));
+        }
+      }
+      if (vc)
+      {
+        putcolour (VC, i);
+      }
+      if (! binary)
+      {
+        out += '\n';
+      }
+    }
+    for (octave_idx_type t = 0; t < nf; t++)
+    {
+      if (binary)
+      {
+        putle<uint8_t> (out, 3);
+      }
+      else
+      {
+        out += '3';
+      }
+      for (int c = 0; c < 3; c++)
+      {
+        const int32_t i = static_cast<int32_t> (F(t,c)) - 1;
+        if (binary)
+        {
+          putle<int32_t> (out, i);
+        }
+        else
+        {
+          out += ' ';
+          puttext (out, i);
+        }
+      }
+      if (fc)
+      {
+        putcolour (FC, t);
+      }
+      if (! binary)
+      {
+        out += '\n';
+      }
+    }
+  }
+  putfile (file, caller, out);
+}
+
 }
 
 DEFUN_DLD (__mesh__, args, ,
@@ -2457,13 +3516,82 @@ Undocumented internal function.\n\
   const string cmd = args(0).string_value ();
   const string caller = args(1).string_value ();
 
-  // [V, F] = __mesh__ ('read', caller, FILE, TOL)
+  // [V, F, VC, FC] = __mesh__ ('read', caller, FILE, TOL, FORMAT), FORMAT
+  // "stl", "obj" or "ply": the vertices and faces, the colours of the
+  // vertices and of the faces, each empty for none.  Welded vertices take
+  // the mean colour of the vertices of the file welded into them.
   if (cmd == "read")
   {
-    Matrix V, F;
-    weld (readstl (args(2).string_value (), caller), args(3).double_value (),
-          V, F);
-    return ovl (V, F);
+    if (args.length () != 5)
+    {
+      print_usage ();
+    }
+    const string file = args(2).string_value ();
+    const string format = args(4).string_value ();
+    meshread m;
+    if (format == "obj")
+    {
+      m = readobj (file, caller);
+    }
+    else if (format == "ply")
+    {
+      m = readply (file, caller);
+    }
+    else
+    {
+      m.xyz = readstl (file, caller);
+    }
+    Matrix V, F, VC, FC;
+    vector<octave_idx_type> id, keep;
+    weld (m.xyz, args(3).double_value (), V, F, id, keep);
+    if (! m.vcol.empty ())
+    {
+      VC = Matrix (V.rows (), 3, 0.0);
+      vector<int> n (V.rows (), 0);
+      std::set<std::pair<octave_idx_type, int64_t>> seen;
+      for (size_t i = 0; i < id.size (); i++)
+      {
+        if (seen.insert ({id[i], m.src[i]}).second)
+        {
+          for (int c = 0; c < 3; c++)
+          {
+            VC(id[i],c) += m.vcol[3 * i + c];
+          }
+          n[id[i]]++;
+        }
+      }
+      for (octave_idx_type i = 0; i < V.rows (); i++)
+        for (int c = 0; c < 3; c++)
+        {
+          VC(i,c) /= n[i];
+        }
+    }
+    if (! m.fcol.empty ())
+    {
+      FC = Matrix (keep.size (), 3);
+      for (size_t r = 0; r < keep.size (); r++)
+        for (int c = 0; c < 3; c++)
+        {
+          FC(r,c) = m.fcol[3 * keep[r] + c];
+        }
+    }
+    return ovl (V, F, VC, FC);
+  }
+
+  // __mesh__ ('write', caller, FILE, V, F, VC, FC, FORMAT, BINARY): the
+  // mesh V, F, with the colours VC of its vertices and FC of its faces,
+  // each empty for none, written to FILE as FORMAT, "stl", "obj" or "ply"
+  else if (cmd == "write")
+  {
+    if (args.length () != 9)
+    {
+      print_usage ();
+    }
+    writemesh (args(2).string_value (), caller, args(3).matrix_value (),
+               args(4).matrix_value (), args(5).matrix_value (),
+               args(6).matrix_value (), args(7).string_value (),
+               args(8).bool_value ());
+    return ovl ();
   }
 
   // [PIECES, OPEN] = __mesh__ ('section', caller, V, F, TOL), the vertices

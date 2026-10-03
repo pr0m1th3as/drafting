@@ -40,7 +40,7 @@ classdef UCS
   ## mouse in a viewer, or by @code{geom.UCS.threepoint} from three points.
   ## It is a value and never changes.
   ##
-  ## @seealso{geom.Polyline, geom.Region, solid.Viewer.pickucs}
+  ## @seealso{geom.Polyline, geom.Region, model.Viewer.pickucs}
   ## @end deftp
 
   properties (SetAccess = private)
@@ -155,10 +155,10 @@ classdef UCS
     ## @math{xy} plane, with its origin at the world origin.
     ##
     ## @code{@var{U} = geom.UCS (@var{V})} picks one with the mouse in the
-    ## viewer @var{V}, a @code{solid.Viewer} showing a shape: a flat face and
+    ## viewer @var{V}, a @code{model.Viewer} showing a shape: a flat face and
     ## two points for the axes, then the origin.  With @var{MODE}
     ## @qcode{'points'} three points give the axes instead of a face and two.
-    ## See @code{solid.Viewer.pickucs}.
+    ## See @code{model.Viewer.pickucs}.
     ##
     ## @code{@var{U} = geom.UCS (@var{NORMAL}, @var{ORIGIN}, @var{XPOINT})}
     ## lays the plane square to the direction @var{NORMAL} through the point
@@ -208,7 +208,7 @@ classdef UCS
         V = varargin{1};
         if (! isobject (V) || ! isscalar (V) || ! ismethod (V, 'pickucs'))
           error (strcat ("geom.UCS: V must be a viewer to pick in, such as", ...
-                         " a solid.Viewer."));
+                         " a model.Viewer."));
         endif
         U = pickucs (V, varargin{2:end});
         this.Origin = U.Origin;
@@ -451,9 +451,9 @@ endfunction
 %!error<geom.UCS.eq: both operands must be geom.UCS objects.> ...
 %! geom.UCS () == 1
 
-%!error<geom.UCS: V must be a viewer to pick in, such as a solid.Viewer.> ...
+%!error<geom.UCS: V must be a viewer to pick in, such as a model.Viewer.> ...
 %! geom.UCS ([0, 0, 1])
-%!error<geom.UCS: V must be a viewer to pick in, such as a solid.Viewer.> ...
+%!error<geom.UCS: V must be a viewer to pick in, such as a model.Viewer.> ...
 %! geom.UCS (geom.UCS ())
 %!error<geom.UCS: NORMAL must be a nonzero real 3-element vector of finite values.> ...
 %! geom.UCS ([0, 0, 0], [0, 0, 0])

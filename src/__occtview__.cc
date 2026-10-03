@@ -17,20 +17,33 @@ You should have received a copy of the GNU General Public License along with
 this program; if not, see <http://www.gnu.org/licenses/>.
 */
 
-// The viewer behind solid.show and solid.Viewer: an Open CASCADE view in a
-// window of its own, run as a separate process so that drawing never blocks
-// Octave.  It reads commands from stdin and writes replies to stdout, one line
-// each:
+// The viewer behind model.Viewer and the show methods: an Open CASCADE view
+// in a window of its own, run as a separate process so that drawing never
+// blocks Octave.  It reads commands from stdin and writes replies to stdout,
+// one line each:
 //
 //   shape N        followed by N bytes of a shape in Open CASCADE's binary
 //                  format; replaces the shape shown, keeping the camera, or
 //                  clears the view when N is zero
-//   mesh NV NF     followed by NV vertices, three doubles each, and NF
-//                  triangles, three 0-based uint32 indices each; replaces the
-//                  shape shown with the triangle mesh, flat shaded
+//   mesh NV NF CK  followed by NV vertices, three doubles each, NF
+//                  triangles, three 0-based uint32 indices each, and the
+//                  colours CK names, a sum of 1 for the vertices' and 2 for
+//                  the faces', three uint8 each, the vertices' first;
+//                  replaces the shape shown with the triangle mesh, flat
+//                  shaded
+//   colours LOOK   LOOK is face, vertex or grey: how a mesh is coloured,
+//                  as the C key chooses, where the mesh has those colours
+//   edges ON       ON is on or off: whether a mesh's triangle edges are
+//                  drawn, as the E key turns them
+//   getlook        replies "look LOOK EDGES", the colouring shown and
+//                  whether the edges are drawn
 //   pick KIND      KIND is edge, face or any: clicks toggle a selection until
 //                  Enter, which replies with "edge K" and "face K" lines and
-//                  then "done", or Escape, which replies "cancel"
+//                  then "done", or Escape, which replies "cancel".  On a mesh
+//                  each click adds the point it hits, marked, and Enter
+//                  replies with a line "point X Y Z K NX NY NZ" for each, K
+//                  the 1-based triangle hit and N its normal by the order of
+//                  its corners
 //   pickone KIND   KIND is face or point: the next click replies at once with
 //                  "face K X Y Z", the face and the point on it, or with
 //                  "point X Y Z SNAP", the point snapped to a vertex, the
@@ -41,7 +54,8 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 //                  and the point on it, and a point snaps to a corner of the
 //                  triangle or the midpoint of one of its sides, near enough
 //                  on the screen, or else lies on it
-//   enter          during a pickone, as the Enter key: replies "skip"
+//   enter          as the Enter key: during a pickone replies "skip", and
+//                  during a pick finishes it
 //   prompt TEXT    shows TEXT at the foot of the view, a backslash and n
 //                  starting a new line; no TEXT clears it
 //   clearmarks     removes the marks of picked points
@@ -89,12 +103,18 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <BRep_Tool.hxx>
 #include <Geom_CartesianPoint.hxx>
 #include <BinTools.hxx>
+#include <Graphic3d_ArrayOfSegments.hxx>
+#include <Graphic3d_ArrayOfTriangles.hxx>
+#include <Graphic3d_AspectFillArea3d.hxx>
+#include <Graphic3d_AspectLine3d.hxx>
+#include <Graphic3d_Group.hxx>
 #include <Graphic3d_TransformPers.hxx>
 #include <Message.hxx>
 #include <Message_Messenger.hxx>
 #include <OpenGl_GraphicDriver.hxx>
 #include <Prs3d_Drawer.hxx>
 #include <Prs3d_LineAspect.hxx>
+#include <Prs3d_ShadingAspect.hxx>
 #include <Quantity_Color.hxx>
 #include <Poly_Triangulation.hxx>
 #include <Select3D_SensitiveTriangulation.hxx>
@@ -185,6 +205,74 @@ class pickshape : public AIS_Shape
 public:
 
   pickshape (const TopoDS_Shape& s) : AIS_Shape (s) { }
+
+  // A triangle mesh draws its own shading: each node of its triangulation
+  // lit by its normal and, unless COLOURS is empty, painted its colour, and
+  // over it the segments EDGES when they are not null
+  bool mesh = false;
+  vector<Quantity_Color> colours;
+  Handle (Graphic3d_ArrayOfSegments) edges;
+
+  void Compute (const Handle (PrsMgr_PresentationManager)& mgr,
+                const Handle (Prs3d_Presentation)& prs,
+                const Standard_Integer mode) override
+  {
+    if (! mesh || mode != AIS_Shaded)
+    {
+      AIS_Shape::Compute (mgr, prs, mode);
+      return;
+    }
+    TopLoc_Location loc;
+    const Handle (Poly_Triangulation) tri
+      = BRep_Tool::Triangulation (TopoDS::Face (myshape), loc);
+    if (tri.IsNull ())
+    {
+      return;
+    }
+    const int n = tri->NbNodes ();
+    const bool painted = ! colours.empty ();
+    Handle (Graphic3d_ArrayOfTriangles) a
+      = new Graphic3d_ArrayOfTriangles (n, 0, painted
+                                        ? Graphic3d_ArrayFlags_VertexNormal
+                                          | Graphic3d_ArrayFlags_VertexColor
+                                        : Graphic3d_ArrayFlags_VertexNormal);
+    for (int i = 1; i <= n; i++)
+    {
+      if (painted)
+      {
+        a->AddVertex (tri->Node (i), tri->Normal (i), colours[i - 1]);
+      }
+      else
+      {
+        a->AddVertex (tri->Node (i), tri->Normal (i));
+      }
+    }
+    // A colour shows as itself, lit, over a white material; the facets sit
+    // a little behind their edges, so that the edges are not lost in them
+    Handle (Graphic3d_AspectFillArea3d) fill
+      = new Graphic3d_AspectFillArea3d (*myDrawer->ShadingAspect ()->Aspect ());
+    if (painted)
+    {
+      Graphic3d_MaterialAspect m = fill->FrontMaterial ();
+      m.SetColor (Quantity_NOC_WHITE);
+      fill->SetFrontMaterial (m);
+      fill->SetBackMaterial (m);
+      fill->SetInteriorColor (Quantity_NOC_WHITE);
+    }
+    fill->SetPolygonOffsets (Aspect_POM_Fill, 1.0f, 1.0f);
+    Handle (Graphic3d_Group) g = prs->NewGroup ();
+    g->SetGroupPrimitivesAspect (fill);
+    g->AddPrimitiveArray (a);
+    if (! edges.IsNull ())
+    {
+      Handle (Graphic3d_Group) e = prs->NewGroup ();
+      e->SetGroupPrimitivesAspect
+        (new Graphic3d_AspectLine3d (Quantity_Color (0.2, 0.2, 0.2,
+                                                     Quantity_TOC_sRGB),
+                                     Aspect_TOL_SOLID, 1.0));
+      e->AddPrimitiveArray (edges);
+    }
+  }
 
   void ComputeSelection (const Handle (SelectMgr_Selection)& sel,
                          const Standard_Integer mode) override
@@ -330,9 +418,30 @@ public:
     }
     else if (cmd == "mesh")
     {
-      size_t nv, nf;
-      in >> nv >> nf;
+      size_t nv, nf, ck = 0;
+      in >> nv >> nf >> ck;
+      meshlooks (data, nv, nf, ck);
       setshape (meshface (data, nv, nf), true);
+    }
+    else if (cmd == "colours")
+    {
+      string look;
+      in >> look;
+      m_look = (look == "face") ? 0 : (look == "vertex") ? 1 : 2;
+      restyle ();
+    }
+    else if (cmd == "edges")
+    {
+      string on;
+      in >> on;
+      m_edgeson = (on == "on");
+      restyle ();
+    }
+    else if (cmd == "getlook")
+    {
+      static const char *looks[3] = {"face", "vertex", "grey"};
+      reply (string ("look ") + looks[look ()] + " "
+             + (m_edgeson ? "on" : "off"));
     }
     else if (cmd == "pick")
     {
@@ -373,6 +482,10 @@ public:
       if (m_one != 0)
       {
         endone ("skip");
+      }
+      else if (m_pick != 0)
+      {
+        finish (true);
       }
     }
     else if (cmd == "prompt")
@@ -427,6 +540,11 @@ public:
       if (m_one != 0)
       {
         onepick (px, py);
+      }
+      else if (m_pick != 0 && m_mesh)
+      {
+        meshadd (px, py);
+        reply ("selected " + to_string (m_points.size ()));
       }
       else
       {
@@ -518,6 +636,26 @@ public:
       case Aspect_VKey_F:
         m_view->FitAll (0.05, Standard_False);
         break;
+      case Aspect_VKey_C:
+        if (m_mesh)
+        {
+          int k = look ();
+          do
+          {
+            k = (k + 1) % 3;
+          }
+          while (! haslook (k));
+          m_look = k;
+          restyle ();
+        }
+        break;
+      case Aspect_VKey_E:
+        if (m_mesh)
+        {
+          m_edgeson = ! m_edgeson;
+          restyle ();
+        }
+        break;
       case Aspect_VKey_0:
         turn (V3d_XposYnegZpos);
         break;
@@ -542,11 +680,19 @@ protected:
   void handleSelectionPick (const Handle (AIS_InteractiveContext)& ctx,
                             const Handle (V3d_View)& view) override
   {
-    if (m_one != 0 && ! myGL.Selection.Points.IsEmpty ())
+    if ((m_one != 0 || (m_pick != 0 && m_mesh))
+        && ! myGL.Selection.Points.IsEmpty ())
     {
       const Graphic3d_Vec2i p = myGL.Selection.Points.Last ();
       myGL.Selection.Points.Clear ();
-      onepick (p.x (), p.y ());
+      if (m_one != 0)
+      {
+        onepick (p.x (), p.y ());
+      }
+      else
+      {
+        meshadd (p.x (), p.y ());
+      }
       return;
     }
     AIS_ViewController::handleSelectionPick (ctx, view);
@@ -588,6 +734,93 @@ private:
     return face;
   }
 
+  // The looks of the triangle mesh in DATA, NV vertices and NF triangles,
+  // with the colours CK names: the colour of each node of its triangulation
+  // from the colours of its faces and from those of its vertices, each empty
+  // when the mesh has none, and its edges, each once
+  void meshlooks (const string& data, size_t nv, size_t nf, size_t ck)
+  {
+    const double *v = reinterpret_cast<const double *> (data.data ());
+    const uint32_t *f = reinterpret_cast<const uint32_t *>
+                          (data.data () + 24 * nv);
+    const unsigned char *rgb = reinterpret_cast<const unsigned char *>
+                                 (data.data () + 24 * nv + 12 * nf);
+    const unsigned char *vrgb = (ck & 1) ? rgb : nullptr;
+    const unsigned char *frgb = (ck & 2) ? rgb + ((ck & 1) ? 3 * nv : 0)
+                                         : nullptr;
+    auto colour = [] (const unsigned char *q)
+    {
+      return Quantity_Color (q[0] / 255.0, q[1] / 255.0, q[2] / 255.0,
+                             Quantity_TOC_sRGB);
+    };
+    m_vcolours.clear ();
+    m_fcolours.clear ();
+    std::set<std::pair<uint32_t, uint32_t>> seen;
+    for (size_t t = 0; t < nf; t++)
+      for (int k = 0; k < 3; k++)
+      {
+        if (vrgb)
+        {
+          m_vcolours.push_back (colour (vrgb + 3 * f[3 * t + k]));
+        }
+        if (frgb)
+        {
+          m_fcolours.push_back (colour (frgb + 3 * t));
+        }
+        const uint32_t a = f[3 * t + k];
+        const uint32_t b = f[3 * t + (k + 1) % 3];
+        seen.insert ({std::min (a, b), std::max (a, b)});
+      }
+    m_edgelines = new Graphic3d_ArrayOfSegments (2 * seen.size ());
+    for (const auto& e : seen)
+    {
+      const double *p = v + 3 * static_cast<size_t> (e.first);
+      const double *q = v + 3 * static_cast<size_t> (e.second);
+      m_edgelines->AddVertex (gp_Pnt (p[0], p[1], p[2]));
+      m_edgelines->AddVertex (gp_Pnt (q[0], q[1], q[2]));
+    }
+  }
+
+  // True where the mesh shown has the colouring K: 0 its faces' colours, 1
+  // its vertices', 2 grey
+  bool haslook (int k) const
+  {
+    return k == 2 || (k == 0 ? ! m_fcolours.empty () : ! m_vcolours.empty ());
+  }
+
+  // The colouring shown: the one chosen where the mesh has it, else the
+  // first it has of its faces' colours, its vertices' and grey
+  int look () const
+  {
+    if (haslook (m_look))
+    {
+      return m_look;
+    }
+    return haslook (0) ? 0 : haslook (1) ? 1 : 2;
+  }
+
+  // Dress the mesh PS in the colouring and the edges chosen
+  void dress (const Handle (pickshape)& ps) const
+  {
+    const int k = look ();
+    ps->colours = (k == 0) ? m_fcolours : (k == 1) ? m_vcolours
+                                                    : vector<Quantity_Color> ();
+    ps->edges = m_edgeson ? m_edgelines : Handle (Graphic3d_ArrayOfSegments) ();
+  }
+
+  // Redraw the mesh shown in the colouring and the edges chosen
+  void restyle ()
+  {
+    Handle (pickshape) ps = Handle (pickshape)::DownCast (m_shape);
+    if (! m_mesh || ps.IsNull ())
+    {
+      return;
+    }
+    dress (ps);
+    ps->SetToUpdate ();
+    m_context->Redisplay (ps, Standard_False);
+  }
+
   // The corners of the triangle of a mesh that the last detection found
   bool facet (gp_Pnt c[3]) const
   {
@@ -596,6 +829,29 @@ private:
           (m_context->MainSelector ()->PickedEntity (1));
     Poly_Triangle t;
     return ! e.IsNull () && e->LastDetectedTriangle (t, c);
+  }
+
+  // A click during a pick on a mesh: the point it hits on a triangle, kept
+  // with the index of the triangle and its normal, and marked
+  void meshadd (int px, int py)
+  {
+    m_context->MoveTo (px, py, m_view, Standard_False);
+    gp_Pnt c[3];
+    if (m_context->HasDetected () && facet (c))
+    {
+      Handle (Select3D_SensitiveTriangulation) e
+        = Handle (Select3D_SensitiveTriangulation)::DownCast
+            (m_context->MainSelector ()->PickedEntity (1));
+      const gp_Vec n = gp_Vec (c[0], c[1]).Crossed (gp_Vec (c[0], c[2]));
+      if (n.Magnitude () > 0)
+      {
+        const gp_Pnt hit = m_context->MainSelector ()->PickedPoint (1);
+        m_points.push_back ({hit, e->LastDetectedTriangleIndex (),
+                             gp_Dir (n)});
+        mark (hit);
+      }
+    }
+    m_context->ClearDetected (Standard_False);
   }
 
   // A pickone on a mesh: the triangle at the pixel PX, PY, as its normal and
@@ -854,11 +1110,14 @@ private:
                                 Standard_True);
     }
 
-    m_shape = new pickshape (s);
+    Handle (pickshape) ps = new pickshape (s);
+    ps->mesh = mesh;
     if (mesh)
     {
-      m_shape->Attributes ()->SetAutoTriangulation (Standard_False);
+      ps->Attributes ()->SetAutoTriangulation (Standard_False);
+      dress (ps);
     }
+    m_shape = ps;
     m_shape->SetColor (Quantity_Color (0.72, 0.74, 0.78, Quantity_TOC_sRGB));
     m_shape->SetMaterial (Graphic3d_NameOfMaterial_Plastified);
     // Displayed selectable, which no later activation can make it if it is
@@ -937,6 +1196,23 @@ private:
 
   void finish (bool accept)
   {
+    for (const meshpoint& q : m_points)
+    {
+      if (accept)
+      {
+        reply ("point" + num (q.p) + " " + to_string (q.tri)
+               + num (gp_Pnt (q.n.XYZ ())));
+      }
+    }
+    if (! m_points.empty ())
+    {
+      m_points.clear ();
+      for (const Handle (AIS_Point)& m : m_marks)
+      {
+        m_context->Remove (m, Standard_False);
+      }
+      m_marks.clear ();
+    }
     if (accept)
     {
       for (m_context->InitSelected (); m_context->MoreSelected ();
@@ -995,6 +1271,18 @@ private:
   int m_one = 0;
   bool m_mesh = false;
   bool m_quit = false;
+  struct meshpoint
+  {
+    gp_Pnt p;
+    int tri;
+    gp_Dir n;
+  };
+  vector<meshpoint> m_points;
+  vector<Quantity_Color> m_vcolours;
+  vector<Quantity_Color> m_fcolours;
+  Handle (Graphic3d_ArrayOfSegments) m_edgelines;
+  int m_look = 0;
+  bool m_edgeson = false;
 };
 
 int
@@ -1059,7 +1347,10 @@ main (int argc, char **argv)
       {
         char *q;
         const size_t nv = strtoul (line.c_str () + 5, &q, 10);
-        need = 24 * nv + 12 * strtoul (q, nullptr, 10);
+        const size_t nf = strtoul (q, &q, 10);
+        const size_t ck = strtoul (q, nullptr, 10);
+        need = 24 * nv + 12 * nf + ((ck & 1) ? 3 * nv : 0)
+               + ((ck & 2) ? 3 * nf : 0);
       }
       if (pending.size () < eol + 1 + need)
       {

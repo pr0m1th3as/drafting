@@ -9,22 +9,22 @@ CAD program or a CNC machine will accept, as a solid for a slicer, as LaTeX for
 a report, or as a figure on screen. Solids proper, built, combined and
 exchanged as STEP, come through Open CASCADE when the package is built with it.
 
-Forty-nine public functions across five namespaces plus the `draw.Drawing`,
+Forty-six public functions across five namespaces plus the `draw.Drawing`,
 `geom.Polyline`, `geom.Spline`, `geom.Region`, `geom.Path`, `geom.UCS`,
-`solid.Shape` and `solid.Viewer` classes, 1683 built-in self-tests and 67 `%!demo` blocks, nearly all of which
-end in a `plot` call, so the documentation shows what a function does rather
-than only describing it.
+`polymesh.Mesh`, `solid.Shape` and `model.Viewer` classes, 1755 built-in
+self-tests and 67 `%!demo` blocks, nearly all of which end in a `plot` call, so
+the documentation shows what a function does rather than only describing it.
 
 ## Layout
 
 ```
 inst/+geom      planar geometry (no file formats, no drawing semantics)
 inst/+dxf       AutoCAD R12 (AC1009) ASCII DXF, both directions
-inst/+polymesh  STL meshes read and cut, and written from planar sections
+inst/+polymesh  STL, OBJ and PLY meshes read, written and cut
 inst/+draw      format-agnostic drawing model, and the backends that render it
 inst/+solid     solids through Open CASCADE, STEP and STL
 inst/tests      classdef .m-tst suites
-src             compiled code: STL meshes, and the interface to Open CASCADE
+src             compiled code: meshes, and the interface to Open CASCADE
 ```
 
 Dependencies point downward only: `+draw` builds on `+geom` and emits through
@@ -100,31 +100,21 @@ from a file, with its block definitions, back into a `Drawing`. Dimensions come
 back as dimensions and measure their geometry again, so a DXF is a round trip
 rather than a one-way door.
 
-Solids come from the same planar model:
-
-```
-polymesh.write ('plate.stl', [-40, -40; 40, -40; 40, 40; -40, 40], [0, 6]);
-```
-
-`polymesh.write` also takes a struct array of sections, each with its own
-profile, `z` range and holes, which expresses a stepped or eccentric shaft
-without leaving the planar model. Each section is written as its own closed shell, so a
-single section is a closed manifold and a stack of several is not. Slicers
-union it without complaint; a tool demanding one closed surface will not.
-
-`polymesh.read` reads a binary or ASCII STL into the vertices and faces `patch`
-takes, welding the corners every triangle repeats. `polymesh.section` cuts the
-mesh with the plane of a `geom.UCS` into `geom.Region` objects, as
-`solid.Shape.section` cuts a solid, healing small gaps in the mesh to a
-tolerance and returning what will not close; the regions build solids like any
-others. `fit` on a region turns the cut's facets back into lines, arcs and
-splines within a tolerance, absolute or relative, so a faceted bore is a
-circle again and a filleted corner an arc. All three are compiled and need
-nothing but Octave:
+`polymesh.read` reads an STL, OBJ or PLY file, binary or ASCII, into a
+`polymesh.Mesh`, with the colours of its vertices or faces where the file has
+them, cutting faces of more than three corners into triangles and welding the
+corners an STL file repeats. Its `write` saves a mesh to any of the three, OBJ
+and PLY exactly, and its `section` cuts it with the plane of a `geom.UCS` into
+`geom.Region` objects, as `solid.Shape.section` cuts a solid, healing small gaps
+in the mesh to a tolerance and returning what will not close; the regions build
+solids like any others. `fit` on a region turns the cut's facets back into
+lines, arcs and splines within a tolerance, absolute or relative, so a faceted
+bore is a circle again and a filleted corner an arc. All of them are compiled
+and need nothing but Octave:
 
 ```
 M = polymesh.read ('bracket.stl');
-R = polymesh.section (M, geom.UCS ([0, 0, 1], [0, 0, 5]));
+R = section (M, geom.UCS ([0, 0, 1], [0, 0, 5]));
 R = fit (R{1}, 'arcs', 'AbsTol', 0.01);
 ```
 
@@ -161,16 +151,16 @@ section.UCS = geom.UCS ([0, -1, 0], [0, 0, 0]);  # the xz plane: y is world z
 shaft = solid.revolve (section);                  # turned about z
 ```
 
-`solid.show` shows a solid in a window Open CASCADE draws in a process of its
-own, so a complex part turns smoothly and never holds up the prompt. Every
-variable gets a window of its own, titled with its name; showing it again
-redraws that window and keeps the camera, as does assigning to the `Shape` of
-the viewer it returns. `pick` on the viewer returns the edges and faces
-clicked, and prints the `edges` or `faces` query that finds them again, for the
-script to use in place of the numbers:
+`show` shows a solid in a `model.Viewer`, a window Open CASCADE draws in a
+process of its own, so a complex part turns smoothly and never holds up the
+prompt. Every variable gets a window of its own, titled with its name; showing
+it again redraws that window and keeps the camera, as does assigning to the
+`Shape` of the viewer it returns. `pick` on the viewer returns the edges and
+faces clicked, and prints the `edges` or `faces` query that finds them again,
+for the script to use in place of the numbers:
 
 ```
-V = solid.show (plate);
+V = show (plate);
 E = pick (V, 'edge');     # click edges, then press Enter
 U = geom.UCS (V);         # click a face, two points for +x, then the origin
 ```
@@ -181,15 +171,17 @@ moves it there, so a profile drawn in the xy plane is laid on any face of a
 part. It is made from a normal and points, or picked with the mouse as above,
 and the pick prints the line that makes it again from coordinates.
 
-The viewer shows a triangle mesh from `polymesh.read` as well, millions of
-triangles shaded facet by facet, and a UCS picked on it, from a facet or three
-points snapped to corners and the middles of sides, is the plane to cut it
-with:
+The viewer shows a `polymesh.Mesh` as well, millions of triangles shaded facet
+by facet in its faces' colours, its vertices' or grey, which the key C turns
+between, with its triangle edges drawn when the key E asks for them. A UCS
+picked on it, from a facet or three points snapped to corners and the middles of
+sides, is the plane to cut it with, and `pick` returns points clicked on it with
+the triangle each lies on:
 
 ```
 M = polymesh.read ('bracket.stl');
-V = solid.show (M);
-R = polymesh.section (M, pickucs (V));
+V = show (M);
+R = section (M, pickucs (V));
 ```
 
 Open CASCADE is optional: a package built without it works as before, and
@@ -267,7 +259,7 @@ built only where its headers are found, by default in
 
   `sudo apt install libocct-foundation-dev libocct-modeling-data-dev libocct-modeling-algorithms-dev libocct-data-exchange-dev`
 
-The viewer behind `solid.show` is a program of its own, built where the X11
+The viewer behind `model.Viewer` is a program of its own, built where the X11
 headers are found as well, and needs Open CASCADE's visualization libraries,
 which `geom.text` needs too:
 

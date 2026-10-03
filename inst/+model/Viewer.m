@@ -17,18 +17,19 @@
 
 classdef Viewer < handle
   ## -*- texinfo -*-
-  ## @deftp {drafting} solid.Viewer
+  ## @deftp {drafting} model.Viewer
   ##
   ## A window showing a solid or a triangle mesh, in which edges, faces and
   ## coordinate systems can be picked.
   ##
   ## Assigning a @code{solid.Shape} to the @code{Shape} of a viewer opens its
   ## window, or redraws it in place, keeping the camera where it was.  Nothing
-  ## else redraws it.  A triangle mesh, as @code{polymesh.read} returns one, is
-  ## shown the same way, shaded facet by facet, however many triangles it
-  ## has.  @code{solid.show} keeps a viewer for each variable and
-  ## is the usual way in; a viewer of your own is for when you want to hold
-  ## it yourself.
+  ## else redraws it.  A @code{polymesh.Mesh} is shown the same way, shaded
+  ## facet by facet, however many triangles it has, in its faces' colours
+  ## where it has them, else in its vertices', blended across each facet,
+  ## else in grey.  The @code{show} method of a shape or a mesh keeps a
+  ## viewer for each variable and is the usual way in; a viewer of your own
+  ## is for when you want to hold it yourself.
   ##
   ## The window is drawn by Open CASCADE in a process of its own, so a complex
   ## model turns smoothly and never holds up the Octave prompt.  The world
@@ -42,7 +43,14 @@ classdef Viewer < handle
   ## @item @kbd{1} @tab front view, looking along @math{+y}
   ## @item @kbd{2} @tab top view, looking down @math{z}
   ## @item @kbd{3} @tab right view, looking along @math{-x}
+  ## @item @kbd{C} @tab on a mesh, the next of the colourings it has: its
+  ## faces' colours, its vertices', grey
+  ## @item @kbd{E} @tab on a mesh, its triangle edges drawn or not, not at
+  ## first
   ## @end multitable
+  ##
+  ## What @kbd{C} and @kbd{E} choose holds for every mesh the viewer shows
+  ## after, where the mesh has that colouring.
   ##
   ## Closing the window ends the viewer; assigning a shape again opens a new
   ## one.  The window closes with Octave.
@@ -50,20 +58,19 @@ classdef Viewer < handle
   ## The viewer is built with the package when Open CASCADE and X11 are found,
   ## and needs a display to run.  It runs on Linux.
   ##
-  ## @seealso{solid.show, solid.Viewer.pick}
+  ## @seealso{solid.Shape.show, polymesh.Mesh.show, model.Viewer.pick}
   ## @end deftp
 
   properties (Dependent)
 
     ## -*- texinfo -*-
-    ## @deftp {solid.Viewer} {property} Shape
+    ## @deftp {model.Viewer} {property} Shape
     ##
     ## Shape shown
     ##
-    ## The @code{solid.Shape} shown, or the triangle mesh: a struct with the
-    ## fields @code{vertices} and @code{faces}, as @code{polymesh.read} returns
-    ## it.  Assigning either opens the window if it is not open and redraws it
-    ## in place if it is.  The empty shape opens the window empty, or clears
+    ## The @code{solid.Shape} or the @code{polymesh.Mesh} shown.  Assigning
+    ## either opens the window if it is not open and redraws it in place if it
+    ## is.  The empty shape opens the window empty, or clears
     ## it if it is open; the first shape shown after it is fitted to the
     ## window.
     ##
@@ -71,13 +78,13 @@ classdef Viewer < handle
     Shape
 
     ## -*- texinfo -*-
-    ## @deftp {solid.Viewer} {property} Name
+    ## @deftp {model.Viewer} {property} Name
     ##
     ## Name of the shape shown
     ##
     ## The name of the variable holding the shape shown.  Setting it titles
     ## the window with the name, so that several viewers can be told apart,
-    ## and the queries @code{solid.Viewer.pick} prints use it.  Until it is set
+    ## and the queries @code{model.Viewer.pick} prints use it.  Until it is set
     ## the window is titled @qcode{drafting} and the queries use @qcode{'S'}.
     ##
     ## @end deftp
@@ -97,9 +104,9 @@ classdef Viewer < handle
 
       st = state (this);
       if (isopen (this))
-        printf ("  solid.Viewer: open, showing %s\n", st.name);
+        printf ("  model.Viewer: open, showing %s\n", st.name);
       else
-        printf ("  solid.Viewer: closed\n");
+        printf ("  model.Viewer: closed\n");
       endif
 
     endfunction
@@ -143,6 +150,45 @@ classdef Viewer < handle
 
     endfunction
 
+    ## How a mesh is shown: its colouring, face, vertex or grey, and whether
+    ## its edges are drawn, on or off
+    function [LOOK, EDGES] = __look__ (this)
+
+      send (this, "getlook");
+      r = strsplit (receive (this, 10));
+      LOOK = r{2};
+      EDGES = r{3};
+
+    endfunction
+
+    ## Choose a mesh's colouring, as the key C does
+    function __colours__ (this, LOOK)
+
+      send (this, ["colours " LOOK]);
+
+    endfunction
+
+    ## Draw a mesh's edges or not, as the key E does
+    function __edges__ (this, ON)
+
+      send (this, ["edges " ON]);
+
+    endfunction
+
+    ## Finish a pick as the Enter key does; what it picked: on a mesh the
+    ## points and their triangles, else the edges and faces
+    function [A, B] = __pickend__ (this)
+
+      send (this, "enter");
+      R = replies (this, 10);
+      if (isa (state (this).mesh, 'polymesh.Mesh'))
+        [A, B] = meshpoints (R);
+      else
+        [A, B] = items (R);
+      endif
+
+    endfunction
+
     ## The view as an RGB image
     function IMG = __dump__ (this)
 
@@ -150,7 +196,7 @@ classdef Viewer < handle
       send (this, ["dump " f]);
       r = receive (this, 30);
       if (! strcmp (r, 'dumped'))
-        error ("solid.Viewer: %s", r);
+        error ("model.Viewer: %s", r);
       endif
       IMG = imread (f);
       unlink (f);
@@ -168,12 +214,8 @@ classdef Viewer < handle
       while (ischar (fgetl (st.out)))
       endwhile
       fclear (st.out);
-      if (isempty (st.mesh))
-        S = this.Shape;
-        B = bbox (S);
-      else
-        B = [min(st.mesh.vertices, [], 1), max(st.mesh.vertices, [], 1)];
-      endif
+      S = this.Shape;
+      B = bbox (S);
       scale = max (abs (B));
       SHOWN = {};
       told = '';
@@ -182,8 +224,8 @@ classdef Viewer < handle
 
         ## The axes
         if (strcmp (MODE, 'face'))
-          if (isempty (st.mesh))
-            info = __occt__ ('faces', 'solid.Viewer.pickucs', S.Data);
+          if (isa (S, 'solid.Shape'))
+            info = __occt__ ('faces', 'model.Viewer.pickucs', S.Data);
           endif
           ask = "Pick a flat face for the plane";
           do
@@ -245,7 +287,7 @@ classdef Viewer < handle
             O(2,:) = str2double (r(2:4));
           endif
         endif
-        U = solid.Viewer.__ucs__ (A, O);
+        U = model.Viewer.__ucs__ (A, O);
         finished = true;
 
       unwind_protect_cleanup
@@ -287,6 +329,38 @@ classdef Viewer < handle
 
   methods (Static, Hidden)
 
+    ## The viewer kept for the variable NAME, or the one that shapes without
+    ## a name share when NAME is empty or not a variable name, opened afresh
+    ## when its window has gone and titled with the name.  The show methods
+    ## come here.  The registry lives in the graphics root, where it
+    ## outlasts clear all.
+    function V = __named__ (NAME)
+
+      if (isempty (NAME) || ! isvarname (NAME))
+        NAME = '';
+        key = 'unnamed';
+      else
+        key = ['v_' NAME];
+      endif
+      ids = getappdata (0, 'drafting_model_show');
+      if (! isstruct (ids))
+        ids = struct ();
+      endif
+      if (isfield (ids, key) &&
+          ! isempty (getappdata (0, sprintf ('drafting_model_viewer_%d',
+                                             ids.(key)))))
+        V = model.Viewer ('__id__', ids.(key));
+      else
+        V = model.Viewer ();
+        ids.(key) = V.Id;
+        setappdata (0, 'drafting_model_show', ids);
+      endif
+      if (! isempty (NAME))
+        V.Name = NAME;
+      endif
+
+    endfunction
+
     ## The UCS from picked points.  AXES holds the axes picked: a planar face
     ## (its outward normal NORMAL and a point FACE on it) and two POINTS, the
     ## start of the x axis and a point towards +x, or three POINTS with no
@@ -314,24 +388,11 @@ classdef Viewer < handle
 
     endfunction
 
-    ## True for a mesh struct M whose vertices are N-by-3 finite reals and
-    ## whose faces are K-by-3 indices into them
-    function TF = __ismesh__ (M)
-
-      V = M.vertices;
-      F = M.faces;
-      TF = isnumeric (V) && isreal (V) && ismatrix (V) && columns (V) == 3 ...
-           && all (isfinite (V(:))) && isnumeric (F) && isreal (F) ...
-           && ismatrix (F) && columns (F) == 3 && all (F(:) == fix (F(:))) ...
-           && all (F(:) >= 1) && all (F(:) <= rows (V));
-
-    endfunction
-
     ## The query that finds the edges or faces IDX of S, and how many it finds
     function [Q, N] = __query__ (S, KIND, IDX, NAME)
 
       if (strcmp (KIND, 'edge'))
-        info = __occt__ ('edges', 'solid.Viewer.pick', S.Data);
+        info = __occt__ ('edges', 'model.Viewer.pick', S.Data);
         [type, dir, box] = info{1:3};
         args = {};
         if (all (strcmp (type(IDX), type{IDX(1)})))
@@ -341,7 +402,7 @@ classdef Viewer < handle
           args(end+1:end+2) = {'Direction', dir(IDX(1),:)};
         endif
       else
-        info = __occt__ ('faces', 'solid.Viewer.pick', S.Data);
+        info = __occt__ ('faces', 'model.Viewer.pick', S.Data);
         [type, normal, axis, box] = info{:};
         args = {};
         if (all (strcmp (type(IDX), type{IDX(1)})))
@@ -387,31 +448,31 @@ classdef Viewer < handle
   methods (Access = public)
 
     ## -*- texinfo -*-
-    ## @deftypefn  {solid.Viewer} {@var{V} =} solid.Viewer ()
-    ## @deftypefnx {solid.Viewer} {@var{V} =} solid.Viewer (@qcode{'Hidden'}, @var{TF})
+    ## @deftypefn  {model.Viewer} {@var{V} =} model.Viewer ()
+    ## @deftypefnx {model.Viewer} {@var{V} =} model.Viewer (@qcode{'Hidden'}, @var{TF})
     ##
     ## Make a viewer.
     ##
-    ## @code{@var{V} = solid.Viewer ()} returns a viewer that shows nothing
+    ## @code{@var{V} = model.Viewer ()} returns a viewer that shows nothing
     ## yet; its window opens when a shape, even the empty one, is assigned to
     ## its @code{Shape}:
     ##
     ## @example
     ## @group
-    ## V = solid.Viewer ();
+    ## V = model.Viewer ();
     ## V.Shape = solid.box (80, 40, 12);
     ## V.Shape = hole (V.Shape, [20, 20, 12], 8, Inf);
     ## @end group
     ## @end example
     ##
-    ## @code{@var{V} = solid.Viewer (@qcode{'Hidden'}, true)} never shows its
+    ## @code{@var{V} = model.Viewer (@qcode{'Hidden'}, true)} never shows its
     ## window.  It draws and picks all the same, which is how the viewer is
     ## tested.
     ##
     ## @end deftypefn
     function this = Viewer (varargin)
 
-      ## A wrapper over an existing viewer, for solid.show
+      ## A wrapper over an existing viewer, for model.Viewer.__named__
       if (nargin == 2 && strcmp (varargin{1}, '__id__'))
         this.Id = varargin{2};
         return;
@@ -419,26 +480,26 @@ classdef Viewer < handle
 
       ## Input validation
       if (mod (numel (varargin), 2) != 0)
-        error ("solid.Viewer: Name/Value arguments must come in pairs.");
+        error ("model.Viewer: Name/Value arguments must come in pairs.");
       endif
       hidden = false;
       for k = 1:2:numel (varargin)
         if (! ischar (varargin{k}) || ! strcmp (varargin{k}, 'Hidden'))
-          error ("solid.Viewer: unknown parameter.");
+          error ("model.Viewer: unknown parameter.");
         endif
         hidden = varargin{k+1};
         if (! (islogical (hidden) || isnumeric (hidden)) ...
             || ! isscalar (hidden) || ! any (hidden == [0, 1]))
-          error ("solid.Viewer: Hidden must be a logical scalar.");
+          error ("model.Viewer: Hidden must be a logical scalar.");
         endif
       endfor
 
       ## The state lives in the graphics root, where it outlasts clear all
-      id = getappdata (0, 'drafting_solid_viewer_next');
+      id = getappdata (0, 'drafting_model_viewer_next');
       if (isempty (id))
         id = 1;
       endif
-      setappdata (0, 'drafting_solid_viewer_next', id + 1);
+      setappdata (0, 'drafting_model_viewer_next', id + 1);
       this.Id = id;
       setstate (this, struct ('pid', -1, 'in', -1, 'out', -1, ...
                               'hidden', logical (hidden), ...
@@ -450,27 +511,25 @@ classdef Viewer < handle
     function S = get.Shape (this)
 
       st = state (this);
-      if (isempty (st.mesh))
-        S = solid.Shape (st.data);
-      else
+      if (isa (st.mesh, 'polymesh.Mesh'))
         S = st.mesh;
+      else
+        S = solid.Shape (st.data);
       endif
 
     endfunction
 
     function set.Shape (this, S)
 
-      ismesh = isstruct (S) && isscalar (S) && isfield (S, 'vertices') ...
-               && isfield (S, 'faces') && solid.Viewer.__ismesh__ (S);
+      ismesh = isa (S, 'polymesh.Mesh') && isscalar (S);
       if (! ismesh && (! isa (S, 'solid.Shape') || ! isscalar (S)))
-        error (strcat ("solid.Viewer: Shape must be a solid.Shape object", ...
-                       " or a mesh struct with vertices and faces."));
+        error (strcat ("model.Viewer: Shape must be a solid.Shape or a", ...
+                       " polymesh.Mesh object."));
       endif
       st = state (this);
       if (ismesh)
         st.data = uint8 ([]);
-        st.mesh = struct ('vertices', double (S.vertices), ...
-                          'faces', double (S.faces));
+        st.mesh = S;
       else
         st.data = S.Data;
         st.mesh = [];
@@ -479,11 +538,22 @@ classdef Viewer < handle
       if (! isopen (this))
         launch (this);
       endif
-      if (ismesh && ! isempty (S.faces))
-        V = double (S.vertices)';
-        F = uint32 (S.faces' - 1);
-        send (this, sprintf ("mesh %d %d", rows (V'), rows (F')), ...
-              [typecast(V(:), 'uint8'); typecast(F(:), 'uint8')]);
+      if (ismesh && ! isempty (S))
+        ## The colours follow the triangles, the vertices' before the faces'
+        V = S.Vertices';
+        F = uint32 (S.Faces' - 1);
+        data = [typecast(V(:), 'uint8'); typecast(F(:), 'uint8')];
+        CK = 0;
+        if (! isempty (S.VertexColour))
+          CK += 1;
+          data = [data; reshape(uint8 (255 * S.VertexColour'), [], 1)];
+        endif
+        if (! isempty (S.FaceColour))
+          CK += 2;
+          data = [data; reshape(uint8 (255 * S.FaceColour'), [], 1)];
+        endif
+        send (this, sprintf ("mesh %d %d %d", numvertices (S), ...
+                             numfaces (S), CK), data);
       else
         send (this, sprintf ("shape %d", numel (st.data)), st.data);
       endif
@@ -499,7 +569,7 @@ classdef Viewer < handle
     function set.Name (this, N)
 
       if (! ischar (N) || ! isvarname (N))
-        error ("solid.Viewer: Name must be a valid variable name.");
+        error ("model.Viewer: Name must be a valid variable name.");
       endif
       st = state (this);
       st.name = N;
@@ -512,11 +582,12 @@ classdef Viewer < handle
     endfunction
 
     ## -*- texinfo -*-
-    ## @deftypefn  {solid.Viewer} {[@var{E}, @var{F}] =} pick (@var{V})
-    ## @deftypefnx {solid.Viewer} {@var{E} =} pick (@var{V}, @qcode{'edge'})
-    ## @deftypefnx {solid.Viewer} {@var{F} =} pick (@var{V}, @qcode{'face'})
+    ## @deftypefn  {model.Viewer} {[@var{E}, @var{F}] =} pick (@var{V})
+    ## @deftypefnx {model.Viewer} {@var{E} =} pick (@var{V}, @qcode{'edge'})
+    ## @deftypefnx {model.Viewer} {@var{F} =} pick (@var{V}, @qcode{'face'})
+    ## @deftypefnx {model.Viewer} {[@var{P}, @var{F}] =} pick (@var{V})
     ##
-    ## Pick edges and faces with the mouse.
+    ## Pick edges and faces of a solid, or points on a mesh, with the mouse.
     ##
     ## @code{[@var{E}, @var{F}] = pick (@var{V})} waits while you click edges
     ## and faces in the viewer's window, then returns the indices of the edges
@@ -545,19 +616,31 @@ classdef Viewer < handle
     ## @end group
     ## @end example
     ##
-    ## @seealso{solid.Shape.edges, solid.Shape.faces, solid.show}
+    ## When the viewer shows a @code{polymesh.Mesh}, @code{[@var{P}, @var{F}]
+    ## = pick (@var{V})} waits while you click points on it, each marked
+    ## where it lands, and returns them in @var{P}, an @math{N}-by-3 matrix of
+    ## the points where the clicks hit the mesh, and in @var{F} an
+    ## @math{N}-by-4 matrix: for each point the index of the triangle it lies
+    ## on, a row of the mesh's @code{Faces}, and the triangle's unit normal,
+    ## turned as its corners run.  A click that misses the mesh adds nothing.
+    ## @kbd{Enter} finishes and @kbd{Escape} cancels, returning nothing.  A
+    ## mesh has no edges or faces in the sense of a solid, so @qcode{'edge'}
+    ## and @qcode{'face'} are refused.
+    ##
+    ## @seealso{solid.Shape.edges, solid.Shape.faces, solid.Shape.show}
     ## @end deftypefn
     function varargout = pick (this, KIND = 'any')
 
       ## Input validation
       if (! ischar (KIND) || ! any (strcmp (KIND, {'edge', 'face', 'any'})))
-        error ("solid.Viewer.pick: KIND must be 'edge', 'face' or 'any'.");
+        error ("model.Viewer.pick: KIND must be 'edge', 'face' or 'any'.");
       endif
-      if (! isempty (state (this).mesh))
-        error ("solid.Viewer.pick: a mesh has no edges or faces to pick.");
+      ismesh = isa (state (this).mesh, 'polymesh.Mesh');
+      if (ismesh && ! strcmp (KIND, 'any'))
+        error ("model.Viewer.pick: a mesh has only points to pick.");
       endif
-      if (! isopen (this) || isempty (state (this).data))
-        error ("solid.Viewer.pick: the viewer is showing no shape.");
+      if (! isopen (this) || isempty (this.Shape))
+        error ("model.Viewer.pick: the viewer is showing no shape.");
       endif
 
       ## Lines left from an earlier exchange are stale
@@ -567,18 +650,9 @@ classdef Viewer < handle
       fclear (st.out);
 
       send (this, ["pick " KIND]);
-      E = zeros (1, 0);
-      F = zeros (1, 0);
       finished = false;
       unwind_protect
-        do
-          r = receive (this, Inf);
-          if (strncmp (r, 'edge ', 5))
-            E(end+1) = str2double (r(6:end));
-          elseif (strncmp (r, 'face ', 5))
-            F(end+1) = str2double (r(6:end));
-          endif
-        until (any (strcmp (r, {'done', 'cancel', 'closed'})))
+        [R, r] = replies (this, Inf);
         finished = true;
       unwind_protect_cleanup
         if (! finished && isopen (this))
@@ -586,19 +660,22 @@ classdef Viewer < handle
         endif
       end_unwind_protect
       if (strcmp (r, 'closed'))
-        error ("solid.Viewer.pick: the window was closed during the pick.");
+        error ("model.Viewer.pick: the window was closed during the pick.");
       endif
-      E = unique (E);
-      F = unique (F);
+      if (ismesh)
+        [varargout{1:2}] = meshpoints (R);
+        return;
+      endif
+      [E, F] = items (R);
 
       ## The queries that find them again
       S = this.Shape;
       if (! isempty (E))
-        [Q, N] = solid.Viewer.__query__ (S, 'edge', E, st.name);
+        [Q, N] = model.Viewer.__query__ (S, 'edge', E, st.name);
         report (Q, N, numel (E), 'edge');
       endif
       if (! isempty (F))
-        [Q, N] = solid.Viewer.__query__ (S, 'face', F, st.name);
+        [Q, N] = model.Viewer.__query__ (S, 'face', F, st.name);
         report (Q, N, numel (F), 'face');
       endif
 
@@ -614,8 +691,8 @@ classdef Viewer < handle
     endfunction
 
     ## -*- texinfo -*-
-    ## @deftypefn  {solid.Viewer} {@var{U} =} pickucs (@var{V})
-    ## @deftypefnx {solid.Viewer} {@var{U} =} pickucs (@var{V}, @var{MODE})
+    ## @deftypefn  {model.Viewer} {@var{U} =} pickucs (@var{V})
+    ## @deftypefnx {model.Viewer} {@var{U} =} pickucs (@var{V}, @var{MODE})
     ##
     ## Pick a user coordinate system with the mouse.
     ##
@@ -658,17 +735,16 @@ classdef Viewer < handle
     ## @end group
     ## @end example
     ##
-    ## @seealso{geom.UCS, solid.Viewer.pick}
+    ## @seealso{geom.UCS, model.Viewer.pick}
     ## @end deftypefn
     function U = pickucs (this, MODE = 'face')
 
       ## Input validation
       if (! ischar (MODE) || ! any (strcmp (MODE, {'face', 'points'})))
-        error ("solid.Viewer.pickucs: MODE must be 'face' or 'points'.");
+        error ("model.Viewer.pickucs: MODE must be 'face' or 'points'.");
       endif
-      st = state (this);
-      if (! isopen (this) || (isempty (st.data) && isempty (st.mesh)))
-        error ("solid.Viewer.pickucs: the viewer is showing no shape.");
+      if (! isopen (this) || isempty (this.Shape))
+        error ("model.Viewer.pickucs: the viewer is showing no shape.");
       endif
 
       U = __pickucs__ (this, MODE, []);
@@ -676,7 +752,7 @@ classdef Viewer < handle
     endfunction
 
     ## -*- texinfo -*-
-    ## @deftypefn {solid.Viewer} {} close (@var{V})
+    ## @deftypefn {model.Viewer} {} close (@var{V})
     ##
     ## Close the viewer's window.
     ##
@@ -698,7 +774,7 @@ classdef Viewer < handle
     endfunction
 
     ## -*- texinfo -*-
-    ## @deftypefn {solid.Viewer} {@var{TF} =} isopen (@var{V})
+    ## @deftypefn {model.Viewer} {@var{TF} =} isopen (@var{V})
     ##
     ## True while the viewer's window is open.
     ##
@@ -744,7 +820,7 @@ classdef Viewer < handle
       endif
       r = strsplit (receive (V, Inf));
       if (any (strcmp (r{1}, {'cancel', 'closed'})))
-        error ("solid.Viewer.pickucs: the pick was cancelled.");
+        error ("model.Viewer.pickucs: the pick was cancelled.");
       endif
 
     endfunction
@@ -761,24 +837,24 @@ classdef Viewer < handle
 
     function st = state (this)
 
-      st = getappdata (0, sprintf ('drafting_solid_viewer_%d', this.Id));
+      st = getappdata (0, sprintf ('drafting_model_viewer_%d', this.Id));
 
     endfunction
 
     function setstate (this, st)
 
-      setappdata (0, sprintf ('drafting_solid_viewer_%d', this.Id), st);
+      setappdata (0, sprintf ('drafting_model_viewer_%d', this.Id), st);
 
     endfunction
 
     function launch (this)
 
       if (isempty (getenv ('DISPLAY')))
-        error ("solid.Viewer: the viewer needs a display, and none is set.");
+        error ("model.Viewer: the viewer needs a display, and none is set.");
       endif
       exe = file_in_loadpath ('__occtview__');
       if (isempty (exe))
-        error (strcat ("solid.Viewer: the viewer is not available: the", ...
+        error (strcat ("model.Viewer: the viewer is not available: the", ...
                        " drafting package was built without it."));
       endif
       st = state (this);
@@ -791,7 +867,7 @@ classdef Viewer < handle
       r = receive (this, 30);
       if (! strcmp (r, 'ready'))
         close (this);
-        error ("solid.Viewer: the viewer could not start: %s", r);
+        error ("model.Viewer: the viewer could not start: %s", r);
       endif
       send (this, ["title " title(st)]);
 
@@ -805,6 +881,18 @@ classdef Viewer < handle
         fwrite (st.in, data, 'uint8');
       endif
       fflush (st.in);
+
+    endfunction
+
+    ## The lines a pick replies with, up to its last, LAST: done, cancel or
+    ## closed, waiting up to TIMEOUT seconds for each
+    function [R, LAST] = replies (this, TIMEOUT)
+
+      R = {};
+      do
+        LAST = receive (this, TIMEOUT);
+        R{end+1} = LAST;
+      until (any (strcmp (LAST, {'done', 'cancel', 'closed'})))
 
     endfunction
 
@@ -824,7 +912,7 @@ classdef Viewer < handle
           return;
         endif
         if (toc (t0) > timeout)
-          error ("solid.Viewer: the viewer did not reply.");
+          error ("model.Viewer: the viewer did not reply.");
         endif
         pause (0.01);
       endwhile
@@ -834,6 +922,39 @@ classdef Viewer < handle
   endmethods
 
 endclassdef
+
+## The edges E and the faces F a pick replied with in the lines R
+function [E, F] = items (R)
+
+  E = zeros (1, 0);
+  F = zeros (1, 0);
+  for k = 1:numel (R)
+    if (strncmp (R{k}, 'edge ', 5))
+      E(end+1) = str2double (R{k}(6:end));
+    elseif (strncmp (R{k}, 'face ', 5))
+      F(end+1) = str2double (R{k}(6:end));
+    endif
+  endfor
+  E = unique (E);
+  F = unique (F);
+
+endfunction
+
+## The points P and their triangles F, index and normal, a pick on a mesh
+## replied with in the lines R
+function [P, F] = meshpoints (R)
+
+  P = zeros (0, 3);
+  F = zeros (0, 4);
+  for k = 1:numel (R)
+    if (strncmp (R{k}, 'point ', 6))
+      x = str2double (strsplit (R{k}(7:end)));
+      P(end+1,:) = x(1:3);
+      F(end+1,:) = x(4:7);
+    endif
+  endfor
+
+endfunction
 
 ## The window's title: the name of the variable shown, once it is known
 function T = title (st)
@@ -866,7 +987,7 @@ endfunction
 function TF = isvalidaxes (A)
 
   try
-    solid.Viewer.__ucs__ (A, zeros (0, 3));
+    model.Viewer.__ucs__ (A, zeros (0, 3));
     TF = true;
   catch
     TF = false;
@@ -898,7 +1019,7 @@ endfunction
 
 %!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
 %! ## The window opens with the first shape and closes on demand
-%! V = solid.Viewer ('Hidden', true);
+%! V = model.Viewer ('Hidden', true);
 %! assert_equal (isopen (V), false);
 %! V.Shape = solid.box (10, 20, 30);
 %! assert_equal (isopen (V), true);
@@ -909,7 +1030,7 @@ endfunction
 %!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
 %! ## A pixel picks the face and the edge the queries name
 %! B = solid.box (10, 20, 30);
-%! V = solid.Viewer ('Hidden', true);
+%! V = model.Viewer ('Hidden', true);
 %! unwind_protect
 %!   V.Shape = B;
 %!   r = V.__pickat__ ('face', V.__project__ ([5, 10, 30]));
@@ -925,7 +1046,7 @@ endfunction
 %!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
 %! ## The seam of a cylinder is never offered
 %! C = solid.cylinder (4, 12);
-%! V = solid.Viewer ('Hidden', true);
+%! V = model.Viewer ('Hidden', true);
 %! unwind_protect
 %!   V.Shape = C;
 %!   assert_equal (V.__pickat__ ('edge', V.__project__ ([4, 0, 6])), 'none');
@@ -937,7 +1058,7 @@ endfunction
 
 %!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
 %! ## A new shape replaces the old one, and the empty shape clears the view
-%! V = solid.Viewer ('Hidden', true);
+%! V = model.Viewer ('Hidden', true);
 %! unwind_protect
 %!   V.Shape = solid.box (10, 20, 30);
 %!   px = V.__project__ ([5, 10, 30]);
@@ -953,7 +1074,7 @@ endfunction
 %! ## What a pick holds is drawn in orange, so that a click visibly took
 %! orange = @(I) I(:,:,1) > 200 & I(:,:,2) < 150 & I(:,:,3) < 60;
 %! near = @(M, p) any (any (M(round (p(2)) + (-3:5), round (p(1)) + (-3:5))));
-%! V = solid.Viewer ('Hidden', true);
+%! V = model.Viewer ('Hidden', true);
 %! unwind_protect
 %!   V.Shape = solid.box (10, 20, 30);
 %!   pe = V.__project__ ([5, 0, 30]);
@@ -977,7 +1098,7 @@ endfunction
 %! ## where the untrimmed surface begins)
 %! B = hole (solid.box (80, 40, 12), [20, 20, 12], 8, Inf);
 %! W = sprintf ("face %d", faces (B, 'Type', 'cylinder'));
-%! V = solid.Viewer ('Hidden', true);
+%! V = model.Viewer ('Hidden', true);
 %! unwind_protect
 %!   V.Shape = B;
 %!   wall = V.__pickat__ ('face', V.__project__ ([17.17, 22.83, 10]));
@@ -990,7 +1111,7 @@ endfunction
 
 %!testif ; exist ('__occt__') == 3  # the query for four upright edges
 %! B = solid.box (10, 20, 30);
-%! [Q, N] = solid.Viewer.__query__ (B, 'edge', edges (B, 'Direction', ...
+%! [Q, N] = model.Viewer.__query__ (B, 'edge', edges (B, 'Direction', ...
 %!                                                    [0, 0, 1]), 'part');
 %! assert_equal (Q, strcat ("edges (part, 'Type', 'line', 'Direction',", ...
 %!                          " [0, 0, 1], 'Within', [0, 0, 0, 10, 20, 30])"));
@@ -998,19 +1119,19 @@ endfunction
 
 %!testif ; exist ('__occt__') == 3  # a query that finds more than was picked
 %! B = solid.box (10, 20, 30);
-%! [Q, N] = solid.Viewer.__query__ (B, 'face', faces (B, 'Normal', ...
+%! [Q, N] = model.Viewer.__query__ (B, 'face', faces (B, 'Normal', ...
 %!                                                    [0, 0, 1]), 'B');
 %! assert_equal (Q, strcat ("faces (B, 'Type', 'plane', 'Normal',", ...
 %!                          " [0, 0, 1], 'Within', [0, 0, 30, 10, 20, 30])"));
 %! assert_equal (N, 1);
 %! C = solid.cylinder (4, 12);
-%! [Q, N] = solid.Viewer.__query__ (C, 'face', 1:3, 'C');
+%! [Q, N] = model.Viewer.__query__ (C, 'face', 1:3, 'C');
 %! assert_equal (Q, "faces (C, 'Within', [-4, -4, 0, 4, 4, 12])");
 %! assert_equal (N, 3);
 
 %!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
 %! ## The window is titled with the name, before it opens and after
-%! V = solid.Viewer ('Hidden', true);
+%! V = model.Viewer ('Hidden', true);
 %! unwind_protect
 %!   V.Name = 'plate';
 %!   V.Shape = solid.box (10, 20, 30);
@@ -1023,7 +1144,7 @@ endfunction
 
 %!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
 %! ## The empty shape opens the window empty
-%! V = solid.Viewer ('Hidden', true);
+%! V = model.Viewer ('Hidden', true);
 %! unwind_protect
 %!   V.Shape = solid.Shape ();
 %!   assert_equal (isopen (V), true);
@@ -1038,19 +1159,19 @@ endfunction
 %!test  # axes from a face and two points, the origin from one point
 %! A = struct ('normal', [0, 0, 2], 'face', [5, 5, 12], ...
 %!             'points', [0, 0, 12; 80, 0, 12]);
-%! U = solid.Viewer.__ucs__ (A, [20, 20, 3]);
+%! U = model.Viewer.__ucs__ (A, [20, 20, 3]);
 %! assert_equal (U == geom.UCS ([0, 0, 1], [20, 20, 12], [21, 20, 12]), true);
 
 %!test  # the start of the x axis is laid in the face; Enter keeps it
 %! A = struct ('normal', [0, -1, 0], 'face', [10, 0, 6], ...
 %!             'points', [0, -3, 0; 80, -3, 0]);
-%! U = solid.Viewer.__ucs__ (A, zeros (0, 3));
+%! U = model.Viewer.__ucs__ (A, zeros (0, 3));
 %! assert_equal (U.Origin, [0, 0, 0]);
 %! assert_equal ([U.XAxis; U.YAxis], [1, 0, 0; 0, 0, 1]);
 
 %!test  # three points, and a datum corner from two
 %! A = struct ('points', [0, 0, 12; 80, 0, 12; 0, 40, 12]);
-%! U = solid.Viewer.__ucs__ (A, [80, 17, 3; 31, 0, 9]);
+%! U = model.Viewer.__ucs__ (A, [80, 17, 3; 31, 0, 9]);
 %! assert_equal (U.Origin, [80, 0, 12]);
 %! assert_equal (U.XAxis, [1, 0, 0]);
 %! assert_equal (U.Normal, [0, 0, 1]);
@@ -1058,7 +1179,7 @@ endfunction
 %!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
 %! ## A face and two corners, then a hole's rim for the origin: its centre
 %! B = hole (solid.box (80, 40, 12), [20, 20, 12], 8, Inf);
-%! V = solid.Viewer ('Hidden', true);
+%! V = model.Viewer ('Hidden', true);
 %! unwind_protect
 %!   V.Shape = B;
 %!   px = @(p) V.__project__ (p);
@@ -1083,7 +1204,7 @@ endfunction
 %! ## A curved face is refused and asked for again; a datum corner from a
 %! ## point on the right face and one on the front
 %! B = hole (solid.box (80, 40, 12), [20, 20, 12], 8, Inf);
-%! V = solid.Viewer ('Hidden', true);
+%! V = model.Viewer ('Hidden', true);
 %! unwind_protect
 %!   V.Shape = B;
 %!   px = @(p) V.__project__ (p);
@@ -1098,7 +1219,7 @@ endfunction
 
 %!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
 %! ## Three corners, Enter keeping the first, and the line it prints
-%! V = solid.Viewer ('Hidden', true);
+%! V = model.Viewer ('Hidden', true);
 %! unwind_protect
 %!   V.Shape = solid.box (80, 40, 12);
 %!   px = @(p) V.__project__ (p);
@@ -1112,7 +1233,7 @@ endfunction
 
 %!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
 %! ## Escape cancels the pick with an error, and the viewer goes on
-%! V = solid.Viewer ('Hidden', true);
+%! V = model.Viewer ('Hidden', true);
 %! unwind_protect
 %!   V.Shape = solid.box (80, 40, 12);
 %!   C = [V.__project__([40, 30, 12]); Inf, Inf];
@@ -1122,7 +1243,7 @@ endfunction
 %!   catch err
 %!     msg = err.message;
 %!   end_try_catch
-%!   assert_equal (msg, "solid.Viewer.pickucs: the pick was cancelled.");
+%!   assert_equal (msg, "model.Viewer.pickucs: the pick was cancelled.");
 %!   assert_equal (V.__pickat__ ('face', V.__project__ ([40, 20, 12]))(1:4), ...
 %!                 'face');
 %! unwind_protect_cleanup
@@ -1135,16 +1256,16 @@ endfunction
 %!       0, 0, DZ; DX, 0, DZ; DX, DY, DZ; 0, DY, DZ];
 %!  F = [1, 3, 2; 1, 4, 3; 5, 6, 7; 5, 7, 8; 1, 2, 6; 1, 6, 5; ...
 %!       2, 3, 7; 2, 7, 6; 3, 4, 8; 3, 8, 7; 4, 1, 5; 4, 5, 8];
-%!  M = struct ('vertices', P, 'faces', F);
+%!  M = polymesh.Mesh (P, F);
 %!endfunction
 
 %!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
 %! ## A mesh is shown and handed back; a click on it is a facet or a point
 %! M = boxmesh (80, 40, 12);
-%! V = solid.Viewer ('Hidden', true);
+%! V = model.Viewer ('Hidden', true);
 %! unwind_protect
 %!   V.Shape = M;
-%!   assert_equal (V.Shape, M);
+%!   assert_equal (V.Shape.Vertices, M.Vertices);
 %!   V.__pickonestart__ ('face');
 %!   r = str2double (strsplit (V.__clickone__ (V.__project__ ([40, 30, 12]))));
 %!   assert_equal (r(2:4), [0, 0, 1], 1e-12);
@@ -1164,7 +1285,7 @@ endfunction
 
 %!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
 %! ## A UCS picked on a mesh: a facet and two corners, Enter for the origin
-%! V = solid.Viewer ('Hidden', true);
+%! V = model.Viewer ('Hidden', true);
 %! unwind_protect
 %!   V.Shape = boxmesh (80, 40, 12);
 %!   px = @(p) V.__project__ (p);
@@ -1182,57 +1303,131 @@ endfunction
 %! end_unwind_protect
 
 %!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
-%! ## A mesh has no edges or faces to pick; a shape replaces it
-%! V = solid.Viewer ('Hidden', true);
+%! ## Points picked on a mesh, with the triangle each lies on and its normal;
+%! ## a click that misses adds nothing, and a shape replaces the mesh.  The
+%! ## top's triangles 3 and 4 meet on its diagonal, y = x / 2; the side's 7
+%! ## lies below z = 0.3 y
+%! M = boxmesh (80, 40, 12);
+%! V = model.Viewer ('Hidden', true);
 %! unwind_protect
-%!   V.Shape = boxmesh (10, 20, 30);
-%!   msg = '';
-%!   try
-%!     pick (V);
-%!   catch err
-%!     msg = err.message;
-%!   end_try_catch
-%!   assert_equal (msg, strcat ("solid.Viewer.pick: a mesh has no edges", ...
-%!                              " or faces to pick."));
+%!   V.Shape = M;
+%!   V.__pickstart__ ('any');
+%!   T = [60, 10, 12; 20, 30, 12; 80, 30, 4];
+%!   assert_equal (V.__click__ (V.__project__ (T(1,:))), 1);
+%!   assert_equal (V.__click__ ([2, 2]), 1);
+%!   assert_equal (V.__click__ (V.__project__ (T(2,:))), 2);
+%!   assert_equal (V.__click__ (V.__project__ (T(3,:))), 3);
+%!   [P, F] = V.__pickend__ ();
+%!   assert_equal (P, T, 0.5);
+%!   assert_equal (F, [3, 0, 0, 1; 4, 0, 0, 1; 7, 1, 0, 0], 1e-12);
 %!   V.Shape = solid.box (10, 20, 30);
 %!   assert_equal (volume (V.Shape), 6000, 1e-9);
 %! unwind_protect_cleanup
 %!   close (V);
 %! end_unwind_protect
 
+%!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
+%! ## A mesh is shown in its faces' colours, its vertices' or grey
+%! M = boxmesh (80, 40, 12);
+%! M.FaceColour = repmat ([1, 0, 0], 12, 1);
+%! M.VertexColour = repmat ([0, 0, 1], 8, 1);
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Shape = M;
+%!   p = round (V.__project__ ([40, 20, 12]));
+%!   at = @(I) double (squeeze (I(p(2), p(1), :)))';
+%!   assert_equal (V.__look__ (), 'face');
+%!   c = at (V.__dump__ ());
+%!   assert_equal (c(1) > 100 && c(2) < 40 && c(3) < 40, true);
+%!   V.__colours__ ('vertex');
+%!   assert_equal (V.__look__ (), 'vertex');
+%!   c = at (V.__dump__ ());
+%!   assert_equal (c(3) > 100 && c(1) < 40 && c(2) < 40, true);
+%!   V.__colours__ ('grey');
+%!   c = at (V.__dump__ ());
+%!   assert_equal (max (c) - min (c) < 30 && min (c) > 60, true);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
+%! ## A colouring chosen holds for the meshes after that have it; one that
+%! ## lacks it is shown in the first it has
+%! M = boxmesh (10, 20, 30);
+%! M.FaceColour = repmat ([1, 0, 0], 12, 1);
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Shape = M;
+%!   V.__colours__ ('vertex');
+%!   assert_equal (V.__look__ (), 'face');
+%!   M.VertexColour = repmat ([0, 0, 1], 8, 1);
+%!   V.Shape = M;
+%!   assert_equal (V.__look__ (), 'vertex');
+%!   V.Shape = boxmesh (10, 20, 30);
+%!   assert_equal (V.__look__ (), 'grey');
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
+%! ## A mesh's triangle edges are drawn when asked for, and only then
+%! dark = @(I) all (I < 90, 3);
+%! near = @(D, p) any (any (D(round (p(2)) + (-3:3), round (p(1)) + (-3:3))));
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Shape = boxmesh (80, 40, 12);
+%!   p = V.__project__ ([40, 20, 12]);
+%!   [~, edges] = V.__look__ ();
+%!   assert_equal (edges, 'off');
+%!   assert_equal (near (dark (V.__dump__ ()), p), false);
+%!   V.__edges__ ('on');
+%!   [~, edges] = V.__look__ ();
+%!   assert_equal (edges, 'on');
+%!   assert_equal (near (dark (V.__dump__ ()), p), true);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
 %!test
-%! V = solid.Viewer ();
+%! V = model.Viewer ();
 %! assert_equal (isopen (V), false);
 %! assert_equal (isempty (V.Shape), true);
 %! assert_equal (V.Name, 'S');
 %! V.Name = 'part';
 %! assert_equal (V.Name, 'part');
 
-%!error<solid.Viewer: Name/Value arguments must come in pairs.> ...
-%! solid.Viewer ('Hidden')
-%!error<solid.Viewer: unknown parameter.> solid.Viewer ('Visible', true)
-%!error<solid.Viewer: Hidden must be a logical scalar.> ...
-%! solid.Viewer ('Hidden', 2)
-%!error<solid.Viewer: Shape must be a solid.Shape object or a mesh struct with vertices and faces.>
-%! V = solid.Viewer ();
+%!error<model.Viewer: Name/Value arguments must come in pairs.> ...
+%! model.Viewer ('Hidden')
+%!error<model.Viewer: unknown parameter.> model.Viewer ('Visible', true)
+%!error<model.Viewer: Hidden must be a logical scalar.> ...
+%! model.Viewer ('Hidden', 2)
+%!error<model.Viewer: Shape must be a solid.Shape or a polymesh.Mesh object.>
+%! V = model.Viewer ();
 %! V.Shape = 1;
-%!error<solid.Viewer: Name must be a valid variable name.>
-%! V = solid.Viewer ();
+%!error<model.Viewer: Name must be a valid variable name.>
+%! V = model.Viewer ();
 %! V.Name = '1part';
-%!error<solid.Viewer.pick: KIND must be 'edge', 'face' or 'any'.>
-%! pick (solid.Viewer (), 'vertex')
-%!error<solid.Viewer.pick: the viewer is showing no shape.>
-%! pick (solid.Viewer ())
-%!error<solid.Viewer: the viewer needs a display, and none is set.>
+%!error<model.Viewer.pick: KIND must be 'edge', 'face' or 'any'.>
+%! pick (model.Viewer (), 'vertex')
+%!error<model.Viewer.pick: the viewer is showing no shape.>
+%! pick (model.Viewer ())
+%!error<model.Viewer.pick: a mesh has only points to pick.>
+%! V = model.Viewer ();
+%! setappdata (0, sprintf ('drafting_model_viewer_%d', V.Id), ...
+%!             setfield (getappdata (0, sprintf ('drafting_model_viewer_%d', ...
+%!                                               V.Id)), 'mesh', ...
+%!                       polymesh.Mesh ()));
+%! pick (V, 'edge')
+%!error<model.Viewer: the viewer needs a display, and none is set.>
 %! d = getenv ('DISPLAY');
 %! unwind_protect
 %!   setenv ('DISPLAY', '');
-%!   V = solid.Viewer ();
+%!   V = model.Viewer ();
 %!   V.Shape = solid.Shape (uint8 (sprintf ("\nOpen CASCADE Topology V3")));
 %! unwind_protect_cleanup
 %!   setenv ('DISPLAY', d);
 %! end_unwind_protect
-%!error<solid.Viewer.pickucs: MODE must be 'face' or 'points'.> ...
-%! pickucs (solid.Viewer (), 'edges')
-%!error<solid.Viewer.pickucs: the viewer is showing no shape.> ...
-%! pickucs (solid.Viewer ())
+%!error<model.Viewer.pickucs: MODE must be 'face' or 'points'.> ...
+%! pickucs (model.Viewer (), 'edges')
+%!error<model.Viewer.pickucs: the viewer is showing no shape.> ...
+%! pickucs (model.Viewer ())

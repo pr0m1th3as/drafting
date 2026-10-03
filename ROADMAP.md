@@ -175,7 +175,7 @@ projection (`section`) and STL in and out are here. These are not:
 | an ellipse, an ellipsoid (`scale` of a circle or a sphere) | `geom.Spline.ellipse` and `solid.ellipsoid`, both exact |
 | `color` | one colour for a whole shape, shown in the viewer and carried through STEP out and in |
 | several objects in one file | multipart STEP out and in: named parts and assemblies of placed parts, through Open CASCADE's document framework (XDE) |
-| `import ()` of OBJ | an OBJ mesh read and made a solid by `solid.polyhedron` |
+| `import ()` of OBJ | OBJ and PLY meshes read and written, ASCII or binary, made a solid by `solid.polyhedron` |
 | `projection (cut = false)` | the outline of a solid on a plane, which milestone 4's views need as well |
 | `hull ()` of solids | the hull of a solid's points, as a faceted solid |
 
@@ -199,16 +199,16 @@ ordinate, has no entity in the drawing model yet.
 
 *Units in the model.* `dxf.read` converts an inch file to millimetres and
 `dxf.write` declares millimetres, so nothing is mis-scaled; what is missing is
-working in anything else. A `Units` property on `Drawing`, honoured by
-`print`, `dxf.write` and `polymesh.write`, would let a drawing be authored in
-inches. It is ergonomic rather than a fix, and may slip to a later release.
+working in anything else. A `Units` property on `Drawing`, honoured by `print`
+and `dxf.write`, would let a drawing be authored in inches. It is ergonomic
+rather than a fix, and may slip to a later release.
 
-**Meshes.** `polymesh.read` reads binary and ASCII STL, `polymesh.section` cuts
-a mesh with a plane into regions, healed to a tolerance where the mesh has gaps,
-and `geom.Region.fit` turns the cut's facets back into lines, arcs and splines,
-so that a faceted bore becomes a circle again. The viewer shows meshes and picks
-a UCS on them. Reading, welding, cutting and fitting are compiled, in a file of
-their own that needs no Open CASCADE.
+**Meshes.** `polymesh.read` reads STL, OBJ and PLY with their colours, `section`
+cuts a `polymesh.Mesh` with a plane into regions, healed to a tolerance where
+the mesh has gaps, and `geom.Region.fit` turns the cut's facets back into lines,
+arcs and splines, so that a faceted bore becomes a circle again. The viewer
+shows meshes and picks a UCS on them. Reading, welding, cutting and fitting are
+compiled, in a file of their own that needs no Open CASCADE.
 
 General geometric queries (the distance to a curve, the nearest point on it,
 the smallest enclosing circle or box) wait until a package built on this one
@@ -290,7 +290,7 @@ drawings through `+draw`, so dependencies still point downward only.
 | Features | fillet, chamfer, shell; holes plain, counterbored, countersunk and tapped, recorded as holes |
 | Queries | edges and faces selected by type, direction and position; volume, area, centre of mass, bounding box; validity |
 | Files | `solid.read` and `solid.write`, STEP and STL |
-| Viewing | `solid.show` and `solid.Viewer`: the solid in Open CASCADE's own viewer, run as a process of its own so that it turns smoothly and never blocks the prompt; redrawn in place when a shape is assigned to it; edges and faces picked with the mouse, reported as indices and as the query that finds them again |
+| Viewing | `show` and `model.Viewer`: the solid in Open CASCADE's own viewer, run as a process of its own so that it turns smoothly and never blocks the prompt; redrawn in place when a shape is assigned to it; edges and faces picked with the mouse, reported as indices and as the query that finds them again |
 | Drawings | views, sections and details laid out on a `draw.Sheet` |
 
 **Drawings.** OCCT projects a solid with hidden lines removed and every edge
@@ -393,9 +393,9 @@ A closed planar profile to a triangle mesh, entirely inside the package:
 - `geom.sweep`: profile along a path, once milestone 5 makes the path exact
 
 This completes a pipeline the package already half owns: geometry to profile to
-mesh to `polymesh.write`. Extrude and revolve are markedly easier than they
-sound once triangulation is in hand, and they are what lets a drawing produce a
-part rather than only describe one.
+mesh to file through `polymesh.Mesh`. Extrude and revolve are markedly easier
+than they sound once triangulation is in hand, and they are what lets a drawing
+produce a part rather than only describe one.
 
 ## Format track: runs alongside, blocks nothing
 

@@ -75,7 +75,7 @@ classdef Shape
   ## empty shape can still be made, but every function and method that needs
   ## the library raises an error saying so.
   ##
-  ## @seealso{solid.box, solid.read, solid.write, solid.show}
+  ## @seealso{solid.box, solid.read, solid.write, solid.Shape.show}
   ## @end deftp
 
   properties (SetAccess = private, Hidden)
@@ -237,6 +237,62 @@ classdef Shape
       else
         data = cellfun (@(x) x.Data, varargin, 'UniformOutput', false);
         C = solid.Shape (occt ('solid.Shape.intersect', 'common', data{:}));
+      endif
+
+    endfunction
+
+    ## -*- texinfo -*-
+    ## @deftypefn  {solid.Shape} {} show (@var{S})
+    ## @deftypefnx {solid.Shape} {@var{V} =} show (@var{S})
+    ##
+    ## Show a shape in a viewer of its own, redrawing in place.
+    ##
+    ## @code{show (@var{S})} shows the shape @var{S} in a
+    ## @code{model.Viewer}, a window drawn by Open CASCADE in a process of
+    ## its own.  Every variable gets a viewer of its own, titled with its
+    ## name: the first @code{show (part)} opens the window for @code{part},
+    ## and every later one redraws that window in place and keeps the camera
+    ## where it was, while @code{show (tool)} uses another.  So a script that
+    ## ends by showing its parts can be run again and again, @code{clear all}
+    ## and all, and each part changes in its own window.  A shape given as an
+    ## expression rather than a variable, such as @code{show (fillet (part,
+    ## E, 3))}, has no name, and all such shapes share one window.
+    ##
+    ## Drag with the left mouse button to rotate, the middle one to pan, and
+    ## turn the wheel to zoom; @kbd{F} fits the part to the window and
+    ## @kbd{0}, @kbd{1}, @kbd{2} and @kbd{3} turn it to the isometric, front,
+    ## top and right views.  Closing a window ends its viewer, and the next
+    ## @code{show} of that variable opens a new one.  Showing the empty shape
+    ## opens a variable's window before there is anything to draw in it.
+    ##
+    ## @code{@var{V} = show (@var{S})} also returns the viewer.  Assigning to
+    ## @code{@var{V}.Shape} redraws it at once, and
+    ## @code{model.Viewer.pick} picks edges and faces with the mouse:
+    ##
+    ## @example
+    ## @group
+    ## part = solid.box (80, 40, 12);
+    ## V = show (part);
+    ## E = pick (V, 'edge');     # click the edges, then press Enter
+    ## V.Shape = fillet (V.Shape, E, 3);
+    ## @end group
+    ## @end example
+    ##
+    ## Calling @code{show (@var{S})} is the same as assigning @var{S} to the
+    ## @code{Shape} of the variable's viewer.  Nothing else redraws it:
+    ## changing the variable that was shown does not, until it is shown again.
+    ##
+    ## The viewer is built with the package when Open CASCADE and X11 are
+    ## found, and needs a display to run.  It runs on Linux.
+    ##
+    ## @seealso{model.Viewer, model.Viewer.pick, polymesh.Mesh.show}
+    ## @end deftypefn
+    function V = show (this)
+
+      viewer = model.Viewer.__named__ (inputname (1, false));
+      viewer.Shape = this;
+      if (nargout > 0)
+        V = viewer;
       endif
 
     endfunction
@@ -1433,7 +1489,7 @@ classdef Shape
       catch
         error (flat);
       end_try_catch
-      H = solid.polyhedron (P, F);
+      H = solid.polyhedron (polymesh.Mesh (P, F));
 
     endfunction
 
@@ -2275,6 +2331,42 @@ endfunction
 %! assert_equal (volume (S), 38400 - 4 * __area__ (R.Outline), -1e-9);
 %! assert_equal (isvalid (S), true);
 
+
+%!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
+%! ## show: each variable has a viewer of its own, titled with its name, and
+%! ## shapes without a name share one
+%! old = getappdata (0, 'drafting_model_show');
+%! VA = model.Viewer ('Hidden', true);
+%! VB = model.Viewer ('Hidden', true);
+%! VU = model.Viewer ('Hidden', true);
+%! setappdata (0, 'drafting_model_show', struct ('v_part_a', VA.Id, ...
+%!                                               'v_part_b', VB.Id, ...
+%!                                               'unnamed', VU.Id));
+%! unwind_protect
+%!   part_a = solid.box (10, 20, 30);
+%!   part_b = solid.cylinder (4, 12);
+%!   W = show (part_a);
+%!   assert_equal (W.Id, VA.Id);
+%!   show (part_b);
+%!   show (solid.sphere (2));
+%!   assert_equal (volume (VA.Shape), 6000, 1e-9);
+%!   assert_equal (volume (VB.Shape), 192 * pi, 1e-9);
+%!   assert_equal (volume (VU.Shape), 32 / 3 * pi, 1e-9);
+%!   assert_equal (VA.__title__ (), 'part_a (drafting)');
+%!   assert_equal (VB.__title__ (), 'part_b (drafting)');
+%!   assert_equal (VU.Name, 'S');
+%!   assert_equal (VU.__title__ (), 'drafting');
+%!   ## Showing a variable again redraws its own window
+%!   part_a = solid.box (10, 20, 40);
+%!   show (part_a);
+%!   assert_equal (volume (VA.Shape), 8000, 1e-9);
+%!   assert_equal (volume (VB.Shape), 192 * pi, 1e-9);
+%! unwind_protect_cleanup
+%!   close (VA);
+%!   close (VB);
+%!   close (VU);
+%!   setappdata (0, 'drafting_model_show', old);
+%! end_unwind_protect
 %!error<solid.Shape.pocket: Taper cannot be applied to a region with splines.> ...
 %! R = geom.Region (geom.Spline ([20, 10; 50, 8; 35, 32], 'Closed', true));
 %! pocket (solid.box (80, 40, 12), R, 4, 'Taper', 5);

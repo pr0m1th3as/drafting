@@ -79,8 +79,8 @@
 ## @end example
 ##
 ## Open CASCADE builds the outlines from the font, and its visualization
-## libraries must be present when the package is built, as for
-## @code{solid.show}.
+## libraries must be present when the package is built, as for the viewer,
+## @code{model.Viewer}.
 ##
 ## @seealso{geom.Region, solid.extrude, geom.Region.offset}
 ## @end deftypefn

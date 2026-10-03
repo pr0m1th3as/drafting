@@ -380,12 +380,12 @@ classdef Region
     ## @group
     ## ## A slice of a scanned part, its bore a circle again
     ## M = polymesh.read ('part.stl');
-    ## R = polymesh.section (M, geom.UCS ([0, 0, 1], [0, 0, 5]));
+    ## R = section (M, geom.UCS ([0, 0, 1], [0, 0, 5]));
     ## R = fit (R@{1@}, 'arcs', 'AbsTol', 0.01);
     ## @end group
     ## @end example
     ##
-    ## @seealso{polymesh.section, geom.Region.fillet, geom.Spline}
+    ## @seealso{polymesh.Mesh.section, geom.Region.fillet, geom.Spline}
     ## @end deftypefn
     function this = fit (this, MODE = 'arcs', varargin)
 

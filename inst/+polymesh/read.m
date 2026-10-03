@@ -19,32 +19,71 @@
 ## @deftypefn  {drafting} {@var{M} =} polymesh.read (@var{FILE})
 ## @deftypefnx {drafting} {@var{M} =} polymesh.read (@var{FILE}, @qcode{'Tolerance'}, @var{T})
 ##
-## Read a triangle mesh from an STL file.
+## Read a triangle mesh from an STL, OBJ or PLY file.
 ##
-## @code{@var{M} = polymesh.read (@var{FILE})} reads the binary or ASCII STL
-## file @var{FILE} and returns its mesh as a struct with the fields
-## @code{vertices}, an @math{N}-by-3 matrix of points, and @code{faces}, a
-## @math{K}-by-3 matrix of the indices of each triangle's corners in
-## @code{vertices}.  That is the form @code{patch} takes, and the form
-## @code{polymesh.section} cuts.
+## @code{@var{M} = polymesh.read (@var{FILE})} reads the mesh in @var{FILE}
+## and returns it as a @code{polymesh.Mesh}, with the colours of its
+## vertices or faces where the file has them.  The extension of @var{FILE}
+## names the format, @file{.stl}, @file{.obj} or @file{.ply}, in any case.
 ##
-## An STL file repeats every corner for every triangle that has it.  The
-## corners are welded into vertices, each shared by every triangle that meets
-## there, and a triangle two of whose corners become one is dropped.  The
-## coordinates are taken as they are written; an STL file has no units, and
-## most are in millimetres.
+## @itemize
+## @item
+## An STL file is binary or ASCII.  It is binary when it is exactly as long
+## as the number of triangles it declares makes it, and anything else is
+## read as ASCII, the three numbers after each @qcode{vertex}, whatever the
+## case and spacing.  It has no colours.
+##
+## @item
+## An OBJ file is text.  Its @qcode{v} lines give the vertices, by their
+## first three numbers, and their colours by the next three where they have
+## them; its @qcode{f} lines give the faces, by the index of each corner's
+## vertex, counted from 1, or back from the last vertex so far when it is
+## below 0.  A face takes the colour @qcode{Kd} of the material its
+## @qcode{usemtl} names, from the libraries its @qcode{mtllib} lines name,
+## read from the folder of @var{FILE}.  Texture and normal indices after a
+## slash are ignored, as is every other line, and so are textures.
+##
+## @item
+## A PLY file is ASCII or binary, in either byte order.  The vertices are
+## the properties @qcode{x}, @qcode{y} and @qcode{z} of the element
+## @qcode{vertex}, and the faces the list @qcode{vertex_indices}, or
+## @qcode{vertex_index}, of the element @qcode{face}, counted from 0.  The
+## properties @qcode{red}, @qcode{green} and @qcode{blue} of either element
+## are its colours: an integer type from 0 to its largest value, as the
+## common @qcode{uchar} from 0 to 255, a float from 0 to 1.  Every other
+## element and property is read past, @qcode{alpha} among them.
+## @end itemize
+##
+## A face of more than three corners, which OBJ and PLY allow, is cut into
+## triangles turned the way the face is, each taking the colour of the
+## face.  It is cut in the plane it lies nearest, so a concave face is cut
+## inside its outline; a face that crosses itself is cut as a fan from one
+## corner.
+##
+## Points that are equal are welded into one vertex, shared by every
+## triangle that meets there, and a triangle two of whose corners become one
+## is dropped.  That is what joins the triangles of an STL file, which
+## repeats every corner for every triangle that has it.  A vertex welded
+## from several of the file's vertices takes the mean of their colours.
+## The vertices come in the order the triangles first use them, and a
+## vertex that no face uses is left out.  The coordinates are taken as they
+## are written; none of the three formats has units, and most files are in
+## millimetres.  A file with vertices but no faces, such as a point cloud,
+## is an error.
+##
+## A file that colours only some of its vertices, or only some of its faces,
+## gives the rest the grey @code{[0.72, 0.74, 0.78]} that an uncoloured mesh
+## is shown in.  An OBJ file whose material library is missing is read
+## without face colours, and a material missing from its library leaves the
+## faces that use it grey; each is a warning.  A colour outside 0 to 1 is
+## an error.
 ##
 ## @code{@var{M} = polymesh.read (@var{FILE}, @qcode{'Tolerance'}, @var{T})}
-## welds corners that lie within @var{T} of one another, not only those that
+## welds points that lie within @var{T} of one another, not only those that
 ## are equal, which closes the hairline gaps some programs leave in a mesh.
 ## The default @var{T} is 0.
 ##
-## The format is told from the file: a binary file is exactly as long as the
-## number of triangles it declares makes it, and anything else is read as
-## ASCII, the three numbers after each @qcode{vertex}, whatever the case and
-## spacing.
-##
-## @seealso{polymesh.section, polymesh.write, solid.polyhedron}
+## @seealso{polymesh.Mesh, polymesh.Mesh.write, solid.polyhedron}
 ## @end deftypefn
 
 function M = read (FILE, varargin)
@@ -57,8 +96,9 @@ function M = read (FILE, varargin)
     error ("polymesh.read: FILE must be a character vector.");
   endif
   [~, ~, ext] = fileparts (FILE);
-  if (! strcmpi (ext, '.stl'))
-    error ("polymesh.read: FILE must end in .stl.");
+  fmt = lower (ext);
+  if (! any (strcmp (fmt, {'.stl', '.obj', '.ply'})))
+    error ("polymesh.read: FILE must end in .stl, .obj or .ply.");
   endif
   T = 0;
   if (nargin == 3)
@@ -66,18 +106,20 @@ function M = read (FILE, varargin)
       error ("polymesh.read: unknown parameter.");
     endif
     T = varargin{2};
-    if (! isnumeric (T) || ! isreal (T) || ! isscalar (T) || ! isfinite (T) ...
-        || T < 0)
+    if (! isnumeric (T) || ! isreal (T) || ! isscalar (T) || ! isfinite (T) ||
+        T < 0)
       error (strcat ("polymesh.read: Tolerance must be a non-negative", ...
                      " finite real scalar."));
     endif
   endif
   if (! isfile (FILE))
-    error ("polymesh.read: FILE is not a readable STL file.");
+    error ("polymesh.read: FILE is not a readable %s file.", ...
+           upper (fmt(2:end)));
   endif
 
-  [V, F] = __mesh__ ('read', 'polymesh.read', FILE, double (T));
-  M = struct ('vertices', V, 'faces', F);
+  [V, F, VC, FC] = __mesh__ ('read', 'polymesh.read', FILE, double (T), ...
+                             fmt(2:end));
+  M = polymesh.Mesh (V, F, 'VertexColour', VC, 'FaceColour', FC);
 
 endfunction
 
@@ -106,12 +148,12 @@ endfunction
 %! unwind_protect
 %!   writebinary (f, cube ());
 %!   M = polymesh.read (f);
-%!   assert_equal (size (M.vertices), [8, 3]);
-%!   assert_equal (size (M.faces), [12, 3]);
-%!   assert_equal (sortrows (M.vertices), [0, 0, 0; 0, 0, 1; 0, 1, 0; ...
+%!   assert_equal (size (M.Vertices), [8, 3]);
+%!   assert_equal (size (M.Faces), [12, 3]);
+%!   assert_equal (sortrows (M.Vertices), [0, 0, 0; 0, 0, 1; 0, 1, 0; ...
 %!                 0, 1, 1; 1, 0, 0; 1, 0, 1; 1, 1, 0; 1, 1, 1]);
 %!   V = cube ();
-%!   assert_equal (M.vertices(M.faces',:), V);
+%!   assert_equal (M.Vertices(M.Faces',:), V);
 %! unwind_protect_cleanup
 %!   delete (f);
 %! end_unwind_protect
@@ -130,8 +172,8 @@ endfunction
 %!   fprintf (fid, "endsolid cube\n");
 %!   fclose (fid);
 %!   M = polymesh.read (f);
-%!   assert_equal (size (M.vertices), [8, 3]);
-%!   assert_equal (M.vertices(M.faces',:), V);
+%!   assert_equal (size (M.Vertices), [8, 3]);
+%!   assert_equal (M.Vertices(M.Faces',:), V);
 %! unwind_protect_cleanup
 %!   delete (f);
 %! end_unwind_protect
@@ -143,9 +185,9 @@ endfunction
 %!   V(end,:) += 1e-7;
 %!   writebinary (f, V);
 %!   M = polymesh.read (f);
-%!   assert_equal (rows (M.vertices), 9);
+%!   assert_equal (rows (M.Vertices), 9);
 %!   M = polymesh.read (f, 'Tolerance', 1e-5);
-%!   assert_equal (rows (M.vertices), 8);
+%!   assert_equal (rows (M.Vertices), 8);
 %! unwind_protect_cleanup
 %!   delete (f);
 %! end_unwind_protect
@@ -155,20 +197,240 @@ endfunction
 %! unwind_protect
 %!   writebinary (f, [cube(); 0, 0, 0; 0, 0, 0; 1, 1, 1]);
 %!   M = polymesh.read (f);
-%!   assert_equal (rows (M.faces), 12);
+%!   assert_equal (rows (M.Faces), 12);
 %!   writebinary (f, zeros (0, 3));
 %!   M = polymesh.read (f);
-%!   assert_equal (size (M.vertices), [0, 3]);
-%!   assert_equal (size (M.faces), [0, 3]);
+%!   assert_equal (size (M.Vertices), [0, 3]);
+%!   assert_equal (size (M.Faces), [0, 3]);
 %! unwind_protect_cleanup
 %!   delete (f);
 %! end_unwind_protect
+
+## The unit cube's corners and its six faces as quadrilaterals turned
+## outwards, the mesh read from text written to a file with extension EXT,
+## its signed volume, the bytes of X as TYPE, big-endian, a column for each
+## value, and the signed areas of a planar mesh's triangles
+%!function [P, Q] = quadcube ()
+%!  P = [0, 0, 0; 1, 0, 0; 1, 1, 0; 0, 1, 0; ...
+%!       0, 0, 1; 1, 0, 1; 1, 1, 1; 0, 1, 1];
+%!  Q = [1, 4, 3, 2; 5, 6, 7, 8; 1, 2, 6, 5; ...
+%!       2, 3, 7, 6; 3, 4, 8, 7; 4, 1, 5, 8];
+%!endfunction
+%!function M = readtext (ext, str)
+%!  f = [tempname(), ext];
+%!  fid = fopen (f, 'w');
+%!  fputs (fid, str);
+%!  fclose (fid);
+%!  unwind_protect
+%!    M = polymesh.read (f);
+%!  unwind_protect_cleanup
+%!    delete (f);
+%!  end_unwind_protect
+%!endfunction
+%!function v = signedvolume (M)
+%!  V = M.Vertices;
+%!  F = M.Faces;
+%!  v = sum (dot (V(F(:,1),:), cross (V(F(:,2),:), V(F(:,3),:), 2), 2)) / 6;
+%!endfunction
+%!function b = bebytes (x, type)
+%!  b = typecast (cast (x(:)', type), 'uint8');
+%!  b = flipud (reshape (b, [], numel (x)));
+%!endfunction
+%!function a = triareas (M)
+%!  V = M.Vertices;
+%!  F = M.Faces;
+%!  e = cross (V(F(:,2),:) - V(F(:,1),:), V(F(:,3),:) - V(F(:,1),:), 2);
+%!  a = e(:,3) / 2;
+%!endfunction
+
+%!test  # OBJ: quadrilaterals cut into triangles turned as they are
+%! [P, Q] = quadcube ();
+%! M = readtext ('.obj', [sprintf("v %d %d %d\n", P'), ...
+%!                        sprintf("f %d %d %d %d\n", Q')]);
+%! assert_equal (size (M.Vertices), [8, 3]);
+%! assert_equal (size (M.Faces), [12, 3]);
+%! assert_equal (signedvolume (M), 1);
+
+%!test  # OBJ: texture and normal indices and other lines ignored
+%! [P, Q] = quadcube ();
+%! M = readtext ('.OBJ', ["o cube\n", sprintf("v %d %d %d 1\n", P'), ...
+%!                        "vt 0 0\nvn 0 0 1\ng side\ns off\n", ...
+%!                        sprintf("f %d/1/1 %d/2/1 %d/3/1 %d/4/1\n", ...
+%!                                Q(1:2,:)'), ...
+%!                        sprintf("f %d//1 %d//1 %d//1 %d//1\n", Q(3:4,:)'), ...
+%!                        sprintf("f %d/1 %d/1 %d/1 %d/1\n", Q(5:6,:)')]);
+%! assert_equal (signedvolume (M), 1);
+
+%!test  # OBJ: an index below 0 counts back from the last vertex
+%! [P, Q] = quadcube ();
+%! M = readtext ('.obj', [sprintf("v %d %d %d\n", P'), ...
+%!                        sprintf("f %d %d %d %d\n", Q' - 9)]);
+%! assert_equal (signedvolume (M), 1);
+
+%!test  # OBJ: comments, and a backslash joining two lines
+%! M = readtext ('.obj', ["# a triangle\nv 0 0 0 # origin\nv 1 0 \\\n0\n", ...
+%!                        "v 0 1 0\nf 1 \\\r\n2 3\n"]);
+%! assert_equal (M.Vertices, [0, 0, 0; 1, 0, 0; 0, 1, 0]);
+%! assert_equal (M.Faces, [1, 2, 3]);
+
+%!test  # a concave quadrilateral is cut inside its outline
+%! M = readtext ('.obj', "v 2 0 0\nv 1 0.5 0\nv 0 2 0\nv 0 0 0\nf 1 2 3 4\n");
+%! assert_equal (all (triareas (M) > 0), true);
+%! assert_equal (sum (triareas (M)), 1.5);
+
+%!test  # a concave hexagon is cut into four triangles inside it
+%! M = readtext ('.obj', ["v 0 0 0\nv 2 0 0\nv 2 1 0\nv 1 1 0\nv 1 2 0\n", ...
+%!                        "v 0 2 0\nf 1 2 3 4 5 6\n"]);
+%! assert_equal (rows (M.Faces), 4);
+%! assert_equal (all (triareas (M) > 0), true);
+%! assert_equal (sum (triareas (M)), 3);
+
+%!test  # PLY ASCII: other properties and elements read past
+%! [P, Q] = quadcube ();
+%! M = readtext ('.ply', ["ply\r\nformat ascii 1.0\r\ncomment a cube\r\n", ...
+%!                        "element vertex 8\r\nproperty float x\r\n", ...
+%!                        "property float y\r\nproperty uchar red\r\n", ...
+%!                        "property float z\r\nelement face 6\r\n", ...
+%!                        "property list uchar int vertex_indices\r\n", ...
+%!                        "property float quality\r\nelement edge 1\r\n", ...
+%!                        "property int vertex1\r\n", ...
+%!                        "property int vertex2\r\n", ...
+%!                        "end_header\r\n", ...
+%!                        sprintf("%d %d 255 %d\r\n", P'), ...
+%!                        sprintf("4 %d %d %d %d 0.5\r\n", Q' - 1), "0 1\r\n"]);
+%! assert_equal (size (M.Vertices), [8, 3]);
+%! assert_equal (signedvolume (M), 1);
+
+%!test  # PLY binary, little-endian
+%! [P, Q] = quadcube ();
+%! f = [tempname(), '.ply'];
+%! unwind_protect
+%!   fid = fopen (f, 'w', 'ieee-le');
+%!   fputs (fid, ["ply\nformat binary_little_endian 1.0\n", ...
+%!                "element vertex 8\nproperty float x\nproperty float y\n", ...
+%!                "property float z\nelement face 6\n", ...
+%!                "property list uchar int vertex_indices\nend_header\n"]);
+%!   fwrite (fid, P', 'float32');
+%!   fwrite (fid, [repmat(uint8 (4), 1, 6); ...
+%!                 reshape(flipud (bebytes (Q' - 1, 'int32')), 16, 6)]);
+%!   fclose (fid);
+%!   assert_equal (signedvolume (polymesh.read (f)), 1);
+%! unwind_protect_cleanup
+%!   delete (f);
+%! end_unwind_protect
+
+%!test  # PLY binary, big-endian, other types and the name vertex_index
+%! [P, Q] = quadcube ();
+%! f = [tempname(), '.ply'];
+%! unwind_protect
+%!   fid = fopen (f, 'w', 'ieee-be');
+%!   fputs (fid, ["ply\nformat binary_big_endian 1.0\nelement vertex 8\n", ...
+%!                "property double x\nproperty short n\n", ...
+%!                "property double y\n", ...
+%!                "property double z\nelement face 6\n", ...
+%!                "property list ushort uint vertex_index\nend_header\n"]);
+%!   fwrite (fid, [bebytes(P(:,1), 'double'); bebytes(-ones (8, 1), 'int16');
+%!                 bebytes(P(:,2), 'double'); bebytes(P(:,3), 'double')]);
+%!   fwrite (fid, [bebytes(4 * ones (6, 1), 'uint16');
+%!                 reshape(bebytes (Q' - 1, 'uint32'), 16, 6)]);
+%!   fclose (fid);
+%!   assert_equal (signedvolume (polymesh.read (f)), 1);
+%! unwind_protect_cleanup
+%!   delete (f);
+%! end_unwind_protect
+
+%!test  # an empty OBJ or PLY file is an empty mesh
+%! M = readtext ('.obj', "# nothing\n");
+%! assert_equal (size (M.Vertices), [0, 3]);
+%! assert_equal (size (M.Faces), [0, 3]);
+%! M = readtext ('.ply', "ply\nformat ascii 1.0\nend_header\n");
+%! assert_equal (size (M.Faces), [0, 3]);
+
+## An OBJ file read with a material library MTL beside it, the OBJ naming
+## it first; the PLY header of NV vertices and NF faces, each with the
+## properties PV and PF after the usual ones
+%!function M = readwithmtl (obj, mtl)
+%!  f = [tempname(), '.obj'];
+%!  l = [tempname(), '.mtl'];
+%!  [~, name, ext] = fileparts (l);
+%!  unwind_protect
+%!    fid = fopen (l, 'w');
+%!    fputs (fid, mtl);
+%!    fclose (fid);
+%!    fid = fopen (f, 'w');
+%!    fputs (fid, ["mtllib ", name, ext, "\n", obj]);
+%!    fclose (fid);
+%!    M = polymesh.read (f);
+%!  unwind_protect_cleanup
+%!    delete (f);
+%!    delete (l);
+%!  end_unwind_protect
+%!endfunction
+%!function h = unitply (nv, nf, pv, pf)
+%!  h = sprintf (["ply\nformat ascii 1.0\nelement vertex %d\n", ...
+%!                "property float x\nproperty float y\nproperty float z\n", ...
+%!                "%selement face %d\n", ...
+%!                "property list uchar int vertex_indices\n%send_header\n"], ...
+%!               nv, pv, nf, pf);
+%!endfunction
+
+%!test  # OBJ vertex colours, in the order the faces first use the vertices
+%! M = readtext ('.obj', ["v 0 0 0 1 0 0\nv 1 0 0 0 1 0\nv 0 1 0 0 0 0.5\n", ...
+%!                        "f 3 1 2\n"]);
+%! assert_equal (M.VertexColour, [0, 0, 0.5; 1, 0, 0; 0, 1, 0]);
+%! assert_equal (M.FaceColour, []);
+
+%!test  # OBJ: a vertex without a colour in a coloured file is grey
+%! M = readtext ('.obj', "v 0 0 0 1 0 0\nv 1 0 0\nv 0 1 0 1\nf 1 2 3\n");
+%! assert_equal (M.VertexColour, [1, 0, 0; 0.72, 0.74, 0.78; 0.72, 0.74, 0.78]);
+
+%!test  # OBJ: points welded into one vertex take the mean of their colours
+%! M = readtext ('.obj', ["v 0 0 0 1 0 0\nv 1 0 0 0 0 0\nv 0 1 0 0 0 0\n", ...
+%!                        "v 0 0 0 0 1 0\nv 0 0 1 0 0 0\nf 1 2 3\nf 4 3 5\n"]);
+%! assert_equal (numvertices (M), 4);
+%! assert_equal (M.VertexColour(1,:), [0.5, 0.5, 0]);
+
+%!test  # OBJ face colours from materials; a quadrilateral's two triangles
+%! M = readwithmtl (["v 0 0 0\nv 1 0 0\nv 1 1 0\nv 0 1 0\nv 0 0 1\n", ...
+%!                   "f 1 2 5\nusemtl red\nf 1 2 3 4\nusemtl blue\n", ...
+%!                   "f 2 3 5\n"], ...
+%!                  ["newmtl red\nKa 0 0 0\nKd 1 0 0\n", ...
+%!                   "newmtl blue\nKd 0 0 1\n"]);
+%! assert_equal (M.FaceColour, [0.72, 0.74, 0.78; 1, 0, 0; 1, 0, 0; 0, 0, 1]);
+
+%!warning<polymesh.read: FILE uses the material green, which its library does not have, so its faces are grey.> ...
+%! M = readwithmtl ("v 0 0 0\nv 1 0 0\nv 0 1 0\nusemtl green\nf 1 2 3\n", ...
+%!                  "newmtl red\nKd 1 0 0\n");
+%! assert_equal (M.FaceColour, [0.72, 0.74, 0.78]);
+
+%!warning<polymesh.read: the material library of FILE is missing, so its faces have no colour.> ...
+%! M = readtext ('.obj', ["mtllib nowhere.mtl\nv 0 0 0\nv 1 0 0\nv 0 1 0\n", ...
+%!                        "usemtl red\nf 1 2 3\n"]);
+%! assert_equal (M.FaceColour, []);
+
+%!test  # PLY colours on vertices, uchar from 0 to 255
+%! M = readtext ('.ply', [unitply(3, 1, ["property uchar red\n", ...
+%!                                       "property uchar green\n", ...
+%!                                       "property uchar blue\n"], ""), ...
+%!                        "0 0 0 255 0 0\n1 0 0 0 51 0\n0 1 0 0 0 0\n", ...
+%!                        "3 0 1 2\n"]);
+%! assert_equal (M.VertexColour, [1, 0, 0; 0, 0.2, 0; 0, 0, 0]);
+
+%!test  # PLY colours on faces, floats from 0 to 1, a quadrilateral's two
+%! M = readtext ('.ply', [unitply(4, 1, "", ["property float red\n", ...
+%!                                           "property float green\n", ...
+%!                                           "property float blue\n"]), ...
+%!                        "0 0 0\n1 0 0\n1 1 0\n0 1 0\n", ...
+%!                        "4 0 1 2 3 0.25 0.5 1\n"]);
+%! assert_equal (M.FaceColour, [0.25, 0.5, 1; 0.25, 0.5, 1]);
+%! assert_equal (M.VertexColour, []);
 
 %!error<polymesh.read: invalid number of input arguments.> polymesh.read ()
 %!error<polymesh.read: invalid number of input arguments.> ...
 %! polymesh.read ('a.stl', 1)
 %!error<polymesh.read: FILE must be a character vector.> polymesh.read (1)
-%!error<polymesh.read: FILE must end in .stl.> polymesh.read ('part.step')
+%!error<polymesh.read: FILE must end in .stl, .obj or .ply.> ...
+%! polymesh.read ('part.step')
 %!error<polymesh.read: unknown parameter.> polymesh.read ('a.stl', 'Weld', 1)
 %!error<polymesh.read: Tolerance must be a non-negative finite real scalar.> ...
 %! polymesh.read ('a.stl', 'Tolerance', -1)
@@ -195,3 +457,68 @@ endfunction
 %! unwind_protect_cleanup
 %!   delete (f);
 %! end_unwind_protect
+%!error<polymesh.read: FILE is not a readable OBJ file.> ...
+%! polymesh.read ([tempname(), '.obj'])
+%!error<polymesh.read: FILE is not a readable OBJ file.> ...
+%! readtext ('.obj', "v 0 0 0\nv 1 0\n")
+%!error<polymesh.read: FILE is not a readable OBJ file.> ...
+%! readtext ('.obj', "v 0 0 0\nv 1 0 0\nf 1 2\n")
+%!error<polymesh.read: FILE is not a readable OBJ file.> ...
+%! readtext ('.obj', "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 0 1 2\n")
+%!error<polymesh.read: FILE is not a readable OBJ file.> ...
+%! readtext ('.obj', "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2x 3\n")
+%!error<polymesh.read: a face of FILE refers to a vertex the file does not have.> ...
+%! readtext ('.obj', "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 4\n")
+%!error<polymesh.read: a face of FILE refers to a vertex the file does not have.> ...
+%! readtext ('.obj', "v 0 0 0\nv 1 0 0\nf 1 2 -3\nv 0 1 0\n")
+%!error<polymesh.read: FILE has vertices but no faces.> ...
+%! readtext ('.obj', "v 0 0 0\nv 1 0 0\nv 0 1 0\nl 1 2\n")
+%!error<polymesh.read: FILE is not a readable PLY file.> ...
+%! readtext ('.ply', "format ascii 1.0\nend_header\n")
+%!error<polymesh.read: FILE is not a readable PLY file.> ...
+%! readtext ('.ply', "ply\nformat ascii 1.0\nelement vertex 1\n")
+%!error<polymesh.read: FILE is not a readable PLY file.> ...
+%! readtext ('.ply', "ply\nformat binary 1.0\nend_header\n")
+%!error<polymesh.read: FILE is not a readable PLY file.> ...
+%! readtext ('.ply', ["ply\nformat ascii 1.0\nelement vertex 1\n", ...
+%!                    "property long x\nend_header\n0\n"])
+%!error<polymesh.read: FILE is not a readable PLY file.> ...
+%! readtext ('.ply', ["ply\nformat ascii 1.0\nelement vertex 1\n", ...
+%!                    "property float x\nproperty float y\nend_header\n0 0\n"])
+%!error<polymesh.read: FILE is not a readable PLY file.> ...
+%! readtext ('.ply', ["ply\nformat ascii 1.0\nelement vertex 2\n", ...
+%!                    "property float x\nproperty float y\n", ...
+%!                    "property float z\nend_header\n0 0 0\n"])
+%!error<polymesh.read: FILE is not a readable PLY file.> ...
+%! readtext ('.ply', ["ply\nformat binary_little_endian 1.0\n", ...
+%!                    "element vertex 1\nproperty float x\n", ...
+%!                    "property float y\nproperty float z\n", ...
+%!                    "end_header\nabcdefgh"])
+%!error<polymesh.read: FILE is not a readable PLY file.> ...
+%! readtext ('.ply', ["ply\nformat ascii 1.0\nelement vertex 3\n", ...
+%!                    "property float x\nproperty float y\n", ...
+%!                    "property float z\nelement face 1\n", ...
+%!                    "property list uchar int vertex_indices\n", ...
+%!                    "end_header\n", ...
+%!                    "0 0 0\n1 0 0\n0 1 0\n2 0 1\n"])
+%!error<polymesh.read: a face of FILE refers to a vertex the file does not have.> ...
+%! readtext ('.ply', ["ply\nformat ascii 1.0\nelement vertex 3\n", ...
+%!                    "property float x\nproperty float y\n", ...
+%!                    "property float z\nelement face 1\n", ...
+%!                    "property list uchar int vertex_indices\n", ...
+%!                    "end_header\n", ...
+%!                    "0 0 0\n1 0 0\n0 1 0\n3 0 1 3\n"])
+%!error<polymesh.read: FILE has vertices but no faces.> ...
+%! readtext ('.ply', ["ply\nformat ascii 1.0\nelement vertex 1\n", ...
+%!                    "property float x\nproperty float y\n", ...
+%!                    "property float z\nend_header\n0 0 0\n"])
+%!error<polymesh.read: a colour in FILE is outside 0 to 1.> ...
+%! readtext ('.obj', "v 0 0 0 255 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n")
+%!error<polymesh.read: a colour in FILE is outside 0 to 1.> ...
+%! readwithmtl ("v 0 0 0\nv 1 0 0\nv 0 1 0\nusemtl red\nf 1 2 3\n", ...
+%!              "newmtl red\nKd 2 0 0\n")
+%!error<polymesh.read: a colour in FILE is outside 0 to 1.> ...
+%! readtext ('.ply', [unitply(3, 1, "", ["property float red\n", ...
+%!                                       "property float green\n", ...
+%!                                       "property float blue\n"]), ...
+%!                    "0 0 0\n1 0 0\n0 1 0\n3 0 1 2 1.5 0 0\n"])

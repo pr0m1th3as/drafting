@@ -5,7 +5,7 @@ MKOCTFILE ?= mkoctfile
 # Open CASCADE is optional.  Where its headers are not found, or are older
 # than 7.8, nothing is built and the solid namespace reports that the package
 # was built without it; every other namespace works as before.  Set OCCT_INC
-# to use another location.  The viewer behind solid.show is a program of its
+# to use another location.  The viewer behind model.Viewer is a program of its
 # own, built where the X11 headers are found as well.
 OCCT_INC ?= /usr/include/opencascade
 X11_INC ?= /usr/include
@@ -28,7 +28,7 @@ OCCT_RECENT := $(shell awk '/define OCC_VERSION_MAJOR/ {M = $$3} \
                  $(OCCT_HDR))
 endif
 
-# The triangle meshes behind the stl namespace need nothing but Octave
+# The triangle meshes behind the polymesh namespace need nothing but Octave
 OCTFILES = __mesh__.oct
 
 ifeq ($(OCCT_RECENT),yes)
@@ -55,7 +55,7 @@ endif
 ifeq ($(OCCT_RECENT),yes)
 ifeq ($(PROGRAMS),)
 	@echo "drafting: X11 not found in $(X11_INC);" \
-	      "building without the viewer behind solid.show."
+	      "building without the viewer behind model.Viewer."
 endif
 endif
 

@@ -16,22 +16,18 @@
 ## this program; if not, see <http://www.gnu.org/licenses/>.
 
 ## -*- texinfo -*-
-## @deftypefn  {drafting} {@var{S} =} solid.polyhedron (@var{V}, @var{F})
-## @deftypefnx {drafting} {@var{S} =} solid.polyhedron (@var{M})
-## @deftypefnx {drafting} {@var{S} =} solid.polyhedron (@dots{}, 'Merge', @var{TF})
+## @deftypefn  {drafting} {@var{S} =} solid.polyhedron (@var{M})
+## @deftypefnx {drafting} {@var{S} =} solid.polyhedron (@var{M}, 'Merge', @var{TF})
 ##
 ## A solid bounded by a closed triangle mesh.
 ##
-## @code{@var{S} = solid.polyhedron (@var{V}, @var{F})} returns the
-## @code{solid.Shape} enclosed by the triangles @var{F}, a @math{K}-by-3
-## matrix of indices into the rows of @var{V}, an @math{N}-by-3 matrix of
-## points.  The solid takes part in booleans as any other, so a scanned or
+## @code{@var{S} = solid.polyhedron (@var{M})} returns the
+## @code{solid.Shape} enclosed by the triangles of the @code{polymesh.Mesh}
+## @var{M}.  The solid takes part in booleans as any other, so a scanned or
 ## downloaded part can be cut, joined and measured.  This is OpenSCAD's
-## @code{polyhedron}.
-##
-## @code{@var{S} = solid.polyhedron (@var{M})} takes the mesh as a struct with
-## the fields @code{vertices} and @code{faces}, as @code{polymesh.read} returns
-## it.
+## @code{polyhedron}.  Vertices and faces in any other form, such as the
+## struct @code{isosurface} returns, become a mesh first through the
+## @code{polymesh.Mesh} constructor.
 ##
 ## The mesh must be closed, every edge shared by exactly two triangles, or it
 ## is an error that says how many edges are not.  Points that are equal are
@@ -51,57 +47,35 @@
 ## ## A tetrahedron with a corner cut away
 ## V = [0, 0, 0; 10, 0, 0; 0, 10, 0; 0, 0, 10];
 ## F = [1, 3, 2; 1, 2, 4; 2, 3, 4; 3, 1, 4];
-## S = subtract (solid.polyhedron (V, F), solid.sphere (3));
+## S = subtract (solid.polyhedron (polymesh.Mesh (V, F)), solid.sphere (3));
 ## @end group
 ## @end example
 ##
-## @seealso{polymesh.read, solid.read, solid.Shape}
+## @seealso{polymesh.Mesh, polymesh.read, solid.read, solid.Shape}
 ## @end deftypefn
 
-function S = polyhedron (varargin)
+function S = polyhedron (M, varargin)
 
   ## Input validation
-  if (nargin < 1 || nargin > 4)
+  if (nargin < 1 || nargin > 3)
     error ("solid.polyhedron: invalid number of input arguments.");
   endif
-  if (isstruct (varargin{1}))
-    M = varargin{1};
-    if (! isscalar (M) || ! all (isfield (M, {'vertices', 'faces'})))
-      error (strcat ("solid.polyhedron: M must be a struct with the fields", ...
-                     " 'vertices' and 'faces'."));
-    endif
-    V = M.vertices;
-    F = M.faces;
-    args = varargin(2:end);
-  elseif (nargin < 2)
-    error ("solid.polyhedron: invalid number of input arguments.");
-  else
-    V = varargin{1};
-    F = varargin{2};
-    args = varargin(3:end);
+  if (! isa (M, 'polymesh.Mesh') || ! isscalar (M))
+    error ("solid.polyhedron: M must be a polymesh.Mesh object.");
   endif
   merge = true;
-  if (! isempty (args))
-    if (numel (args) != 2)
+  if (! isempty (varargin))
+    if (numel (varargin) != 2)
       error ("solid.polyhedron: Name/Value arguments must come in pairs.");
     endif
-    if (! ischar (args{1}) || ! strcmp (args{1}, 'Merge'))
+    if (! ischar (varargin{1}) || ! strcmp (varargin{1}, 'Merge'))
       error ("solid.polyhedron: unknown parameter.");
     endif
-    merge = args{2};
-    if (! (islogical (merge) || isnumeric (merge)) || ! isscalar (merge) ...
-        || ! any (merge == [0, 1]))
+    merge = varargin{2};
+    if (! (islogical (merge) || isnumeric (merge)) || ! isscalar (merge) ||
+        ! any (merge == [0, 1]))
       error ("solid.polyhedron: Merge must be true or false.");
     endif
-  endif
-  if (! isnumeric (V) || ! isreal (V) || ! ismatrix (V) || columns (V) != 3 ...
-      || ! all (isfinite (V(:))))
-    error ("solid.polyhedron: V must be an N-by-3 matrix of finite real points.");
-  endif
-  if (! isnumeric (F) || ! isreal (F) || ! ismatrix (F) || columns (F) != 3 ...
-      || any (F(:) != fix (F(:))) || any (F(:) < 1 | F(:) > rows (V)))
-    error (strcat ("solid.polyhedron: F must be a K-by-3 matrix of indices", ...
-                   " into the rows of V."));
   endif
   errmsg = solid.__checkocct__ ();
   if (! isempty (errmsg))
@@ -109,8 +83,8 @@ function S = polyhedron (varargin)
   endif
 
   ## Points that are equal are one vertex
-  [V, ~, j] = unique (double (V), 'rows');
-  F = reshape (j(F), size (F));
+  [V, ~, j] = unique (M.Vertices, 'rows');
+  F = reshape (j(M.Faces), size (M.Faces));
   S = solid.Shape (__occt__ ('polyhedron', 'solid.polyhedron', V, F, ...
                              logical (merge)));
 
@@ -150,52 +124,55 @@ endfunction
 
 %!testif ; exist ('__occt__') == 3  # a box, its coplanar triangles merged
 %! [V, F] = boxmesh ([10, 20, 30]);
-%! S = solid.polyhedron (V, F);
+%! S = solid.polyhedron (polymesh.Mesh (V, F));
 %! assert_equal (volume (S), 6000, -1e-12);
 %! assert_equal (numfaces (S), 6);
 %! assert_equal (isvalid (S), true);
-%! assert_equal (numfaces (solid.polyhedron (V, F, 'Merge', false)), 12);
+%! S = solid.polyhedron (polymesh.Mesh (V, F), 'Merge', false);
+%! assert_equal (numfaces (S), 12);
 %! assert_equal (bbox (S), [0, 0, 0, 10, 20, 30], 1e-12);
 
-%!testif ; exist ('__occt__') == 3  # from a struct, triangles turned anyhow
+%!testif ; exist ('__occt__') == 3  # triangles turned anyhow
 %! [V, F] = boxmesh ([10, 10, 10]);
 %! F([2, 5, 9],:) = F([2, 5, 9], [1, 3, 2]);
-%! S = solid.polyhedron (struct ('vertices', V, 'faces', F));
+%! S = solid.polyhedron (polymesh.Mesh (V, F));
 %! assert_equal (volume (S), 1000, -1e-12);
-%! S = solid.polyhedron (V, F(:,[1, 3, 2]));
+%! S = solid.polyhedron (polymesh.Mesh (V, F(:,[1, 3, 2])));
 %! assert_equal (volume (S), 1000, -1e-12);
 
-%!testif ; exist ('__occt__') == 3  # repeated points welded, flat triangles dropped
+%!testif ; exist ('__occt__') == 3  # equal points welded, flat ones dropped
 %! [V, F] = boxmesh ([1, 1, 1]);
 %! W = V(F',:);
-%! S = solid.polyhedron (W, [reshape(1:36, 3, [])'; 1, 1, 2]);
+%! S = solid.polyhedron (polymesh.Mesh (W, [reshape(1:36, 3, [])'; 1, 1, 2]));
 %! assert_equal (volume (S), 1, -1e-12);
 
 %!testif ; exist ('__occt__') == 3  # a piece inside another turned in is a void
 %! [V, F] = boxmesh ([10, 10, 10]);
-%! S = solid.polyhedron ([V; V / 2 + 2.5], [F; F(:,[1, 3, 2]) + 8]);
+%! S = solid.polyhedron (polymesh.Mesh ([V; V / 2 + 2.5], ...
+%!                                    [F; F(:,[1, 3, 2]) + 8]));
 %! assert_equal (volume (S), 875, -1e-12);
 %! assert_equal (numsolids (S), 1);
-%! S = solid.polyhedron ([V; V + 20], [F; F + 8]);
+%! S = solid.polyhedron (polymesh.Mesh ([V; V + 20], [F; F + 8]));
 %! assert_equal (volume (S), 2000, -1e-12);
 %! assert_equal (numsolids (S), 2);
 
 %!testif ; exist ('__occt__') == 3  # pieces that overlap are united
 %! [V, F] = boxmesh ([10, 10, 10]);
-%! S = solid.polyhedron ([V; V + 5], [F; F + 8]);
+%! S = solid.polyhedron (polymesh.Mesh ([V; V + 5], [F; F + 8]));
 %! assert_equal (volume (S), 1875, -1e-12);
 %! assert_equal (numsolids (S), 1);
 %! assert_equal (isvalid (S), true);
-%! S = solid.polyhedron ([V; V + 5], [F; F + 8], 'Merge', false);
+%! S = solid.polyhedron (polymesh.Mesh ([V; V + 5], [F; F + 8]), ...
+%!                       'Merge', false);
 %! assert_equal (volume (S), 1875, -1e-12);
-%! S = solid.polyhedron ([V; V / 2 + 2.5], [F; F + 8]);
+%! S = solid.polyhedron (polymesh.Mesh ([V; V / 2 + 2.5], [F; F + 8]));
 %! assert_equal (volume (S), 1000, -1e-12);
 %! assert_equal (numsolids (S), 1);
 %! assert_equal (numfaces (S), 6);
 
 %!testif ; exist ('__occt__') == 3  # a torus, cut by a box
 %! [V, F] = wrapped (48, 24, 20, 5, false);
-%! S = solid.polyhedron (V, F);
+%! S = solid.polyhedron (polymesh.Mesh (V, F));
 %! assert_equal (volume (S), abs (meshvolume (V, F)), -1e-9);
 %! assert_equal (numfaces (S), rows (F) / 2);  # each cell a flat quad
 %! T = intersect (S, translate (solid.box (40, 40, 20), [0, 0, -10]));
@@ -205,30 +182,24 @@ endfunction
 %!error<solid.polyhedron: invalid number of input arguments.> ...
 %! solid.polyhedron ()
 %!error<solid.polyhedron: invalid number of input arguments.> ...
+%! solid.polyhedron (polymesh.Mesh (), 'Merge', true, 1)
+%!error<solid.polyhedron: M must be a polymesh.Mesh object.> ...
 %! solid.polyhedron (eye (3))
-%!error<solid.polyhedron: M must be a struct with the fields 'vertices' and 'faces'.> ...
-%! solid.polyhedron (struct ('vertices', eye (3)))
+%!error<solid.polyhedron: M must be a polymesh.Mesh object.> ...
+%! solid.polyhedron (struct ('vertices', eye (3), 'faces', [1, 2, 3]))
 %!error<solid.polyhedron: Name/Value arguments must come in pairs.> ...
-%! solid.polyhedron (eye (3), [1, 2, 3], 'Merge')
+%! solid.polyhedron (polymesh.Mesh (eye (3), [1, 2, 3]), 'Merge')
 %!error<solid.polyhedron: unknown parameter.> ...
-%! solid.polyhedron (eye (3), [1, 2, 3], 'Weld', true)
+%! solid.polyhedron (polymesh.Mesh (eye (3), [1, 2, 3]), 'Weld', true)
 %!error<solid.polyhedron: Merge must be true or false.> ...
-%! solid.polyhedron (eye (3), [1, 2, 3], 'Merge', 2)
-%!error<solid.polyhedron: V must be an N-by-3 matrix of finite real points.> ...
-%! solid.polyhedron (eye (2), [1, 2, 3])
-%!error<solid.polyhedron: V must be an N-by-3 matrix of finite real points.> ...
-%! solid.polyhedron ([eye(3); NaN, 0, 0], [1, 2, 3])
-%!error<solid.polyhedron: F must be a K-by-3 matrix of indices into the rows of V.> ...
-%! solid.polyhedron (eye (3), [1, 2, 4])
-%!error<solid.polyhedron: F must be a K-by-3 matrix of indices into the rows of V.> ...
-%! solid.polyhedron (eye (3), [1, 2, 2.5])
+%! solid.polyhedron (polymesh.Mesh (eye (3), [1, 2, 3]), 'Merge', 2)
 %!error<solid.polyhedron: the mesh has no triangles.> ...
-%! solid.polyhedron (eye (3), zeros (0, 3))
+%! solid.polyhedron (polymesh.Mesh ())
 %!error<solid.polyhedron: the mesh is not closed: 3 edges belong to one triangle only.> ...
-%! solid.polyhedron (eye (3), [1, 2, 3])
+%! solid.polyhedron (polymesh.Mesh (eye (3), [1, 2, 3]))
 %!error<solid.polyhedron: the mesh is not manifold: 1 edge belongs to more than two triangles.>
 %! [V, F] = boxmesh ([10, 10, 10]);
-%! solid.polyhedron ([V; 5, 5, 20], [F; 5, 6, 9; 6, 5, 9]);
+%! solid.polyhedron (polymesh.Mesh ([V; 5, 5, 20], [F; 5, 6, 9; 6, 5, 9]));
 %!error<solid.polyhedron: the mesh is one-sided, as a Klein bottle, and encloses no volume.>
 %! [V, F] = wrapped (8, 6, 20, 5, true);
-%! solid.polyhedron (V, F);
+%! solid.polyhedron (polymesh.Mesh (V, F));

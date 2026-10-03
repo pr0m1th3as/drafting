@@ -62,7 +62,7 @@ function S = read (FILE)
     if (! isempty (errmsg))
       error ("solid.read: %s", errmsg);
     endif
-    [V, F] = __mesh__ ('read', 'solid.read', FILE, 0);
+    [V, F] = __mesh__ ('read', 'solid.read', FILE, 0, 'stl');
     S = solid.Shape (__occt__ ('polyhedron', 'solid.read', V, F, true));
     return;
   endif
