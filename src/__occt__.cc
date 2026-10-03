@@ -87,7 +87,6 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <STEPControl_Reader.hxx>
 #include <STEPControl_Writer.hxx>
 #include <Standard_Failure.hxx>
-#include <StlAPI_Writer.hxx>
 #include <TCollection_HAsciiString.hxx>
 #include <TopExp.hxx>
 #include <TopExp_Explorer.hxx>
@@ -1385,9 +1384,14 @@ writestep (const TopoDS_Shape& s, const string& file, const string& name,
   }
 }
 
-static void
-writestl (const TopoDS_Shape& s, const string& file, double tol,
-          double angle, const string& caller)
+// The triangles of a mesh of S that strays no further than TOL from its
+// surface, nor spans more than ANGLE radians of it: a cell of the points,
+// N-by-3, and the triangles, K-by-3 indices into them from 1, each turned
+// outwards.  Every face keeps points of its own; those along an edge that
+// two faces share are equal, and are welded by the caller.
+static Cell
+tessellation (const TopoDS_Shape& s, double tol, double angle,
+              const string& caller)
 {
   BRepMesh_IncrementalMesh mesh (s, tol, Standard_False, angle,
                                  Standard_True);
@@ -1396,12 +1400,52 @@ writestl (const TopoDS_Shape& s, const string& file, double tol,
     error ("%s: Open CASCADE could not triangulate the shape.",
            caller.c_str ());
   }
-  StlAPI_Writer w;
-  w.ASCIIMode () = Standard_False;
-  if (! w.Write (s, file.c_str ()))
+  vector<gp_Pnt> p;
+  vector<int> t;
+  for (TopExp_Explorer ex (s, TopAbs_FACE); ex.More (); ex.Next ())
   {
-    error ("%s: cannot write '%s'.", caller.c_str (), file.c_str ());
+    const TopoDS_Face& f = TopoDS::Face (ex.Current ());
+    TopLoc_Location loc;
+    Handle (Poly_Triangulation) T = BRep_Tool::Triangulation (f, loc);
+    if (T.IsNull ())
+    {
+      continue;
+    }
+    const gp_Trsf tr = loc.Transformation ();
+    const bool flip = (f.Orientation () == TopAbs_REVERSED)
+                      != tr.IsNegative ();
+    const int base = p.size ();
+    for (int i = 1; i <= T->NbNodes (); i++)
+    {
+      p.push_back (T->Node (i).Transformed (tr));
+    }
+    for (int i = 1; i <= T->NbTriangles (); i++)
+    {
+      int a, b, c;
+      T->Triangle (i).Get (a, b, c);
+      if (flip)
+      {
+        std::swap (b, c);
+      }
+      t.insert (t.end (), {base + a, base + b, base + c});
+    }
   }
+  Matrix P (p.size (), 3);
+  for (size_t i = 0; i < p.size (); i++)
+  {
+    P(i,0) = p[i].X ();
+    P(i,1) = p[i].Y ();
+    P(i,2) = p[i].Z ();
+  }
+  Matrix F (t.size () / 3, 3);
+  for (size_t i = 0; i < t.size (); i++)
+  {
+    F(i / 3, i % 3) = t[i];
+  }
+  Cell c (1, 2);
+  c(0) = P;
+  c(1) = F;
+  return c;
 }
 
 // The points of the surface of S: the nodes of a triangulation that strays
@@ -2283,11 +2327,10 @@ function directly. \n\
       writestep (toshape (args(2), caller), args(3).string_value (),
                  args(4).string_value (), caller);
     }
-    else if (cmd == "writestl")
+    else if (cmd == "tessellate")
     {
-      writestl (toshape (args(2), caller), args(3).string_value (),
-                args(4).double_value (),
-                args(5).double_value () * M_PI / 180, caller);
+      out = tessellation (toshape (args(2), caller), args(3).double_value (),
+                          args(4).double_value () * M_PI / 180, caller);
     }
     else if (cmd == "points")
     {

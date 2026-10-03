@@ -289,7 +289,7 @@ drawings through `+draw`, so dependencies still point downward only.
 | From profiles | extrude, revolve, sweep and loft of `+geom` polylines, bulges carried as true arcs |
 | Features | fillet, chamfer, shell; holes plain, counterbored, countersunk and tapped, recorded as holes |
 | Queries | edges and faces selected by type, direction and position; volume, area, centre of mass, bounding box; validity |
-| Files | `solid.read`, STEP; `solid.write`, STEP and STL |
+| Files | `solid.read`, STEP; `solid.write`, STEP, and STL, OBJ and PLY through `tessellate` |
 | Viewing | `show` and `model.Viewer`: the solid in Open CASCADE's own viewer, run as a process of its own so that it turns smoothly and never blocks the prompt; redrawn in place when a shape is assigned to it; edges and faces picked with the mouse, reported as indices and as the query that finds them again |
 | Drawings | views, sections and details laid out on a `draw.Sheet` |
 

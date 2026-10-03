@@ -11,7 +11,7 @@ exchanged as STEP, come through Open CASCADE when the package is built with it.
 
 Forty-six public functions across five namespaces plus the `draw.Drawing`,
 `geom.Polyline`, `geom.Spline`, `geom.Region`, `geom.Path`, `geom.UCS`,
-`polymesh.Mesh`, `solid.Shape` and `model.Viewer` classes, 1752 built-in
+`polymesh.Mesh`, `solid.Shape` and `model.Viewer` classes, 1761 built-in
 self-tests and 67 `%!demo` blocks, nearly all of which end in a `plot` call, so
 the documentation shows what a function does rather than only describing it.
 
@@ -134,8 +134,9 @@ size), cut pockets, round and bevel edges and hollow a shape, on edges and faces
 chosen by kind, direction and position, and `section` cuts a solid with a plane
 into regions exact enough to build from again. `solid.polyhedron` makes a solid
 of a closed `polymesh.Mesh`, so a mesh `polymesh.read` reads takes part in
-booleans like any other. `solid.read` reads STEP, and `solid.write` writes STEP
-for a CAD program or STL for a slicer:
+booleans like any other, and `tessellate` turns a solid into a mesh within a
+tolerance. `solid.read` reads STEP, and `solid.write` writes STEP for a CAD
+program, or STL, OBJ or PLY, tessellated, for a slicer:
 
 ```
 plate = solid.box (80, 40, 12);

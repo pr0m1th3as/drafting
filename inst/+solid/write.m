@@ -19,7 +19,7 @@
 ## @deftypefn  {drafting} {} solid.write (@var{FILE}, @var{S})
 ## @deftypefnx {drafting} {} solid.write (@var{FILE}, @var{S}, @qcode{'Tolerance'}, @var{TOL})
 ##
-## Write a solid to a STEP or STL file.
+## Write a solid to a STEP, STL, OBJ or PLY file.
 ##
 ## @code{solid.write (@var{FILE}, @var{S})} writes the @code{solid.Shape}
 ## @var{S} in the format named by the extension of @var{FILE}, in either case:
@@ -31,20 +31,21 @@
 ## another manufacturer.  The part is named after the base name of
 ## @var{FILE}.
 ##
-## @item @file{.stl}
-## Binary STL, a mesh of triangles in millimetres, which is what a slicer
-## prints from.  The facets approximate every curved surface; their vertices
-## lie on it.
+## @item @file{.stl}, @file{.obj}, @file{.ply}
+## A mesh of triangles in millimetres, the mesh @code{solid.Shape.tessellate}
+## makes, written by @code{polymesh.Mesh.write}: binary STL, which is what a
+## slicer prints from, OBJ, or binary PLY.  The facets approximate every
+## curved surface; their vertices lie on it.
 ## @end table
 ##
-## @code{solid.write (@dots{}, @qcode{'Tolerance'}, @var{TOL})} sets, for an
-## STL file, the largest distance in millimetres between a facet and the true
+## @code{solid.write (@dots{}, @qcode{'Tolerance'}, @var{TOL})} sets, for a
+## mesh, the largest distance in millimetres between a facet and the true
 ## surface.  It is 0.01 by default, well below what a printer resolves; a
 ## larger value gives a smaller file.  No facet spans more than 20 degrees of
 ## a curved surface, whatever @var{TOL}.  A STEP file is exact and takes no
 ## tolerance.
 ##
-## @seealso{solid.read, solid.Shape}
+## @seealso{solid.read, solid.Shape, solid.Shape.tessellate}
 ## @end deftypefn
 
 function write (FILE, S, varargin)
@@ -73,11 +74,11 @@ function write (FILE, S, varargin)
   endfor
   [folder, base, ext] = fileparts (FILE);
   isstep = any (strcmpi (ext, {'.step', '.stp'}));
-  if (! isstep && ! strcmpi (ext, '.stl'))
-    error ("solid.write: FILE must end in .step, .stp or .stl.");
+  if (! isstep && ! any (strcmpi (ext, {'.stl', '.obj', '.ply'})))
+    error ("solid.write: FILE must end in .step, .stp, .stl, .obj or .ply.");
   endif
   if (isstep && ! isempty (opt.Tolerance))
-    error ("solid.write: Tolerance applies to STL files only.");
+    error ("solid.write: Tolerance applies to STL, OBJ and PLY files only.");
   endif
   if (isempty (opt.Tolerance))
     opt.Tolerance = 0.01;
@@ -100,8 +101,7 @@ function write (FILE, S, varargin)
   if (isstep)
     __occt__ ('writestep', 'solid.write', S.Data, FILE, base);
   else
-    __occt__ ('writestl', 'solid.write', S.Data, FILE, ...
-              double (opt.Tolerance), 20);
+    write (tessellate (S, opt.Tolerance), FILE);
   endif
 
 endfunction
@@ -185,6 +185,28 @@ endfunction
 %!   unlink (f2);
 %! end_unwind_protect
 
+%!testif ; exist ('__occt__') == 3  # OBJ: the mesh of the solid, closed
+%! f = [tempname(), '.obj'];
+%! unwind_protect
+%!   solid.write (f, solid.box (10, 20, 30));
+%!   M = polymesh.read (f);
+%!   assert_equal (isclosed (M), true);
+%!   assert_equal (volume (M), 6000, -1e-12);
+%! unwind_protect_cleanup
+%!   unlink (f);
+%! end_unwind_protect
+
+%!testif ; exist ('__occt__') == 3  # PLY: the mesh of the solid, closed
+%! f = [tempname(), '.ply'];
+%! unwind_protect
+%!   solid.write (f, solid.box (10, 20, 30));
+%!   M = polymesh.read (f);
+%!   assert_equal (isclosed (M), true);
+%!   assert_equal (volume (M), 6000, -1e-12);
+%! unwind_protect_cleanup
+%!   unlink (f);
+%! end_unwind_protect
+
 %!error<solid.write: invalid number of input arguments.> solid.write ('a.stl')
 %!error<solid.write: FILE must be a non-empty character vector.> ...
 %! solid.write ('', solid.Shape ())
@@ -193,9 +215,9 @@ endfunction
 %! solid.write ('a.stl', solid.Shape (), 'Tolerance')
 %!error<solid.write: unknown parameter.> ...
 %! solid.write ('a.stl', solid.Shape (), 'Angle', 5)
-%!error<solid.write: FILE must end in .step, .stp or .stl.> ...
+%!error<solid.write: FILE must end in .step, .stp, .stl, .obj or .ply.> ...
 %! solid.write ('a.dxf', solid.Shape ())
-%!error<solid.write: Tolerance applies to STL files only.> ...
+%!error<solid.write: Tolerance applies to STL, OBJ and PLY files only.> ...
 %! solid.write ('a.step', solid.Shape (), 'Tolerance', 0.1)
 %!error<solid.write: Tolerance must be a positive and finite real scalar.> ...
 %! solid.write ('a.stl', solid.Shape (), 'Tolerance', 0)

@@ -242,6 +242,56 @@ classdef Shape
     endfunction
 
     ## -*- texinfo -*-
+    ## @deftypefn  {solid.Shape} {@var{M} =} tessellate (@var{S})
+    ## @deftypefnx {solid.Shape} {@var{M} =} tessellate (@var{S}, @var{TOL})
+    ##
+    ## A triangle mesh of a shape.
+    ##
+    ## @code{@var{M} = tessellate (@var{S}, @var{TOL})} returns a
+    ## @code{polymesh.Mesh} of the surface of @var{S}: flat triangles whose
+    ## corners lie on it and which stray from it by at most @var{TOL}
+    ## millimetres, 0.01 by default, nor span more than 20 degrees of a
+    ## curved face.  The triangles meet edge to edge, sharing their corners,
+    ## and are turned outwards, so the mesh of a solid is closed.  The empty
+    ## shape gives the empty mesh.
+    ##
+    ## This is the mesh @code{solid.write} writes to STL, OBJ and PLY, and it
+    ## can be shown, cut, measured, coloured and written as any other.
+    ##
+    ## @example
+    ## @group
+    ## M = tessellate (solid.cylinder (4, 12), 0.05);
+    ## write (M, 'pin.obj');
+    ## @end group
+    ## @end example
+    ##
+    ## @seealso{polymesh.Mesh, solid.write, solid.polyhedron}
+    ## @end deftypefn
+    function M = tessellate (this, TOL = 0.01)
+
+      ## Input validation
+      errmsg = solid.__checkpos__ (TOL, 'TOL');
+      if (! isempty (errmsg))
+        error ("solid.Shape.tessellate: %s", errmsg);
+      endif
+
+      if (isempty (this.Data))
+        M = polymesh.Mesh ();
+        return;
+      endif
+      c = occt ('solid.Shape.tessellate', 'tessellate', this.Data, ...
+                double (TOL), 20);
+
+      ## Points that are equal are one vertex, and a triangle two of whose
+      ## corners become one is dropped
+      [V, ~, j] = unique (c{1}, 'rows', 'stable');
+      F = reshape (j(c{2}), size (c{2}));
+      F = F(F(:,1) != F(:,2) & F(:,2) != F(:,3) & F(:,3) != F(:,1),:);
+      M = polymesh.Mesh (V, F);
+
+    endfunction
+
+    ## -*- texinfo -*-
     ## @deftypefn  {solid.Shape} {} show (@var{S})
     ## @deftypefnx {solid.Shape} {@var{V} =} show (@var{S})
     ##
@@ -2367,6 +2417,44 @@ endfunction
 %!   close (VU);
 %!   setappdata (0, 'drafting_model_show', old);
 %! end_unwind_protect
+%!testif ; exist ('__occt__') == 3  # tessellate: a box is twelve triangles
+%! M = tessellate (solid.box (10, 20, 30));
+%! assert_equal (numvertices (M), 8);
+%! assert_equal (numfaces (M), 12);
+%! assert_equal (isclosed (M), true);
+%! assert_equal (volume (M), 6000, -1e-12);
+
+%!testif ; exist ('__occt__') == 3  # tessellate: corners on the surface
+%! M = tessellate (solid.cylinder (4, 12), 0.05);
+%! r = hypot (M.Vertices(:,1), M.Vertices(:,2));
+%! z = M.Vertices(:,3);
+%! assert_equal (all (abs (r - 4) < 1e-9 | ((z == 0 | z == 12) & r < 4)), ...
+%!               true);
+
+%!testif ; exist ('__occt__') == 3  # tessellate: side facets within TOL
+%! M = tessellate (solid.cylinder (4, 12), 0.05);
+%! z = M.Vertices(:,3);
+%! F = M.Faces(any (z(M.Faces) != z(M.Faces(:,1)), 2),:);
+%! E = [F(:,[1, 2]); F(:,[2, 3]); F(:,[3, 1])];
+%! m = (M.Vertices(E(:,1),:) + M.Vertices(E(:,2),:)) / 2;
+%! assert_equal (min (hypot (m(:,1), m(:,2))) >= 4 - 0.05 - 1e-9, true);
+
+%!testif ; exist ('__occt__') == 3  # tessellate: a finer TOL, more triangles
+%! S = solid.sphere (20);
+%! assert_equal (numfaces (tessellate (S, 0.5)) < ...
+%!               numfaces (tessellate (S, 0.05)), true);
+
+%!testif ; exist ('__occt__') == 3  # tessellate: a mirrored part turned out
+%! M = tessellate (mirror (solid.cone (5, 2, 8), [1, 0, 0]));
+%! V = M.Vertices;
+%! F = M.Faces;
+%! assert_equal (isclosed (M), true);
+%! assert_equal (dot (V(F(:,1),:), cross (V(F(:,2),:), V(F(:,3),:), 2), ...
+%!                    2)' * ones (rows (F), 1) > 0, true);
+
+%!test  # tessellate: the empty shape gives the empty mesh
+%! assert_equal (isempty (tessellate (solid.Shape ())), true);
+
 %!error<solid.Shape.pocket: Taper cannot be applied to a region with splines.> ...
 %! R = geom.Region (geom.Spline ([20, 10; 50, 8; 35, 32], 'Closed', true));
 %! pocket (solid.box (80, 40, 12), R, 4, 'Taper', 5);
@@ -2776,3 +2864,5 @@ endfunction
 %! polararray (solid.Shape (), 3, 90, 'Rotate', 2)
 %!error<solid.Shape.polararray: unknown parameter.> ...
 %! polararray (solid.Shape (), 3, 90, 'Turn', true)
+%!error<solid.Shape.tessellate: TOL must be a positive and finite real scalar.> ...
+%! tessellate (solid.Shape (), 0)
