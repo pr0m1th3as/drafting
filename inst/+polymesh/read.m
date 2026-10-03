@@ -19,12 +19,13 @@
 ## @deftypefn  {drafting} {@var{M} =} polymesh.read (@var{FILE})
 ## @deftypefnx {drafting} {@var{M} =} polymesh.read (@var{FILE}, @qcode{'Tolerance'}, @var{T})
 ##
-## Read a triangle mesh from an STL, OBJ or PLY file.
+## Read a triangle mesh from an STL, OBJ, PLY or 3MF file.
 ##
 ## @code{@var{M} = polymesh.read (@var{FILE})} reads the mesh in @var{FILE}
 ## and returns it as a @code{polymesh.Mesh}, with the colours of its
 ## vertices or faces where the file has them.  The extension of @var{FILE}
-## names the format, @file{.stl}, @file{.obj} or @file{.ply}, in any case.
+## names the format, @file{.stl}, @file{.obj}, @file{.ply} or @file{.3mf},
+## in any case.
 ##
 ## @itemize
 ## @item
@@ -52,6 +53,15 @@
 ## are its colours: an integer type from 0 to its largest value, as the
 ## common @qcode{uchar} from 0 to 255, a float from 0 to 1.  Every other
 ## element and property is read past, @qcode{alpha} among them.
+##
+## @item
+## A 3MF file is the archive slicers write, its parts stored or deflated.
+## The mesh is every item of its build, each object placed where its
+## transform puts it, the objects it is made of placed in turn, those in
+## other model parts of the archive included, in millimetres whatever unit
+## the file declares.  A triangle takes the colour its property names, or
+## else its object's, from base materials or a colour group; textures and
+## the other kinds of property are passed over.
 ## @end itemize
 ##
 ## A face of more than three corners, which OBJ and PLY allow, is cut into
@@ -97,8 +107,8 @@ function M = read (FILE, varargin)
   endif
   [~, ~, ext] = fileparts (FILE);
   fmt = lower (ext);
-  if (! any (strcmp (fmt, {'.stl', '.obj', '.ply'})))
-    error ("polymesh.read: FILE must end in .stl, .obj or .ply.");
+  if (! any (strcmp (fmt, {'.stl', '.obj', '.ply', '.3mf'})))
+    error ("polymesh.read: FILE must end in .stl, .obj, .ply or .3mf.");
   endif
   T = 0;
   if (nargin == 3)
@@ -423,11 +433,148 @@ endfunction
 %! assert_equal (M.FaceColour, [0.25, 0.5, 1; 0.25, 0.5, 1]);
 %! assert_equal (M.VertexColour, []);
 
+## A file NAME of the text TEXT under the folder D; a 3MF package of the
+## model MODEL and the other parts EXTRA, pairs of a name and its text,
+## zipped; and a tetrahedron object with the identity ID
+## and the attributes ATTR, its triangles each with TRI after its corners
+%!function putpart (d, name, text)
+%!  folder = fileparts (fullfile (d, name));
+%!  if (! isfolder (folder))
+%!    mkdir (folder);
+%!  endif
+%!  fid = fopen (fullfile (d, name), 'w');
+%!  fputs (fid, text);
+%!  fclose (fid);
+%!endfunction
+%!function f = pack3mf (model, extra)
+%!  d = tempname ();
+%!  ct = ['<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://', ...
+%!        'schemas.openxmlformats.org/package/2006/content-types">', ...
+%!        '<Default Extension="rels" ContentType="application/', ...
+%!        'vnd.openxmlformats-', ...
+%!        'package.relationships+xml"/><Default Extension="model" ', ...
+%!        'ContentType="application/vnd.ms-package.3dmanufacturing-', ...
+%!        '3dmodel+xml"/></Types>'];
+%!  rels = ['<?xml version="1.0" encoding="UTF-8"?><Relationships ', ...
+%!          'xmlns="http://schemas.openxmlformats.org/package/2006/', ...
+%!          'relationships"><Relationship Target="/3D/3dmodel.model" ', ...
+%!          'Id="rel0" Type="http://schemas.microsoft.com/', ...
+%!          '3dmanufacturing/2013/01/3dmodel"/>', ...
+%!          '</Relationships>'];
+%!  names = [{'[Content_Types].xml', '_rels/.rels', '3D/3dmodel.model'}, ...
+%!           extra(1:2:end)];
+%!  texts = [{ct, rels, model}, extra(2:2:end)];
+%!  mkdir (d);
+%!  cellfun (@(n, t) putpart (d, n, t), names, texts);
+%!  f = [tempname(), '.3mf'];
+%!  zip (f, names, d);
+%!  confirm_recursive_rmdir (false, 'local');
+%!  rmdir (d, 's');
+%!endfunction
+%!function o = tetra3mf (id, attr, tri)
+%!  o = sprintf (['<object id="%d" type="model"%s><mesh><vertices>', ...
+%!                '<vertex x="0" y="0" z="0"/><vertex x="1" y="0" z="0"/>', ...
+%!                '<vertex x="0" y="1" z="0"/><vertex x="0" y="0" z="1"/>', ...
+%!                '</vertices><triangles>', ...
+%!                '<triangle v1="0" v2="2" v3="1"%s/>', ...
+%!                '<triangle v1="0" v2="1" v3="3"%s/>', ...
+%!                '<triangle v1="1" v2="2" v3="3"%s/>', ...
+%!                '<triangle v1="2" v2="0" v3="3"%s/>', ...
+%!                '</triangles></mesh></object>'], ...
+%!               id, attr, tri, tri, tri, tri);
+%!endfunction
+
+%!test  # 3MF as polymesh.Mesh writes it, back exactly, colours to 1/255
+%! V = [0.1, 0.2, 0.3; pi, 0.2, 0.3; 0.1, exp(1), 0.3; 0.1, 0.2, 1/3];
+%! M = polymesh.Mesh (V, [1, 3, 2; 1, 2, 4; 2, 3, 4; 3, 1, 4], ...
+%!                    'FaceColour', [1, 0, 0; 1, 0, 0; 0, 0, 1; 0.2, 0.4, 0.6]);
+%! f = [tempname(), '.3mf'];
+%! unwind_protect
+%!   write (M, f);
+%!   R = polymesh.read (f);
+%!   assert_equal (R.Vertices(R.Faces',:), M.Vertices(M.Faces',:));
+%!   assert_equal (R.FaceColour, M.FaceColour, 0.5 / 255);
+%! unwind_protect_cleanup
+%!   unlink (f);
+%! end_unwind_protect
+
+%!testif ; ! isempty (file_in_path (getenv ('PATH'), 'zip')) || ! isempty (file_in_path (getenv ('PATH'), 'zip.exe'))
+%! ## 3MF: a component placed twice, by its transform and the item's
+%! m = ['<model unit="millimeter" xmlns="http://schemas.microsoft.com/', ...
+%!      '3dmanufacturing/core/2015/02"><resources>', tetra3mf(1, '', ''), ...
+%!      '<object id="2" type="model"><components>', ...
+%!      '<component objectid="1"/>', ...
+%!      '<component objectid="1" transform="0 1 0 -1 0 0 0 0 1 10 0 0"/>', ...
+%!      '</components></object></resources><build>', ...
+%!      '<item objectid="2" transform="1 0 0 0 1 0 0 0 1 0 0 5"/>', ...
+%!      '</build></model>'];
+%! f = pack3mf (m, {});
+%! unwind_protect
+%!   M = polymesh.read (f);
+%!   assert_equal (numfaces (M), 8);
+%!   assert_equal ([min(M.Vertices); max(M.Vertices)], [0, 0, 5; 10, 1, 6]);
+%! unwind_protect_cleanup
+%!   unlink (f);
+%! end_unwind_protect
+
+%!testif ; ! isempty (file_in_path (getenv ('PATH'), 'zip')) || ! isempty (file_in_path (getenv ('PATH'), 'zip.exe'))
+%! ## 3MF: a model in centimetres comes back in millimetres
+%! m = ['<model unit="centimeter" xmlns="http://schemas.microsoft.com/', ...
+%!      '3dmanufacturing/core/2015/02"><resources>', tetra3mf(1, '', ''), ...
+%!      '</resources><build><item objectid="1"/></build></model>'];
+%! f = pack3mf (m, {});
+%! unwind_protect
+%!   M = polymesh.read (f);
+%!   assert_equal (max (M.Vertices), [10, 10, 10]);
+%! unwind_protect_cleanup
+%!   unlink (f);
+%! end_unwind_protect
+
+%!testif ; ! isempty (file_in_path (getenv ('PATH'), 'zip')) || ! isempty (file_in_path (getenv ('PATH'), 'zip.exe'))
+%! ## 3MF: colours of a colour group, the object's and a triangle's own
+%! m = ['<model unit="millimeter" xmlns="http://schemas.microsoft.com/', ...
+%!      '3dmanufacturing/core/2015/02" xmlns:m="http://schemas.microsoft.', ...
+%!      'com/3dmanufacturing/material/2015/02"><resources>', ...
+%!      '<m:colorgroup id="5"><m:color color="#FF0000"/>', ...
+%!      '<m:color color="#0000FFFF"/></m:colorgroup>', ...
+%!      tetra3mf(1, ' pid="5" pindex="0"', ''), ...
+%!      '</resources><build><item objectid="1"/></build></model>'];
+%! m = strrep (m, '<triangle v1="1" v2="2" v3="3"/>', ...
+%!             '<triangle v1="1" v2="2" v3="3" pid="5" p1="1"/>');
+%! f = pack3mf (m, {});
+%! unwind_protect
+%!   M = polymesh.read (f);
+%!   assert_equal (sortrows (M.FaceColour), ...
+%!                 [0, 0, 1; 1, 0, 0; 1, 0, 0; 1, 0, 0]);
+%! unwind_protect_cleanup
+%!   unlink (f);
+%! end_unwind_protect
+
+%!testif ; ! isempty (file_in_path (getenv ('PATH'), 'zip')) || ! isempty (file_in_path (getenv ('PATH'), 'zip.exe'))
+%! ## 3MF: a component in another model part of the archive
+%! m = ['<model unit="millimeter" xmlns="http://schemas.microsoft.com/', ...
+%!      '3dmanufacturing/core/2015/02" xmlns:p="http://schemas.microsoft.', ...
+%!      'com/3dmanufacturing/production/2015/06"><resources>', ...
+%!      '<object id="2" type="model"><components>', ...
+%!      '<component p:path="/3D/Objects/part.model" objectid="1"/>', ...
+%!      '</components></object></resources><build>', ...
+%!      '<item objectid="2"/></build></model>'];
+%! o = ['<model unit="millimeter" xmlns="http://schemas.microsoft.com/', ...
+%!      '3dmanufacturing/core/2015/02"><resources>', tetra3mf(1, '', ''), ...
+%!      '</resources><build/></model>'];
+%! f = pack3mf (m, {'3D/Objects/part.model', o});
+%! unwind_protect
+%!   M = polymesh.read (f);
+%!   assert_equal (numfaces (M), 4);
+%! unwind_protect_cleanup
+%!   unlink (f);
+%! end_unwind_protect
+
 %!error<polymesh.read: invalid number of input arguments.> polymesh.read ()
 %!error<polymesh.read: invalid number of input arguments.> ...
 %! polymesh.read ('a.stl', 1)
 %!error<polymesh.read: FILE must be a character vector.> polymesh.read (1)
-%!error<polymesh.read: FILE must end in .stl, .obj or .ply.> ...
+%!error<polymesh.read: FILE must end in .stl, .obj, .ply or .3mf.> ...
 %! polymesh.read ('part.step')
 %!error<polymesh.read: unknown parameter.> polymesh.read ('a.stl', 'Weld', 1)
 %!error<polymesh.read: Tolerance must be a non-negative finite real scalar.> ...
@@ -520,3 +667,22 @@ endfunction
 %!                                       "property float green\n", ...
 %!                                       "property float blue\n"]), ...
 %!                    "0 0 0\n1 0 0\n0 1 0\n3 0 1 2 1.5 0 0\n"])
+%!error<polymesh.read: FILE is not a readable 3MF file.> ...
+%! readtext ('.3mf', "not a zip archive\n")
+%!testif ; ! isempty (file_in_path (getenv ('PATH'), 'zip')) || ! isempty (file_in_path (getenv ('PATH'), 'zip.exe'))
+%! ## a missing object is not a readable 3MF file
+%! m = ['<model unit="millimeter" xmlns="http://schemas.microsoft.com/', ...
+%!      '3dmanufacturing/core/2015/02"><resources></resources><build>', ...
+%!      '<item objectid="7"/></build></model>'];
+%! f = pack3mf (m, {});
+%! unwind_protect
+%!   msg = '';
+%!   try
+%!     polymesh.read (f);
+%!   catch err
+%!     msg = err.message;
+%!   end_try_catch
+%!   assert_equal (msg, "polymesh.read: FILE is not a readable 3MF file.");
+%! unwind_protect_cleanup
+%!   unlink (f);
+%! end_unwind_protect

@@ -30,6 +30,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <functional>
 #include <map>
 #include <sstream>
 #include <string>
@@ -3256,6 +3257,599 @@ readply (const string& file, const string& caller)
   return facemesh (V, VC, idx, start, FC, caller);
 }
 
+// A number of type T stored least significant byte first at P
+template <typename T>
+T
+getle (const char *p)
+{
+  unsigned char b[sizeof (T)];
+  std::memcpy (b, p, sizeof (T));
+  if (! littleendian ())
+  {
+    std::reverse (b, b + sizeof (T));
+  }
+  T x;
+  std::memcpy (&x, b, sizeof (T));
+  return x;
+}
+
+// The files of the ZIP archive in BUF, by name, each stored or deflated;
+// BAD raises the error that the archive is not readable
+std::map<string, string>
+unzipped (const vector<char>& buf, const std::function<void ()>& bad)
+{
+  const char *p = buf.data ();
+  const size_t n = buf.size () - 1;
+  size_t eocd = string::npos;
+  for (size_t i = (n >= 22) ? n - 22 + 1 : 0; i-- > 0 && n - i <= 22 + 65535; )
+  {
+    if (getle<uint32_t> (p + i) == 0x06054b50)
+    {
+      eocd = i;
+      break;
+    }
+  }
+  if (eocd == string::npos)
+  {
+    bad ();
+  }
+  const uint16_t entries = getle<uint16_t> (p + eocd + 10);
+  size_t at = getle<uint32_t> (p + eocd + 16);
+  std::map<string, string> files;
+  for (uint16_t e = 0; e < entries; e++)
+  {
+    if (at + 46 > n || getle<uint32_t> (p + at) != 0x02014b50)
+    {
+      bad ();
+    }
+    const uint16_t method = getle<uint16_t> (p + at + 10);
+    const uint32_t csize = getle<uint32_t> (p + at + 20);
+    const uint32_t usize = getle<uint32_t> (p + at + 24);
+    const uint16_t nl = getle<uint16_t> (p + at + 28);
+    const uint16_t xl = getle<uint16_t> (p + at + 30);
+    const uint16_t cl = getle<uint16_t> (p + at + 32);
+    const uint32_t local = getle<uint32_t> (p + at + 42);
+    if (at + 46 + nl > n || local + 30 > n)
+    {
+      bad ();
+    }
+    const string name (p + at + 46, nl);
+    at += 46 + nl + xl + cl;
+    if (getle<uint32_t> (p + local) != 0x04034b50)
+    {
+      bad ();
+    }
+    const size_t data = local + 30 + getle<uint16_t> (p + local + 26)
+                        + getle<uint16_t> (p + local + 28);
+    if (data + csize > n || (method != 0 && method != 8))
+    {
+      bad ();
+    }
+    string out;
+    if (method == 0)
+    {
+      out.assign (p + data, csize);
+    }
+    else
+    {
+      out.resize (usize);
+      z_stream z = {};
+      if (inflateInit2 (&z, -15) != Z_OK)
+      {
+        bad ();
+      }
+      z.next_in = reinterpret_cast<Bytef *> (const_cast<char *> (p + data));
+      z.avail_in = csize;
+      z.next_out = reinterpret_cast<Bytef *> (&out[0]);
+      z.avail_out = usize;
+      const int r = inflate (&z, Z_FINISH);
+      inflateEnd (&z);
+      if (r != Z_STREAM_END || z.total_out != usize)
+      {
+        bad ();
+      }
+    }
+    files[name] = out;
+  }
+  return files;
+}
+
+// An element of XML: its name without its namespace prefix, its attributes
+// likewise, whether it closes an element and whether it closes itself
+struct xmltag
+{
+  string name;
+  std::map<string, string> attr;
+  bool close = false;
+  bool empty = false;
+};
+
+// TEXT with the entities of XML replaced by what they stand for
+string
+unescaped (const string& text)
+{
+  string out;
+  for (size_t i = 0; i < text.size (); i++)
+  {
+    const size_t e = (text[i] == '&') ? text.find (';', i) : string::npos;
+    if (e == string::npos)
+    {
+      out += text[i];
+      continue;
+    }
+    const string ent = text.substr (i + 1, e - i - 1);
+    if (ent == "amp") out += '&';
+    else if (ent == "lt") out += '<';
+    else if (ent == "gt") out += '>';
+    else if (ent == "quot") out += '"';
+    else if (ent == "apos") out += '\'';
+    else if (! ent.empty () && ent[0] == '#')
+    {
+      const long c = (ent.size () > 1 && (ent[1] == 'x' || ent[1] == 'X'))
+                     ? std::strtol (ent.c_str () + 2, nullptr, 16)
+                     : std::strtol (ent.c_str () + 1, nullptr, 10);
+      if (c < 0x80)
+      {
+        out += static_cast<char> (c);
+      }
+      else if (c < 0x800)
+      {
+        out += static_cast<char> (0xC0 | (c >> 6));
+        out += static_cast<char> (0x80 | (c & 0x3F));
+      }
+      else
+      {
+        out += static_cast<char> (0xE0 | (c >> 12));
+        out += static_cast<char> (0x80 | ((c >> 6) & 0x3F));
+        out += static_cast<char> (0x80 | (c & 0x3F));
+      }
+    }
+    else
+    {
+      out += text.substr (i, e - i + 1);
+    }
+    i = e;
+  }
+  return out;
+}
+
+// The elements of the XML text X, one after another, with no regard for the
+// text between them; comments, declarations and CDATA are passed over
+vector<xmltag>
+xmltags (const string& x)
+{
+  vector<xmltag> tags;
+  auto local = [] (const string& n)
+  {
+    const size_t c = n.find (':');
+    return (c == string::npos) ? n : n.substr (c + 1);
+  };
+  size_t i = 0;
+  while ((i = x.find ('<', i)) != string::npos)
+  {
+    if (x.compare (i, 4, "<!--") == 0)
+    {
+      i = x.find ("-->", i);
+      i = (i == string::npos) ? x.size () : i + 3;
+      continue;
+    }
+    if (x.compare (i, 9, "<![CDATA[") == 0)
+    {
+      i = x.find ("]]>", i);
+      i = (i == string::npos) ? x.size () : i + 3;
+      continue;
+    }
+    if (x.compare (i, 2, "<?") == 0 || x.compare (i, 2, "<!") == 0)
+    {
+      i = x.find ('>', i);
+      i = (i == string::npos) ? x.size () : i + 1;
+      continue;
+    }
+    // The end of the tag, past any '>' within quotes
+    size_t e = i + 1;
+    char q = 0;
+    while (e < x.size () && (q != 0 || x[e] != '>'))
+    {
+      if (q == 0 && (x[e] == '"' || x[e] == '\''))
+      {
+        q = x[e];
+      }
+      else if (q != 0 && x[e] == q)
+      {
+        q = 0;
+      }
+      e++;
+    }
+    xmltag t;
+    size_t k = i + 1;
+    if (k < e && x[k] == '/')
+    {
+      t.close = true;
+      k++;
+    }
+    t.empty = (e > k && x[e-1] == '/');
+    const size_t end = t.empty ? e - 1 : e;
+    size_t s = k;
+    while (k < end && ! isspacechar (x[k]))
+    {
+      k++;
+    }
+    t.name = local (x.substr (s, k - s));
+    while (k < end)
+    {
+      while (k < end && isspacechar (x[k]))
+      {
+        k++;
+      }
+      s = k;
+      while (k < end && x[k] != '=' && ! isspacechar (x[k]))
+      {
+        k++;
+      }
+      const string key = local (x.substr (s, k - s));
+      while (k < end && (isspacechar (x[k]) || x[k] == '='))
+      {
+        k++;
+      }
+      if (k < end && (x[k] == '"' || x[k] == '\''))
+      {
+        const char quote = x[k++];
+        s = k;
+        while (k < end && x[k] != quote)
+        {
+          k++;
+        }
+        if (! key.empty ())
+        {
+          t.attr[key] = unescaped (x.substr (s, k - s));
+        }
+        k++;
+      }
+    }
+    tags.push_back (t);
+    i = e + 1;
+  }
+  return tags;
+}
+
+// A colour of 3MF, "#RRGGBB" or "#RRGGBBAA", as red, green and blue from 0
+// to 1; false when it is not one
+bool
+hexcolour (const string& h, std::array<double, 3>& c)
+{
+  if ((h.size () != 7 && h.size () != 9) || h[0] != '#'
+      || h.find_first_not_of ("0123456789abcdefABCDEF", 1) != string::npos)
+  {
+    return false;
+  }
+  for (int k = 0; k < 3; k++)
+  {
+    c[k] = std::strtol (h.substr (1 + 2 * k, 2).c_str (), nullptr, 16) / 255.0;
+  }
+  return true;
+}
+
+// A 3MF placement, a point's row of coordinates multiplied from the left:
+// rows of x, y and z, then the translation
+typedef std::array<double, 12> affine;
+
+const affine identity = {1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0};
+
+// The placement A followed by B
+affine
+compose (const affine& A, const affine& B)
+{
+  affine C;
+  for (int r = 0; r < 4; r++)
+    for (int c = 0; c < 3; c++)
+    {
+      C[3 * r + c] = A[3 * r] * B[c] + A[3 * r + 1] * B[3 + c]
+                     + A[3 * r + 2] * B[6 + c] + (r == 3 ? B[9 + c] : 0);
+    }
+  return C;
+}
+
+// The placement the attribute T gives, or the identity where there is none
+affine
+placement (const std::map<string, string>& attr,
+           const std::function<void ()>& bad)
+{
+  const auto it = attr.find ("transform");
+  if (it == attr.end ())
+  {
+    return identity;
+  }
+  affine m;
+  const char *s = it->second.c_str ();
+  for (int k = 0; k < 12; k++)
+  {
+    char *q;
+    m[k] = std::strtod (s, &q);
+    if (q == s || ! std::isfinite (m[k]))
+    {
+      bad ();
+    }
+    s = q;
+  }
+  return m;
+}
+
+// The mesh of a 3MF file: every item of its build, the components of each
+// resolved and their placements composed, in millimetres.  A triangle takes
+// the colour its property gives, or its object's, from base materials or a
+// colour group; the rest are grey when any triangle has a colour.
+meshread
+read3mf (const string& file, const string& caller)
+{
+  const vector<char> buf = slurp (file, caller, "3MF");
+  const std::function<void ()> bad = [&] ()
+  {
+    error ("%s: FILE is not a readable 3MF file.", caller.c_str ());
+  };
+  const std::map<string, string> files = unzipped (buf, bad);
+  auto part = [&] (string path) -> const string&
+  {
+    if (! path.empty () && path[0] == '/')
+    {
+      path.erase (0, 1);
+    }
+    const auto it = files.find (path);
+    if (it == files.end ())
+    {
+      bad ();
+    }
+    return it->second;
+  };
+
+  // The model part the package's relationships name, else the usual one
+  string root = "3D/3dmodel.model";
+  const auto rels = files.find ("_rels/.rels");
+  if (rels != files.end ())
+  {
+    for (const xmltag& t : xmltags (rels->second))
+    {
+      const auto ty = t.attr.find ("Type");
+      if (t.name == "Relationship" && ty != t.attr.end ()
+          && ty->second.find ("3dmodel") != string::npos
+          && t.attr.count ("Target"))
+      {
+        root = t.attr.at ("Target");
+        break;
+      }
+    }
+  }
+  if (! root.empty () && root[0] == '/')
+  {
+    root.erase (0, 1);
+  }
+
+  struct component
+  {
+    string path;
+    int id;
+    affine m;
+  };
+  struct object
+  {
+    bool mesh = false;
+    int pid = -1;
+    int pindex = 0;
+    vector<double> v;
+    vector<int> t;
+    vector<int> tpid;
+    vector<int> tp;
+    vector<component> comps;
+  };
+  struct model
+  {
+    double unit = 1;
+    std::map<int, object> objects;
+    std::map<int, vector<std::array<double, 3>>> groups;
+    vector<component> items;
+  };
+  std::map<string, model> models;
+  std::function<const model& (const string&)> load;
+  load = [&] (const string& path) -> const model&
+  {
+    const auto it = models.find (path);
+    if (it != models.end ())
+    {
+      return it->second;
+    }
+    model& m = models[path];
+    object *o = nullptr;
+    vector<std::array<double, 3>> *g = nullptr;
+    auto integer = [&] (const xmltag& t, const char *key, int def) -> int
+    {
+      const auto a = t.attr.find (key);
+      if (a == t.attr.end ())
+      {
+        return def;
+      }
+      char *q;
+      const long v = std::strtol (a->second.c_str (), &q, 10);
+      if (q == a->second.c_str () || *q)
+      {
+        bad ();
+      }
+      return v;
+    };
+    auto number = [&] (const xmltag& t, const char *key) -> double
+    {
+      const auto a = t.attr.find (key);
+      if (a == t.attr.end ())
+      {
+        bad ();
+      }
+      char *q;
+      const double v = std::strtod (a->second.c_str (), &q);
+      if (q == a->second.c_str () || ! std::isfinite (v))
+      {
+        bad ();
+      }
+      return v;
+    };
+    static const std::map<string, double> units = {
+      {"micron", 0.001}, {"millimeter", 1}, {"centimeter", 10},
+      {"inch", 25.4}, {"foot", 304.8}, {"meter", 1000}};
+    for (const xmltag& t : xmltags (part (path)))
+    {
+      if (t.close)
+      {
+        if (t.name == "object")
+        {
+          o = nullptr;
+        }
+        else if (t.name == "basematerials" || t.name == "colorgroup")
+        {
+          g = nullptr;
+        }
+        continue;
+      }
+      if (t.name == "model" && t.attr.count ("unit"))
+      {
+        const auto u = units.find (t.attr.at ("unit"));
+        if (u == units.end ())
+        {
+          bad ();
+        }
+        m.unit = u->second;
+      }
+      else if (t.name == "object")
+      {
+        o = &m.objects[integer (t, "id", -1)];
+        o->pid = integer (t, "pid", -1);
+        o->pindex = integer (t, "pindex", 0);
+      }
+      else if (t.name == "basematerials" || t.name == "colorgroup")
+      {
+        g = &m.groups[integer (t, "id", -1)];
+      }
+      else if ((t.name == "base" || t.name == "color") && g)
+      {
+        std::array<double, 3> c = {NAN, NAN, NAN};
+        const char *key = (t.name == "base") ? "displaycolor" : "color";
+        if (t.attr.count (key))
+        {
+          hexcolour (t.attr.at (key), c);
+        }
+        g->push_back (c);
+      }
+      else if (t.name == "vertex" && o)
+      {
+        o->mesh = true;
+        o->v.insert (o->v.end (), {number (t, "x"), number (t, "y"),
+                                   number (t, "z")});
+      }
+      else if (t.name == "triangle" && o)
+      {
+        o->mesh = true;
+        o->t.insert (o->t.end (), {integer (t, "v1", -1),
+                                   integer (t, "v2", -1),
+                                   integer (t, "v3", -1)});
+        o->tpid.push_back (integer (t, "pid", -1));
+        o->tp.push_back (integer (t, "p1", -1));
+      }
+      else if (t.name == "component" && o)
+      {
+        const auto pa = t.attr.find ("path");
+        o->comps.push_back ({pa == t.attr.end () ? path : pa->second,
+                             integer (t, "objectid", -1),
+                             placement (t.attr, bad)});
+      }
+      else if (t.name == "item")
+      {
+        const auto pa = t.attr.find ("path");
+        m.items.push_back ({pa == t.attr.end () ? path : pa->second,
+                            integer (t, "objectid", -1),
+                            placement (t.attr, bad)});
+      }
+    }
+    return m;
+  };
+
+  meshread out;
+  bool coloured = false;
+  int64_t base = 0;
+  std::function<void (const string&, int, const affine&, int)> place;
+  place = [&] (const string& p, int id, const affine& T, int depth)
+  {
+    string path = p;
+    if (! path.empty () && path[0] == '/')
+    {
+      path.erase (0, 1);
+    }
+    const model& m = load (path);
+    const auto it = m.objects.find (id);
+    if (it == m.objects.end () || depth > 64)
+    {
+      bad ();
+    }
+    const object& o = it->second;
+    const int64_t nv = o.v.size () / 3;
+    for (size_t k = 0; k < o.t.size (); k++)
+    {
+      if (o.t[k] < 0 || o.t[k] >= nv)
+      {
+        error ("%s: a face of FILE refers to a vertex the file does not "
+               "have.", caller.c_str ());
+      }
+    }
+    for (size_t k = 0; k < o.t.size () / 3; k++)
+    {
+      for (int c = 0; c < 3; c++)
+      {
+        const double *q = &o.v[3 * o.t[3 * k + c]];
+        for (int j = 0; j < 3; j++)
+        {
+          out.xyz.push_back (q[0] * T[j] + q[1] * T[3 + j] + q[2] * T[6 + j]
+                             + T[9 + j]);
+        }
+        out.src.push_back (base + o.t[3 * k + c]);
+      }
+      const int pid = (o.tpid[k] >= 0) ? o.tpid[k] : o.pid;
+      const int pi = (o.tpid[k] >= 0 && o.tp[k] >= 0) ? o.tp[k] : o.pindex;
+      std::array<double, 3> c = {NAN, NAN, NAN};
+      const auto gr = m.groups.find (pid);
+      if (gr != m.groups.end () && pi >= 0
+          && pi < static_cast<int> (gr->second.size ()))
+      {
+        c = gr->second[pi];
+        coloured = coloured || ! std::isnan (c[0]);
+      }
+      out.fcol.insert (out.fcol.end (), c.begin (), c.end ());
+    }
+    base += nv;
+    for (const component& c : o.comps)
+    {
+      place (c.path, c.id, compose (c.m, T), depth + 1);
+    }
+  };
+  const model& top = load (root);
+  for (const component& item : top.items)
+  {
+    place (item.path, item.id, item.m, 0);
+  }
+
+  // Millimetres, and grey where a triangle has no colour of its own
+  for (double& x : out.xyz)
+  {
+    x *= top.unit;
+  }
+  if (! coloured)
+  {
+    out.fcol.clear ();
+  }
+  for (size_t k = 0; k < out.fcol.size (); k += 3)
+  {
+    if (std::isnan (out.fcol[k]))
+    {
+      std::copy (grey, grey + 3, out.fcol.begin () + k);
+    }
+  }
+  return out;
+}
+
 // X in the bytes of its little-endian form, appended to OUT
 template <typename T>
 void
@@ -3790,6 +4384,10 @@ Undocumented internal function.\n\
     else if (format == "ply")
     {
       m = readply (file, caller);
+    }
+    else if (format == "3mf")
+    {
+      m = read3mf (file, caller);
     }
     else
     {

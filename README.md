@@ -12,7 +12,7 @@ exchanged as STEP, come through Open CASCADE when the package is built with it.
 Forty-seven public functions across six namespaces plus the `draw.Drawing`,
 `geom.Polyline`, `geom.Spline`, `geom.Region`, `geom.Path`, `geom.UCS`,
 `polymesh.Mesh`, `solid.Shape`, `model.Assembly` and `model.Viewer` classes,
-1821 built-in self-tests and 67 `%!demo` blocks, nearly all of which end in a
+1828 built-in self-tests and 67 `%!demo` blocks, nearly all of which end in a
 `plot` call, so the documentation shows what a function does rather than only
 describing it.
 
@@ -101,7 +101,7 @@ from a file, with its block definitions, back into a `Drawing`. Dimensions come
 back as dimensions and measure their geometry again, so a DXF is a round trip
 rather than a one-way door.
 
-`polymesh.read` reads an STL, OBJ or PLY file, binary or ASCII, into a
+`polymesh.read` reads an STL, OBJ, PLY or 3MF file, binary or ASCII, into a
 `polymesh.Mesh`, with the colours of its vertices or faces where the file has
 them, cutting faces of more than three corners into triangles and welding the
 corners an STL file repeats. Its `write` saves a mesh to any of the three, OBJ
