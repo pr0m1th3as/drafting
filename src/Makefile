@@ -11,7 +11,8 @@ OCCT_INC ?= /usr/include/opencascade
 X11_INC ?= /usr/include
 OCCT_LIBS = -lTKernel -lTKMath -lTKG2d -lTKG3d -lTKGeomBase -lTKBRep \
             -lTKTopAlgo -lTKPrim -lTKBO -lTKFillet -lTKOffset -lTKMesh \
-            -lTKDESTEP -lTKXSBase -lTKDE -lTKXCAF -lTKLCAF -lTKCAF -lTKCDF
+            -lTKDESTEP -lTKXSBase -lTKDE -lTKXCAF -lTKLCAF -lTKCAF -lTKCDF \
+            -lTKHLR -lTKShHealing
 VIEW_LIBS = -lTKernel -lTKMath -lTKG3d -lTKBRep -lTKTopAlgo -lTKMesh \
             -lTKService -lTKV3d -lTKOpenGl -lX11
 FONT_LIBS = -lTKernel -lTKMath -lTKG2d -lTKG3d -lTKGeomBase -lTKBRep \

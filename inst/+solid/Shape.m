@@ -61,7 +61,9 @@ classdef Shape
   ## @code{shell} hollows the shape.  The edges and faces they act on are
   ## chosen by @code{edges} and @code{faces}, by the kind of curve or surface,
   ## by direction and by position.  @code{section} cuts a shape with a plane
-  ## into regions, which the @code{solid} functions build from again.
+  ## into regions, which the @code{solid} functions build from again, and
+  ## @code{projection} gives the outline of a shape seen along a direction as
+  ## regions in the same way.
   ##
   ## The class is a @emph{value} class.  Every operation returns a new shape
   ## and leaves its operands unchanged, and a copy is independent of the
@@ -1494,6 +1496,68 @@ classdef Shape
         return;
       endif
       F = occt ('solid.Shape.section', 'section', this.Data, ...
+                [U.Origin; U.XAxis; U.YAxis; U.Normal]);
+      R = geom.Region.__faces__ (F, U);
+
+    endfunction
+
+    ## -*- texinfo -*-
+    ## @deftypefn  {solid.Shape} {@var{R} =} projection (@var{S})
+    ## @deftypefnx {solid.Shape} {@var{R} =} projection (@var{S}, @var{U})
+    ##
+    ## Outline of a shape seen along a direction.
+    ##
+    ## @code{@var{R} = projection (@var{S}, @var{U})} projects the shape @var{S}
+    ## along the normal of the @code{geom.UCS} @var{U} onto its plane and
+    ## returns the area it covers as a 1-by-@math{N} cell array of
+    ## @code{geom.Region} objects in @var{U}, one for each separate piece of
+    ## it, largest first.  This is the shadow the shape casts on the plane in
+    ## light falling along the normal: a bore seen along its axis is a hole in
+    ## the outline, and seen from the side it is not there.  A piece standing
+    ## in a hole of another is a piece of its own.  Where the plane lies along
+    ## its normal changes only the plane the regions lie in.  The empty shape
+    ## has no outline, and @var{R} is the empty @code{cell (1, 0)}.
+    ##
+    ## @code{@var{R} = projection (@var{S})} projects onto the @math{xy} plane,
+    ## as seen from above, which is what OpenSCAD's @code{projection} does.
+    ##
+    ## The outline is drawn from the edges of @var{S} and the outlines of its
+    ## curved faces.  Straight edges are straight segments and a circle seen
+    ## square on is a circle; a circle seen at a slant is the ellipse it makes,
+    ## and the outline of a cylinder, a cone or a sphere is exact too.  That of
+    ## a torus or of a spline surface is the B-spline Open CASCADE fits to it.
+    ## @code{section} cuts a shape with a plane instead.
+    ##
+    ## @example
+    ## @group
+    ## ## A plate with a bore, seen from above and from the front
+    ## S = subtract (solid.box (80, 40, 12), ...
+    ##               translate (solid.cylinder (4, 12), [20, 20, 0]));
+    ## top = projection (S);
+    ## numel (top@{1@}.Holes)
+    ## @result{} 1
+    ## front = projection (S, geom.UCS ([0, -1, 0], [0, 0, 0]));
+    ## numel (front@{1@}.Holes)
+    ## @result{} 0
+    ## @end group
+    ## @end example
+    ##
+    ## @seealso{solid.Shape.section, geom.Region, geom.UCS}
+    ## @end deftypefn
+    function R = projection (this, U)
+
+      ## Input validation
+      if (nargin < 2)
+        U = geom.UCS ();
+      elseif (! isa (U, 'geom.UCS') || ! isscalar (U))
+        error ("solid.Shape.projection: U must be a geom.UCS object.");
+      endif
+
+      R = cell (1, 0);
+      if (isempty (this.Data))
+        return;
+      endif
+      F = occt ('solid.Shape.projection', 'projection', this.Data, ...
                 [U.Origin; U.XAxis; U.YAxis; U.Normal]);
       R = geom.Region.__faces__ (F, U);
 
@@ -2942,6 +3006,75 @@ endfunction
 %! section (solid.Shape ())
 %!error<solid.Shape.section: U must be a geom.UCS object.> ...
 %! section (solid.Shape (), [0, 0, 1])
+
+%!testif ; exist ('__occt__') == 3  # a bore seen along its axis is a hole
+%! S = subtract (solid.box (80, 40, 12), ...
+%!               translate (solid.cylinder (4, 12), [20, 20, 0]));
+%! R = projection (S, geom.UCS ());
+%! assert_equal (numel (R), 1);
+%! assert_equal (abs (__area__ (R{1}.Outline)), 3200, 1e-9);
+%! assert_equal (numel (R{1}.Holes), 1);
+%! assert_equal (abs (__area__ (R{1}.Holes{1})), 16 * pi, 1e-9);
+
+%!testif ; exist ('__occt__') == 3  # a bore seen from the side is not there
+%! S = subtract (solid.box (80, 40, 12), ...
+%!               translate (solid.cylinder (4, 12), [20, 20, 0]));
+%! R = projection (S, geom.UCS ([0, -1, 0], [0, 0, 0]));
+%! assert_equal (numel (R{1}.Holes), 0);
+%! assert_equal (abs (__area__ (R{1}.Outline)), 960, 1e-9);
+
+%!testif ; exist ('__occt__') == 3  # the xy plane by default
+%! R = projection (solid.box (10, 20, 30));
+%! assert_equal (R{1}.UCS, geom.UCS ());
+%! assert_equal (abs (__area__ (R{1}.Outline)), 200, 1e-9);
+
+%!testif ; exist ('__occt__') == 3  # the regions lie in the plane of U
+%! U = geom.UCS ([0, 0, 1], [0, 0, -5]);
+%! R = projection (solid.box (10, 20, 30), U);
+%! assert_equal (R{1}.UCS, U);
+
+%!testif ; exist ('__occt__') == 3  # a sphere's outline is its great circle
+%! R = projection (solid.sphere (5), geom.UCS ([1, 2, 3], [0, 0, 0]));
+%! assert_equal (abs (__area__ (R{1}.Outline)), 25 * pi, 1e-9);
+
+%!testif ; exist ('__occt__') == 3  # a cylinder at a slant, ellipses and lines
+%! S = rotate (solid.cylinder (5, 20), 30, [1, 0, 0]);
+%! R = projection (S);
+%! assert_equal (abs (__area__ (R{1}.Outline)), ...
+%!               25 * pi * cosd (30) + 200 * sind (30), 1e-9);
+
+%!testif ; exist ('__occt__') == 3  # a torus seen edge on
+%! R = projection (solid.torus (20, 5), geom.UCS ([0, 1, 0], [0, 0, 0]));
+%! assert_equal (abs (__area__ (R{1}.Outline)), 400 + 25 * pi, 1e-4);
+
+%!testif ; exist ('__occt__') == 3  # a coil seen along its axis is a ring
+%! S = solid.helix (geom.Region ([10, -1; 12, -1; 12, 1; 10, 1]), 5, 3);
+%! R = projection (S, geom.UCS ([0, 1, 0], [0, 0, 0]));
+%! assert_equal (abs (__area__ (R{1}.Outline)) ...
+%!               - abs (__area__ (R{1}.Holes{1})), 44 * pi, 1e-3);
+
+%!testif ; exist ('__occt__') == 3  # a piece in a hole is a piece of its own
+%! S = union (subtract (solid.cylinder (10, 5), solid.cylinder (6, 5)), ...
+%!            translate (solid.cylinder (3, 5), [0, 0, 10]));
+%! R = projection (S);
+%! assert_equal (numel (R), 2);
+%! assert_equal (abs (__area__ (R{2}.Outline)), 9 * pi, 1e-9);
+
+%!testif ; exist ('__occt__') == 3  # what overlaps is covered once
+%! S = union (solid.box (10, 10, 2), ...
+%!            translate (solid.box (30, 4, 2), [0, 3, 8]));
+%! R = projection (S);
+%! assert_equal (abs (__area__ (R{1}.Outline)), 180, 1e-9);
+
+%!testif ; exist ('__occt__') == 3  # solids apart are pieces apart
+%! B = solid.box (5, 5, 5);
+%! assert_equal (numel (projection (union (B, translate (B, [10, 0, 0])))), 2);
+
+%!test  # the empty shape
+%! assert_equal (projection (solid.Shape ()), cell (1, 0));
+
+%!error<solid.Shape.projection: U must be a geom.UCS object.> ...
+%! projection (solid.Shape (), [0, 0, 1])
 
 %!testif ; exist ('__occt__') == 3  # boxes: exact, in whole faces
 %! A = solid.box (10, 10, 10);

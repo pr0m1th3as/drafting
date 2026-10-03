@@ -12,7 +12,7 @@ exchanged as STEP, come through Open CASCADE when the package is built with it.
 Forty-seven public functions across six namespaces plus the `draw.Drawing`,
 `geom.Polyline`, `geom.Spline`, `geom.Region`, `geom.Path`, `geom.UCS`,
 `polymesh.Mesh`, `solid.Shape`, `model.Assembly` and `model.Viewer` classes,
-1838 built-in self-tests and 67 `%!demo` blocks, nearly all of which end in a
+1851 built-in self-tests and 67 `%!demo` blocks, nearly all of which end in a
 `plot` call, so the documentation shows what a function does rather than only
 describing it.
 
@@ -133,8 +133,9 @@ centroid; `solid.extrude`, `solid.revolve`, `solid.loft`, `solid.sweep` and
 it, its arcs carried as true arcs and its holes right through. Methods drill
 holes (plain, counterbored, countersunk, tapping size), cut pockets, round and
 bevel edges and hollow a shape, on edges and faces chosen by kind, direction and
-position, and `section` cuts a solid with a plane into regions exact enough to
-build from again. `solid.polyhedron` makes a solid of a closed `polymesh.Mesh`,
+position. `section` cuts a solid with a plane into regions exact enough to build
+from again, and `projection` gives its outline seen along a direction, the
+shadow it casts, as OpenSCAD's `projection` does. `solid.polyhedron` makes a solid of a closed `polymesh.Mesh`,
 so a mesh `polymesh.read` reads takes part in booleans like any other, and
 `tessellate` turns a solid into a mesh within a tolerance. `solid.read` reads
 STEP, and `solid.write` writes STEP for a CAD program, or STL, OBJ or PLY,

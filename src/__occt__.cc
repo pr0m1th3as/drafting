@@ -50,6 +50,14 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <BRepAlgoAPI_Common.hxx>
 #include <BRepAlgoAPI_Cut.hxx>
 #include <BRepAlgoAPI_Fuse.hxx>
+#include <BRepAlgoAPI_Splitter.hxx>
+#include <BRepIntCurveSurface_Inter.hxx>
+#include <ShapeAnalysis_Curve.hxx>
+#include <BOPTools_AlgoTools3D.hxx>
+#include <IntTools_Context.hxx>
+#include <HLRAlgo_Projector.hxx>
+#include <HLRBRep_Algo.hxx>
+#include <HLRBRep_HLRToShape.hxx>
 #include <BRepBndLib.hxx>
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
@@ -1202,6 +1210,255 @@ facesout (const TopoDS_Shape& c, double scale)
     out(i) = faces[i];
   }
   return out;
+}
+
+// The face F without the edges lying inside it, such as an edge drawn on a
+// projection that ends within the outline; a wire left with none is dropped
+static TopoDS_Face
+withoutinternal (const TopoDS_Face& f)
+{
+  BRep_Builder b;
+  TopoDS_Face g = TopoDS::Face (f.EmptyCopied ());
+  for (TopoDS_Iterator w (f, Standard_False, Standard_False); w.More ();
+       w.Next ())
+  {
+    TopoDS_Wire nw;
+    b.MakeWire (nw);
+    int n = 0;
+    for (TopoDS_Iterator e (w.Value (), Standard_False, Standard_False);
+         e.More (); e.Next ())
+    {
+      const TopAbs_Orientation o = e.Value ().Orientation ();
+      if (o == TopAbs_FORWARD || o == TopAbs_REVERSED)
+      {
+        b.Add (nw, e.Value ());
+        n++;
+      }
+    }
+    if (n > 0)
+    {
+      nw.Orientation (w.Value ().Orientation ());
+      nw.Closed (Standard_True);
+      b.Add (g, nw);
+    }
+  }
+  return g;
+}
+
+// The edge E in pieces turning through a quarter turn at most, so that no
+// piece runs over itself, as the outline of a coil seen along its axis would
+static vector<TopoDS_Edge>
+turns (const TopoDS_Edge& e)
+{
+  double a, b;
+  const Handle (Geom_Curve) c = BRep_Tool::Curve (e, a, b);
+  if (c.IsNull () || BRep_Tool::Degenerated (e))
+  {
+    return {e};
+  }
+  const BRepAdaptor_Curve g (e);
+  if (g.GetType () == GeomAbs_Line)
+  {
+    return {e};
+  }
+  // The turning, from the tangent at many points along it
+  const int m = 256;
+  double turn = 0;
+  gp_Vec t0;
+  bool have = false;
+  for (int i = 0; i <= m; i++)
+  {
+    gp_Pnt p;
+    gp_Vec t;
+    c->D1 (a + i * (b - a) / m, p, t);
+    if (t.Magnitude () < gp::Resolution ())
+    {
+      continue;
+    }
+    if (have)
+    {
+      turn += t0.Angle (t);
+    }
+    t0 = t;
+    have = true;
+  }
+  const int n = std::ceil (turn / (M_PI / 2) - 1e-9);
+  if (n <= 1)
+  {
+    return {e};
+  }
+  vector<TopoDS_Edge> out;
+  for (int i = 0; i < n; i++)
+  {
+    out.push_back (BRepBuilderAPI_MakeEdge (c, a + i * (b - a) / n,
+                                            a + (i + 1) * (b - a) / n).Edge ());
+  }
+  return out;
+}
+
+// Whether the edge E lies along the edges TAKEN, each with its box, every
+// one of a few points along it within TOL of one of them
+static bool
+covered (const TopoDS_Edge& e, const vector<pair<Bnd_Box, TopoDS_Edge>>& taken,
+         double tol)
+{
+  if (BRep_Tool::Degenerated (e))
+  {
+    return true;
+  }
+  if (taken.empty ())
+  {
+    return false;
+  }
+  BRepAdaptor_Curve g (e);
+  const double a = g.FirstParameter ();
+  const double b = g.LastParameter ();
+  ShapeAnalysis_Curve sa;
+  for (int i = 0; i <= 8; i++)
+  {
+    const gp_Pnt p = g.Value (a + i * (b - a) / 8);
+    bool near = false;
+    for (size_t k = 0; k < taken.size () && ! near; k++)
+    {
+      if (taken[k].first.IsOut (p))
+      {
+        continue;
+      }
+      double f, l;
+      const Handle (Geom_Curve) c = BRep_Tool::Curve (taken[k].second, f, l);
+      gp_Pnt q;
+      double t;
+      near = (! c.IsNull ()
+              && sa.Project (c, p, tol, q, t, f, l) <= tol);
+    }
+    if (! near)
+    {
+      return false;
+    }
+  }
+  return true;
+}
+
+// The outline of the shape S seen along z, on the plane z = 0, as facesout
+// gives it
+static Cell
+projection (const TopoDS_Shape& s, const string& caller)
+{
+  Bnd_Box box;
+  BRepBndLib::Add (s, box);
+  if (box.IsVoid ())
+  {
+    return Cell (1, 0);
+  }
+  double x0, y0, z0, x1, y1, z1;
+  box.Get (x0, y0, z0, x1, y1, z1);
+  const double size = (x1 - x0) + (y1 - y0) + (z1 - z0);
+
+  Handle (HLRBRep_Algo) hlr = new HLRBRep_Algo ();
+  hlr->Add (s);
+  hlr->Projector (HLRAlgo_Projector (gp_Ax2 (gp::Origin (), gp::DZ (),
+                                             gp::DX ())));
+  hlr->Update ();
+  hlr->ShowAll ();
+  HLRBRep_HLRToShape h (hlr);
+
+  // Every edge and outline, hidden or not, since what is hidden is not always
+  // told right where a face is seen edge on; one lying along those taken is
+  // left out, as the turns of a coil seen along its axis are
+  const double tol = 1e-5 * size;
+  TopTools_ListOfShape tools;
+  vector<pair<Bnd_Box, TopoDS_Edge>> taken;
+  for (const TopoDS_Shape& c : {h.VCompound (), h.OutLineVCompound (),
+                                h.Rg1LineVCompound (), h.RgNLineVCompound (),
+                                h.HCompound (), h.OutLineHCompound (),
+                                h.Rg1LineHCompound (), h.RgNLineHCompound ()})
+  {
+    if (c.IsNull ())
+    {
+      continue;
+    }
+    BRepLib::BuildCurves3d (c);
+    for (TopExp_Explorer x (c, TopAbs_EDGE); x.More (); x.Next ())
+    {
+      for (const TopoDS_Edge& e : turns (TopoDS::Edge (x.Current ())))
+      {
+        if (covered (e, taken, tol))
+        {
+          continue;
+        }
+        Bnd_Box b;
+        BRepBndLib::Add (e, b);
+        b.Enlarge (tol);
+        taken.push_back ({b, e});
+        tools.Append (e);
+      }
+    }
+  }
+  if (tools.IsEmpty ())
+  {
+    return Cell (1, 0);
+  }
+
+  const double r = 1 + (x1 - x0) + (y1 - y0);
+  const TopoDS_Face plane
+    = BRepBuilderAPI_MakeFace (gp_Pln (gp::XOY ()), x0 - r, x1 + r,
+                               y0 - r, y1 + r).Face ();
+  TopTools_ListOfShape objects;
+  objects.Append (plane);
+  BRepAlgoAPI_Splitter sp;
+  sp.SetArguments (objects);
+  sp.SetTools (tools);
+  sp.SetFuzzyValue (tol);
+  sp.Build ();
+  if (sp.HasErrors () || ! sp.IsDone ())
+  {
+    error ("%s: Open CASCADE could not compute the projection.",
+           caller.c_str ());
+  }
+
+  Handle (IntTools_Context) ctx = new IntTools_Context ();
+  BRep_Builder b;
+  TopoDS_Compound kept;
+  b.MakeCompound (kept);
+  int n = 0;
+  for (TopExp_Explorer x (sp.Shape (), TopAbs_FACE); x.More (); x.Next ())
+  {
+    const TopoDS_Face face = TopoDS::Face (x.Current ());
+    gp_Pnt p;
+    gp_Pnt2d q;
+    if (BOPTools_AlgoTools3D::PointInFace (face, p, q, ctx) != 0)
+    {
+      GProp_GProps g;
+      BRepGProp::SurfaceProperties (face, g);
+      if (std::abs (g.Mass ()) > 1e-12 * (x1 - x0) * (y1 - y0))
+      {
+        error ("%s: Open CASCADE could not compute the projection.",
+               caller.c_str ());
+      }
+      continue;
+    }
+    BRepIntCurveSurface_Inter hit;
+    hit.Init (s, gp_Lin (p, gp::DZ ()), Precision::Confusion ());
+    if (hit.More ())
+    {
+      b.Add (kept, face);
+      n++;
+    }
+  }
+  if (n == 0)
+  {
+    return Cell (1, 0);
+  }
+  ShapeUpgrade_UnifySameDomain u (kept, Standard_True, Standard_True,
+                                  Standard_False);
+  u.Build ();
+  TopoDS_Compound c;
+  b.MakeCompound (c);
+  for (TopExp_Explorer x (u.Shape (), TopAbs_FACE); x.More (); x.Next ())
+  {
+    b.Add (c, withoutinternal (TopoDS::Face (x.Current ())));
+  }
+  return facesout (c, (x1 - x0) * (y1 - y0) + 1);
 }
 
 // The solids of S, in the order a map of them gives
@@ -2630,6 +2887,24 @@ function directly. \n\
       {
         out = Cell (1, 0);
       }
+    }
+
+    // The outline of a shape seen along the normal of a frame, rows origin,
+    // x axis, y axis and normal, on the plane of the frame: the shape is
+    // carried into the frame, its edges and outlines drawn on the plane
+    // z = 0, and a face of that plane larger than the shape split by them.
+    // A piece is kept where a line along z through a point inside it meets
+    // the shape; the pieces kept are made one, the edges between them gone.
+    // Each face of it comes back as its outer loop and its inner loops.
+    else if (cmd == "projection")
+    {
+      const Matrix f = args(3).matrix_value ();
+      gp_Trsf t;
+      t.SetTransformation (gp_Ax3 (gp_Pnt (f(0,0), f(0,1), f(0,2)),
+                                   gp_Dir (f(3,0), f(3,1), f(3,2)),
+                                   gp_Dir (f(1,0), f(1,1), f(1,2))));
+      const TopoDS_Shape s = transform (toshape (args(2), caller), t);
+      out = projection (s, caller);
     }
 
     // The faces of a flat shape, such as the outlines of text, read in the
