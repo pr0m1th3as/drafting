@@ -12,7 +12,7 @@ exchanged as STEP, come through Open CASCADE when the package is built with it.
 Forty-seven public functions across six namespaces plus the `draw.Drawing`,
 `geom.Polyline`, `geom.Spline`, `geom.Region`, `geom.Path`, `geom.UCS`,
 `polymesh.Mesh`, `solid.Shape`, `model.Assembly` and `model.Viewer` classes,
-1851 built-in self-tests and 67 `%!demo` blocks, nearly all of which end in a
+1885 built-in self-tests and 67 `%!demo` blocks, nearly all of which end in a
 `plot` call, so the documentation shows what a function does rather than only
 describing it.
 
@@ -60,8 +60,8 @@ classes; only their constructors take plain matrices.
 
 `draw.Drawing` is a value class carrying lines, polylines with per-vertex
 bulges, arcs, circles, ellipses, text, hatches, blocks and inserts, and a full
-set of dimension entities (linear, diameter, radius and angular, plus centre
-marks and leaders) on named layers with line types and colours. Drawings
+set of dimension entities (linear, diameter, radius, angular and ordinate, plus
+centre marks and leaders) on named layers with line types and colours. Drawings
 compose: `transform` places one, `merge` assembles several into a sheet, and
 `draw.titleblock` frames it.
 

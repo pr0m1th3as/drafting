@@ -36,11 +36,12 @@
 ## an @code{INSERT} is a reference to geometry the caller never receives.
 ##
 ## A @code{DIMENSION} is returned with its six definition points in
-## @code{pts}, its DXF type in @code{angles} --- 0 rotated, 1 aligned, 2
-## angular, 3 diameter, 4 radius --- the name of the block holding its picture
-## in
-## @code{block}, and its text in @code{text}, where @qcode{'<>'} means the
-## dimension measures itself.
+## @code{pts}, from group codes 10, 11, 13, 14, 15 and 16, its DXF type in
+## @code{angles} --- 0 rotated, 1 aligned, 2 angular between two lines, 3
+## diameter, 4 radius, 5 angular by three points, 6 ordinate, with 64 added
+## for an ordinate measuring @math{x} --- the name of the block holding its
+## picture in @code{block}, and its text in @code{text}, where @qcode{'<>'}
+## means the dimension measures itself.
 ##
 ## @code{@var{E} = dxf.read (@var{FILE})} parses @var{FILE} and returns its
 ## drawing entities as a struct array with one element per entity and the
@@ -361,7 +362,10 @@ function [E, SKIPPED] = parseentities (codes, values, scale)
         s.pts = pts;
         s.block = grouptext (codes(body), values(body), 2, '');
         s.text = grouptext (codes(body), values(body), 1, '<>');
-        s.angles = mod (groupnum (codes(body), values(body), 70, 0), 32);
+        ## The type is the low three bits; of the flags, only 64 (an ordinate
+        ## measuring x) says what is measured
+        t = groupnum (codes(body), values(body), 70, 0);
+        s.angles = bitand (t, 7) + bitand (t, 64);
         s.rotation = groupnum (codes(body), values(body), 50, 0);
 
       case 'INSERT'
@@ -741,7 +745,37 @@ endfunction
 %!   dxf.write (fn, E, 'blocks', BL);
 %!   R = dxf.read (fn);
 %!   d = R(strcmp ({R.type}, 'DIMENSION'));
-%!   assert_equal (sort ([d.angles]), [0, 2, 3, 4]);
+%!   assert_equal (sort ([d.angles]), [0, 3, 4, 5]);
+%! unwind_protect_cleanup
+%!   unlink (fn);
+%! end_unwind_protect
+
+%!test  # an ordinate keeps the flag that says it measures x
+%! D = draw.Drawing ().ordinate ([0, 0], [20, 15], 'x', [20, -10]);
+%! D = D.ordinate ([0, 0], [20, 15], 'y', [-10, 15]);
+%! [E, ~, BL] = entities (D);
+%! fn = [tempname() '.dxf'];
+%! unwind_protect
+%!   dxf.write (fn, E, 'blocks', BL);
+%!   R = dxf.read (fn);
+%!   assert_equal ([R.angles], [70, 6]);
+%! unwind_protect_cleanup
+%!   unlink (fn);
+%! end_unwind_protect
+
+%!test  # the flag for text placed by hand is dropped from the type
+%! D = draw.Drawing ().diam ([0, 0], 5);
+%! [E, ~, BL] = entities (D);
+%! fn = [tempname() '.dxf'];
+%! unwind_protect
+%!   dxf.write (fn, E, 'blocks', BL);
+%!   txt = fileread (fn);
+%!   txt = regexprep (txt, '(\n *70\r?\n) *35(\r?\n)', '$1163$2', 'once');
+%!   fid = fopen (fn, 'w');
+%!   fputs (fid, txt);
+%!   fclose (fid);
+%!   R = dxf.read (fn);
+%!   assert_equal (R(strcmp ({R.type}, 'DIMENSION')).angles, 3);
 %! unwind_protect_cleanup
 %!   unlink (fn);
 %! end_unwind_protect

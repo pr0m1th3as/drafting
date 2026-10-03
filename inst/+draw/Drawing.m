@@ -752,7 +752,7 @@ classdef Drawing
 ##                             Available Methods                              ##
 ##                                                                            ##
 ## 'dim'             'diam'            'radius'          'angdim'             ##
-## 'centremark'      'leader'                                                 ##
+## 'ordinate'        'centremark'      'leader'                               ##
 ################################################################################
 
   methods (Access = public)
@@ -913,7 +913,7 @@ classdef Drawing
     ## explement instead.  That is the choice being offered, not an ambiguity:
     ## a corner and its outside both get dimensioned on real drawings.
     ##
-    ## @seealso{diam, radius, draw.symbol}
+    ## @seealso{diam, radius, ordinate, draw.symbol}
     ## @end deftypefn
     function this = angdim (this, V, P1, P2, RAD, LABEL = '')
 
@@ -951,6 +951,88 @@ classdef Drawing
         e.text = sprintf ('%g%%%%d', ...
                           round (mod ((a2 - a1) * 180 / pi, 360) * 100) / 100);
       endif
+      this.Entities(end+1) = e;
+
+    endfunction
+
+    ## -*- texinfo -*-
+    ## @deftypefn  {draw.Drawing} {@var{D} =} ordinate (@var{D}, @var{O}, @var{P}, @var{AXIS}, @var{L})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} ordinate (@dots{}, @var{LABEL})
+    ##
+    ## Append an ordinate dimension, the distance of a point from a datum.
+    ##
+    ## @var{O} is the datum, @var{P} the feature dimensioned and @var{AXIS}
+    ## either @qcode{'x'} or @qcode{'y'}, the coordinate stated.  The dimension
+    ## is a leader from @var{P} to the point @var{L} and the distance at its
+    ## end, with no dimension line and no arrow.  An @qcode{'x'} ordinate's
+    ## leader runs up or down the sheet and a @qcode{'y'} ordinate's across it,
+    ## so @var{L} must lie away from @var{P} in that direction; where @var{L} is
+    ## off the line through @var{P}, the leader jogs across in its middle third.
+    ##
+    ## A part dimensioned this way gives every feature its distance from one
+    ## datum, usually a corner, as a column of @math{x} values along one edge
+    ## and a row of @math{y} values along the other.  A machinist or a program
+    ## reads each position straight off the datum, and no error adds up along a
+    ## chain of dimensions.
+    ##
+    ## The label is the distance, without sign, to a micron, measured when the
+    ## drawing is lowered, so it follows the geometry; @var{LABEL} gives
+    ## literal text instead.
+    ##
+    ## @example
+    ## @group
+    ## ## A plate with two holes, dimensioned from its lower left corner
+    ## D = draw.Drawing ();
+    ## D = D.polyline (geom.Polyline ([0, 0; 80, 0; 80, 50; 0, 50], ...
+    ##                                'Closed', true));
+    ## D = D.circle ([20, 15], 4).circle ([60, 35], 4);
+    ## D = D.ordinate ([0, 0], [20, 15], 'x', [20, -10]);
+    ## D = D.ordinate ([0, 0], [60, 35], 'x', [60, -10]);
+    ## D = D.ordinate ([0, 0], [20, 15], 'y', [-10, 15]);
+    ## D = D.ordinate ([0, 0], [60, 35], 'y', [-10, 35]);
+    ## @end group
+    ## @end example
+    ##
+    ## @seealso{dim, leader}
+    ## @end deftypefn
+    function this = ordinate (this, O, P, AXIS, L, LABEL = '')
+
+      if (nargin < 5 || nargin > 6)
+        error ("draw.Drawing.ordinate: invalid number of input arguments.");
+      endif
+      errmsg = checkpt (O);
+      if (! isempty (errmsg))
+        error ("draw.Drawing.ordinate: O %s", errmsg);
+      endif
+      errmsg = checkpt (P);
+      if (! isempty (errmsg))
+        error ("draw.Drawing.ordinate: P %s", errmsg);
+      endif
+      if (! ischar (AXIS) || ! isrow (AXIS)
+                          || ! any (strcmpi (AXIS, {'x', 'y'})))
+        error ("draw.Drawing.ordinate: AXIS must be 'x' or 'y'.");
+      endif
+      errmsg = checkpt (L);
+      if (! isempty (errmsg))
+        error ("draw.Drawing.ordinate: L %s", errmsg);
+      endif
+      if (! ischar (LABEL) || ! (isrow (LABEL) || isempty (LABEL)))
+        error ("draw.Drawing.ordinate: LABEL must be a character vector.");
+      endif
+      AXIS = lower (AXIS);
+      if (strcmp (AXIS, 'x') && L(2) == P(2))
+        error (strcat ("draw.Drawing.ordinate: an x ordinate needs L to", ...
+                       " differ from P in y."));
+      endif
+      if (strcmp (AXIS, 'y') && L(1) == P(1))
+        error (strcat ("draw.Drawing.ordinate: a y ordinate needs L to", ...
+                       " differ from P in x."));
+      endif
+
+      e = makeentity ('ordinate', this.Layer, this.Linetype, this.Colour);
+      e.pts = [O; P; L];
+      e.direction = AXIS;
+      e.text = LABEL;
       this.Entities(end+1) = e;
 
     endfunction
@@ -1175,6 +1257,16 @@ classdef Drawing
               e.direction = axisafter (M, e.direction);
             endif
             e.offset *= sx;
+
+          case 'ordinate'
+            if (! onaxes)
+              error (strcat ("draw.Drawing.transform: entity %d is an", ...
+                             " ordinate dimension and the transformation", ...
+                             " would leave it off its axis."), ii);
+            endif
+            if (abs (M(1,1)) <= abs (M(1,2)))
+              e.direction = char ('x' + 'y' - e.direction);
+            endif
         endswitch
 
         this.Entities(ii) = e;
@@ -1679,6 +1771,19 @@ classdef Drawing
             for kk = 1:numel (parts)
               E(end+1) = parts(kk);
             endfor
+
+          case 'ordinate'
+            parts = explodeord (e, dimScale);
+            if (strcmp (dimMode, 'associative'))
+              nDim++;
+              bn = sprintf ('*D%d', nDim);
+              BLOCKS(end+1) = struct ('name', bn, 'entities', {parts});
+              E(end+1) = dimrecord (e, bn, 'ordinate');
+            else
+              for kk = 1:numel (parts)
+                E(end+1) = parts(kk);
+              endfor
+            endif
 
           case 'centremark'
             parts = explodemark (e, dimScale);
@@ -2638,6 +2743,9 @@ function P = extentpoints (e)
     case 'arc'
       P = arcextent (e.pts, e.radius, e.angles(1), e.angles(2));
 
+    case 'ordinate'
+      P = e.pts(1:2,:);
+
     otherwise
       P = e.pts;
 
@@ -2944,14 +3052,24 @@ function d = dimrecord (e, blockname, kind)
       d.angles = 4;
 
     case 'angdim'
+      ## DXF's angular dimension by three points: a point on the arc, the
+      ## text, an arm point each, the vertex.  The arc point on the middle of
+      ## the sweep tells which of the two angles at the vertex is measured.
       V = e.pts(1,:);
       P1 = e.pts(2,:);
       P2 = e.pts(3,:);
-      am = (atan2d (P1(2) - V(2), P1(1) - V(1)) ...
-            + atan2d (P2(2) - V(2), P2(1) - V(1))) / 2;
+      a1 = atan2d (P1(2) - V(2), P1(1) - V(1));
+      a2 = atan2d (P2(2) - V(2), P2(1) - V(1));
+      am = a1 + mod (a2 - a1, 360) / 2;
       A = V + e.radius * [cosd(am), sind(am)];
-      d.pts = [A; A; V; P1; V; P2];
-      d.angles = 2;
+      d.pts = [A; A; P1; P2; V; 0, 0];
+      d.angles = 5;
+
+    case 'ordinate'
+      ## The datum, the text, the feature and the end of the leader; 64 marks
+      ## an ordinate measuring x
+      d.pts = [e.pts(1,:); e.pts(3,:); e.pts(2,:); e.pts(3,:); 0, 0; 0, 0];
+      d.angles = 6 + 64 * strcmp (e.direction, 'x');
 
   endswitch
 
@@ -3065,6 +3183,65 @@ function parts = explodeang (e, scale)
   am = a1 + mod (a2 - a1, 360) / 2;
   t = mkent ('TEXT', e, V + (e.radius + 0.5 * hgt) * [cosd(am), sind(am)]);
   t.text = e.text;
+  t.height = hgt;
+  t.rotation = 0;
+  parts(end+1) = t;
+
+endfunction
+
+## An ordinate dimension: the leader from the feature, clear of it by a gap,
+## jogging across its middle third where its end is off the line through the
+## feature, and the distance past its end
+function parts = explodeord (e, scale)
+
+  gap = 1.0 * scale;
+  hgt = 2.5 * scale;
+  tgap = 0.8 * scale;
+  O = e.pts(1,:);
+  P = e.pts(2,:);
+  L = e.pts(3,:);
+  k = 1 + strcmp (e.direction, 'x');   # the coordinate the leader runs along
+  s = sign (L(k) - P(k));
+  S = P;
+  S(k) += s * gap;
+  if (L(3-k) == P(3-k))
+    Q = [S; L];
+  else
+    d = (L(k) - S(k)) / 3;
+    K1 = S;
+    K1(k) += d;
+    K2 = L;
+    K2(k) -= d;
+    Q = [S; K1; K2; L];
+  endif
+  parts = mkent ('POLYLINE', e, Q);
+
+  if (isempty (e.text))
+    v = abs (P(3-k) - O(3-k));
+    label = sprintf ('%g', round (v * 1000) / 1000);
+  else
+    label = e.text;
+  endif
+  wid = 0.6 * hgt * numel (label);
+  if (k == 2)
+    ## Up or down the sheet: the label centred past the end
+    ix = L(1) - wid / 2;
+    if (s > 0)
+      iy = L(2) + tgap;
+    else
+      iy = L(2) - tgap - hgt;
+    endif
+  else
+    ## Across the sheet: the label beside the end
+    iy = L(2) - hgt / 2;
+    if (s > 0)
+      ix = L(1) + tgap;
+    else
+      ix = L(1) - tgap - wid;
+    endif
+  endif
+  t = mkent ('TEXT', e, [ix, iy]);
+  t.text = label;
   t.height = hgt;
   t.rotation = 0;
   parts(end+1) = t;

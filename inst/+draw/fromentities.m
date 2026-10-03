@@ -68,9 +68,11 @@
 ## Geometry returns as itself: lines, polylines with their bulges, arcs,
 ## circles, text, points, and inserts of the blocks that came with them.  A
 ## @code{DIMENSION} returns as a dimension --- its definition points name what
-## it measures, so a linear, angular, diameter or radius dimension is rebuilt
-## as the method that would have made it, and it measures the geometry again
-## rather than repeating a number.
+## it measures, so a linear, angular, diameter, radius or ordinate dimension
+## is rebuilt as the method that would have made it, and it measures the
+## geometry again rather than repeating a number.  An angular dimension
+## between two lines is measured at the point where they meet, over the angle
+## that holds its arc.
 ##
 ## @strong{What was lowered on the way out does not come back.}  A hatch left
 ## as its boundary and fill lines, and an ellipse as a sampled polyline; a file
@@ -419,8 +421,48 @@ function [D, why] = raisedim (D, e)
       D = D.dim (P1, P2, dot (L - P1, N), 'aligned', lbl);
 
     case 2
-      V = P1;
-      D = D.angdim (V, P2, e.pts(6,:), norm (L - V), lbl);
+      ## Two lines, 13 to 14 and 15 to 10, and a point on the arc, 16.  The
+      ## vertex is where the lines meet, and the arms run from it each way
+      ## along them that bounds the angle holding the arc.
+      r1 = P2 - P1;
+      r2 = L - Q;
+      M = [r1', r2'];
+      if (norm (r1) == 0 || norm (r2) == 0
+                         || abs (det (M)) <= 1e-12 * norm (r1) * norm (r2))
+        why = 'the two lines of an angular dimension must meet';
+        return;
+      endif
+      t = M \ (Q - P1)';
+      V = P1 + t(1) * r1;
+      A = e.pts(6,:);
+      if (norm (A - V) == 0)
+        why = 'the arc of an angular dimension must lie off its vertex';
+        return;
+      endif
+      c = M \ (A - V)';
+      u1 = r1 * (2 * (c(1) >= 0) - 1);
+      u2 = r2 * (2 * (c(2) >= 0) - 1);
+      if (u1(1) * u2(2) - u1(2) * u2(1) < 0)
+        [u1, u2] = deal (u2, u1);
+      endif
+      D = D.angdim (V, V + u1, V + u2, norm (A - V), lbl);
+
+    case 5
+      ## The vertex, 15, an arm point each, 13 and 14, and a point on the arc,
+      ## 10, which tells which of the two angles at the vertex is measured
+      V = Q;
+      if (isequal (P1, V) || isequal (P2, V) || isequal (L, V))
+        why = 'an angular dimension needs its points off its vertex';
+        return;
+      endif
+      a1 = atan2d (P1(2) - V(2), P1(1) - V(1));
+      a2 = atan2d (P2(2) - V(2), P2(1) - V(1));
+      aa = atan2d (L(2) - V(2), L(1) - V(1));
+      if (mod (aa - a1, 360) <= mod (a2 - a1, 360))
+        D = D.angdim (V, P1, P2, norm (L - V), lbl);
+      else
+        D = D.angdim (V, P2, P1, norm (L - V), lbl);
+      endif
 
     case 3
       C = (L + Q) / 2;
@@ -432,6 +474,17 @@ function [D, why] = raisedim (D, e)
       R = norm (L - Q);
       a = atan2d (L(2) - Q(2), L(1) - Q(1));
       D = D.radius (Q, R, a, lbl);
+
+    case {6, 70}
+      ## The datum, 10, the feature, 13, and the end of the leader, 14
+      axes = 'yx';
+      ax = axes(1 + (e.angles == 70));
+      k = 1 + (ax == 'x');
+      if (P2(k) == P1(k))
+        why = 'the leader of an ordinate dimension must run along its axis';
+        return;
+      endif
+      D = D.ordinate (L, P1, ax, P2, lbl);
 
     otherwise
       why = sprintf ('dimension type %g is not one this package draws', ...
@@ -695,6 +748,56 @@ endfunction
 %! d = D.Entities(strcmp ({D.Entities.type}, 'dim'));
 %! L = cellfun (@(p) norm (p(2,:) - p(1,:)), {d.pts});
 %! assert_equal (sort (L), [60, 100, 100, hypot(100, 60)], 1e-9);
+
+%!test  # a real file's angle between two lines is measured where they meet
+%! fn = fullfile (fileparts (fileparts (which ('dxf.read'))), 'tests', ...
+%!                'fixtures', 'foreign_dims_2000.dxf');
+%! [E, ~, ~, B] = dxf.read (fn);
+%! D = draw.fromentities (E, B);
+%! a = D.Entities(strcmp ({D.Entities.type}, 'angdim'));
+%! assert_equal (a.pts, [0, 0; 100, 0; 100, 60], 1e-9);
+%! assert_equal (a.radius, hypot (32, 9), 1e-9);
+%! assert_equal (a.text, '30.96%%d');
+
+%!test  # two lines crossing, over the angle that holds the arc
+%! e = struct ('type', 'DIMENSION', 'layer', '0', 'block', '', ...
+%!             'pts', [0, 10; 0, 0; -10, 0; 10, 0; 0, -10; -3, 4], ...
+%!             'angles', 2, 'text', '<>');
+%! D = draw.fromentities (e);
+%! assert_equal (D.Entities(1).pts, [0, 0; 0, 20; -20, 0], 1e-12);
+%! assert_equal (D.Entities(1).radius, 5, 1e-12);
+
+%!test  # lines that never meet make no angle
+%! e = struct ('type', 'DIMENSION', 'layer', '0', 'block', '', ...
+%!             'pts', [10, 5; 0, 0; 0, 0; 10, 0; 0, 5; 5, 3], ...
+%!             'angles', 2, 'text', '<>');
+%! [D, LOST] = draw.fromentities (e);
+%! assert_equal (LOST.reason, ...
+%!               'the two lines of an angular dimension must meet');
+
+%!test  # an angle by three points comes back as it was drawn
+%! D = draw.Drawing ().angdim ([1, 2], [10, 2], [1, 12], 5);
+%! [E, ~, BL] = entities (D);
+%! back = draw.fromentities (E, BL);
+%! assert_equal (back.Entities(1).pts, [1, 2; 10, 2; 1, 12], 1e-12);
+%! assert_equal (back.Entities(1).radius, 5, 1e-12);
+
+%!test  # and its explement too, which its arc point tells apart
+%! D = draw.Drawing ().angdim ([0, 0], [0, 10], [10, 0], 5);
+%! back = draw.fromentities (entities (D));
+%! assert_equal (back.Entities(1).text, '270%%d');
+
+%!test  # an x ordinate comes back with its datum, feature and leader
+%! D = draw.Drawing ().ordinate ([1, 2], [20, 15], 'x', [20, -10]);
+%! back = draw.fromentities (entities (D));
+%! assert_equal (back.Entities(1).type, 'ordinate');
+%! assert_equal (back.Entities(1).direction, 'x');
+%! assert_equal (back.Entities(1).pts, [1, 2; 20, 15; 20, -10], 1e-12);
+
+%!test  # and a y ordinate as one
+%! D = draw.Drawing ().ordinate ([0, 0], [20, 15], 'y', [-10, 15]);
+%! back = draw.fromentities (entities (D));
+%! assert_equal (back.Entities(1).direction, 'y');
 
 %!error<draw.fromentities: invalid number of input arguments.> ...
 %! draw.fromentities ()

@@ -699,6 +699,111 @@
 %! D = draw.Drawing ().diam ([0, 0], 6.17283945);
 %! assert_equal (D.Entities(1).text, '%%c12.346');
 
+%!test  # an x ordinate is the distance of the feature from the datum in x
+%! D = draw.Drawing ().ordinate ([0, 0], [20, 15], 'x', [20, -10]);
+%! E = entities (D, 'dimensions', 'explode');
+%! assert_equal (E(strcmp ({E.type}, 'TEXT')).text, '20');
+
+%!test  # a y ordinate measures in y, from a datum anywhere
+%! D = draw.Drawing ().ordinate ([5, 5], [60, 35], 'y', [90, 35]);
+%! E = entities (D, 'dimensions', 'explode');
+%! assert_equal (E(strcmp ({E.type}, 'TEXT')).text, '30');
+
+%!test  # the distance has no sign
+%! D = draw.Drawing ().ordinate ([50, 0], [20, 15], 'x', [20, -10]);
+%! E = entities (D, 'dimensions', 'explode');
+%! assert_equal (E(strcmp ({E.type}, 'TEXT')).text, '30');
+
+%!test  # the distance is stated to a micron
+%! D = draw.Drawing ().ordinate ([0, 0], [1.23456, 0], 'x', [1.23456, -5]);
+%! E = entities (D, 'dimensions', 'explode');
+%! assert_equal (E(strcmp ({E.type}, 'TEXT')).text, '1.235');
+
+%!test  # an ordinate's label is literal when given
+%! D = draw.Drawing ().ordinate ([0, 0], [20, 15], 'x', [20, -10], 'A');
+%! E = entities (D, 'dimensions', 'explode');
+%! assert_equal (E(strcmp ({E.type}, 'TEXT')).text, 'A');
+
+%!test  # a leader in line with the feature is straight, clear of it by a gap
+%! D = draw.Drawing ().ordinate ([0, 0], [20, 15], 'x', [20, -10]);
+%! E = entities (D, 'dimensions', 'explode');
+%! assert_equal (E(strcmp ({E.type}, 'POLYLINE')).pts, [20, 14; 20, -10]);
+
+%!test  # a leader ending off that line jogs across its middle third
+%! D = draw.Drawing ().ordinate ([0, 0], [60, 35], 'y', [91, 30]);
+%! E = entities (D, 'dimensions', 'explode');
+%! assert_equal (E(strcmp ({E.type}, 'POLYLINE')).pts, ...
+%!               [61, 35; 71, 35; 81, 30; 91, 30], 1e-12);
+
+%!test  # the label sits past the end of a leader running down
+%! D = draw.Drawing ().ordinate ([0, 0], [20, 15], 'x', [20, -10]);
+%! E = entities (D, 'dimensions', 'explode');
+%! assert_equal (E(strcmp ({E.type}, 'TEXT')).pts(2) < -10, true);
+
+%!test  # and past the end of a leader running left
+%! D = draw.Drawing ().ordinate ([0, 0], [20, 15], 'y', [-10, 15]);
+%! E = entities (D, 'dimensions', 'explode');
+%! t = E(strcmp ({E.type}, 'TEXT'));
+%! assert_equal (t.pts(1) + 0.6 * t.height * numel (t.text) < -10, true);
+
+%!test  # an ordinate measures again after the drawing is scaled
+%! D = draw.Drawing ().ordinate ([0, 0], [20, 15], 'x', [20, -10]);
+%! E = entities (transform (D, 'scale', 2), 'dimensions', 'explode');
+%! assert_equal (E(strcmp ({E.type}, 'TEXT')).text, '40');
+
+%!test  # a quarter turn makes an x ordinate a y ordinate
+%! D = draw.Drawing ().ordinate ([0, 0], [20, 15], 'x', [20, -10]);
+%! D = transform (D, 'rotate', 90);
+%! assert_equal (D.Entities(1).direction, 'y');
+
+%!test  # an ordinate's box is its datum and its feature
+%! D = draw.Drawing ().ordinate ([0, 0], [20, 15], 'x', [20, -10]);
+%! assert_equal (bbox (D), [0, 0, 20, 15]);
+
+%!test  # an x ordinate is DXF type 6 with 64 added, its points the datum,
+%!      # the feature and the end of the leader
+%! D = draw.Drawing ().ordinate ([1, 2], [20, 15], 'x', [20, -10]);
+%! E = entities (D);
+%! assert_equal (E.angles, 70);
+%! assert_equal (E.pts([1, 3, 4],:), [1, 2; 20, 15; 20, -10]);
+
+%!test  # a y ordinate is DXF type 6
+%! D = draw.Drawing ().ordinate ([0, 0], [20, 15], 'y', [-10, 15]);
+%! E = entities (D);
+%! assert_equal (E.angles, 6);
+
+%!test  # an angular dimension is DXF type 5, its vertex at 15 and its arm
+%!      # points at 13 and 14
+%! D = draw.Drawing ().angdim ([1, 2], [10, 2], [1, 12], 5);
+%! E = entities (D);
+%! assert_equal (E.angles, 5);
+%! assert_equal (E.pts(3:5,:), [10, 2; 1, 12; 1, 2]);
+
+%!test  # its arc point is on the angle measured, across the negative x axis
+%! D = draw.Drawing ().angdim ([0, 0], [-10, 1], [-10, -1], 5);
+%! E = entities (D);
+%! assert_equal (E.pts(1,:), [-5, 0], 1e-12);
+
+%!error<draw.Drawing.ordinate: invalid number of input arguments.> ...
+%! draw.Drawing ().ordinate ([0, 0], [1, 1], 'x')
+%!error<draw.Drawing.ordinate: O must be a real finite 1-by-2 vector.> ...
+%! draw.Drawing ().ordinate ([0, 0, 0], [1, 1], 'x', [1, 0])
+%!error<draw.Drawing.ordinate: P must be a real finite 1-by-2 vector.> ...
+%! draw.Drawing ().ordinate ([0, 0], [1, NaN], 'x', [1, 0])
+%!error<draw.Drawing.ordinate: AXIS must be 'x' or 'y'.> ...
+%! draw.Drawing ().ordinate ([0, 0], [1, 1], 'z', [1, 0])
+%!error<draw.Drawing.ordinate: L must be a real finite 1-by-2 vector.> ...
+%! draw.Drawing ().ordinate ([0, 0], [1, 1], 'x', 'a')
+%!error<draw.Drawing.ordinate: LABEL must be a character vector.> ...
+%! draw.Drawing ().ordinate ([0, 0], [1, 1], 'x', [1, 0], 5)
+%!error<draw.Drawing.ordinate: an x ordinate needs L to differ from P in y.> ...
+%! draw.Drawing ().ordinate ([0, 0], [1, 1], 'x', [5, 1])
+%!error<draw.Drawing.ordinate: a y ordinate needs L to differ from P in x.> ...
+%! draw.Drawing ().ordinate ([0, 0], [1, 1], 'y', [1, 5])
+%!error<draw.Drawing.transform: entity 1 is an ordinate dimension and the transformation would leave it off its axis.> ...
+%! transform (draw.Drawing ().ordinate ([0, 0], [1, 1], 'x', [1, 0]), ...
+%!            'rotate', 30)
+
 %!test  # a drawing renders one object per entity
 %! f = figure ('visible', 'off');
 %! unwind_protect
@@ -1561,7 +1666,7 @@
 %! D = D.angdim ([0, 20], [10, 20], [8, 26], 5);
 %! D = D.diam ([40, 0], 6, 45).radius ([60, 0], 4, 30);
 %! E = entities (D);
-%! assert_equal (sort ([E.angles]), [0, 2, 3, 4]);
+%! assert_equal (sort ([E.angles]), [0, 3, 4, 5]);
 
 %!test  # an auto label stays live, so the reader measures it for itself
 %! D = draw.Drawing ().diam ([0, 0], 20, 45);
@@ -1632,6 +1737,7 @@
 %!  D = D.angdim ([0, 0], [30, 0], [20, 20], 25);
 %!  D = D.diam ([50, 30], 10, 45);
 %!  D = D.radius ([50, 30], 20, 200);
+%!  D = D.ordinate ([0, 0], [100, 60], 'x', [100, 75]);
 %!endfunction
 
 %!function mm = __mediabox__ (FILE)
@@ -1667,8 +1773,8 @@
 %! D = __allentities__ ();
 %! assert_equal (sort (unique ({D.Entities.type})), ...
 %!               {'angdim', 'arc', 'centremark', 'circle', 'diam', 'dim', ...
-%!                'ellipse', 'hatch', 'insert', 'leader', 'line', 'point', ...
-%!                'polyline', 'radius', 'text'});
+%!                'ellipse', 'hatch', 'insert', 'leader', 'line', ...
+%!                'ordinate', 'point', 'polyline', 'radius', 'text'});
 
 %!test  # every entity type reaches the DXF backend
 %! D = __allentities__ ();

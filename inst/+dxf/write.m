@@ -41,8 +41,10 @@
 ## @item @qcode{'POINT'} @tab one point
 ## @item @qcode{'DIMENSION'} @tab six definition points, plus @code{block}
 ## naming the block that holds its picture, @code{angles} giving the DXF
-## dimension type (0 linear, 2 angular, 3 diameter, 4 radius) and @code{text},
-## where @qcode{'<>'} leaves the reader to measure it
+## dimension type (0 linear, 1 aligned, 2 angular between two lines, 3
+## diameter, 4 radius, 5 angular by three points, 6 ordinate, 70 ordinate
+## measuring @math{x}) and @code{text}, where @qcode{'<>'} leaves the reader
+## to measure it
 ## @end multitable
 ##
 ## Layers are collected from the entities and declared in the layer table.  An
@@ -357,9 +359,10 @@ function s = checkentity (e, ii)
       endif
       s.angles = optfield (e, 'angles', 0);
       if (! isnumeric (s.angles) || ! isscalar (s.angles) ...
-          || ! any (s.angles == [0, 2, 3, 4]))
+          || ! any (s.angles == [0:6, 70]))
         error (strcat ("dxf.write: E(%d).angles is the DIMENSION type and", ...
-                       " must be 0, 2, 3 or 4."), ii);
+                       " must be an integer from 0 to 6, or 70 for an", ...
+                       " ordinate measuring x."), ii);
       endif
       s.text = optfield (e, 'text', '<>');
       s.rotation = optfield (e, 'rotation', 0);
@@ -941,7 +944,7 @@ endfunction
 %!error<dxf.write: E\(1\) DIMENSION needs the name of the block holding its picture in .block.> ...
 %! dxf.write (tempname (), struct ('type', 'DIMENSION', ...
 %!                                 'pts', zeros (6, 2), 'angles', 0))
-%!error<dxf.write: E\(1\).angles is the DIMENSION type and must be 0, 2, 3 or 4.> ...
+%!error<dxf.write: E\(1\).angles is the DIMENSION type and must be an integer from 0 to 6, or 70 for an ordinate measuring x.> ...
 %! dxf.write (tempname (), struct ('type', 'DIMENSION', ...
 %!                                 'pts', zeros (6, 2), ...
 %!                                 'block', '*D1', 'angles', 9))
