@@ -38,7 +38,7 @@
 ## STL, OBJ or PLY file, is read by @code{polymesh.read} and made a solid by
 ## @code{solid.polyhedron}.
 ##
-## @seealso{solid.write, solid.Shape, model.read, polymesh.read}
+## @seealso{solid.Shape.write, solid.Shape, model.read, polymesh.read}
 ## @end deftypefn
 
 function S = read (FILE)
@@ -107,7 +107,7 @@ endfunction
 %!               translate (solid.cylinder (4, 12), [20, 20, 0]));
 %! f = [tempname(), '.step'];
 %! unwind_protect
-%!   solid.write (f, A);
+%!   write (A, f);
 %!   S = solid.read (f);
 %!   assert_equal (volume (S), 38400 - 192 * pi, 1e-9);
 %!   assert_equal (numfaces (S), 7);
@@ -119,7 +119,7 @@ endfunction
 %!testif ; exist ('__occt__') == 3  # the extension in upper case
 %! f = [tempname(), '.STP'];
 %! unwind_protect
-%!   solid.write (f, solid.sphere (5));
+%!   write (solid.sphere (5), f);
 %!   assert_equal (volume (solid.read (f)), 4 / 3 * pi * 125, 1e-9);
 %! unwind_protect_cleanup
 %!   unlink (f);
@@ -129,7 +129,7 @@ endfunction
 %! A = solid.box (10, 10, 10);
 %! f = [tempname(), '.step'];
 %! unwind_protect
-%!   solid.write (f, union (A, translate (A, [20, 0, 0])));
+%!   write (union (A, translate (A, [20, 0, 0])), f);
 %!   assert_equal (numsolids (solid.read (f)), 2);
 %! unwind_protect_cleanup
 %!   unlink (f);
@@ -138,7 +138,7 @@ endfunction
 %!testif ; exist ('__occt__') == 3  # a comment before the keyword
 %! f = [tempname(), '.step'];
 %! unwind_protect
-%!   solid.write (f, solid.box (1, 2, 3));
+%!   write (solid.box (1, 2, 3), f);
 %!   txt = fileread (f);
 %!   fid = fopen (f, 'w');
 %!   fprintf (fid, "/* exported */\n%s", txt);
@@ -154,7 +154,7 @@ endfunction
 %! U.Colour = [1, 0, 0; 0, 0.5, 1];
 %! f = [tempname(), '.step'];
 %! unwind_protect
-%!   solid.write (f, U);
+%!   write (U, f);
 %!   R = solid.read (f);
 %!   assert_equal (R.Colour, U.Colour, 1e-6);
 %! unwind_protect_cleanup
@@ -167,10 +167,10 @@ endfunction
 %! U.Colour = [NaN, NaN, NaN; 0, 1, 0];
 %! f = [tempname(), '.step'];
 %! unwind_protect
-%!   solid.write (f, U);
+%!   write (U, f);
 %!   R = solid.read (f);
 %!   assert_equal (R.Colour, U.Colour, 1e-6);
-%!   solid.write (f, B);
+%!   write (B, f);
 %!   R = solid.read (f);
 %!   assert_equal (R.Colour, []);
 %! unwind_protect_cleanup

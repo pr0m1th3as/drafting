@@ -362,7 +362,7 @@ classdef Assembly
     ## mesh, how far its facets may stray from the parts' surfaces, as
     ## @code{solid.Shape.tessellate} takes it, 0.01 by default.
     ##
-    ## @seealso{model.read, solid.write}
+    ## @seealso{model.read, solid.Shape.write}
     ## @end deftypefn
     function write (this, FILE, varargin)
 

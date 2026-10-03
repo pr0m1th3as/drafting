@@ -12,7 +12,7 @@ exchanged as STEP, come through Open CASCADE when the package is built with it.
 Forty-seven public functions across six namespaces plus the `draw.Drawing`,
 `geom.Polyline`, `geom.Spline`, `geom.Region`, `geom.Path`, `geom.UCS`,
 `polymesh.Mesh`, `solid.Shape`, `model.Assembly` and `model.Viewer` classes,
-1885 built-in self-tests and 67 `%!demo` blocks, nearly all of which end in a
+1884 built-in self-tests and 67 `%!demo` blocks, nearly all of which end in a
 `plot` call, so the documentation shows what a function does rather than only
 describing it.
 
@@ -135,19 +135,19 @@ holes (plain, counterbored, countersunk, tapping size), cut pockets, round and
 bevel edges and hollow a shape, on edges and faces chosen by kind, direction and
 position. `section` cuts a solid with a plane into regions exact enough to build
 from again, and `projection` gives its outline seen along a direction, the
-shadow it casts, as OpenSCAD's `projection` does. `solid.polyhedron` makes a solid of a closed `polymesh.Mesh`,
-so a mesh `polymesh.read` reads takes part in booleans like any other, and
-`tessellate` turns a solid into a mesh within a tolerance. `solid.read` reads
-STEP, and `solid.write` writes STEP for a CAD program, or STL, OBJ or PLY,
-tessellated, for a slicer:
+shadow it casts, as OpenSCAD's `projection` does. `solid.polyhedron` makes a
+solid of a closed `polymesh.Mesh`, so a mesh `polymesh.read` reads takes part in
+booleans like any other, and `tessellate` turns a solid into a mesh within a
+tolerance. `solid.read` reads STEP, and `write` writes a solid to STEP for a CAD
+program, or to STL, OBJ, PLY or 3MF, tessellated, for a slicer:
 
 ```
 plate = solid.box (80, 40, 12);
 plate = hole (plate, [20, 20, 12; 60, 20, 12], 'M8', Inf);
 plate = fillet (plate, edges (plate, 'Direction', [0, 0, 1], ...
                               'Type', 'line'), 5);
-solid.write ('plate.step', plate);
-solid.write ('plate.stl', plate);
+write (plate, 'plate.step');
+write (plate, 'plate.stl');
 
 section = geom.Region ([0, 0; 10, 0; 10, 30; 6, 30; 6, 50; 0, 50]);
 section.UCS = geom.UCS ([0, -1, 0], [0, 0, 0]);  # the xz plane: y is world z

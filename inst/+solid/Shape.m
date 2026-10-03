@@ -25,8 +25,8 @@ classdef Shape
   ## face a plane, cylinder, cone, sphere, torus or spline surface, every edge
   ## a line, circle or curve, with nothing approximated by facets.  It is what
   ## the functions of the @code{solid} namespace create, what the boolean
-  ## operators combine, and what @code{solid.write} saves as STEP for exchange
-  ## or STL for printing.
+  ## operators combine, and what its @code{write} method saves as STEP for
+  ## exchange or STL for printing.
   ##
   ## Shapes are made by @code{solid.box}, @code{solid.cylinder},
   ## @code{solid.cone}, @code{solid.sphere} and @code{solid.torus}, from
@@ -77,7 +77,7 @@ classdef Shape
   ## empty shape can still be made, but every function and method that needs
   ## the library raises an error saying so.
   ##
-  ## @seealso{solid.box, solid.read, solid.write, solid.Shape.show}
+  ## @seealso{solid.box, solid.read, solid.Shape.write, solid.Shape.show}
   ## @end deftp
 
   properties (SetAccess = private, Hidden)
@@ -292,7 +292,7 @@ classdef Shape
     ## @code{FaceColour}, and the grey @code{[0.72, 0.74, 0.78]} where its
     ## solid has none.  The empty shape gives the empty mesh.
     ##
-    ## This is the mesh @code{solid.write} writes to STL, OBJ and PLY, and it
+    ## This is the mesh @code{write} writes to STL, OBJ, PLY and 3MF, and it
     ## can be shown, cut, measured, coloured and written as any other.
     ##
     ## @example
@@ -302,7 +302,7 @@ classdef Shape
     ## @end group
     ## @end example
     ##
-    ## @seealso{polymesh.Mesh, solid.write, solid.polyhedron}
+    ## @seealso{polymesh.Mesh, solid.Shape.write, solid.polyhedron}
     ## @end deftypefn
     function M = tessellate (this, TOL = 0.01)
 
@@ -388,6 +388,101 @@ classdef Shape
       viewer.Shape = this;
       if (nargout > 0)
         V = viewer;
+      endif
+
+    endfunction
+
+    ## -*- texinfo -*-
+    ## @deftypefn  {solid.Shape} {} write (@var{S}, @var{FILE})
+    ## @deftypefnx {solid.Shape} {} write (@var{S}, @var{FILE}, @qcode{'Tolerance'}, @var{TOL})
+    ##
+    ## Write a solid to a STEP, STL, OBJ, PLY or 3MF file.
+    ##
+    ## @code{write (@var{S}, @var{FILE})} writes the shape @var{S} in the format
+    ## named by the extension of @var{FILE}, in either case:
+    ##
+    ## @table @asis
+    ## @item @file{.step}, @file{.stp}
+    ## STEP (ISO 10303-21, application protocol 214), in millimetres.  The
+    ## exact geometry is kept, so this is the file to send to a CAD program or
+    ## to another manufacturer.  The part is named after the base name of
+    ## @var{FILE}, and each solid carries its @code{solid.Shape.Colour}.
+    ##
+    ## @item @file{.stl}, @file{.obj}, @file{.ply}, @file{.3mf}
+    ## A mesh of triangles in millimetres, the mesh
+    ## @code{solid.Shape.tessellate} makes, written by
+    ## @code{polymesh.Mesh.write}: binary STL, OBJ, binary PLY, or 3MF, the
+    ## archive slicers take.  The facets approximate every curved surface;
+    ## their vertices lie on it.  OBJ, PLY and 3MF carry the solids' colours on
+    ## their triangles; STL has none.
+    ## @end table
+    ##
+    ## @code{write (@dots{}, @qcode{'Tolerance'}, @var{TOL})} sets, for a
+    ## mesh, the largest distance in millimetres between a facet and the true
+    ## surface.  It is 0.01 by default, well below what a printer resolves; a
+    ## larger value gives a smaller file.  No facet spans more than 20 degrees
+    ## of a curved surface, whatever @var{TOL}.  A STEP file is exact and takes
+    ## no tolerance.
+    ##
+    ## @seealso{solid.read, solid.Shape.tessellate, polymesh.Mesh.write}
+    ## @end deftypefn
+    function write (this, FILE, varargin)
+
+      ## Input validation
+      if (nargin < 2)
+        error ("solid.Shape.write: invalid number of input arguments.");
+      endif
+      if (! ischar (FILE) || ! isrow (FILE) || isempty (FILE))
+        error (strcat ("solid.Shape.write: FILE must be a non-empty", ...
+                       " character vector."));
+      endif
+      if (mod (numel (varargin), 2) != 0)
+        error ("solid.Shape.write: Name/Value arguments must come in pairs.");
+      endif
+      opt = struct ('Tolerance', []);
+      known = fieldnames (opt);
+      for k = 1:2:numel (varargin)
+        name = varargin{k};
+        if (! ischar (name) || ! isrow (name)
+                            || ! any (strcmp (name, known)))
+          error ("solid.Shape.write: unknown parameter.");
+        endif
+        opt.(name) = varargin{k+1};
+      endfor
+      [folder, base, ext] = fileparts (FILE);
+      isstep = any (strcmpi (ext, {'.step', '.stp'}));
+      if (! isstep
+          && ! any (strcmpi (ext, {'.stl', '.obj', '.ply', '.3mf'})))
+        error (strcat ("solid.Shape.write: FILE must end in .step, .stp,", ...
+                       " .stl, .obj, .ply or .3mf."));
+      endif
+      if (isstep && ! isempty (opt.Tolerance))
+        error ("solid.Shape.write: Tolerance applies to meshes only.");
+      endif
+      if (isempty (opt.Tolerance))
+        opt.Tolerance = 0.01;
+      endif
+      errmsg = solid.__checkpos__ (opt.Tolerance, 'Tolerance');
+      if (! isempty (errmsg))
+        error ("solid.Shape.write: %s", errmsg);
+      endif
+      if (! isempty (folder) && ! isfolder (folder))
+        error ("solid.Shape.write: folder '%s' does not exist.", folder);
+      endif
+      if (isempty (this))
+        error (strcat ("solid.Shape.write: S is empty, so there is", ...
+                       " nothing to write."));
+      endif
+      errmsg = solid.__checkocct__ ();
+      if (! isempty (errmsg))
+        error ("solid.Shape.write: %s", errmsg);
+      endif
+
+      if (isstep)
+        __occt__ ('writestep', 'solid.Shape.write', this.Data, FILE, base, ...
+                  this.Colour);
+      else
+        write (tessellate (this, opt.Tolerance), FILE);
       endif
 
     endfunction
@@ -2646,6 +2741,167 @@ endfunction
 
 %!test  # tessellate: the empty shape gives the empty mesh
 %! assert_equal (isempty (tessellate (solid.Shape ())), true);
+
+## The vertices of a binary STL file, three rows per facet
+%!function V = stlvertices (f)
+%!  fid = fopen (f, 'r', 'ieee-le');
+%!  fread (fid, 80, 'uint8');
+%!  n = fread (fid, 1, 'uint32');
+%!  B = fread (fid, [50, n], 'uint8=>uint8');
+%!  fclose (fid);
+%!  V = double (reshape (typecast (reshape (B(13:48,:), [], 1), 'single'), ...
+%!                       3, [])');
+%!endfunction
+
+%!testif ; exist ('__occt__') == 3  # STEP keeps the exact surfaces
+%! f = [tempname(), '.step'];
+%! unwind_protect
+%!   write (solid.cylinder (4, 12), f);
+%!   txt = fileread (f);
+%!   assert_equal (isempty (strfind (txt, 'CYLINDRICAL_SURFACE')), false);
+%!   assert_equal (isempty (strfind (txt, "'GNU Octave drafting package'")), ...
+%!                 false);
+%! unwind_protect_cleanup
+%!   unlink (f);
+%! end_unwind_protect
+
+%!testif ; exist ('__occt__') == 3  # STEP carries a solid's colour
+%! f = [tempname(), '.step'];
+%! S = solid.box (1, 2, 3);
+%! S.Colour = [0.2, 0.4, 0.6];
+%! unwind_protect
+%!   write (S, f);
+%!   assert_equal (isempty (strfind (fileread (f), 'COLOUR_RGB')), false);
+%! unwind_protect_cleanup
+%!   unlink (f);
+%! end_unwind_protect
+
+%!testif ; exist ('__occt__') == 3  # the product is named after the file
+%! f = [tempname(), '.stp'];
+%! [~, base] = fileparts (f);
+%! unwind_protect
+%!   write (solid.box (1, 2, 3), f);
+%!   txt = fileread (f);
+%!   assert_equal (isempty (strfind (txt, ["PRODUCT('", base])), false);
+%! unwind_protect_cleanup
+%!   unlink (f);
+%! end_unwind_protect
+
+%!testif ; exist ('__occt__') == 3  # STL: a box is twelve triangles
+%! f = [tempname(), '.stl'];
+%! unwind_protect
+%!   write (solid.box (10, 20, 30), f);
+%!   V = stlvertices (f);
+%!   assert_equal (rows (V), 36);
+%!   assert_equal (min (V), [0, 0, 0]);
+%!   assert_equal (max (V), [10, 20, 30]);
+%! unwind_protect_cleanup
+%!   unlink (f);
+%! end_unwind_protect
+
+%!testif ; exist ('__occt__') == 3  # facets stay within the tolerance
+%! f = [tempname(), '.stl'];
+%! unwind_protect
+%!   write (solid.cylinder (4, 12), f, 'Tolerance', 0.05);
+%!   V = stlvertices (f);
+%!   assert_equal (max (abs (hypot (V(:,1), V(:,2)) - 4)) < 1e-5, true);
+%!   ## Gap at the midpoint of every edge of a facet on the curved side; the
+%!   ## flat ends are left out, their facets having no curve to follow
+%!   A = V(1:3:end,:);
+%!   B = V(2:3:end,:);
+%!   C = V(3:3:end,:);
+%!   side = ! (A(:,3) == B(:,3) & B(:,3) == C(:,3));
+%!   M = ([A(side,1:2); B(side,1:2); C(side,1:2)] ...
+%!        + [B(side,1:2); C(side,1:2); A(side,1:2)]) / 2;
+%!   gap = 4 - hypot (M(:,1), M(:,2));
+%!   assert_equal (max (gap) <= 0.05 + 1e-5, true);
+%!   assert_equal (max (gap) > 0.01, true);
+%! unwind_protect_cleanup
+%!   unlink (f);
+%! end_unwind_protect
+
+%!testif ; exist ('__occt__') == 3  # a finer tolerance gives more facets
+%! f1 = [tempname(), '.stl'];
+%! f2 = [tempname(), '.stl'];
+%! unwind_protect
+%!   write (solid.sphere (20), f1, 'Tolerance', 0.5);
+%!   write (solid.sphere (20), f2, 'Tolerance', 0.01);
+%!   assert_equal (rows (stlvertices (f2)) > rows (stlvertices (f1)), true);
+%! unwind_protect_cleanup
+%!   unlink (f1);
+%!   unlink (f2);
+%! end_unwind_protect
+
+%!testif ; exist ('__occt__') == 3  # OBJ: the mesh of the solid, closed
+%! f = [tempname(), '.obj'];
+%! unwind_protect
+%!   write (solid.box (10, 20, 30), f);
+%!   M = polymesh.read (f);
+%!   assert_equal (isclosed (M), true);
+%!   assert_equal (volume (M), 6000, -1e-12);
+%! unwind_protect_cleanup
+%!   unlink (f);
+%! end_unwind_protect
+
+%!testif ; exist ('__occt__') == 3  # PLY: the mesh of the solid, closed
+%! f = [tempname(), '.ply'];
+%! unwind_protect
+%!   write (solid.box (10, 20, 30), f);
+%!   M = polymesh.read (f);
+%!   assert_equal (isclosed (M), true);
+%!   assert_equal (volume (M), 6000, -1e-12);
+%! unwind_protect_cleanup
+%!   unlink (f);
+%! end_unwind_protect
+
+%!testif ; exist ('__occt__') == 3  # PLY: the triangles in the solid's colour
+%! f = [tempname(), '.ply'];
+%! S = solid.box (10, 20, 30);
+%! S.Colour = [0.2, 0.4, 0.6];
+%! unwind_protect
+%!   write (S, f);
+%!   M = polymesh.read (f);
+%!   assert_equal (M.FaceColour, repmat ([0.2, 0.4, 0.6], 12, 1), 1e-9);
+%! unwind_protect_cleanup
+%!   unlink (f);
+%! end_unwind_protect
+
+%!testif ; exist ('__occt__') == 3 && (! isempty (file_in_path (getenv ('PATH'), 'unzip')) || ! isempty (file_in_path (getenv ('PATH'), 'unzip.exe')))
+%! ## 3MF: the solid's mesh in its colour
+%! f = [tempname(), '.3mf'];
+%! d = tempname ();
+%! S = solid.box (10, 20, 30);
+%! S.Colour = [0.2, 0.4, 0.6];
+%! unwind_protect
+%!   write (S, f);
+%!   unzip (f, d);
+%!   t = fileread (fullfile (d, '3D', '3dmodel.model'));
+%!   assert_equal (numel (strfind (t, '<triangle ')), 12);
+%!   assert_equal (! isempty (strfind (t, 'displaycolor="#336699"')), true);
+%! unwind_protect_cleanup
+%!   unlink (f);
+%!   confirm_recursive_rmdir (false, 'local');
+%!   rmdir (d, 's');
+%! end_unwind_protect
+
+%!error<solid.Shape.write: invalid number of input arguments.> ...
+%! write (solid.Shape ())
+%!error<solid.Shape.write: FILE must be a non-empty character vector.> ...
+%! write (solid.Shape (), '')
+%!error<solid.Shape.write: Name/Value arguments must come in pairs.> ...
+%! write (solid.Shape (), 'a.stl', 'Tolerance')
+%!error<solid.Shape.write: unknown parameter.> ...
+%! write (solid.Shape (), 'a.stl', 'Angle', 5)
+%!error<solid.Shape.write: FILE must end in .step, .stp, .stl, .obj, .ply or .3mf.> ...
+%! write (solid.Shape (), 'a.dxf')
+%!error<solid.Shape.write: Tolerance applies to meshes only.> ...
+%! write (solid.Shape (), 'a.step', 'Tolerance', 0.1)
+%!error<solid.Shape.write: Tolerance must be a positive and finite real scalar.> ...
+%! write (solid.Shape (), 'a.stl', 'Tolerance', 0)
+%!error<solid.Shape.write: folder 'no_such_folder_9f2c' does not exist.> ...
+%! write (solid.Shape (), fullfile ('no_such_folder_9f2c', 'a.stl'))
+%!error<solid.Shape.write: S is empty, so there is nothing to write.> ...
+%! write (solid.Shape (), 'a.stl')
 
 %!testif ; exist ('__occt__') == 3  # Colour: one row colours every solid
 %! B = solid.box (1, 1, 1);

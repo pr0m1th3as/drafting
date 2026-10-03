@@ -117,7 +117,7 @@ endfunction
 %! f = [tempname(), '.step'];
 %! [~, base] = fileparts (f);
 %! unwind_protect
-%!   solid.write (f, solid.box (1, 2, 3));
+%!   write (solid.box (1, 2, 3), f);
 %!   R = model.read (f);
 %!   assert_equal (R.Name, base);
 %!   assert_equal ([numparts(R), numinstances(R)], [1, 1]);
