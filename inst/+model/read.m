@@ -18,7 +18,7 @@
 ## -*- texinfo -*-
 ## @deftypefn {drafting} {@var{A} =} model.read (@var{FILE})
 ##
-## Read an assembly from a STEP file.
+## Read an assembly from a STEP or 3MF file.
 ##
 ## @code{@var{A} = model.read (@var{FILE})} returns the product the STEP file
 ## @var{FILE} holds as a @code{model.Assembly}, in millimetres whatever unit
@@ -30,10 +30,20 @@
 ## a single part gives an assembly placing it once; either is named after
 ## the base name of @var{FILE}.
 ##
-## @code{solid.read} reads the same file as one shape, its parts the solids
-## of it.
+## @code{@var{A} = model.read (@var{FILE})} reads a 3MF file, @file{.3mf},
+## the same way: each object a @code{polymesh.Mesh} part, in the colours
+## of its triangles, each object made of others an assembly of them, and
+## the build an assembly named after @var{FILE}, unless it is one assembly
+## placed as it is.  An object without a name is named after its number,
+## and a name used twice is made distinct.  3MF may place an object scaled
+## or mirrored, which a @code{geom.UCS} cannot: such an object is placed as
+## a copy of it, made so, at the origin, named after it with
+## @qcode{' (placed)'}.
 ##
-## @seealso{model.Assembly, solid.read}
+## @code{solid.read} reads a STEP file as one shape, its parts the solids
+## of it, and @code{polymesh.read} a 3MF file as one mesh.
+##
+## @seealso{model.Assembly, solid.read, polymesh.read}
 ## @end deftypefn
 
 function A = read (FILE)
@@ -46,11 +56,16 @@ function A = read (FILE)
     error ("model.read: FILE must be a non-empty character vector.");
   endif
   [~, base, ext] = fileparts (FILE);
-  if (! any (strcmpi (ext, {'.step', '.stp'})))
-    error ("model.read: FILE must end in .step or .stp.");
+  if (! any (strcmpi (ext, {'.step', '.stp', '.3mf'})))
+    error ("model.read: FILE must end in .step, .stp or .3mf.");
   endif
   if (! isfile (FILE))
     error ("model.read: cannot find file '%s'.", FILE);
+  endif
+  if (strcmpi (ext, '.3mf'))
+    T = __mesh__ ('read3mftree', 'model.read', FILE, base);
+    A = model.Assembly.__from3mf__ (T);
+    return;
   endif
   errmsg = solid.__checkocct__ ();
   if (! isempty (errmsg))
@@ -111,8 +126,97 @@ endfunction
 %!   unlink (f);
 %! end_unwind_protect
 
+## A 3MF package of the model MODEL, zipped, its file NAME of the text TEXT
+## put under the folder D
+%!function zippart (d, name, text)
+%!  folder = fileparts (fullfile (d, name));
+%!  if (! isfolder (folder))
+%!    mkdir (folder);
+%!  endif
+%!  fid = fopen (fullfile (d, name), 'w');
+%!  fputs (fid, text);
+%!  fclose (fid);
+%!endfunction
+%!function f = zip3mf (model)
+%!  d = tempname ();
+%!  mkdir (d);
+%!  rels = ['<?xml version="1.0" encoding="UTF-8"?><Relationships ', ...
+%!          'xmlns="http://schemas.openxmlformats.org/package/2006/', ...
+%!          'relationships"><Relationship Target="/3D/3dmodel.model" ', ...
+%!          'Id="rel0" Type="http://schemas.microsoft.com/', ...
+%!          '3dmanufacturing/2013/01/3dmodel"/></Relationships>'];
+%!  zippart (d, '_rels/.rels', rels);
+%!  zippart (d, '3D/3dmodel.model', model);
+%!  f = [tempname(), '.3mf'];
+%!  zip (f, {'_rels/.rels', '3D/3dmodel.model'}, d);
+%!  confirm_recursive_rmdir (false, 'local');
+%!  rmdir (d, 's');
+%!endfunction
+
+%!test  # 3MF: an assembly of mesh parts comes back as it was written
+%! T = polymesh.Mesh ([0, 0, 0; 1, 0, 0; 0, 1, 0; 0, 0, 1], ...
+%!                    [1, 3, 2; 1, 2, 4; 2, 3, 4; 3, 1, 4]);
+%! A = add (model.Assembly ('pair'), 'tet', T, geom.UCS ());
+%! A = add (A, 'tet', [], geom.UCS ([1, 0, 0], [5, 0, 0]));
+%! f = [tempname(), '.3mf'];
+%! unwind_protect
+%!   write (A, f);
+%!   R = model.read (f);
+%!   assert_equal (R.Name, 'pair');
+%!   assert_equal ({R.Parts.name}, {'tet'});
+%!   assert_equal ({R.Instances.name}, {'tet', 'tet:2'});
+%!   assert_equal (R.Instances(2).placement == A.Instances(2).placement, true);
+%! unwind_protect_cleanup
+%!   unlink (f);
+%! end_unwind_protect
+
+%!testif ; ! isempty (file_in_path (getenv ('PATH'), 'zip')) || ! isempty (file_in_path (getenv ('PATH'), 'zip.exe'))
+%! ## 3MF: a scaled placement becomes a copy of its part, made so
+%! o = ['<object id="1" type="model" name="tet"><mesh><vertices>', ...
+%!      '<vertex x="0" y="0" z="0"/><vertex x="1" y="0" z="0"/>', ...
+%!      '<vertex x="0" y="1" z="0"/><vertex x="0" y="0" z="1"/>', ...
+%!      '</vertices><triangles><triangle v1="0" v2="2" v3="1"/>', ...
+%!      '<triangle v1="0" v2="1" v3="3"/><triangle v1="1" v2="2" v3="3"/>', ...
+%!      '<triangle v1="2" v2="0" v3="3"/></triangles></mesh></object>'];
+%! m = ['<model unit="millimeter" xmlns="http://schemas.microsoft.com/', ...
+%!      '3dmanufacturing/core/2015/02"><resources>', o, '</resources>', ...
+%!      '<build><item objectid="1"/>', ...
+%!      '<item objectid="1" transform="2 0 0 0 2 0 0 0 2 10 0 0"/>', ...
+%!      '</build></model>'];
+%! f = zip3mf (m);
+%! unwind_protect
+%!   [~, base] = fileparts (f);
+%!   R = model.read (f);
+%!   assert_equal (R.Name, base);
+%!   assert_equal ({R.Parts.name}, {'tet', 'tet (placed)'});
+%!   assert_equal (max (R.Parts(2).item.Vertices), [12, 2, 2]);
+%! unwind_protect_cleanup
+%!   unlink (f);
+%! end_unwind_protect
+
+%!testif ; ! isempty (file_in_path (getenv ('PATH'), 'zip')) || ! isempty (file_in_path (getenv ('PATH'), 'zip.exe'))
+%! ## 3MF: objects without names, or with one name, named apart
+%! o = @(id, nm) sprintf (['<object id="%d" type="model"%s><mesh>', ...
+%!                         '<vertices><vertex x="0" y="0" z="0"/>', ...
+%!                         '<vertex x="1" y="0" z="0"/>', ...
+%!                         '<vertex x="0" y="1" z="0"/></vertices>', ...
+%!                         '<triangles><triangle v1="0" v2="1" v3="2"/>', ...
+%!                         '</triangles></mesh></object>'], id, nm);
+%! m = ['<model unit="millimeter" xmlns="http://schemas.microsoft.com/', ...
+%!      '3dmanufacturing/core/2015/02"><resources>', o(3, ''), ...
+%!      o(4, ' name="a"'), o(5, ' name="a"'), '</resources><build>', ...
+%!      '<item objectid="3"/><item objectid="4"/><item objectid="5"/>', ...
+%!      '</build></model>'];
+%! f = zip3mf (m);
+%! unwind_protect
+%!   R = model.read (f);
+%!   assert_equal ({R.Parts.name}, {'object3', 'a', 'a_2'});
+%! unwind_protect_cleanup
+%!   unlink (f);
+%! end_unwind_protect
+
 %!error<model.read: invalid number of input arguments.> model.read ()
 %!error<model.read: FILE must be a non-empty character vector.> model.read (1)
-%!error<model.read: FILE must end in .step or .stp.> model.read ('a.stl')
+%!error<model.read: FILE must end in .step, .stp or .3mf.> model.read ('a.stl')
 %!error<model.read: cannot find file 'no_such_part_7e1a.step'.> ...
 %! model.read ('no_such_part_7e1a.step')

@@ -23,10 +23,10 @@ classdef Assembly
   ##
   ## @code{model.Assembly} holds a product as CAD programs exchange one: a
   ## tree of named parts, each placed in the frame of a @code{geom.UCS}, and
-  ## of assemblies placed the same way.  A part is defined once and placed
-  ## as often as it is used, so the twenty pins of a ring are one part
-  ## placed twenty times, as STEP and 3MF keep them.  Each part keeps the
-  ## colours of its solids.
+  ## of assemblies placed the same way, each part a @code{solid.Shape} or a
+  ## @code{polymesh.Mesh}.  A part is defined once and placed as often as it
+  ## is used, so the twenty pins of a ring are one part placed twenty
+  ## times, as STEP and 3MF keep them.  Each part keeps its colours.
   ##
   ## @example
   ## @group
@@ -128,10 +128,11 @@ classdef Assembly
     ## Place a part in an assembly.
     ##
     ## @code{@var{A} = add (@var{A}, @var{NAME}, @var{X}, @var{U})} places
-    ## @var{X}, a @code{solid.Shape} or a @code{model.Assembly}, as the part
-    ## named @var{NAME}, its own coordinates taken in the frame of the
-    ## @code{geom.UCS} @var{U}.  The frame is a rigid placement: a part
-    ## mirrored is another part, made with @code{solid.Shape.mirror}.
+    ## @var{X}, a @code{solid.Shape}, a @code{polymesh.Mesh} or a
+    ## @code{model.Assembly}, as the part named @var{NAME}, its own
+    ## coordinates taken in the frame of the @code{geom.UCS} @var{U}.  The
+    ## frame is a rigid placement: a part mirrored is another part, made
+    ## with @code{solid.Shape.mirror} or @code{polymesh.Mesh.mirror}.
     ##
     ## The first use of a name defines the part.  A later use places the same
     ## part again, and gives the same @var{X}, or @code{[]} for it; another
@@ -184,12 +185,12 @@ classdef Assembly
           error ("model.Assembly.add: no part named '%s' is defined yet.", ...
                  NAME);
         endif
-      elseif (! ((isa (X, 'solid.Shape') || isa (X, 'model.Assembly')) &&
-                 isscalar (X)))
-        error (strcat ("model.Assembly.add: X must be a solid.Shape or a", ...
-                       " model.Assembly object, or empty."));
+      elseif (! ((isa (X, 'solid.Shape') || isa (X, 'polymesh.Mesh') ||
+                  isa (X, 'model.Assembly')) && isscalar (X)))
+        error (strcat ("model.Assembly.add: X must be a solid.Shape, a", ...
+                       " polymesh.Mesh or a model.Assembly object, or empty."));
       elseif (isempty (k))
-        if (isa (X, 'solid.Shape') && isempty (X))
+        if (! isa (X, 'model.Assembly') && isempty (X))
           error ("model.Assembly.add: the part '%s' is empty.", NAME);
         endif
         this.Parts(end+1) = struct ('name', NAME, 'item', X);
@@ -212,15 +213,21 @@ classdef Assembly
     ## included, each in its part's colour.  The solids are kept apart, not
     ## united, so parts that touch stay separate solids.  This is the shape
     ## to measure, cut, show or tessellate.  The empty assembly gives the
-    ## empty shape.
+    ## empty shape.  An assembly with a mesh among its parts has no exact
+    ## shape and is an error; @code{tessellate} gives it whole as a mesh.
     ##
-    ## @seealso{model.Assembly.write, solid.Shape}
+    ## @seealso{model.Assembly.tessellate, model.Assembly.write, solid.Shape}
     ## @end deftypefn
     function S = shape (this)
 
       S = solid.Shape ();
       if (isempty (this.Instances))
         return;
+      endif
+      name = meshpart (this);
+      if (! isempty (name))
+        error (strcat ("model.Assembly.shape: the part '%s' is a mesh; use", ...
+                       " tessellate for the whole as a mesh."), name);
       endif
       errmsg = solid.__checkocct__ ();
       if (! isempty (errmsg))
@@ -250,6 +257,64 @@ classdef Assembly
     endfunction
 
     ## -*- texinfo -*-
+    ## @deftypefn  {model.Assembly} {@var{M} =} tessellate (@var{A})
+    ## @deftypefnx {model.Assembly} {@var{M} =} tessellate (@var{A}, @var{TOL})
+    ##
+    ## Every part placed, as one triangle mesh.
+    ##
+    ## @code{@var{M} = tessellate (@var{A}, @var{TOL})} returns a
+    ## @code{polymesh.Mesh} of every part where the assembly places it,
+    ## sub-assemblies included: each solid part as
+    ## @code{solid.Shape.tessellate} makes it within @var{TOL} millimetres,
+    ## 0.01 by default, and each mesh part as it is.  The parts keep their
+    ## own vertices, so parts that touch are not joined.  A triangle keeps
+    ## its part's colour, and is grey where its part has none, when any
+    ## part has one.  The empty assembly gives the empty mesh.
+    ##
+    ## @seealso{model.Assembly.shape, solid.Shape.tessellate}
+    ## @end deftypefn
+    function M = tessellate (this, TOL = 0.01)
+
+      ## Input validation
+      errmsg = solid.__checkpos__ (TOL, 'TOL');
+      if (! isempty (errmsg))
+        error ("model.Assembly.tessellate: %s", errmsg);
+      endif
+
+      M = polymesh.Mesh ();
+      n = numel (this.Instances);
+      if (n == 0)
+        return;
+      endif
+      [V, F, C] = deal (cell (n, 1));
+      base = 0;
+      for k = 1:n
+        p = strcmp (this.Instances(k).part, {this.Parts.name});
+        X = this.Parts(p).item;
+        if (! isa (X, 'polymesh.Mesh'))
+          X = tessellate (X, TOL);
+        endif
+        U = this.Instances(k).placement;
+        V{k} = X.Vertices * [U.XAxis; U.YAxis; U.Normal] + U.Origin;
+        F{k} = X.Faces + base;
+        C{k} = X.FaceColour;
+        if (isempty (C{k}))
+          C{k} = NaN (numfaces (X), 3);
+        endif
+        base += numvertices (X);
+      endfor
+      C = vertcat (C{:});
+      if (all (isnan (C(:))))
+        C = [];
+      else
+        bare = isnan (C(:,1));
+        C(bare,:) = repmat ([0.72, 0.74, 0.78], nnz (bare), 1);
+      endif
+      M = polymesh.Mesh (vertcat (V{:}), vertcat (F{:}), 'FaceColour', C);
+
+    endfunction
+
+    ## -*- texinfo -*-
     ## @deftypefn  {model.Assembly} {} show (@var{A})
     ## @deftypefnx {model.Assembly} {@var{V} =} show (@var{A})
     ##
@@ -257,7 +322,8 @@ classdef Assembly
     ##
     ## @code{show (@var{A})} shows @code{shape (@var{A})} in the
     ## @code{model.Viewer} kept for the variable, as
-    ## @code{solid.Shape.show} does, each part in its colour.
+    ## @code{solid.Shape.show} does, each part in its colour, or
+    ## @code{tessellate (@var{A})} when a part is a mesh.
     ## @code{@var{V} = show (@var{A})} also returns the viewer.
     ##
     ## @seealso{model.Viewer, solid.Shape.show}
@@ -265,7 +331,11 @@ classdef Assembly
     function V = show (this)
 
       viewer = model.Viewer.__named__ (inputname (1, false));
-      viewer.Shape = shape (this);
+      if (isempty (meshpart (this)))
+        viewer.Shape = shape (this);
+      else
+        viewer.Shape = tessellate (this);
+      endif
       if (nargout > 0)
         V = viewer;
       endif
@@ -283,10 +353,10 @@ classdef Assembly
     ## @file{.step} or @file{.stp}, keeps its structure: each part once, with
     ## its name and colours, placed by its placements, which carry their
     ## names, and each sub-assembly the same way, so that a CAD program opens
-    ## the product as it was built.  A 3MF file, the archive slicers take,
-    ## keeps the same structure, each part a mesh written once and placed as
-    ## a component, in its colours.  An STL, OBJ or PLY file holds the mesh
-    ## of @code{shape (@var{A})}, as @code{solid.write} writes it.
+    ## the product as it was built; it cannot hold a mesh part.  A 3MF file,
+    ## the archive slicers take, keeps the same structure, each part a mesh
+    ## written once and placed as a component, in its colours.  An STL, OBJ
+    ## or PLY file holds @code{tessellate (@var{A})}.
     ##
     ## @code{write (@dots{}, @qcode{'Tolerance'}, @var{TOL})} sets, for a
     ## mesh, how far its facets may stray from the parts' surfaces, as
@@ -306,21 +376,18 @@ classdef Assembly
       endif
       [~, ~, ext] = fileparts (FILE);
       fmt = lower (ext);
-      if (any (strcmp (fmt, {'.stl', '.obj', '.ply'})))
-        S = shape (this);
-        solid.write (FILE, S, varargin{:});
-        return;
-      endif
-      if (! any (strcmp (fmt, {'.step', '.stp', '.3mf'})))
+      if (! any (strcmp (fmt, {'.step', '.stp', '.3mf', '.stl', '.obj', ...
+                               '.ply'})))
         error (strcat ("model.Assembly.write: FILE must end in .step,", ...
                        " .stp, .3mf, .stl, .obj or .ply."));
       endif
+      isstep = any (strcmp (fmt, {'.step', '.stp'}));
       TOL = 0.01;
       if (nargin == 4)
         if (! ischar (varargin{1}) || ! strcmp (varargin{1}, 'Tolerance'))
           error ("model.Assembly.write: unknown parameter.");
         endif
-        if (! strcmp (fmt, '.3mf'))
+        if (isstep)
           error ("model.Assembly.write: Tolerance applies to meshes only.");
         endif
         TOL = varargin{2};
@@ -332,9 +399,20 @@ classdef Assembly
       if (isempty (this.Instances))
         error ("model.Assembly.write: the assembly places nothing.");
       endif
-      errmsg = solid.__checkocct__ ();
-      if (! isempty (errmsg))
-        error ("model.Assembly.write: %s", errmsg);
+      if (any (strcmp (fmt, {'.stl', '.obj', '.ply'})))
+        write (tessellate (this, TOL), FILE);
+        return;
+      endif
+      if (isstep)
+        name = meshpart (this);
+        if (! isempty (name))
+          error (strcat ("model.Assembly.write: STEP cannot hold the mesh", ...
+                         " part '%s'."), name);
+        endif
+        errmsg = solid.__checkocct__ ();
+        if (! isempty (errmsg))
+          error ("model.Assembly.write: %s", errmsg);
+        endif
       endif
 
       T = struct ('names', {{}}, 'parts', {{}}, 'children', {{}}, ...
@@ -345,7 +423,10 @@ classdef Assembly
         n = numel (T.names);
         [V, F, FC] = deal (cell (1, n));
         for k = find (ispart)
-          M = tessellate (T.parts{k}, TOL);
+          M = T.parts{k};
+          if (! isa (M, 'polymesh.Mesh'))
+            M = tessellate (M, TOL);
+          endif
           [V{k}, F{k}, FC{k}] = deal (M.Vertices, M.Faces, M.FaceColour);
         endfor
         __mesh__ ('write3mf', 'model.Assembly.write', FILE, T.names, V, ...
@@ -442,9 +523,79 @@ classdef Assembly
 
     endfunction
 
+    ## The assembly of the objects model.read gets from a 3MF file, as
+    ## __mesh__ gives them: a mesh object a mesh part, a group of objects an
+    ## assembly, the whole last.  A placement that is not rigid is applied to
+    ## a copy of the part, placed where it is and named after it.
+    function A = __from3mf__ (T)
+
+      n = numel (T{1});
+      D = cell (1, n);
+      for i = 1:n
+        if (isempty (T{5}{i}))
+          D{i} = polymesh.Mesh (T{2}{i}, T{3}{i}, 'FaceColour', T{4}{i});
+          continue;
+        endif
+        A = model.Assembly (T{1}{i});
+        C = T{5}{i};
+        for k = 1:rows (C)
+          X = D{C(k,1)};
+          if (isempty (X))
+            continue;
+          endif
+          name = T{1}{C(k,1)};
+          R = reshape (C(k,2:10), 3, 3)';
+          O = C(k,11:13);
+          if (norm (R * R' - eye (3), Inf) < 1e-9 && det (R) > 0)
+            A = add (A, name, X, geom.UCS (R(3,:), O, O + R(1,:)));
+          else
+            if (isa (X, 'model.Assembly'))
+              X = tessellate (X);
+            endif
+            F = X.Faces;
+            if (det (R) < 0)
+              F = F(:,[1, 3, 2]);
+            endif
+            X = polymesh.Mesh (X.Vertices * R + O, F, ...
+                               'FaceColour', X.FaceColour);
+            used = {A.Parts.name};
+            name = [name, ' (placed)'];
+            m = 1;
+            while (any (strcmp (name, used)))
+              m++;
+              name = sprintf ("%s (placed %d)", T{1}{C(k,1)}, m);
+            endwhile
+            A = add (A, name, X, geom.UCS ());
+          endif
+        endfor
+        D{i} = A;
+      endfor
+      A = D{n};
+
+    endfunction
+
   endmethods
 
 endclassdef
+
+## The name of the first part of A that is a mesh, its own or one of its
+## sub-assemblies', or empty when none is
+function name = meshpart (A)
+
+  name = '';
+  for k = 1:numel (A.Parts)
+    X = A.Parts(k).item;
+    if (isa (X, 'polymesh.Mesh'))
+      name = A.Parts(k).name;
+    elseif (isa (X, 'model.Assembly'))
+      name = meshpart (X);
+    endif
+    if (! isempty (name))
+      return;
+    endif
+  endfor
+
+endfunction
 
 ## True when the parts X and Y are the same: shapes of the same bytes and
 ## colours, or assemblies of the same name, parts and placements
@@ -452,6 +603,10 @@ function TF = same (X, Y)
 
   if (isa (X, 'solid.Shape') && isa (Y, 'solid.Shape'))
     TF = isequal (X.Data, Y.Data) && isequaln (X.Colour, Y.Colour);
+  elseif (isa (X, 'polymesh.Mesh') && isa (Y, 'polymesh.Mesh'))
+    TF = (isequal (X.Vertices, Y.Vertices) && isequal (X.Faces, Y.Faces) &&
+          isequal (X.FaceColour, Y.FaceColour) &&
+          isequal (X.VertexColour, Y.VertexColour));
   elseif (isa (X, 'model.Assembly') && isa (Y, 'model.Assembly'))
     P = [X.Instances.placement];
     Q = [Y.Instances.placement];
@@ -608,6 +763,37 @@ endfunction
 %!   unlink (f);
 %! end_unwind_protect
 
+## A tetrahedron as a mesh, its triangles turned outwards
+%!function M = tetrapart ()
+%!  M = polymesh.Mesh ([0, 0, 0; 1, 0, 0; 0, 1, 0; 0, 0, 1], ...
+%!                     [1, 3, 2; 1, 2, 4; 2, 3, 4; 3, 1, 4]);
+%!endfunction
+
+%!test  # a mesh part placed twice
+%! A = add (model.Assembly (), 'tet', tetrapart (), geom.UCS ());
+%! A = add (A, 'tet', [], geom.UCS ([0, 0, 1], [5, 0, 0]));
+%! assert_equal ([numparts(A), numinstances(A)], [1, 2]);
+
+%!test  # tessellate: mesh parts where their frames put them
+%! A = add (model.Assembly (), 'tet', tetrapart (), ...
+%!          geom.UCS ([1, 0, 0], [5, 0, 0]));
+%! M = tessellate (A);
+%! assert_equal ([min(M.Vertices); max(M.Vertices)], [5, 0, 0; 6, 1, 1], ...
+%!               1e-12);
+
+%!testif ; exist ('__occt__') == 3  # tessellate: solids and meshes, coloured
+%! T = tetrapart ();
+%! T.FaceColour = repmat ([1, 0, 0], 4, 1);
+%! A = add (model.Assembly (), 'tet', T, geom.UCS ([0, 0, 1], [5, 0, 0]));
+%! A = add (A, 'box', solid.box (1, 1, 1), geom.UCS ());
+%! M = tessellate (A);
+%! assert_equal (numfaces (M), 16);
+%! assert_equal (sortrows (unique (M.FaceColour, 'rows')), ...
+%!               [0.72, 0.74, 0.78; 1, 0, 0]);
+
+%!test  # tessellate: the empty assembly
+%! assert_equal (isempty (tessellate (model.Assembly ())), true);
+
 %!error<model.Assembly: NAME must be a non-empty character vector.> ...
 %! model.Assembly ('')
 %!error<model.Assembly.add: invalid number of input arguments.> ...
@@ -616,7 +802,7 @@ endfunction
 %! add (model.Assembly (), 1, solid.Shape (), geom.UCS ())
 %!error<model.Assembly.add: U must be a geom.UCS object.> ...
 %! add (model.Assembly (), 'pin', solid.Shape (), 1)
-%!error<model.Assembly.add: X must be a solid.Shape or a model.Assembly object, or empty.> ...
+%!error<model.Assembly.add: X must be a solid.Shape, a polymesh.Mesh or a model.Assembly object, or empty.> ...
 %! add (model.Assembly (), 'pin', 1, geom.UCS ())
 %!error<model.Assembly.add: the part 'pin' is empty.> ...
 %! add (model.Assembly (), 'pin', solid.Shape (), geom.UCS ())
@@ -647,3 +833,9 @@ endfunction
 %! write (model.Assembly (), 'a.3mf', 'Tolerance', 0)
 %!error<model.Assembly.write: the assembly places nothing.> ...
 %! write (model.Assembly (), 'a.step')
+%!error<model.Assembly.shape: the part 'tet' is a mesh; use tessellate for the whole as a mesh.>
+%! shape (add (model.Assembly (), 'tet', tetrapart (), geom.UCS ()))
+%!error<model.Assembly.write: STEP cannot hold the mesh part 'tet'.>
+%! write (add (model.Assembly (), 'tet', tetrapart (), geom.UCS ()), 'a.step')
+%!error<model.Assembly.tessellate: TOL must be a positive and finite real scalar.> ...
+%! tessellate (model.Assembly (), 0)

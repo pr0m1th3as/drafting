@@ -12,7 +12,7 @@ exchanged as STEP, come through Open CASCADE when the package is built with it.
 Forty-seven public functions across six namespaces plus the `draw.Drawing`,
 `geom.Polyline`, `geom.Spline`, `geom.Region`, `geom.Path`, `geom.UCS`,
 `polymesh.Mesh`, `solid.Shape`, `model.Assembly` and `model.Viewer` classes,
-1828 built-in self-tests and 67 `%!demo` blocks, nearly all of which end in a
+1838 built-in self-tests and 67 `%!demo` blocks, nearly all of which end in a
 `plot` call, so the documentation shows what a function does rather than only
 describing it.
 
@@ -153,12 +153,12 @@ section.UCS = geom.UCS ([0, -1, 0], [0, 0, 0]);  # the xz plane: y is world z
 shaft = solid.revolve (section);                  # turned about z
 ```
 
-A `model.Assembly` places named parts in the frames of `geom.UCS` objects, a
-part defined once however often it is placed, and sub-assemblies the same way.
-`write` saves it to STEP with its structure, names and colours, so a CAD program
-opens the product as it was built, or to 3MF, the archive slicers take, each
-part a mesh written once and placed as often as it is used; and `model.read`
-reads a STEP assembly back:
+A `model.Assembly` places named parts, solids or meshes, in the frames of
+`geom.UCS` objects, a part defined once however often it is placed, and
+sub-assemblies the same way. `write` saves it to STEP with its structure, names
+and colours, so a CAD program opens the product as it was built, or to 3MF, the
+archive slicers take, each part a mesh written once and placed as often as it is
+used; and `model.read` reads either back:
 
 ```
 ring = model.Assembly ('ring');

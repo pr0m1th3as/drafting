@@ -3574,63 +3574,20 @@ placement (const std::map<string, string>& attr,
   return m;
 }
 
-// The mesh of a 3MF file: every item of its build, the components of each
-// resolved and their placements composed, in millimetres.  A triangle takes
-// the colour its property gives, or its object's, from base materials or a
-// colour group; the rest are grey when any triangle has a colour.
-meshread
-read3mf (const string& file, const string& caller)
+// A 3MF package: its files, and its model parts as they are read, each
+// object a mesh or a group of placed objects
+struct package3mf
 {
-  const vector<char> buf = slurp (file, caller, "3MF");
-  const std::function<void ()> bad = [&] ()
-  {
-    error ("%s: FILE is not a readable 3MF file.", caller.c_str ());
-  };
-  const std::map<string, string> files = unzipped (buf, bad);
-  auto part = [&] (string path) -> const string&
-  {
-    if (! path.empty () && path[0] == '/')
-    {
-      path.erase (0, 1);
-    }
-    const auto it = files.find (path);
-    if (it == files.end ())
-    {
-      bad ();
-    }
-    return it->second;
-  };
-
-  // The model part the package's relationships name, else the usual one
-  string root = "3D/3dmodel.model";
-  const auto rels = files.find ("_rels/.rels");
-  if (rels != files.end ())
-  {
-    for (const xmltag& t : xmltags (rels->second))
-    {
-      const auto ty = t.attr.find ("Type");
-      if (t.name == "Relationship" && ty != t.attr.end ()
-          && ty->second.find ("3dmodel") != string::npos
-          && t.attr.count ("Target"))
-      {
-        root = t.attr.at ("Target");
-        break;
-      }
-    }
-  }
-  if (! root.empty () && root[0] == '/')
-  {
-    root.erase (0, 1);
-  }
-
   struct component
   {
     string path;
     int id;
     affine m;
   };
+
   struct object
   {
+    string name;
     bool mesh = false;
     int pid = -1;
     int pindex = 0;
@@ -3640,6 +3597,7 @@ read3mf (const string& file, const string& caller)
     vector<int> tp;
     vector<component> comps;
   };
+
   struct model
   {
     double unit = 1;
@@ -3647,14 +3605,55 @@ read3mf (const string& file, const string& caller)
     std::map<int, vector<std::array<double, 3>>> groups;
     vector<component> items;
   };
+
+  std::function<void ()> bad;
+  std::map<string, string> files;
   std::map<string, model> models;
-  std::function<const model& (const string&)> load;
-  load = [&] (const string& path) -> const model&
+  string root = "3D/3dmodel.model";
+
+  package3mf (const string& file, const string& caller)
   {
+    bad = [caller] ()
+    {
+      error ("%s: FILE is not a readable 3MF file.", caller.c_str ());
+    };
+    files = unzipped (slurp (file, caller, "3MF"), bad);
+    const auto rels = files.find ("_rels/.rels");
+    if (rels != files.end ())
+    {
+      for (const xmltag& t : xmltags (rels->second))
+      {
+        const auto ty = t.attr.find ("Type");
+        if (t.name == "Relationship" && ty != t.attr.end ()
+            && ty->second.find ("3dmodel") != string::npos
+            && t.attr.count ("Target"))
+        {
+          root = bare (t.attr.at ("Target"));
+          break;
+        }
+      }
+    }
+  }
+
+  // PATH without the slash that starts a path from the package's root
+  static string bare (const string& path)
+  {
+    return (! path.empty () && path[0] == '/') ? path.substr (1) : path;
+  }
+
+  // The model part at PATH, read the first time it is asked for
+  const model& load (const string& p)
+  {
+    const string path = bare (p);
     const auto it = models.find (path);
     if (it != models.end ())
     {
       return it->second;
+    }
+    const auto f = files.find (path);
+    if (f == files.end ())
+    {
+      bad ();
     }
     model& m = models[path];
     object *o = nullptr;
@@ -3692,7 +3691,7 @@ read3mf (const string& file, const string& caller)
     static const std::map<string, double> units = {
       {"micron", 0.001}, {"millimeter", 1}, {"centimeter", 10},
       {"inch", 25.4}, {"foot", 304.8}, {"meter", 1000}};
-    for (const xmltag& t : xmltags (part (path)))
+    for (const xmltag& t : xmltags (f->second))
     {
       if (t.close)
       {
@@ -3720,6 +3719,10 @@ read3mf (const string& file, const string& caller)
         o = &m.objects[integer (t, "id", -1)];
         o->pid = integer (t, "pid", -1);
         o->pindex = integer (t, "pindex", 0);
+        if (t.attr.count ("name"))
+        {
+          o->name = t.attr.at ("name");
+        }
       }
       else if (t.name == "basematerials" || t.name == "colorgroup")
       {
@@ -3753,47 +3756,106 @@ read3mf (const string& file, const string& caller)
       else if (t.name == "component" && o)
       {
         const auto pa = t.attr.find ("path");
-        o->comps.push_back ({pa == t.attr.end () ? path : pa->second,
+        o->comps.push_back ({pa == t.attr.end () ? path : bare (pa->second),
                              integer (t, "objectid", -1),
                              placement (t.attr, bad)});
       }
       else if (t.name == "item")
       {
         const auto pa = t.attr.find ("path");
-        m.items.push_back ({pa == t.attr.end () ? path : pa->second,
+        m.items.push_back ({pa == t.attr.end () ? path : bare (pa->second),
                             integer (t, "objectid", -1),
                             placement (t.attr, bad)});
       }
     }
-    return m;
-  };
-
-  meshread out;
-  bool coloured = false;
-  int64_t base = 0;
-  std::function<void (const string&, int, const affine&, int)> place;
-  place = [&] (const string& p, int id, const affine& T, int depth)
-  {
-    string path = p;
-    if (! path.empty () && path[0] == '/')
+    for (const auto& ob : m.objects)
     {
-      path.erase (0, 1);
+      const int nv = ob.second.v.size () / 3;
+      for (int k : ob.second.t)
+      {
+        if (k < 0 || k >= nv)
+        {
+          bad ();
+        }
+      }
     }
-    const model& m = load (path);
-    const auto it = m.objects.find (id);
-    if (it == m.objects.end () || depth > 64)
+    return m;
+  }
+
+  // The object ID of the model part at PATH, and that model
+  const object& find (const string& path, int id, const model *& m)
+  {
+    m = &load (path);
+    const auto it = m->objects.find (id);
+    if (it == m->objects.end ())
     {
       bad ();
     }
-    const object& o = it->second;
-    const int64_t nv = o.v.size () / 3;
-    for (size_t k = 0; k < o.t.size (); k++)
+    return it->second;
+  }
+
+  // The colour of each triangle of the object O of the model M, red, green
+  // and blue for each in turn, NaN where it has none
+  static vector<double> colours (const object& o, const model& m)
+  {
+    vector<double> c;
+    for (size_t k = 0; k < o.tpid.size (); k++)
     {
-      if (o.t[k] < 0 || o.t[k] >= nv)
+      const int pid = (o.tpid[k] >= 0) ? o.tpid[k] : o.pid;
+      const int pi = (o.tpid[k] >= 0 && o.tp[k] >= 0) ? o.tp[k] : o.pindex;
+      std::array<double, 3> rgb = {NAN, NAN, NAN};
+      const auto gr = m.groups.find (pid);
+      if (gr != m.groups.end () && pi >= 0
+          && pi < static_cast<int> (gr->second.size ()))
       {
-        error ("%s: a face of FILE refers to a vertex the file does not "
-               "have.", caller.c_str ());
+        rgb = gr->second[pi];
       }
+      c.insert (c.end (), rgb.begin (), rgb.end ());
+    }
+    return c;
+  }
+};
+
+// C with grey where a triangle has no colour, or nothing when none has one
+void
+greyed (vector<double>& c)
+{
+  bool any = false;
+  for (size_t k = 0; k < c.size (); k += 3)
+  {
+    any = any || ! std::isnan (c[k]);
+  }
+  if (! any)
+  {
+    c.clear ();
+  }
+  for (size_t k = 0; k < c.size (); k += 3)
+  {
+    if (std::isnan (c[k]))
+    {
+      std::copy (grey, grey + 3, c.begin () + k);
+    }
+  }
+}
+
+// The mesh of a 3MF file: every item of its build, the components of each
+// resolved and their placements composed, in millimetres.  A triangle takes
+// the colour its property gives, or its object's, from base materials or a
+// colour group; the rest are grey when any triangle has a colour.
+meshread
+read3mf (const string& file, const string& caller)
+{
+  package3mf pk (file, caller);
+  meshread out;
+  int64_t base = 0;
+  std::function<void (const string&, int, const affine&, int)> place;
+  place = [&] (const string& path, int id, const affine& T, int depth)
+  {
+    const package3mf::model *m;
+    const package3mf::object& o = pk.find (path, id, m);
+    if (depth > 64)
+    {
+      pk.bad ();
     }
     for (size_t k = 0; k < o.t.size () / 3; k++)
     {
@@ -3807,46 +3869,153 @@ read3mf (const string& file, const string& caller)
         }
         out.src.push_back (base + o.t[3 * k + c]);
       }
-      const int pid = (o.tpid[k] >= 0) ? o.tpid[k] : o.pid;
-      const int pi = (o.tpid[k] >= 0 && o.tp[k] >= 0) ? o.tp[k] : o.pindex;
-      std::array<double, 3> c = {NAN, NAN, NAN};
-      const auto gr = m.groups.find (pid);
-      if (gr != m.groups.end () && pi >= 0
-          && pi < static_cast<int> (gr->second.size ()))
-      {
-        c = gr->second[pi];
-        coloured = coloured || ! std::isnan (c[0]);
-      }
-      out.fcol.insert (out.fcol.end (), c.begin (), c.end ());
     }
-    base += nv;
-    for (const component& c : o.comps)
+    const vector<double> c = package3mf::colours (o, *m);
+    out.fcol.insert (out.fcol.end (), c.begin (), c.end ());
+    base += o.v.size () / 3;
+    for (const package3mf::component& k : o.comps)
     {
-      place (c.path, c.id, compose (c.m, T), depth + 1);
+      place (k.path, k.id, compose (k.m, T), depth + 1);
     }
   };
-  const model& top = load (root);
-  for (const component& item : top.items)
+  const package3mf::model& top = pk.load (pk.root);
+  for (const package3mf::component& item : top.items)
   {
     place (item.path, item.id, item.m, 0);
   }
-
-  // Millimetres, and grey where a triangle has no colour of its own
   for (double& x : out.xyz)
   {
     x *= top.unit;
   }
-  if (! coloured)
+  greyed (out.fcol);
+  return out;
+}
+
+// The objects of a 3MF file as definitions, those an object places before
+// it and the whole last: a cell of names, unique, made from the objects'
+// names or else their numbers; of points, N-by-3 in millimetres, empty for
+// a group of placed objects; of triangles, K-by-3 from 1; of the colours of
+// the triangles, empty for none, grey where one has none; and of the
+// placements of a group, a row for each of the index from 1 of the object
+// placed and its 3MF transform, the translation in millimetres.  The build
+// is a group named NAME, unless it is one group placed as it is.
+Cell
+read3mftree (const string& file, const string& name, const string& caller)
+{
+  package3mf pk (file, caller);
+  vector<octave_value> names, vs, fs, fcs, children;
+  std::map<string, int> seen;
+  std::map<string, int> used;
+  auto distinct = [&] (const string& n)
   {
-    out.fcol.clear ();
-  }
-  for (size_t k = 0; k < out.fcol.size (); k += 3)
+    const int k = ++used[n];
+    return (k == 1) ? n : n + "_" + std::to_string (k);
+  };
+  auto rows = [] (const vector<package3mf::component>& comps,
+                  const vector<int>& idx, double unit)
   {
-    if (std::isnan (out.fcol[k]))
+    Matrix C (comps.size (), 13);
+    for (size_t k = 0; k < comps.size (); k++)
     {
-      std::copy (grey, grey + 3, out.fcol.begin () + k);
+      C(k,0) = idx[k] + 1;
+      for (int j = 0; j < 12; j++)
+      {
+        C(k,j+1) = comps[k].m[j] * (j >= 9 ? unit : 1);
+      }
     }
+    return C;
+  };
+  std::function<int (const string&, int, int)> visit;
+  visit = [&] (const string& path, int id, int depth) -> int
+  {
+    const string key = path + "#" + std::to_string (id);
+    const auto it = seen.find (key);
+    if (it != seen.end ())
+    {
+      return it->second;
+    }
+    const package3mf::model *m;
+    const package3mf::object& o = pk.find (path, id, m);
+    if (depth > 64)
+    {
+      pk.bad ();
+    }
+    Matrix V, F, FC, C;
+    if (o.mesh || o.comps.empty ())
+    {
+      const octave_idx_type nv = o.v.size () / 3;
+      const octave_idx_type nt = o.t.size () / 3;
+      V = Matrix (nv, 3);
+      F = Matrix (nt, 3);
+      for (octave_idx_type i = 0; i < nv; i++)
+        for (int j = 0; j < 3; j++)
+        {
+          V(i,j) = o.v[3 * i + j] * m->unit;
+        }
+      for (octave_idx_type i = 0; i < nt; i++)
+        for (int j = 0; j < 3; j++)
+        {
+          F(i,j) = o.t[3 * i + j] + 1;
+        }
+      vector<double> c = package3mf::colours (o, *m);
+      greyed (c);
+      FC = Matrix (c.size () / 3, 3);
+      for (size_t i = 0; i < c.size () / 3; i++)
+        for (int j = 0; j < 3; j++)
+        {
+          FC(i,j) = c[3 * i + j];
+        }
+    }
+    else
+    {
+      vector<int> idx;
+      for (const package3mf::component& k : o.comps)
+      {
+        idx.push_back (visit (k.path, k.id, depth + 1));
+      }
+      C = rows (o.comps, idx, m->unit);
+    }
+    names.push_back (distinct (o.name.empty () ? "object" + std::to_string (id)
+                                             : o.name));
+    vs.push_back (V);
+    fs.push_back (F);
+    fcs.push_back (FC);
+    children.push_back (C);
+    const int k = names.size () - 1;
+    seen[key] = k;
+    return k;
+  };
+  const package3mf::model& top = pk.load (pk.root);
+  vector<int> idx;
+  for (const package3mf::component& item : top.items)
+  {
+    idx.push_back (visit (item.path, item.id, 0));
   }
+  const bool alone = (idx.size () == 1 && top.items[0].m == identity
+                      && children[idx[0]].matrix_value ().rows () > 0);
+  if (! alone)
+  {
+    names.push_back (distinct (name));
+    vs.push_back (Matrix ());
+    fs.push_back (Matrix ());
+    fcs.push_back (Matrix ());
+    children.push_back (rows (top.items, idx, top.unit));
+  }
+  auto tocell = [] (const vector<octave_value>& v)
+  {
+    Cell c (1, v.size ());
+    for (size_t i = 0; i < v.size (); i++)
+    {
+      c(i) = v[i];
+    }
+    return c;
+  };
+  Cell out (1, 5);
+  out(0) = tocell (names);
+  out(1) = tocell (vs);
+  out(2) = tocell (fs);
+  out(3) = tocell (fcs);
+  out(4) = tocell (children);
   return out;
 }
 
@@ -4454,6 +4623,18 @@ Undocumented internal function.\n\
     section (args(2).matrix_value (), args(3).matrix_value (),
              args(4).double_value (), pieces, open);
     return ovl (pieces, open);
+  }
+
+  // T = __mesh__ ('read3mftree', caller, FILE, NAME): the objects of a 3MF
+  // file as definitions, as read3mftree gives them
+  else if (cmd == "read3mftree")
+  {
+    if (args.length () != 4)
+    {
+      print_usage ();
+    }
+    return ovl (read3mftree (args(2).string_value (), args(3).string_value (),
+                             caller));
   }
 
   // __mesh__ ('write3mf', caller, FILE, NAMES, VS, FS, FCS, CHILDREN): the
