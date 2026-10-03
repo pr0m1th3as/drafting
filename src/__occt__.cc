@@ -20,6 +20,7 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <array>
 #include <cmath>
 #include <functional>
+#include <set>
 #include <sstream>
 #include <string>
 #include <unordered_map>
@@ -1209,11 +1210,14 @@ solidsof (const TopoDS_Shape& s)
   return m;
 }
 
-// Where each solid of R came from, a row of indices from 1 into the solids
-// of SOURCES, those of each in turn in the order a map of them gives: the
-// first solid that any face of R's is, or was made by OP from, a face or an
-// edge of; 0 for a solid none of whose faces came from one
-static Matrix
+// The solids each solid of a result came from, as indices from 1 into the
+// solids of the operands, those of each in turn in the order a map of them
+// gives
+typedef vector<std::set<int>> origins;
+
+// Where each solid of R came from: the solids of SOURCES that any of its
+// faces is, or was made by OP from, a face or an edge of
+static origins
 lineage (BRepBuilderAPI_MakeShape& op, const vector<TopoDS_Shape>& sources,
          const TopoDS_Shape& r)
 {
@@ -1256,15 +1260,14 @@ lineage (BRepBuilderAPI_MakeShape& op, const vector<TopoDS_Shape>& sources,
     }
   }
   const TopTools_IndexedMapOfShape rs = solidsof (r);
-  Matrix L (1, rs.Extent (), 0.0);
+  origins L (rs.Extent ());
   for (int i = 1; i <= rs.Extent (); i++)
   {
     for (TopExp_Explorer x (rs (i), TopAbs_FACE); x.More (); x.Next ())
     {
-      if (owner.IsBound (x.Current ())
-          && (L(0,i-1) == 0 || owner (x.Current ()) < L(0,i-1)))
+      if (owner.IsBound (x.Current ()))
       {
-        L(0,i-1) = owner (x.Current ());
+        L[i-1].insert (owner (x.Current ()));
       }
     }
   }
@@ -1272,38 +1275,65 @@ lineage (BRepBuilderAPI_MakeShape& op, const vector<TopoDS_Shape>& sources,
 }
 
 // Where each solid of R came from, as lineage gives it, for an operation
-// that keeps no history: the first solid of S whose box meets the solid's
-static Matrix
+// that keeps no history: the solids of S whose boxes meet the solid's
+static origins
 overlap (const TopoDS_Shape& s, const TopoDS_Shape& r)
 {
   const TopTools_IndexedMapOfShape from = solidsof (s);
   const TopTools_IndexedMapOfShape rs = solidsof (r);
-  Matrix L (1, rs.Extent (), 0.0);
+  origins L (rs.Extent ());
   for (int i = 1; i <= rs.Extent (); i++)
   {
     Bnd_Box b;
     BRepBndLib::Add (rs (i), b);
-    for (int j = 1; j <= from.Extent () && L(0,i-1) == 0; j++)
+    for (int j = 1; j <= from.Extent (); j++)
     {
       Bnd_Box a;
       BRepBndLib::Add (from (j), a);
       if (! a.IsOut (b))
       {
-        L(0,i-1) = j;
+        L[i-1].insert (j);
       }
     }
   }
   return L;
 }
 
-// A shape's bytes and where its solids came from, as the commands that
-// change solids return them
-static Cell
-traced (const TopoDS_Shape& r, const Matrix& L)
+// Each solid of a shape of N solids from the solid of the same number
+static origins
+itself (int n)
 {
+  origins L (n);
+  for (int j = 0; j < n; j++)
+  {
+    L[j].insert (j + 1);
+  }
+  return L;
+}
+
+// A shape's bytes and where its solids came from, as the commands that
+// change solids return them: a row for each solid of the solids it came
+// from, in increasing order, padded with 0
+static Cell
+traced (const TopoDS_Shape& r, const origins& L)
+{
+  size_t k = 0;
+  for (const auto& o : L)
+  {
+    k = std::max (k, o.size ());
+  }
+  Matrix M (L.size (), k, 0.0);
+  for (size_t i = 0; i < L.size (); i++)
+  {
+    size_t j = 0;
+    for (int o : L[i])
+    {
+      M(i,j++) = o;
+    }
+  }
   Cell c (1, 2);
   c(0) = todata (r);
-  c(1) = L;
+  c(1) = M;
   return c;
 }
 
@@ -2025,7 +2055,7 @@ function directly. \n\
         = picked (s, TopAbs_EDGE, args(3).array_value ());
       const double size = args(4).array_value ()(0);
       TopoDS_Shape r;
-      Matrix L;
+      origins L;
       if (cmd == "fillet")
       {
         BRepFilletAPI_MakeFillet op (s);
@@ -2203,12 +2233,8 @@ function directly. \n\
       // Pairwise, each step's lineage carried back to the operands' solids,
       // numbered all in turn: SEEN of them before the shape intersected next
       TopoDS_Shape s = toshape (args(2), caller);
-      Matrix L (1, count (s, TopAbs_SOLID));
-      for (int j = 0; j < L.numel (); j++)
-      {
-        L(j) = j + 1;
-      }
-      int seen = L.numel ();
+      origins L = itself (count (s, TopAbs_SOLID));
+      int seen = L.size ();
       for (int i = 3; i < args.length () && count (s, TopAbs_FACE) > 0; i++)
       {
         const TopoDS_Shape t = toshape (args(i), caller);
@@ -2219,13 +2245,22 @@ function directly. \n\
         op.SetArguments (objects);
         op.SetTools (tools);
         const TopoDS_Shape r = boolean (op, caller, "intersection");
-        const Matrix step = lineage (op, {s, t}, r);
+        const origins step = lineage (op, {s, t}, r);
         const int ns = count (s, TopAbs_SOLID);
-        Matrix next (1, step.numel (), 0.0);
-        for (int j = 0; j < step.numel (); j++)
+        origins next (step.size ());
+        for (size_t j = 0; j < step.size (); j++)
         {
-          const int k = static_cast<int> (step(j));
-          next(j) = (k == 0) ? 0 : (k <= ns) ? L(k - 1) : seen + k - ns;
+          for (int k : step[j])
+          {
+            if (k <= ns)
+            {
+              next[j].insert (L[k-1].begin (), L[k-1].end ());
+            }
+            else
+            {
+              next[j].insert (seen + k - ns);
+            }
+          }
         }
         seen += count (t, TopAbs_SOLID);
         L = next;
@@ -2302,12 +2337,7 @@ function directly. \n\
           bb.Add (c, it.Value ());
         }
       }
-      Matrix L (1, count (c, TopAbs_SOLID));
-      for (int j = 0; j < L.numel (); j++)
-      {
-        L(j) = j + 1;
-      }
-      out = traced (c, L);
+      out = traced (c, itself (count (c, TopAbs_SOLID)));
     }
 
     // The cut through a shape by the plane of a frame, rows origin, x axis,

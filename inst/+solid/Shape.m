@@ -96,7 +96,10 @@ classdef Shape
     ## @code{solid.Shape.numsolids} counts them, a row of @code{NaN} for a
     ## solid without a colour, or empty when none has one.  Assigning a single
     ## row colours every solid.  The viewer shows it, and a STEP file carries
-    ## it out and in.  A transform keeps it.
+    ## it out and in.  A transform keeps it, and each solid a boolean or a
+    ## feature makes takes the colour of the first coloured solid it came
+    ## from, so parts apart keep their own; the tools of @code{subtract} give
+    ## none.
     ##
     ## @end deftp
     Colour = [];
@@ -232,6 +235,7 @@ classdef Shape
         r = occt ('solid.Shape.subtract', 'cut', C.Data, data{:});
         A = C;
         C = solid.Shape (r{1});
+        tools = cellfun (@bare, tools, 'UniformOutput', false);
         C.Colour = inherit (r{2}, A, tools{:});
       endif
 
@@ -1910,18 +1914,30 @@ function C = copies (S, D, A, K, P, caller)
 
 endfunction
 
-## The colours of a result's solids, from the solids they came from: L a row
-## of indices from 1 into the solids of the shapes SRC, those of each in
-## turn, 0 for none
+## The colours of a result's solids, each the colour of the first coloured
+## solid it came from: L a row for each, the indices from 1 of the solids it
+## came from, in increasing order and padded with 0, into the solids of the
+## shapes SRC, those of each in turn
 function C = inherit (L, varargin)
 
   C = [];
-  if (all (cellfun (@(s) isempty (s.Colour), varargin)))
+  if (all (cellfun (@(s) isempty (s.Colour), varargin)) || isempty (L))
     return;
   endif
   P = cellfun (@colours, varargin, 'UniformOutput', false);
   P = [NaN, NaN, NaN; vertcat(P{:})];
-  C = P(L + 1,:);
+  has = reshape (! isnan (P(L + 1,1)), size (L));
+  [found, k] = max (has, [], 2);
+  first = L(sub2ind (size (L), (1:rows (L))', k));
+  first(! found) = 0;
+  C = P(first + 1,:);
+
+endfunction
+
+## S without colours, a tool whose material is taken away
+function S = bare (S)
+
+  S.Colour = [];
 
 endfunction
 
@@ -2596,11 +2612,17 @@ endfunction
 %! B.Colour = [0, 0, 1];
 %! assert_equal (sortrows (union (A, B).Colour), [0, 0, 1; 1, 0, 0]);
 
-%!testif ; exist ('__occt__') == 3  # Colour: an uncoloured first operand
+%!testif ; exist ('__occt__') == 3  # Colour: the first coloured operand's
 %! A = solid.box (10, 10, 10);
 %! B = translate (solid.box (10, 10, 10), [5, 5, 5]);
 %! B.Colour = [0, 0, 1];
-%! assert_equal (union (A, B).Colour, []);
+%! assert_equal (union (A, B).Colour, [0, 0, 1]);
+
+%!testif ; exist ('__occt__') == 3  # Colour: a tool's never colours the part
+%! A = solid.box (10, 10, 10);
+%! B = translate (solid.box (10, 10, 10), [5, 5, 5]);
+%! B.Colour = [0, 0, 1];
+%! assert_equal (subtract (A, B).Colour, []);
 
 %!testif ; exist ('__occt__') == 3  # Colour: subtract keeps the part's
 %! A = solid.box (10, 10, 10);
