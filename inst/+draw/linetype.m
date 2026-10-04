@@ -65,7 +65,7 @@
 ## the right size
 ## @item @code{tikz} @tab the drawing scale @tab cancels the reduction, so
 ## dashes reach the page at nominal size
-## @item @code{dxf.write} @tab 1 @tab written into the file as
+## @item @code{write} @tab 1 @tab written into the file as
 ## @code{$LTSCALE}, so the recipient's CAD does not supply its own
 ## @end multitable
 ##
@@ -82,7 +82,7 @@
 ## DXF line-type table; an unknown name is emitted by name alone, which is
 ## exactly how a CAD file refers to a line type its recipient already has.
 ##
-## @seealso{draw.Drawing, draw.colour, dxf.write}
+## @seealso{draw.Drawing, draw.colour, draw.Drawing.write}
 ## @end deftypefn
 
 function [PATTERN, DESCR] = linetype (varargin)

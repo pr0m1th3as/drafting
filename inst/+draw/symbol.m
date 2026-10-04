@@ -40,10 +40,10 @@
 ##
 ## The three symbols cannot simply be written into the text, because the
 ## backends disagree about how to carry them and none of them takes a bare
-## Unicode character reliably.  The DXF revision this package writes has no
-## encoding declaration at all, so a byte above 127 in a file is at the mercy of
-## whatever the recipient assumes; a LaTeX backend needs a control sequence, not
-## a character; and a figure renders whatever glyph its font happens to hold.
+## Unicode character reliably.  A DXF file carries a character outside ASCII
+## only as a @code{\U+XXXX} escape, which not every reader decodes; a LaTeX
+## backend needs a control sequence, not a character; and a figure renders
+## whatever glyph its font happens to hold.
 ##
 ## These codes are the ones AutoCAD has used for the same purpose since before
 ## any of that was settled, so a DXF file carries them @emph{verbatim} and
@@ -54,7 +54,7 @@
 ## @subheading What each backend does
 ##
 ## @multitable @columnfractions 0.20 0.80
-## @item @code{dxf.write} @tab writes the code unchanged; CAD renders it
+## @item @code{write} @tab writes the code unchanged; CAD renders it
 ## @item @code{tikz} @tab translates to LaTeX needing no extra package
 ## @item @code{plot} @tab substitutes a character the figure font holds
 ## @end multitable
@@ -136,7 +136,7 @@ endfunction
 %! fn = [tempname(), '.dxf'];
 %! unwind_protect
 %!   D = draw.Drawing ().text ([0, 0], [draw.symbol('diameter'), '25'], 3);
-%!   dxf.write (fn, entities (D));
+%!   write (D, fn);
 %!   assert_equal (! isempty (strfind (fileread (fn), '%%c25')), true);
 %! unwind_protect_cleanup
 %!   unlink (fn);

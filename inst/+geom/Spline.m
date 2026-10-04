@@ -531,6 +531,55 @@ classdef Spline
 
     endfunction
 
+
+    ## -*- texinfo -*-
+    ## @deftypefn  {geom.Spline} {} write (@var{SP}, @var{FILE})
+    ## @deftypefnx {geom.Spline} {} write (@var{SP}, @var{FILE}, @var{Name}, @var{Value}, @dots{})
+    ##
+    ## Write a spline to a DXF file.
+    ##
+    ## @code{write (@var{SP}, @var{FILE})} writes the spline @var{SP} to
+    ## @var{FILE}, which must end in @file{.dxf}, as one @code{SPLINE} of an
+    ## ASCII DXF drawing, in world coordinates: its control points, knots and
+    ## weights, and its fit points and end directions where it was drawn
+    ## through points.  The spline's @code{geom.UCS} goes with it as extended
+    ## data under the application @qcode{'DRAFTING'}, so @code{geom.read}
+    ## gives back the spline that was written, frame and fit data included.
+    ##
+    ## Name/Value pairs:
+    ##
+    ## @table @asis
+    ## @item @qcode{'Layer'}
+    ## The layer, @qcode{'0'} by default.
+    ## @item @qcode{'Linetype'}
+    ## One of the line types of @code{draw.linetype}, or any name the
+    ## receiving program holds; @qcode{'CONTINUOUS'} by default.
+    ## @item @qcode{'Colour'}
+    ## An AutoCAD colour index from 1 to 256, 256 meaning the layer's colour,
+    ## which is the default.  True colour came only with R2004.
+    ## @item @qcode{'Version'}
+    ## @qcode{'R2000'} (@code{AC1015}), the default, or @qcode{'R12'}
+    ## (@code{AC1009}) for a program that reads nothing later.  R12 holds
+    ## only lines and arcs, so a spline is an error there.
+    ## @item @qcode{'LTScale'}
+    ## The drawing's line-type scale, 1 by default, written in the header so
+    ## the dashes look the same wherever the file is opened.
+    ## @end table
+    ##
+    ## The drawing units are millimetres.  Several geom objects go in one file
+    ## through @code{geom.write}.
+    ##
+    ## @seealso{geom.read, geom.write, draw.Drawing.write}
+    ## @end deftypefn
+    function write (this, FILE, varargin)
+
+      if (nargin < 2)
+        error ("geom.Spline.write: invalid number of input arguments.");
+      endif
+      __dxf__ ('write', FILE, {this}, varargin, 'geom.Spline.write');
+
+    endfunction
+
   endmethods
 
   methods (Static)
@@ -1124,3 +1173,34 @@ endfunction
 %! geom.Spline.ellipse (1, 2, 'Centre', [0, 0])
 %!error<geom.Spline.ellipse: UCS must be a geom.UCS object.> ...
 %! geom.Spline.ellipse (1, 2, 'UCS', 3)
+
+%!test  # write: geom.read gives back the spline, its fit data and frame
+%! U = geom.UCS ([0, -1, 0], [5, 0, 0]);
+%! SP = geom.Spline ([0, 0; 10, 10; 20, 0; 30, 10], ...
+%!                   'Tangents', [0, 1, 0; NaN, NaN, NaN], 'UCS', U);
+%! fn = [tempname(), '.dxf'];
+%! unwind_protect
+%!   write (SP, fn);
+%!   C = geom.read (fn);
+%!   assert_equal (C{1}.FitPoints, SP.FitPoints, 1e-12);
+%!   assert_equal (C{1}.ControlPoints, SP.ControlPoints, 1e-9);
+%!   assert_equal (C{1}.UCS.Normal, U.Normal, 1e-12);
+%! unwind_protect_cleanup
+%!   unlink (fn);
+%! end_unwind_protect
+%!test  # write: a rational spline keeps its weights
+%! SP = geom.Spline.ellipse (10, 4);
+%! fn = [tempname(), '.dxf'];
+%! unwind_protect
+%!   write (SP, fn);
+%!   C = geom.read (fn);
+%!   assert_equal (C{1}.Weights, SP.Weights, 1e-12);
+%!   assert_equal (C{1}.Knots, SP.Knots, 1e-12);
+%! unwind_protect_cleanup
+%!   unlink (fn);
+%! end_unwind_protect
+
+%!error<geom.Spline.write: invalid number of input arguments.> ...
+%! write (geom.Spline ([0, 0; 1, 1; 2, 0]))
+%!error<geom.Spline.write: R12 holds only lines and arcs, not a spline.> ...
+%! write (geom.Spline ([0, 0; 1, 1; 2, 0]), 'a.dxf', 'Version', 'R12')

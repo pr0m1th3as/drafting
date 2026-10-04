@@ -8,9 +8,8 @@
 %!   a = 2 * pi * (k - 1) / 6;
 %!   D = D.insert ('bore', 30 * [cos(a), sin(a)]);
 %! endfor
-%! [~, ~, BL] = entities (D, 'blocks', 'reference');
-%! printf ('%d entities referring to %d block\n', ...
-%!         numentities (D), numel (BL));
+%! printf ('%d entities, six of them placing the one block\n', ...
+%!         numentities (D));
 %! printf ('%d once expanded\n', numentities (D.expand ()));
 %! plot (D);
 %! title ('a bolt circle from one block definition');

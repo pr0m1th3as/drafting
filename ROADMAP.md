@@ -6,25 +6,18 @@ are indicative. Anything here may be reordered by what turns out to be needed.
 
 ## Where the package stands
 
-Version 0.1.0 is feature-complete for a first release: thirty public
-functions across `+geom`, `+dxf`, `+stl` and `+draw`, the `draw.Drawing` class
-with its three backends, 847 built-in self-tests, and a `%!demo` block on
-nearly every function that ends in a plot, so the documentation shows rather
-than asserts.
-
-The suite asserts the printed artefact and not merely the numbers handed to the
+Version 0.1.0 shipped planar geometry, DXF reading and writing, STL output and
+the `draw.Drawing` class with its plot, TikZ and DXF backends. Its suite
+asserts the printed artefact and not merely the numbers handed to the
 renderer: the page a PDF declares, the size and resolution of a raster sheet,
 that a model length arrives on paper at the stated scale, and that every entity
-type reaches every backend. Writing it found three defects: a raster print that
-carried no sheet, a fit computed against the figure's shape rather than the
-drawing's, and a printed scale that drifted whenever the drawing carried text.
+type reaches every backend.
 
-The file loop is closed in that release. `draw.Drawing.entities` lowers a
-drawing to a flat entity list and `draw.fromentities` raises one back, blocks
-and all, with dimensions returning as dimensions that measure their geometry
-again. A DXF is a round trip rather than a one-way door, which is what makes
-the ordinary workflow (open an existing drawing, add to it, write it back)
-possible at all.
+Version 0.2.0, milestone 1 below, is under way and most of it is built: the
+outline classes of `+geom`, solids through Open CASCADE in `+solid`, meshes in
+`+polymesh`, and assemblies and the viewer in `+model`. What is left before
+its release is the DXF work described under Files, the drawings made by
+another application, and a tarball install test of the compiled code.
 
 The geometry half of the package is strong. The drafting half, the part that
 encodes what a technical drawing *means* rather than what shape it is, is
@@ -43,10 +36,26 @@ are deliberate:
 - The kernel is not ours. Solids are built, combined and read through Open
   CASCADE; the package writes no boolean, fillet or surface-intersection code
   of its own. The booleans and offsets of regions are Open CASCADE's too. The
-  rest of the planar model is plain Octave, and the work on triangle meshes is
-  compiled, needing nothing but Octave.
+  rest of the planar model is plain Octave, and the work on triangle meshes
+  and on DXF files is compiled, needing nothing but Octave.
 
 Everything below is checked against those two lines.
+
+## How the package is layered
+
+`+geom` is the middle layer, and the other namespaces build on it.
+
+- Solids (`+solid`) take and give `+geom` objects: a solid is made from
+  regions and paths (extrude, revolve, sweep, loft, helix), and a section or
+  a projection of it is a set of regions again.
+- Meshes (`+polymesh`) only give them: a cut through a mesh with the plane of
+  a `geom.UCS` is regions, fitted back to lines, arcs and splines.
+- Assemblies (`+model`) hold solids and meshes, each placed by a `geom.UCS`.
+- A drawing (`+draw`) takes `+geom` objects and nothing else that is
+  geometry.
+
+`+geom` depends on none of them, so a solid never depends on the drawing
+model, and the drawing model never depends on Open CASCADE.
 
 ## Polylines and regions
 
@@ -75,22 +84,21 @@ accept plain matrices. Point sets that carry no arcs, such as the input of
   carried into paths. It refuses an outline or a hole that is open, crosses
   or touches itself or encloses no area, a hole not strictly inside the
   outline, and holes that meet. It normalises the outline anticlockwise and
-  the holes clockwise. An island inside a hole is not supported; a second
-  region unioned onto the solid makes one. Assigning its `UCS` moves it,
-  keeping its shape in its own coordinates: a region drawn in the xy plane is
-  laid on a face by giving it the face's UCS. A taper is refused on a region
-  with splines if Open CASCADE cannot offset them faithfully.
+  the holes clockwise. An island inside a hole is a second region, unioned
+  onto the solid made from the first. Assigning its `UCS` moves it, keeping
+  its shape in its own coordinates: a region drawn in the xy plane is laid on
+  a face by giving it the face's UCS. A taper is refused on a region with
+  splines if Open CASCADE cannot offset them faithfully.
 
 A region is what a solid is made from (`solid.extrude`, `revolve`, `sweep`,
-`loft`, `helix`), what a section of a solid is, and what a hatch fills, and the
-polygon booleans of milestone 6 act on regions. A solid is made where its
-region's plane puts it: `extrude` rises along the normal; `revolve` and `helix`
-turn about the plane's own y axis through its origin, local x the radius, so a
-region in the default xy plane turns about the model's y axis; `loft` takes
-each section where its plane lies, sections need not be parallel, and all have
-the same number of holes; `sweep` sweeps the region from where it lies along a
-`geom.Path` (below). A pocket, a recess of limited depth, is an operation on a
-solid, not part of a region.
+`loft`, `helix`), what a section of a solid is, and what a hatch fills. A
+solid is made where its region's plane puts it: `extrude` rises along the
+normal; `revolve` and `helix` turn about the plane's own y axis through its
+origin, local x the radius, so a region in the default xy plane turns about
+the model's y axis; `loft` takes each section where its plane lies, sections
+need not be parallel, and all have the same number of holes; `sweep` sweeps
+the region from where it lies along a `geom.Path` (below). A pocket, a recess
+of limited depth, is an operation on a solid, not part of a region.
 
 `solid.Shape.section` cuts a solid with the plane of a UCS and returns the cut
 as regions in that UCS, one for each separate piece, largest first, exact
@@ -110,7 +118,7 @@ this form.
 - `geom.UCS (NORMAL, ORIGIN, XPOINT)` lays the plane square to the normal
   through the origin, its x axis towards the point, projected onto the plane.
 - `geom.UCS (NORMAL, ORIGIN)` takes the x axis from DXF's arbitrary axis
-  algorithm, so it reads and writes DXF exactly.
+  algorithm, so it matches the frame DXF gives a flat entity.
 - `geom.UCS.threepoint (P1, P2, P3)` is AutoCAD's three-point UCS: origin, +x,
   and a point on the +y side.
 - `geom.UCS (V)` picks one with the mouse in the viewer `V`. Picking lives in
@@ -151,6 +159,118 @@ assembly, one smooth solid with its section carried along, not new shapes.
 A sweep along a spline is what a grip, a curved rib or a cooling channel
 following the shape of a printed mould is made from.
 
+## Solids
+
+**The kernel is Open CASCADE (OCCT), bound and not written.** Booleans on
+curved surfaces, fillets, and the tolerances where faces nearly meet are
+decades of work in OCCT, which CadQuery, build123d and FreeCAD all stand on.
+The package wraps it in compiled functions and writes none of that geometry
+itself. OCCT is LGPL 2.1 with an exception, which GPLv3 code may link, and
+Debian ships it as `libocct-*-dev`.
+
+**OCCT is optional at build time.** Only `+solid`, and the parts of `+geom`
+and `+model` that call it, need it. Where it is not found the package builds
+without it, everything else works as before, and every function that needs it
+raises an error naming the missing library; its BISTs run under a runtime
+condition and skip on such a build. Linux comes first. Windows, which needs a
+MinGW build of OCCT since the MSVC binaries do not link against Octave, and
+macOS follow.
+
+`solid.Shape` is a value class over an OCCT shape. It has primitives (box,
+cylinder, cone, sphere, torus, wedge, ellipsoid), solids from regions
+(extrude, revolve, sweep, loft, helix) and from closed meshes (`polyhedron`),
+the booleans `union`, `subtract` and `intersect`, each taking any number of
+shapes in one operation, features (`fillet`, `chamfer`, `shell`, `hole`
+plain, counterbored, countersunk or at the tapping size of a metric thread,
+and `pocket`), queries (edges and faces selected by type, direction and
+position; volume, area, centre of mass, bounding box; validity), `section` and
+`projection`, and `show` in Open CASCADE's own viewer, run as a process of its
+own so that it turns smoothly and never blocks the prompt.
+
+## Files
+
+Reading is a function in the namespace of what it returns; writing is a method
+of the object written, object first, the format chosen by the file's
+extension.
+
+| Object | Read | Write |
+|---|---|---|
+| `solid.Shape` | `solid.read`: STEP | `write (S, FILE)`: STEP; STL, OBJ, PLY, 3MF through `tessellate` |
+| `polymesh.Mesh` | `polymesh.read`: STL, OBJ, PLY, 3MF | `write (M, FILE)` |
+| `model.Assembly` | `model.read`: STEP, 3MF | `write (A, FILE)`: STEP, 3MF |
+| `geom.Polyline`, `geom.Spline`, `geom.Path`, `geom.Region` | `geom.read`: DXF | `write (G, FILE)`: DXF; `geom.write (C, FILE)` for several |
+| `draw.Drawing` | `draw.read`: DXF | `write (D, FILE)`: DXF; `print` and `tikz` |
+
+**DXF.** Reading and writing are compiled, in `src/__dxf__.cc`, which takes
+the objects themselves and builds them by their constructors, with no entity
+list between. Each `write` method is a call to it, which validates the
+arguments and raises its errors under the method's name. The writer emits
+R2000 (`AC1015`) by default; `'Version', 'R12'` is accepted only for lines
+and arcs, and anything R12 cannot hold is an error naming it.
+
+- A `Polyline` is one `LWPOLYLINE` and a `Spline` one `SPLINE`. A `Path` is
+  its pieces, `LINE`, `ARC` in its own plane and `SPLINE`, bound by a
+  `GROUP`. A `Region` is its loops bound by a `GROUP`; `'Fill', true` adds a
+  `HATCH`, which reads back with its group and never as a second region.
+- Geom objects carry no layer, line type or colour. `'Layer'`, `'Linetype'`
+  and `'Colour'` give them, one value for every object or one per object.
+  Line types are CONTINUOUS, HIDDEN, CENTER, PHANTOM, DASHED, DASHDOT and DOT;
+  a colour is an AutoCAD colour index, 1 to 256, 256 meaning by layer, since
+  true colour came only with R2004.
+- Text is written as R2000 with every character outside ASCII escaped as
+  `\U+XXXX`, so the file reads the same whatever the reader's code page.
+- `geom.write (C, FILE, ...)` writes a cell of geom objects in one pass.
+  There is no append mode: adding to a DXF rewrites its tables, its handles
+  and its objects section.
+- Every geom object carries its `UCS` as extended data under the registered
+  application `DRAFTING`: the origin in group 1011 and the x axis in group
+  1013, and for a path or spline the normal in a second 1013, since a flat
+  entity keeps its normal in group 210. On a group the same block names the
+  class, `geom.Path` or `geom.Region`, in group 1000. `geom.read` restores
+  the `UCS`, for a flat object only when the stored normal matches group 210
+  and the origin lies in the plane. The entities' own coordinates stay
+  authoritative, so a stale frame can never move the geometry.
+- Without that data, any plane is read: a normal of +Z in the world frame, a
+  normal of -Z mirrored into +Z first, as 2-D CAD programs treat it, and any
+  other normal in DXF's own frame. Paths and splines are read in world
+  coordinates.
+- Without `'Type'`, `geom.read` returns what is in the file: a row cell
+  with one geom object per entity, nothing joined and nothing reclassified.
+  `LINE`, `ARC`, `CIRCLE` and `LWPOLYLINE` are polylines, `SPLINE` and
+  `ELLIPSE` splines, a `HATCH` a region; a line slanting in 3-D and a 3-D
+  `POLYLINE` are paths, since no single plane holds them, and meshes and
+  solids in the file are skipped. A group the package wrote is one
+  item, the class its extended data names, so what was written is what is
+  read: a closed path stays a path, the route `solid.sweep` turns into a
+  ring.
+- With `'Type'` (`'path'`, `'polyline'`, `'region'`, `'spline'`) it builds
+  that class and returns one object: `'path'` chains entities end to end
+  (`geom.Path.chain`), `'region'` chains them and nests loops that share a
+  plane (`geom.Region.nest`), and the package's own groups count as built.
+  Ends within 1e-4 mm are joined and snapped to one point, which is above
+  the rounding of coordinates in a file and below anything that can be made.
+  More than one candidate is an error naming the layer, as is finding
+  candidates on several layers with no `'Layer'` given, and finding none:
+  separate parts belong on separate layers.
+- `draw.read` restores everything a drawing holds: dimensions as
+  dimensions, blocks and inserts, text.
+- Entities skipped, or left over under `'Type'`, are reported in one warning
+  per read, counted by type.
+- A `draw.Drawing` holds only flat geom objects lying in z = 0; one facing
+  down is mirrored into +Z. Its `write` writes no frames; its path and
+  region groups carry only their class name, from which `draw.read` gives
+  them back. `write (D, FILE, ...)` takes `'Version'`,
+  `'Dimensions'` (`'associative'`, or `'explode'` for programs that cannot
+  read a `DIMENSION`), `'Blocks'` (`'reference'`, or `'expand'` for programs
+  that ignore `INSERT`) and `'DimScale'`.
+- The reader takes ASCII DXF from R12 (`AC1009`) to R2018 (`AC1032`); a
+  binary DXF is an error. Text before R2007 is decoded from the code page
+  the header names, and from R2007 as UTF-8.
+
+`draw.Drawing.entities` stays as the drawing's own lowering to a flat list of
+primitives, which `plot` and `tikz` draw from; it is hidden, and the DXF path
+does not use it.
+
 ## Milestone 1: an OpenSCAD alternative (0.2.0)
 
 The package is the base for packages like `cycloidal`, and an alternative to
@@ -160,7 +280,7 @@ helices, STEP as well as STL, sections that can be built from again, and a
 real language around it all. What an OpenSCAD user reaches for is therefore
 the measure of this release. Primitives, linear and rotational extrusion
 (twist and scale included), the solid booleans and transforms, the cut
-projection (`section`) and STL in and out are here. These are not:
+projection (`section`) and STL in and out are the base. This release adds:
 
 | OpenSCAD | Here |
 |---|---|
@@ -174,7 +294,7 @@ projection (`section`) and STL in and out are here. These are not:
 | copies in a `for` loop | `copy`, `rectarray` and `polararray` on `solid.Shape` and `geom.Region`, the copies united |
 | an ellipse, an ellipsoid (`scale` of a circle or a sphere) | `geom.Spline.ellipse` and `solid.ellipsoid`, both exact |
 | `color` | one colour for a whole shape, shown in the viewer and carried through STEP out and in |
-| several objects in one file | multipart STEP out and in: named parts and assemblies of placed parts, through Open CASCADE's document framework (XDE) |
+| several objects in one file | multipart STEP and 3MF out and in: named parts and assemblies of placed parts, through Open CASCADE's document framework (XDE) |
 | `import ()` of OBJ | OBJ and PLY meshes read and written, ASCII or binary, made a solid by `solid.polyhedron` |
 | `projection (cut = false)` | the outline of a solid on a plane, which milestone 4's views need as well |
 | `hull ()` of solids | the hull of a solid's points, as a faceted solid |
@@ -183,32 +303,35 @@ projection (`section`) and STL in and out are here. These are not:
 `minkowski`, rounding a shape, is `fillet` and the offsets, and a Minkowski sum
 of exact solids has no counterpart in Open CASCADE.
 
-**The package's own shape.** Three pieces of the drawing side close here.
+**The drawing side.** Three pieces close here.
 
-*A drawing made by another application.* Every DXF the tests read was written
-by this package, and no round trip can reach a path our own output never takes:
-a nested block, the layout containers a real file defines, an aligned dimension.
-One such drawing is in, under `inst/tests/fixtures/`, saved by LibreCAD in every
-version it offers, and it found three defects in its first minute. The rest of
-the idea follows: blocks with nested inserts, the entities R12 cannot store,
-polyline widths and bulges, an inch file, a layer table, each drawn elsewhere,
-checked in with the values it was drawn to, and read by tests that assert them.
+*DXF as described under Files.* It replaces the R12 writer of 0.1.0 and the
+`+dxf` namespace with it: `dxf.read`, `dxf.write` and `draw.fromentities` go,
+and a drawing holds the geom classes (`spline`, `path`, `region`, and `hatch`
+taking a region) where it held matrices.
 
-*DXF dimension types 5 and 6.* Type 5, angular, maps onto `angdim`; type 6,
-ordinate, has no entity in the drawing model yet.
+*A drawing made by another application.* A file this package writes cannot
+reach a path its own output never takes: a nested block, the layout containers
+a real file defines, an aligned dimension. One such drawing is in, under
+`inst/tests/fixtures/`, saved by LibreCAD in every version it offers, and it
+found three defects in its first minute. The rest of the idea follows: blocks
+with nested inserts, polyline widths and bulges, an inch file, a layer table,
+each drawn elsewhere, checked in with the values it was drawn to, and read by
+tests that assert them.
 
-*Units in the model.* `dxf.read` converts an inch file to millimetres and
-`dxf.write` declares millimetres, so nothing is mis-scaled; what is missing is
-working in anything else. A `Units` property on `Drawing`, honoured by `print`
-and `dxf.write`, would let a drawing be authored in inches. It is ergonomic
-rather than a fix, and may slip to a later release.
+*Units in the model.* An inch file is read in millimetres and the writer
+declares millimetres, so nothing is mis-scaled; what is missing is working in
+anything else. A `Units` property on `Drawing`, honoured by `print` and
+`write`, would let a drawing be authored in inches. It is ergonomic rather
+than a fix, and may slip to a later release.
 
-**Meshes.** `polymesh.read` reads STL, OBJ and PLY with their colours, `section`
-cuts a `polymesh.Mesh` with a plane into regions, healed to a tolerance where
-the mesh has gaps, and `geom.Region.fit` turns the cut's facets back into lines,
-arcs and splines, so that a faceted bore becomes a circle again. The viewer
-shows meshes and picks a UCS on them. Reading, welding, cutting and fitting are
-compiled, in a file of their own that needs no Open CASCADE.
+**Meshes.** `polymesh.read` reads STL, OBJ, PLY and 3MF with their colours,
+`section` cuts a `polymesh.Mesh` with a plane into regions, healed to a
+tolerance where the mesh has gaps, and `geom.Region.fit` turns the cut's facets
+back into lines, arcs and splines, so that a faceted bore becomes a circle
+again. The viewer shows meshes and picks a UCS on them. Reading, welding,
+cutting and fitting are compiled, in a file of their own that needs no Open
+CASCADE.
 
 General geometric queries (the distance to a curve, the nearest point on it,
 the smallest enclosing circle or box) wait until a package built on this one
@@ -228,7 +351,7 @@ it changes what the package is. In rough order of value:
 |---|---|
 | Dimensional tolerances | symmetric (`±0.05`), limit dimensions (`25.05/24.95`), and ISO fits (`H7`, `g6`) resolved to real limits from the standard tables |
 | Feature control frames | position, flatness, perpendicularity, concentricity, runout and profile, with datum references and material-condition modifiers |
-| Ordinate and baseline dimensions | datum-referenced running dimensions over a point set, and chain-dimension helpers |
+| Baseline and chain dimensions | datum-referenced running dimensions over a point set, building on `ordinate`, and chain-dimension helpers |
 | Surface finish and welds | Ra/Rz finish symbols, and weld symbols per ISO 2553 |
 | Section and detail marks | cutting planes with view direction, circled detail callouts carrying their own scale |
 | Balloons and parts list | numbered leaders and a bill of materials table |
@@ -248,61 +371,32 @@ its own viewport at its own scale, arranged around a title block.
 A `draw.Sheet` object holding placed, independently scaled viewports over a set
 of `Drawing`s would turn the package's primary human-facing output from a
 figure into a drawing. It is also where the section and detail marks of
-milestone 2 acquire something to point at, and it is the natural home for DXF
-paper-space layouts should the format track below be taken up, so the two
-reinforce each other rather than compete.
+milestone 2 acquire something to point at, and the natural home for DXF
+paper-space layouts, which R2000 can hold, so the two reinforce each other
+rather than compete.
 
 `print` already emits true vector PDF (embedded fonts, no image stream), and
 `Resolution` applies only to the raster formats, as its docstring states. So
 there is nothing to confirm before starting: a sheet composed of viewports will
 print as vector, and the work can be built on that.
 
-## Milestone 4: solids and their drawings (0.5.0)
+## Milestone 4: drawings of solids (0.5.0)
 
 A part is designed as a solid, whether it is printed or machined, and a part
-made on a manual lathe or mill is made from a drawing. This milestone models
-solids in Octave code, writes them as STEP for exchange and STL for printing,
-and draws them on a `draw.Sheet` for the machinist. One script describes a
-part, whatever makes it.
+made on a manual lathe or mill is made from a drawing. The solids are in from
+0.2.0; this milestone draws them on a `draw.Sheet` for the machinist, so one
+script describes a part, whatever makes it.
 
-**The kernel is Open CASCADE (OCCT), bound and not written.** Booleans on
-curved surfaces, fillets, and the tolerances where faces nearly meet are
-decades of work in OCCT, which CadQuery, build123d and FreeCAD all stand on.
-The package wraps it in compiled functions and writes none of that geometry
-itself. OCCT is LGPL 2.1 with an exception, which GPLv3 code may link, and
-Debian ships it as `libocct-*-dev`.
-
-**OCCT is optional at build time.** Only the new `+solid` namespace needs it.
-Where it is not found the package builds without it, everything else works as
-before, and every `+solid` function raises an error naming the missing
-library; its BISTs run under a runtime condition and skip on such a build.
-Linux comes first. Windows, which needs a MinGW build of OCCT since the MSVC
-binaries do not link against Octave, and macOS follow.
-
-`+solid` sits above `+draw`: it builds solids from `+geom` profiles and emits
-drawings through `+draw`, so dependencies still point downward only.
-
-| Piece | Content |
-|---|---|
-| `solid.Shape` | a value class over an OCCT shape, with the booleans `union`, `subtract` and `intersect`, named as MATLAB's `polyshape` names them, each taking any number of shapes in one operation |
-| Primitives | box, cylinder, cone, sphere, torus |
-| From profiles | extrude, revolve, sweep and loft of `+geom` polylines, bulges carried as true arcs |
-| Features | fillet, chamfer, shell; holes plain, counterbored, countersunk and tapped, recorded as holes |
-| Queries | edges and faces selected by type, direction and position; volume, area, centre of mass, bounding box; validity |
-| Files | `solid.read`, STEP; `write`, STEP, and STL, OBJ and PLY through `tessellate` |
-| Viewing | `show` and `model.Viewer`: the solid in Open CASCADE's own viewer, run as a process of its own so that it turns smoothly and never blocks the prompt; redrawn in place when a shape is assigned to it; edges and faces picked with the mouse, reported as indices and as the query that finds them again |
-| Drawings | views, sections and details laid out on a `draw.Sheet` |
-
-**Drawings.** OCCT projects a solid with hidden lines removed and every edge
-exact, and each edge becomes a `Drawing` entity: lines, arcs, circles and
-ellipses as themselves, a B-spline as a sampled polyline until milestone 5 adds
-the spline entity. Visible edges are drawn continuous and thick, hidden ones
-dashed and thin, per ISO 128. The seam edge of a cylinder or cone is never
+**Views.** OCCT projects a solid with hidden lines removed and every edge
+exact; `projection` and `section` return the result as `+geom` objects, which
+a drawing takes as they are: lines, arcs and circles as polylines, ellipses
+and B-splines as splines. Visible edges are drawn continuous and thick, hidden
+ones dashed and thin, per ISO 128. The seam edge of a cylinder or cone is never
 drawn, and an edge between tangent faces is drawn thin or omitted, never as an
-outline. A section is OCCT's planar cut, hatched. A section through a part with
-a hole is a region with an island, so `geom.hatchlines` and `Drawing.hatch`
-learn to fill a boundary with holes, by an even-odd scan that needs none of
-milestone 6's booleans.
+outline. A section is OCCT's planar cut, a set of regions, hatched; a section
+through a part with a bore is a region with a hole, and `hatch` fills a region
+with its holes left clear, by an even-odd scan that needs none of milestone
+6's booleans.
 
 Annotation that follows from the geometry is generated, not placed by hand:
 
@@ -322,14 +416,9 @@ line, diameters taken from the profile and lengths from a face; a milled part
 carries ordinate dimensions from its datum corner. A solid read from a STEP
 file records no intent, so it gets the geometric annotation only.
 
-**Order.** The first step is a spike that decides the rest: an oct-file linked
-against OCCT builds a box less a cylinder, writes it as STEP and STL, and
-reports its volume. Then the shape class, primitives, booleans and files; then
-profiles and features; then `show` and the checks. None of these needs
-milestones 1 to 3, so they may start before them. Drawings need milestone 3's
-sheet, with a viewport that can be clipped to a circle for a detail view.
-Dimensions from intent need milestone 2's tolerances and fits, ordinate
-dimensions, and section and detail marks.
+**Order.** Views need milestone 3's sheet, with a viewport that can be clipped
+to a circle for a detail view. Dimensions from intent need milestone 2's
+tolerances and fits, and its section and detail marks.
 
 **Verifying it.** Every solid a test builds is checked by OCCT's validity check
 and by its exact volume, area and bounding box against values worked out by
@@ -341,40 +430,29 @@ failures as exceptions, and every wrapper turns them into Octave errors; some
 bad input crashes it instead, so input is validated before it reaches the
 library.
 
-## Milestone 5: analytic curves (0.6.0)
+## Milestone 5: exact curve operations (0.6.0)
 
-Every curve in the package is a sampled polyline. `curvature`, `curvesample`,
-`curveoffset`, `resample`, `simplify` and `arclength` all take points and
-return points. There is no Bézier, no B-spline, no NURBS.
+Curves are exact objects from 0.2.0: `geom.Spline` carries NURBS, `geom.Path`
+arcs and splines in 3-D. The planar curve functions are not yet: `curvature`,
+`curvesample`, `curveoffset`, `resample`, `simplify` and `arclength` take points
+and return points, so a profile handed to them is frozen into points and can no
+longer be recovered.
 
-This is the largest structural gap in the geometry half, and its consequences
-compound. A profile that is analytic in origin is frozen into points when it is
-authored and can never be recovered: there is no exact tangency at a join, no
-re-sampling at a different resolution further down the pipeline, no `SPLINE` on
-export, and offsetting accumulates discretisation error instead of being
-computed on the true curve. Downstream engineering packages that generate
-smooth profiles pay this cost on every part they draw.
+The work carries those operations onto the exact form, with the sampled
+versions kept and unchanged:
 
-The work is a curve representation carried as a first-class entity:
-
-- `geom.bezier`, `geom.bspline`: evaluation, derivatives, arc length
-- `geom.splinefit`: interpolation through, and approximation of, a point set
 - `geom.splitcurve`, `geom.curveintersect`: subdivision and curve/curve meets
-- `draw.Drawing.spline`: the entity, lowered by `entities` for every backend
-- exact `curveoffset` and `fillet` on the analytic form, with the sampled
-  versions kept and unchanged
-
-Note the ordering consequence for the format track below: hatching is *not* the
-reason to leave DXF R12, because `geom.hatchlines` already emits hatch as line
-segments and R12 carries those. A spline has no R12 representation at all.
-This milestone is what makes the format work worth doing.
+  on polylines, splines and paths
+- curvature and arc length evaluated on the curve rather than on samples
+- exact `curveoffset` and `fillet` on splines, where Open CASCADE's offsets
+  of regions do not already cover them
 
 ## Milestone 6: polygon booleans without Open CASCADE (0.7.0)
 
 Union, intersection and difference of regions come through Open CASCADE from
 0.2.0, exact for arcs and splines. What remains is the same on plain N-by-2
-polygons for a build without Open CASCADE, for hatch boundaries with islands
-and clearance checks there.
+polygons for a build without Open CASCADE, for hatch boundaries and clearance
+checks there.
 
 It should be entered with clear eyes. Vatti, Greiner-Hormann and
 Martínez-Rueda each fail on degeneracies rather than on the general case:
@@ -383,14 +461,15 @@ at a point without crossing. Making them robust is the actual project, and it
 needs either exact predicates or a tolerance policy chosen up front, so nothing
 else is scheduled to depend on it.
 
-## Milestone 7: profiles to solids (0.8.0)
+## Milestone 7: profiles to meshes (0.8.0)
 
-A closed planar profile to a triangle mesh, entirely inside the package:
+A closed planar profile to a triangle mesh, entirely inside the package, for a
+build without Open CASCADE:
 
 - `geom.extrude`: profile plus depth, with holes carried through as inner
   loops and the caps triangulated by the existing `geom.triangulate`
 - `geom.revolve`: profile about an axis, with a partial-sweep option
-- `geom.sweep`: profile along a path, once milestone 5 makes the path exact
+- `geom.sweep`: profile along a `geom.Path`
 
 This completes a pipeline the package already half owns: geometry to profile to
 mesh to file through `polymesh.Mesh`. Extrude and revolve are markedly easier
@@ -399,44 +478,14 @@ produce a part rather than only describe one.
 
 ## Format track: runs alongside, blocks nothing
 
-Two output formats are worth adding, on their own schedule.
-
 **SVG backend.** The cheapest reach per line in the package. No dependency,
-exact affine control, and it consumes the same lowered entity list that
-`plot`, `tikz` and `dxf.write` already take, so it is a fourth consumer rather
-than a new architecture. It serves documentation, the web, and everyone without
-a CAD program.
+exact affine control, and it draws from the same lowered list that `plot` and
+`tikz` take, so it is a third consumer rather than a new architecture. It
+serves documentation, the web, and everyone without a CAD program.
 
-**DXF R2000 (`AC1015`).** `dxf.write` emits R12 (`AC1009`), which is the most
-widely accepted flavour there is and was the right first choice. Moving up has
-a fixed structural cost that buys nothing visible on its own, and there is no
-cheaper intermediate: R12 is the only version without entity handles, so R13
-and R14 cost the same as R2000 and offer less. The entry fee:
-
-| Piece | Work |
-|---|---|
-| Handles and ownership | a hex handle allocator, `$HANDSEED`, and a correct `330` owner pointer on every entity, table record and block |
-| Subclass markers | `AcDbEntity` in `putcommon`, then per-type markers; `ARC` needs two and `DIMENSION` needs two of which the second depends on the dimension kind |
-| Tables | `VPORT`, `STYLE`, `APPID`, `VIEW`, `UCS` and `BLOCK_RECORD` in addition to the present `LTYPE`, `LAYER` and `DIMSTYLE` |
-| Blocks and objects | `*Model_Space` and `*Paper_Space` definitions, plus a root dictionary with the layout, group, mline-style and plot-style entries |
-| Header | roughly twenty variables where R12 needed three |
-
-Call it four to six hundred lines in `dxf.write` and a few focused sessions,
-almost all of it mechanical. Two things make it cheaper than it looks:
-`putpair` is a genuine chokepoint through which every byte passes, and
-`dxf.read` is already version-agnostic: it splits on group `0`, dispatches on
-the type name, and looks up fields by code, so handles, subclass markers and
-owner pointers are ignored for free.
-
-Take it up when milestone 5 gives it a reason. When it is taken up, add it as
-`dxf.write (FILE, E, 'Version', 'R2000')` with R12 remaining the default, and
-factor the header, tables and objects into per-version emitters, so R12 stays
-under test and the new scaffolding can be validated before any new entity type
-depends on it.
-
-**Verifying the format work.** `ezdxf` is the right development-time oracle:
-it covers R12 through R2018 both ways, its auditor checks precisely what is
-easy to get wrong here (handle uniqueness, owner-pointer validity, dangling
+**Verifying the DXF work.** `ezdxf` is the right development-time oracle: it
+covers R12 through R2018 both ways, its auditor checks precisely what is easy
+to get wrong in R2000 (handle uniqueness, owner-pointer validity, dangling
 table references), and it can write files for the reader to be tested against.
 Two cautions. Its ordinary loader silently repairs what it reads, so anything
 inspected after a plain load may be its corrected version rather than what was
@@ -454,7 +503,8 @@ handled. The package's test suite remains `pkg test` and nothing else.
 |---|---|
 | G-code and CAM | a different discipline with a different failure mode; belongs to a package that consumes this one |
 | DWG | proprietary and undocumented; the only routes are a closed converter or an experimental writer |
-| A solid-modelling kernel of our own | decades of work that Open CASCADE already holds; milestone 4 binds it instead |
+| Solids in DXF (`3DSOLID`) | the geometry is ACIS, proprietary and unreadable by Open CASCADE; solids are exchanged as STEP, and reach DXF as drawings |
+| A solid-modelling kernel of our own | decades of work that Open CASCADE already holds; the package binds it instead |
 | Parametric constraint solving | genuinely valuable and genuinely a research project: degree-of-freedom analysis, conditioning, and useful diagnostics for under- and over-constrained sketches. Its own package if ever |
 
 ## Standing requirements
@@ -470,7 +520,7 @@ These apply to every milestone and are not restated in them.
 - A `%!demo` block that ends in a plot, rendered and looked at. A demo that
   runs is not a demo that reads. No test can tell the two apart, so this is
   enforced by eye alone, which is why it is written down here.
-- Anything new that a backend must draw is added to `draw.Drawing.entities`
-  first, and then to *every* backend. A backend that silently ignores an
-  entity type produces a plausible and incomplete figure, which is worse than
-  an error.
+- Anything new a drawing holds is added to its lowering and to *every*
+  backend, the DXF writer included. A backend that silently ignores an entity
+  type produces a plausible and incomplete figure, which is worse than an
+  error.

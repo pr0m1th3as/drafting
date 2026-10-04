@@ -9,28 +9,32 @@ CAD program or a CNC machine will accept, as a solid for a slicer, as LaTeX for
 a report, or as a figure on screen. Solids proper, built, combined and
 exchanged as STEP, come through Open CASCADE when the package is built with it.
 
-Forty-seven public functions across six namespaces plus the `draw.Drawing`,
+Forty-six public functions across five namespaces plus the `draw.Drawing`,
 `geom.Polyline`, `geom.Spline`, `geom.Region`, `geom.Path`, `geom.UCS`,
 `polymesh.Mesh`, `solid.Shape`, `model.Assembly` and `model.Viewer` classes,
-1884 built-in self-tests and 67 `%!demo` blocks, nearly all of which end in a
+1976 built-in self-tests and 58 `%!demo` blocks, nearly all of which end in a
 `plot` call, so the documentation shows what a function does rather than only
 describing it.
 
 ## Layout
 
 ```
-inst/+geom      planar geometry (no file formats, no drawing semantics)
-inst/+dxf       AutoCAD R12 (AC1009) ASCII DXF, both directions
-inst/+polymesh  STL, OBJ and PLY meshes read, written and cut
-inst/+draw      format-agnostic drawing model, and the backends that render it
-inst/+solid     solids through Open CASCADE, STEP and STL
+inst/+geom      outlines, curves and planar geometry, read and written as DXF
+inst/+polymesh  STL, OBJ, PLY and 3MF meshes read, written and cut
+inst/+draw      the drawing model, its backends, and drawings as DXF
+inst/+solid     solids through Open CASCADE, STEP, and meshes for a slicer
+inst/+model     assemblies of solids and meshes, and the viewer
 inst/tests      classdef .m-tst suites
-src             compiled code: meshes, and the interface to Open CASCADE
+src             compiled code: meshes, DXF, and the interface to Open CASCADE
 ```
 
-Dependencies point downward only: `+draw` builds on `+geom` and emits through
-`+dxf`; `+geom`, `+dxf` and `+polymesh` know nothing of drawings. `+solid`
-builds on `+geom` and on Open CASCADE.
+`+geom` is the middle layer, and the other namespaces build on it. Solids take
+and give `+geom` objects: a solid is made from regions and paths, and a section
+or a projection of it is a set of regions again. Meshes give them: a cut
+through a mesh is regions. Assemblies hold solids and meshes, each placed by a
+`geom.UCS`. A drawing takes `+geom` objects and nothing else that is geometry.
+`+geom` depends on none of them, so a solid never depends on the drawing model,
+and the drawing model never depends on Open CASCADE.
 
 `+geom` covers primitives (signed area, bounding box, centroid, affine
 transform, offset, largest inscribed rectangle, triangulation), curve geometry
@@ -38,37 +42,35 @@ transform, offset, largest inscribed rectangle, triangulation), curve geometry
 construction geometry (line and circle intersections, tangent points, fillets).
 Polylines can be resampled or simplified.
 
-Outlines and curves are value classes. A `geom.Polyline` is a DXF polyline,
-open or closed: vertices `[x, y, bulge]` in a plane of its own, an origin, an x
-axis and a normal, the xy plane unless told otherwise, so a sketch can be laid
-on any face. A `geom.Spline` is a NURBS curve, drawn through points or given
-by its control points, knots and weights, open or closed, an exact ellipse
-among them. A `geom.Region` is a
-closed area, one outline with holes of any shape in it, straight segments, arcs
-and splines, checked to be valid; it is what a solid is made from. A
-`geom.Path` is a route in 3-D of straight segments, arcs and splines, along
-which a region is swept; its corners are rounded into bends with `fillet`.
-Regions combine with `union`, `subtract` and `intersect` and grow or shrink
-with `offset`, round, sharp or chamfered at the corners: OpenSCAD's 2-D
-operations, with arcs exact, computed by Open CASCADE. `hull` wraps regions
-and points as OpenSCAD's `hull` does, its lines truly tangent to the arcs, so
-two circles make a lever and four a rounded plate. `geom.text` gives the
-outlines of text in any installed font as regions, to extrude, engrave or
-emboss. A region is resized, evenly or stretched, mirrored in a line, and
-copied, in rows and columns or round a point, the copies united. Functions take the
-classes; only their constructors take plain matrices.
+Outlines and curves are value classes. A `geom.Polyline` is a DXF polyline, open
+or closed: vertices `[x, y, bulge]` in a plane of its own, an origin, an x axis
+and a normal, the xy plane unless told otherwise, so a sketch can be laid on any
+face. A `geom.Spline` is a NURBS curve, drawn through points or given by its
+control points, knots and weights, open or closed, an exact ellipse among them.
+A `geom.Region` is a closed area, one outline with holes of any shape in it,
+straight segments, arcs and splines, checked to be valid; it is what a solid is
+made from. A `geom.Path` is a route in 3-D of straight segments, arcs and
+splines, along which a region is swept; its corners are rounded into bends with
+`fillet`. Regions combine with `union`, `subtract` and `intersect` and grow or
+shrink with `offset`, round, sharp or chamfered at the corners: OpenSCAD's 2-D
+operations, with arcs exact, computed by Open CASCADE. `hull` wraps regions and
+points as OpenSCAD's `hull` does, its lines truly tangent to the arcs, so two
+circles make a lever and four a rounded plate. `geom.text` gives the outlines of
+text in any installed font as regions, to extrude, engrave or emboss. A region
+is resized, evenly or stretched, mirrored in a line, and copied, in rows and
+columns or round a point, the copies united. Functions take the classes; only
+their constructors take plain matrices.
 
 `draw.Drawing` is a value class carrying lines, polylines with per-vertex
-bulges, arcs, circles, ellipses, text, hatches, blocks and inserts, and a full
-set of dimension entities (linear, diameter, radius, angular and ordinate, plus
-centre marks and leaders) on named layers with line types and colours. Drawings
-compose: `transform` places one, `merge` assembles several into a sheet, and
-`draw.titleblock` frames it.
+bulges, arcs, circles, ellipses, splines, paths and regions, text, hatches over
+regions, blocks and inserts, and a full set of dimension entities (linear,
+diameter, radius, angular and ordinate, plus centre marks and leaders) on named
+layers with line types and colours. Drawings compose: `transform` places one,
+`merge` assembles several into a sheet, and `draw.titleblock` frames it.
 
-## One lowering, three backends
+## Three outputs and DXF in both directions
 
-`entities` lowers a `Drawing` into a flat entity list, and every backend
-consumes that list rather than walking the drawing itself:
+A drawing goes to the screen, into a report or to a CAD program:
 
 ```
 D = draw.Drawing ('plate');
@@ -81,34 +83,46 @@ D.Layer = 'DIMENSIONS';
 D = D.dim ([-40, -40], [40, -40], -12, 'horizontal');
 D = D.diam ([0, 0], 25);
 
-plot (D);                                # on screen
-dxf.write ('plate.dxf', entities (D));   # to CAD
-tex = tikz (D);                          # into a report
+plot (D);                     # on screen
+tex = tikz (D);               # into a report
+write (D, 'plate.dxf');       # to CAD
 ```
 
-The figure therefore shows the entities the file will contain rather than a
-more flattering rendering of them. This is not a stylistic preference: before
-the backends were unified, `draw.tikz` rendered from the drawing model directly
-and silently ignored five entity types it had never been taught, producing a
-plausible but incomplete figure.
+`plot` and `tikz` draw from one lowering of the drawing into lines, arcs and
+text, so the figure and the report show the same thing, dimension ornaments
+and hatch fills included. `write` writes each entity as itself: a polyline with
+its bulges, an ellipse, a spline, a hatch over its region, a dimension a CAD
+program measures again, a block once however often it is placed. Line-type dash
+lengths follow one rule everywhere, model units times a scale factor as CAD's
+`LTSCALE` does, and `write` states `$LTSCALE` in the file, so its dashes do not
+depend on the recipient's setting.
 
-Line-type dash lengths follow one rule everywhere: model units times a scale
-factor, as CAD's `LTSCALE` does. `dxf.write` states `$LTSCALE` in the
-header, so a written file's dashes no longer depend on the recipient's setting.
+`draw.read` reads a DXF file back into a `Drawing`. Dimensions come back as
+dimensions and measure their geometry again, blocks come back with their
+inserts, and hatches over their regions, so a DXF is a round trip rather than a
+one-way door, and a drawing another program wrote can be edited and written
+again.
 
-`draw.fromentities` is the inverse of `entities`: it raises an entity list read
-from a file, with its block definitions, back into a `Drawing`. Dimensions come
-back as dimensions and measure their geometry again, so a DXF is a round trip
-rather than a one-way door.
+The geom objects have files of their own. `write` on a `geom.Polyline`,
+`geom.Spline`, `geom.Path` or `geom.Region` writes it to DXF, and `geom.write`
+writes several to one file; each keeps its `geom.UCS`, so `geom.read` gives back
+what was written. A file from anywhere else is read one geom object per entity,
+in any plane, and `'Type'` builds one object from it, chaining lines and arcs
+into a path or nesting closed loops into a region, ready to extrude:
+
+```
+R = geom.read ('profile.dxf', 'Type', 'region', 'Layer', 'PROFILE');
+S = solid.extrude (R, 10);
+```
 
 `polymesh.read` reads an STL, OBJ, PLY or 3MF file, binary or ASCII, into a
 `polymesh.Mesh`, with the colours of its vertices or faces where the file has
 them, cutting faces of more than three corners into triangles and welding the
-corners an STL file repeats. Its `write` saves a mesh to any of the three, OBJ
-and PLY exactly, and its `section` cuts it with the plane of a `geom.UCS` into
-`geom.Region` objects, as `solid.Shape.section` cuts a solid, healing small gaps
-in the mesh to a tolerance and returning what will not close; the regions build
-solids like any others. `fit` on a region turns the cut's facets back into
+corners an STL file repeats. Its `write` saves a mesh to any of the four, OBJ,
+PLY and 3MF exactly, and its `section` cuts it with the plane of a `geom.UCS`
+into `geom.Region` objects, as `solid.Shape.section` cuts a solid, healing small
+gaps in the mesh to a tolerance and returning what will not close; the regions
+build solids like any others. `fit` on a region turns the cut's facets back into
 lines, arcs and splines within a tolerance, absolute or relative, so a faceted
 bore is a circle again and a filleted corner an arc. All of them are compiled
 and need nothing but Octave:
@@ -206,18 +220,17 @@ every `solid` function raises an error saying so.
 
 All geometry is in millimetres.
 
-## Why R12 rather than a later DXF revision
+## DXF R2000
 
-R12 needs no entity handles, no object dictionary and no class table, so the
-files are small, readable and accepted essentially everywhere. The costs are
-known and bounded: R12 has no `SPLINE` and no `LWPOLYLINE`, so polylines are
-written as `POLYLINE` with a vertex list, which is what a manufacturing
-toolpath wants in any case; it has no `ELLIPSE`, so an ellipse is sampled to a
-closed polyline, and `draw.entities` records that as a loss; and it has no
-`HATCH`, so a hatch is generated as explicit fill lines, which loses nothing:
-the recipient sees the section hatched.
-
-Nothing outside `dxf.write` depends on the choice.
+DXF is read and written by compiled code that needs nothing but Octave. Files
+are written as R2000 (`AC1015`), which holds what the package draws as itself:
+`LWPOLYLINE` with its bulges, `SPLINE`, `ELLIPSE`, `HATCH`, groups that bind a
+path's pieces or a region's loops, and the extended data that keeps a geom
+object's frame. `'Version', 'R12'` writes R12 (`AC1009`) for a program that
+reads nothing later, where the geometry is lines and arcs. Files from R12 to
+R2018 are read, text in the code page a file names or in UTF-8, and text
+outside ASCII is written as `\U+XXXX`, so it reads the same whatever the
+recipient's code page.
 
 ## Documentation
 
@@ -290,7 +303,7 @@ macOS are not yet.
 After installation, type:
 - `pkg load drafting` to load the **drafting** package.
 - `news drafting` to review all the user visible changes since last version.
-- `pkg test drafting` to run a test suite for all 50 functions and class
+- `pkg test drafting` to run a test suite for all 56 functions and class
   definitions currently available and ensure that they work properly on your
   system.
 

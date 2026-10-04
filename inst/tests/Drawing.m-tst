@@ -31,7 +31,7 @@
 %! assert_equal (fieldnames (D.Entities), {'type'; 'layer'; 'linetype'; ...
 %!               'colour'; 'pts'; 'closed'; 'radius'; 'angles'; 'angle'; ...
 %!               'text'; 'height'; 'offset'; 'direction'; 'pattern'; ...
-%!               'spacing'; 'block'; 'scale'; 'bulge'});
+%!               'spacing'; 'block'; 'scale'; 'bulge'; 'shape'});
 %!error<draw.Drawing: NAME must be a non-empty character vector.> ...
 %! draw.Drawing (42)
 %!error<draw.Drawing: NAME must be a non-empty character vector.> ...
@@ -102,6 +102,78 @@
 %! draw.Drawing ().polyline (geom.Polyline ([0, 0; 1, 1], 'UCS', ...
 %!                                         geom.UCS ([0, 0, 1], [0, 0, 5])))
 
+%!function R = __tiltedregion__ ()
+%!  ## A region lying in a vertical plane, which no drawing can hold
+%!  R = geom.Region ([0, 0; 10, 0; 10, 5; 0, 5]);
+%!  R.UCS = geom.UCS ([1, 0, 0], [0, 0, 0]);
+%!endfunction
+
+%!test  # a spline is kept as the curve it is, on the current layer
+%! SP = geom.Spline ([0, 0; 20, 15; 45, 10; 60, 30]);
+%! D = draw.Drawing ();
+%! D.Layer = 'CURVES';
+%! D = D.spline (SP);
+%! assert_equal (D.Entities(1).type, 'spline');
+%! assert_equal (D.Entities(1).layer, 'CURVES');
+%! assert_equal (D.Entities(1).shape.ControlPoints, SP.ControlPoints);
+%! assert_equal (D.Entities(1).pts, []);
+%! assert_equal (D.Entities(1).closed, false);
+%!test  # a closed spline is closed
+%! SP = geom.Spline ([0, 0; 20, 0; 10, 15], 'Closed', true);
+%! assert_equal (draw.Drawing ().spline (SP).Entities(1).closed, true);
+%!test  # a spline in a frame facing down keeps its curve in the drawing's
+%! SP = geom.Spline ([0, 0; 20, 15; 45, 10]);
+%! SP.UCS = geom.UCS ([0, 0, -1], [5, 0, 0]);
+%! S = draw.Drawing ().spline (SP).Entities(1).shape;
+%! assert_equal (S.UCS == geom.UCS (), true);
+%! assert_equal (S.FitPoints, [5, 0, 0; -15, 15, 0; -40, 10, 0], 1e-12);
+%!error<draw.Drawing.spline: invalid number of input arguments.> ...
+%! draw.Drawing ().spline ()
+%!error<draw.Drawing.spline: SP must be a geom.Spline object.> ...
+%! draw.Drawing ().spline ([0, 0; 1, 1; 2, 0])
+%!error<draw.Drawing.spline: SP must lie in the xy plane.> ...
+%! draw.Drawing ().spline (geom.Spline ([0, 0, 0; 10, 0, 5; 20, 0, 0]))
+
+%!test  # a path keeps its segments, arcs and splines
+%! P = join (geom.Path ([0, 0; 20, 0]), geom.Spline ([20, 0; 35, 10; 50, 5]));
+%! D = draw.Drawing ().path (P);
+%! assert_equal (D.Entities(1).type, 'path');
+%! assert_equal (D.Entities(1).shape.Vertices, P.Vertices);
+%! assert_equal (sum (! cellfun (@isempty, D.Entities(1).shape.Splines)), 1);
+%! assert_equal (D.Entities(1).closed, false);
+%!test  # a path in its own frame is carried into the drawing's
+%! P = geom.Path ([0, 0; 10, 0]);
+%! P.UCS = geom.UCS ([0, 0, 1], [3, 4, 0]);
+%! S = draw.Drawing ().path (P).Entities(1).shape;
+%! assert_equal (S.UCS == geom.UCS (), true);
+%! assert_equal (S.Vertices, [3, 4, 0; 13, 4, 0], 1e-12);
+%!error<draw.Drawing.path: invalid number of input arguments.> ...
+%! draw.Drawing ().path ()
+%!error<draw.Drawing.path: P must be a geom.Path object.> ...
+%! draw.Drawing ().path (geom.Polyline ([0, 0; 1, 1]))
+%!error<draw.Drawing.path: P must lie in the xy plane.> ...
+%! draw.Drawing ().path (geom.Path ([0, 0, 0; 10, 0, 0; 10, 0, 10]))
+
+%!test  # a region keeps its outline and holes
+%! R = geom.Region ([0, 0; 60, 0; 60, 40; 0, 40], {[20, 20, 1; 40, 20, 1]});
+%! D = draw.Drawing ().region (R);
+%! assert_equal (D.Entities(1).type, 'region');
+%! assert_equal (numel (D.Entities(1).shape.Holes), 1);
+%! assert_equal (D.Entities(1).closed, true);
+%! assert_equal (D.Entities(1).pattern, '');
+%!test  # a region in a frame facing down is kept in the drawing's frame
+%! R = geom.Region ([0, 0; 10, 0; 10, 5; 0, 5]);
+%! R.UCS = geom.UCS ([0, 0, -1], [20, 0, 0]);
+%! D = draw.Drawing ().region (R);
+%! assert_equal (D.Entities(1).shape.UCS == geom.UCS (), true);
+%! assert_equal (bbox (D), [10, 0, 20, 5], 1e-12);
+%!error<draw.Drawing.region: invalid number of input arguments.> ...
+%! draw.Drawing ().region ()
+%!error<draw.Drawing.region: R must be a geom.Region object.> ...
+%! draw.Drawing ().region ([0, 0; 1, 0; 1, 1])
+%!error<draw.Drawing.region: R must lie in the xy plane.> ...
+%! draw.Drawing ().region (__tiltedregion__ ())
+
 %!test  # arc keeps its centre, radius and both angles
 %! D = draw.Drawing ().arc ([10, 20], 5, 30, 120);
 %! assert_equal (D.Entities(1).type, 'arc');
@@ -158,29 +230,47 @@
 %! draw.Drawing ().text ([0, 0], 'A', 2.5, NaN)
 
 %!test  # hatch defaults to ANSI31 at 2.5 mm and is always closed
-%! P = [0, 0; 10, 0; 10, 10];
-%! D = draw.Drawing ().hatch (P);
+%! R = geom.Region ([0, 0; 10, 0; 10, 10]);
+%! D = draw.Drawing ().hatch (R);
 %! assert_equal (D.Entities(1).type, 'hatch');
-%! assert_equal (D.Entities(1).pts, P);
+%! assert_equal (D.Entities(1).shape.Outline.Vertices, R.Outline.Vertices);
+%! assert_equal (D.Entities(1).pts, []);
 %! assert_equal (D.Entities(1).closed, true);
 %! assert_equal (D.Entities(1).pattern, 'ANSI31');
 %! assert_equal (D.Entities(1).angle, 0);
 %! assert_equal (D.Entities(1).spacing, 2.5);
 %!test  # pattern, angle and spacing override the defaults
-%! D = draw.Drawing ().hatch ([0, 0; 1, 0; 1, 1], 'ANSI37', 45, 4);
+%! D = draw.Drawing ().hatch (geom.Region ([0, 0; 1, 0; 1, 1]), 'ANSI37', ...
+%!                            45, 4);
 %! assert_equal (D.Entities(1).pattern, 'ANSI37');
 %! assert_equal (D.Entities(1).angle, 45);
 %! assert_equal (D.Entities(1).spacing, 4);
+%!test  # the holes of the region are kept
+%! R = geom.Region ([0, 0; 60, 0; 60, 40; 0, 40], {[20, 20, 1; 40, 20, 1]});
+%! D = draw.Drawing ().hatch (R);
+%! assert_equal (numel (D.Entities(1).shape.Holes), 1);
+%!test  # a region in a frame facing down is kept in the drawing's frame
+%! R = geom.Region ([0, 0; 10, 0; 10, 5; 0, 5]);
+%! R.UCS = geom.UCS ([0, 0, -1], [20, 0, 0]);
+%! D = draw.Drawing ().hatch (R);
+%! assert_equal (D.Entities(1).shape.UCS == geom.UCS (), true);
+%! assert_equal (bbox (D), [10, 0, 20, 5], 1e-12);
 %!error<draw.Drawing.hatch: invalid number of input arguments.> ...
 %! draw.Drawing ().hatch ()
 %!error<draw.Drawing.hatch: ANGLE and SPACING must be given together.> ...
-%! draw.Drawing ().hatch ([0, 0; 1, 0; 1, 1], 'ANSI31', 45)
-%!error<draw.Drawing.hatch: P must contain at least 3 vertices.> ...
-%! draw.Drawing ().hatch ([0, 0; 1, 1])
+%! draw.Drawing ().hatch (geom.Region ([0, 0; 1, 0; 1, 1]), 'ANSI31', 45)
+%!error<draw.Drawing.hatch: R must be a geom.Region; make one from a polygon with geom.Region \(P\).> ...
+%! draw.Drawing ().hatch ([0, 0; 1, 0; 1, 1])
+%!error<draw.Drawing.hatch: R must be a geom.Region object.> ...
+%! draw.Drawing ().hatch (geom.Polyline ([0, 0; 1, 0; 1, 1], 'Closed', true))
 %!error<draw.Drawing.hatch: PATTERN must be a non-empty character vector.> ...
-%! draw.Drawing ().hatch ([0, 0; 1, 0; 1, 1], '')
+%! draw.Drawing ().hatch (geom.Region ([0, 0; 1, 0; 1, 1]), '')
+%!error<draw.Drawing.hatch: ANGLE must be a real finite scalar.> ...
+%! draw.Drawing ().hatch (geom.Region ([0, 0; 1, 0; 1, 1]), 'ANSI31', NaN, 1)
 %!error<draw.Drawing.hatch: SPACING must be a real positive finite scalar.> ...
-%! draw.Drawing ().hatch ([0, 0; 1, 0; 1, 1], 'ANSI31', 0, -1)
+%! draw.Drawing ().hatch (geom.Region ([0, 0; 1, 0; 1, 1]), 'ANSI31', 0, -1)
+%!error<draw.Drawing.hatch: R must lie in the xy plane.> ...
+%! draw.Drawing ().hatch (__tiltedregion__ ())
 
 %!test  # a dimension is aligned and unlabelled by default
 %! D = draw.Drawing ().dim ([0, 0], [100, 0], -20);
@@ -224,7 +314,7 @@
 
 %!test  # numentities counts every type alike
 %! D = draw.Drawing ().line ([0, 0], [1, 1]).circle ([0, 0], 1);
-%! D = D.text ([0, 0], 'A').hatch ([0, 0; 1, 0; 1, 1]);
+%! D = D.text ([0, 0], 'A').hatch (geom.Region ([0, 0; 1, 0; 1, 1]));
 %! assert_equal (D.numentities (), 4);
 
 %!test  # an empty drawing has no extent
@@ -260,15 +350,26 @@
 %!test  # the extent spans every entity in the drawing
 %! D = draw.Drawing ().line ([-50, -50], [0, 0]).circle ([100, 100], 25);
 %! assert_equal (D.bbox (), [-50, -50, 125, 125], 1e-9);
+%!test  # a path counts the true extent of its arcs
+%! P = geom.Path (geom.Polyline ([0, 0, 1; 20, 0, 0]));
+%! assert_equal (draw.Drawing ().path (P).bbox (), [0, -10, 20, 0], 1e-12);
+%!test  # a region counts its outline
+%! R = geom.Region ([0, 0; 60, 0; 60, 40; 0, 40], {[20, 20, 1; 40, 20, 1]});
+%! assert_equal (draw.Drawing ().region (R).bbox (), [0, 0, 60, 40], 1e-12);
+%!test  # a spline counts the curve, which stays inside its control polygon
+%! D = draw.Drawing ().spline (geom.Spline ([0, 0; 20, 15; 45, 10]));
+%! B = D.bbox ();
+%! assert_equal (B([1, 3]), [0, 45], 1e-12);
+%! assert_equal (B(4) >= 15, true);
 
 %!test  # a mixed drawing keeps one uniform field set across every entity
 %! D = draw.Drawing ('mixed');
 %! D = D.line ([0, 0], [1, 0]).polyline (geom.Polyline ([0, 0; 1, 1; 2, 0], ...
 %!                                                      'Closed', true));
 %! D = D.arc ([0, 0], 1, 0, 90).circle ([0, 0], 2).text ([0, 0], 'A');
-%! D = D.hatch ([0, 0; 1, 0; 1, 1]).dim ([0, 0], [1, 0], 5);
+%! D = D.hatch (geom.Region ([0, 0; 1, 0; 1, 1])).dim ([0, 0], [1, 0], 5);
 %! assert_equal (numel (D.Entities), 7);
-%! assert_equal (numel (fieldnames (D.Entities)), 18);
+%! assert_equal (numel (fieldnames (D.Entities)), 19);
 %! assert_equal ({D.Entities.type}, {'line', 'polyline', 'arc', 'circle', ...
 %!                                   'text', 'hatch', 'dim'});
 
@@ -326,9 +427,26 @@
 %! assert_equal (T2.Entities(1).height, 10, 1e-12);
 
 %!test  # a hatch rotates its pattern and scales its spacing
-%! D = draw.Drawing ().hatch ([0, 0; 10, 0; 10, 10], 'ANSI31', 0, 2);
+%! R = geom.Region ([0, 0; 10, 0; 10, 10]);
+%! D = draw.Drawing ().hatch (R, 'ANSI31', 0, 2);
 %! T = D.transform ('scale', 3);
 %! assert_equal (T.Entities(1).spacing, 6, 1e-12);
+%! assert_equal (bbox (T), [0, 0, 30, 30], 1e-12);
+%!test  # a spline moves as the curve it is
+%! D = draw.Drawing ().spline (geom.Spline ([0, 0; 20, 15; 45, 10]));
+%! T = D.transform ('translate', [10, 5]);
+%! assert_equal (T.Entities(1).shape.FitPoints, ...
+%!               [10, 5, 0; 30, 20, 0; 55, 15, 0], 1e-12);
+%!test  # a path keeps its arcs through a rotation
+%! P = geom.Path (geom.Polyline ([0, 0, 1; 20, 0, 0]));
+%! T = draw.Drawing ().path (P).transform ('rotate', 90);
+%! assert_equal (bbox (T), [0, 0, 10, 20], 1e-12);
+%! assert_equal (isnan (T.Entities(1).shape.Midpoints(1,1)), false);
+%!test  # a mirrored region is still a region, its outline anticlockwise
+%! R = geom.Region ([0, 0; 10, 0; 10, 5; 0, 5], {[2, 2; 4, 2; 4, 3; 2, 3]});
+%! T = draw.Drawing ().region (R).transform ('mirror', 'y');
+%! assert_equal (bbox (T), [-10, 0, 0, 5], 1e-12);
+%! assert_equal (__area__ (T.Entities(1).shape.Outline) > 0, true);
 
 %!test  # an arc rotates its angles
 %! T = draw.Drawing ().arc ([0, 0], 10, 30, 120).transform ('rotate', 45);
@@ -425,6 +543,12 @@
 %! draw.Drawing ().transform ()
 %!error<draw.Drawing.transform: entity 1 is a circle and the scaling is not uniform; the result would be an ellipse.> ...
 %! draw.Drawing ().circle ([0, 0], 5).transform ('scale', [2, 1])
+%!error<draw.Drawing.transform: entity 1 is a spline and the scaling is not uniform.> ...
+%! D = draw.Drawing ().spline (geom.Spline ([0, 0; 20, 15; 45, 10]));
+%! D.transform ('scale', [2, 1])
+%!error<draw.Drawing.transform: entity 1 is a hatch and the scaling is not uniform.> ...
+%! D = draw.Drawing ().hatch (geom.Region ([0, 0; 10, 0; 10, 10]));
+%! D.transform ('scale', [2, 1])
 %!error<draw.Drawing.transform: entity 1 is a 'horizontal' dimension and the transformation would leave it off its axis; make it 'aligned' first.> ...
 %! D = draw.Drawing ().dim ([0, 0], [50, 0], -10, 'horizontal');
 %! D.transform ('rotate', 30)
@@ -670,7 +794,7 @@
 %! unwind_protect
 %!   D = draw.Drawing ().diam ([0, 0], 12.5);
 %!   D = D.angdim ([50, 0], [60, 0], [50, 10], 5);
-%!   dxf.write (fn, entities (D, 'dimensions', 'explode'));
+%!   write (D, fn, 'Dimensions', 'explode');
 %!   txt = fileread (fn);
 %!   assert_equal (! isempty (strfind (txt, '%%c25')), true);
 %!   assert_equal (! isempty (strfind (txt, '90%%d')), true);
@@ -999,7 +1123,7 @@
 %! f = figure ('visible', 'off');
 %! unwind_protect
 %!   ax = axes ('parent', f);
-%!   D = draw.Drawing ().hatch ([0, 0; 20, 0; 20, 20; 0, 20]);
+%!   D = draw.Drawing ().hatch (geom.Region ([0, 0; 20, 0; 20, 20; 0, 20]));
 %!   nfill = numel (plot (D, 'Axes', ax));
 %!   nline = numel (plot (D, 'Axes', ax, 'Hatch', 'boundary'));
 %!   assert_equal (nline, 1);
@@ -1179,7 +1303,7 @@
 %! assert_equal (E(1).layer, 'outline');
 %! assert_equal (E(1).closed, true);
 
-%!test  # the result has exactly the fields dxf.write expects
+%!test  # the result has exactly the fields of the lowering
 %! E = entities (draw.Drawing ().line ([0, 0], [1, 1]), ...
 %!     'dimensions', 'explode');
 %! assert_equal (fieldnames (E), {'type'; 'layer'; 'linetype'; 'colour'; ...
@@ -1308,7 +1432,7 @@
 %! assert_equal (all (isfinite ([E(1).pts(:); E(2).pts(:)])), true);
 
 %!test  # a hatch keeps its boundary and gains the fill as explicit lines
-%! D = draw.Drawing ().hatch ([0, 0; 10, 0; 10, 10]);
+%! D = draw.Drawing ().hatch (geom.Region ([0, 0; 10, 0; 10, 10]));
 %! [E, LOST] = entities (D, 'dimensions', 'explode');
 %! assert_equal (E(1).type, 'POLYLINE');
 %! assert_equal (E(1).closed, true);
@@ -1317,7 +1441,7 @@
 %! assert_equal (isempty (LOST), true);
 
 %!test  # asking for the boundary alone gives what it used to
-%! D = draw.Drawing ().hatch ([0, 0; 10, 0; 10, 10]);
+%! D = draw.Drawing ().hatch (geom.Region ([0, 0; 10, 0; 10, 10]));
 %! [E, LOST] = entities (D, 'hatch', 'boundary', 'dimensions', 'explode');
 %! assert_equal (numel (E), 1);
 %! assert_equal (E(1).type, 'POLYLINE');
@@ -1329,17 +1453,57 @@
 %! D = draw.Drawing ();
 %! D.Layer = 'SECTION';
 %! D.Colour = 'blue';
-%! E = entities (D.hatch ([0, 0; 10, 0; 10, 10]), 'dimensions', 'explode');
+%! E = entities (D.hatch (geom.Region ([0, 0; 10, 0; 10, 10])), ...
+%!               'dimensions', 'explode');
 %! assert_equal (all (strcmp ({E.layer}, 'SECTION')), true);
 %! assert_equal (all ([E.colour] == 5), true);
 
 %!test  # spacing given to the hatch reaches the generated lines
 %! D = draw.Drawing ();
 %! P = [0, 0; 20, 0; 20, 20; 0, 20];
-%! Ewide = entities (D.hatch (P, 'ANSI31', 0, 4), 'dimensions', 'explode');
-%! Efine = entities (D.hatch (P, 'ANSI31', 0, 1), 'dimensions', 'explode');
+%! Ewide = entities (D.hatch (geom.Region (P), 'ANSI31', 0, 4), ...
+%!                   'dimensions', 'explode');
+%! Efine = entities (D.hatch (geom.Region (P), 'ANSI31', 0, 1), ...
+%!                   'dimensions', 'explode');
 %! assert_equal (numel (Efine) > numel (Ewide), true);
 
+%!test  # the fill lines of a hatch stay clear of its holes
+%! R = geom.Region ([0, 0; 60, 0; 60, 40; 0, 40], {[20, 20, 1; 40, 20, 1]});
+%! E = entities (draw.Drawing ().hatch (R));
+%! L = E(strcmp ({E.type}, 'LINE'));
+%! M = cell2mat (arrayfun (@(e) mean (e.pts, 1), L, 'UniformOutput', false)');
+%! assert_equal (any (hypot (M(:,1) - 30, M(:,2) - 20) < 10 - 1e-9), false);
+%!test  # a hatch with a hole draws both loops
+%! R = geom.Region ([0, 0; 60, 0; 60, 40; 0, 40], {[20, 20, 1; 40, 20, 1]});
+%! E = entities (draw.Drawing ().hatch (R), 'hatch', 'boundary');
+%! assert_equal ({E.type}, {'POLYLINE', 'POLYLINE'});
+%! assert_equal ([E.closed], [true, true]);
+%!test  # a spline lowers to one polyline from its start to its end
+%! E = entities (draw.Drawing ().spline (geom.Spline ([0, 0; 20, 15; 45, 10])));
+%! assert_equal (numel (E), 1);
+%! assert_equal (E.type, 'POLYLINE');
+%! assert_equal (E.pts([1, end],:), [0, 0; 45, 10], 1e-12);
+%!test  # a closed spline lowers to a closed polyline without a repeated point
+%! SP = geom.Spline ([0, 0; 20, 0; 10, 15], 'Closed', true);
+%! E = entities (draw.Drawing ().spline (SP));
+%! assert_equal (E.closed, true);
+%! assert_equal (isequal (E.pts(1,:), E.pts(end,:)), false);
+%!test  # a path of lines and arcs keeps its arcs as bulges
+%! P = geom.Path (geom.Polyline ([0, 0, 1; 20, 0, 0; 20, 10, 0]));
+%! E = entities (draw.Drawing ().path (P));
+%! assert_equal (E.pts, [0, 0; 20, 0; 20, 10], 1e-12);
+%! assert_equal (E.bulge, [1; 0; 0], 1e-12);
+%!test  # a path with a spline lowers to points along it
+%! P = join (geom.Path ([0, 0; 20, 0]), geom.Spline ([20, 0; 35, 10; 50, 5]));
+%! E = entities (draw.Drawing ().path (P));
+%! assert_equal (E.bulge, []);
+%! assert_equal (E.pts([1, end],:), [0, 0; 50, 5], 1e-12);
+%!test  # a region lowers to one closed polyline per loop
+%! R = geom.Region ([0, 0; 60, 0; 60, 40; 0, 40], {[20, 20, 1; 40, 20, 1]});
+%! E = entities (draw.Drawing ().region (R));
+%! assert_equal ({E.type}, {'POLYLINE', 'POLYLINE'});
+%! assert_equal ([E.closed], [true, true]);
+%! assert_equal (E(2).bulge, [-1; -1], 1e-12);   # a hole runs clockwise
 %!error<draw.Drawing.entities: Hatch must be 'lines' or 'boundary'.> ...
 %! entities (draw.Drawing (), 'hatch', 'fill', 'dimensions', 'explode')
 
@@ -1354,14 +1518,14 @@
 %! assert_equal (isempty (L9), true);
 
 %!test  # asking for LOST silences the warning, omitting it does not
-%! D = draw.Drawing ().hatch ([0, 0; 10, 0; 10, 10]);
+%! D = draw.Drawing ().hatch (geom.Region ([0, 0; 10, 0; 10, 10]));
 %! lastwarn ('');
 %! [E, LOST] = entities (D, 'hatch', 'boundary', 'dimensions', 'explode');
 %! assert_equal (lastwarn (), '');
 %! E = entities (D, 'hatch', 'boundary', 'dimensions', 'explode');
 %! assert_equal (isempty (lastwarn ()), false);
 
-%!test  # a lowered drawing survives a DXF round trip
+%!test  # a drawing survives a DXF round trip
 %! fn = [tempname(), '.dxf'];
 %! unwind_protect
 %!   D = draw.Drawing ('rt');
@@ -1370,13 +1534,13 @@
 %!                                  'Closed', true));
 %!   D.Layer = 'inner';
 %!   D = D.line ([100, 100], [1500, 100]).circle ([800, 900], 50);
-%!   dxf.write (fn, entities (D, 'dimensions', 'explode'));
-%!   R = dxf.read (fn);
-%!   assert_equal (numel (R), 3);
-%!   assert_equal ({R.type}, {'POLYLINE', 'LINE', 'CIRCLE'});
-%!   assert_equal (R(1).pts, [0, 0; 1600, 0; 1600, 1800; 0, 1800], 1e-6);
-%!   assert_equal (R(1).closed, true);
-%!   assert_equal (R(3).radius, 50, 1e-6);
+%!   write (D, fn);
+%!   R = draw.read (fn);
+%!   assert_equal ({R.Entities.type}, {'polyline', 'line', 'circle'});
+%!   assert_equal (R.Entities(1).pts, [0, 0; 1600, 0; 1600, 1800; 0, 1800], ...
+%!                 1e-12);
+%!   assert_equal (R.Entities(1).closed, true);
+%!   assert_equal (R.Entities(3).radius, 50, 1e-12);
 %! unwind_protect_cleanup
 %!   unlink (fn);
 %! end_unwind_protect
@@ -1516,7 +1680,7 @@
 %!       # generates, the same ones the DXF file carries.  The native TikZ
 %!       # pattern this replaced stroked no boundary at all and ignored the
 %!       # angle and spacing the hatch was given.
-%! S = tikz (draw.Drawing ().hatch ([0, 0; 10, 0; 10, 10]));
+%! S = tikz (draw.Drawing ().hatch (geom.Region ([0, 0; 10, 0; 10, 10])));
 %! assert_equal (! isempty (strfind (S, '-- cycle;')), true);
 %! assert_equal (numel (strfind (S, '\draw')) > 3, true);
 %! assert_equal (isempty (strfind (S, 'pattern=')), true);
@@ -1634,14 +1798,14 @@
 %!test  # the spacing given to a hatch reaches the page, which the native
 %!       # pattern it replaced could not carry
 %! P = [0, 0; 40, 0; 40, 40; 0, 40];
-%! Swide = tikz (draw.Drawing ().hatch (P, 'ANSI31', 0, 8));
-%! Sfine = tikz (draw.Drawing ().hatch (P, 'ANSI31', 0, 2));
+%! Swide = tikz (draw.Drawing ().hatch (geom.Region (P), 'ANSI31', 0, 8));
+%! Sfine = tikz (draw.Drawing ().hatch (geom.Region (P), 'ANSI31', 0, 2));
 %! assert_equal (numel (strfind (Sfine, '\draw')) ...
 %!               > numel (strfind (Swide, '\draw')), true);
 
 %!test  # and a sectioned area is drawn with its outline
 %! P = [0, 0; 40, 0; 40, 40; 0, 40];
-%! S = tikz (draw.Drawing ().hatch (P, 'ANSI31'));
+%! S = tikz (draw.Drawing ().hatch (geom.Region (P), 'ANSI31'));
 %! assert_equal (! isempty (strfind (S, '-- cycle;')), true);
 
 %!test  # a dimension lowers to one DIMENSION entity and a block for its picture
@@ -1731,7 +1895,11 @@
 %!  D = D.text ([10, 50], 'TEXT', 3.5);
 %!  D = D.centremark ([50, 30], 12);
 %!  D = D.leader ([70, 40; 90, 55], 'NOTE');
-%!  D = D.hatch ([10, 10; 30, 10; 30, 25; 10, 25], 'ANSI31', 45, 3);
+%!  D = D.hatch (geom.Region ([10, 10; 30, 10; 30, 25; 10, 25]), 'ANSI31', ...
+%!                45, 3);
+%!  D = D.spline (geom.Spline ([10, 70; 30, 80; 50, 72]));
+%!  D = D.path (geom.Path ([60, 70; 80, 70; 90, 80]));
+%!  D = D.region (geom.Region ([110, 0; 130, 0; 130, 20; 110, 20]));
 %!  D = D.block ('BORE', bore).insert ('BORE', [80, 10]);
 %!  D = D.dim ([0, 0], [100, 0], -15, 'horizontal');
 %!  D = D.angdim ([0, 0], [30, 0], [20, 20], 25);
@@ -1774,7 +1942,8 @@
 %! assert_equal (sort (unique ({D.Entities.type})), ...
 %!               {'angdim', 'arc', 'centremark', 'circle', 'diam', 'dim', ...
 %!                'ellipse', 'hatch', 'insert', 'leader', 'line', ...
-%!                'ordinate', 'point', 'polyline', 'radius', 'text'});
+%!                'ordinate', 'path', 'point', 'polyline', 'radius', ...
+%!                'region', 'spline', 'text'});
 
 %!test  # every entity type reaches the DXF backend
 %! D = __allentities__ ();
@@ -1785,6 +1954,75 @@
 %!               'ARC CIRCLE DIMENSION LINE POINT POLYLINE TEXT');
 %! assert_equal (numel (LOST), 1);
 %! assert_equal (LOST(1).type, 'ellipse');
+
+%!test  # the picture of a dimension is its extension lines, ticks and label
+%! B = __ornament__ (draw.Drawing ().dim ([0, 0], [100, 0], -20), 1, 1);
+%! assert_equal ({B.Entities.type}, {'line', 'line', 'line', 'line', ...
+%!                                   'line', 'text'});
+%!test  # and it is what plotting a dimension draws
+%! D = draw.Drawing ().dim ([0, 0], [100, 0], -20, 'horizontal');
+%! E = entities (__ornament__ (D, 1, 2));
+%! F = entities (D, 'dimensions', 'explode', 'DimScale', 2);
+%! assert_equal ({E.type}, {F.type});
+%! assert_equal (vertcat (E.pts), vertcat (F.pts));
+%!test  # its record states a dimension as DXF type 0 with its rotation
+%! [~, REC] = __ornament__ (draw.Drawing ().dim ([0, 0], [0, 50], 10, ...
+%!                                               'vertical'), 1, 1);
+%! assert_equal (REC.angles, 0);
+%! assert_equal (REC.rotation, 90);
+%! assert_equal (size (REC.pts), [6, 2]);
+%! assert_equal (REC.text, '<>');
+%!test  # a diameter: its line, two ticks and the label, DXF type 3
+%! [B, REC] = __ornament__ (draw.Drawing ().diam ([0, 0], 5), 1, 1);
+%! assert_equal ({B.Entities.type}, {'line', 'line', 'line', 'text'});
+%! assert_equal (REC.angles, 3);
+%!test  # a radius: its line, one tick and the label, DXF type 4
+%! [B, REC] = __ornament__ (draw.Drawing ().radius ([0, 0], 5), 1, 1);
+%! assert_equal ({B.Entities.type}, {'line', 'line', 'text'});
+%! assert_equal (REC.angles, 4);
+%!test  # an angle: its arc, two ticks and the label, DXF type 5
+%! D = draw.Drawing ().angdim ([0, 0], [10, 0], [0, 10], 5);
+%! [B, REC] = __ornament__ (D, 1, 1);
+%! assert_equal ({B.Entities.type}, {'arc', 'line', 'line', 'text'});
+%! assert_equal (REC.angles, 5);
+%!test  # an ordinate measuring x: its leader and the label, DXF type 70
+%! D = draw.Drawing ().ordinate ([0, 0], [20, 15], 'x', [20, -10]);
+%! [B, REC] = __ornament__ (D, 1, 1);
+%! assert_equal ({B.Entities.type}, {'polyline', 'text'});
+%! assert_equal (REC.angles, 70);
+%!test  # an ordinate measuring y is DXF type 6
+%! D = draw.Drawing ().ordinate ([0, 0], [20, 15], 'y', [-10, 15]);
+%! [~, REC] = __ornament__ (D, 1, 1);
+%! assert_equal (REC.angles, 6);
+%!test  # a centre mark is its cross and has no record
+%! [B, REC] = __ornament__ (draw.Drawing ().centremark ([0, 0], 12), 1, 1);
+%! assert_equal ({B.Entities.type}, {'line', 'line'});
+%! assert_equal (REC, []);
+%!test  # a leader is its path, its arrow and its note
+%! D = draw.Drawing ().leader ([0, 0; 10, 10], 'NOTE');
+%! [B, REC] = __ornament__ (D, 1, 1);
+%! assert_equal ({B.Entities.type}, {'polyline', 'line', 'line', 'text'});
+%! assert_equal (REC, []);
+%!test  # the picture keeps the layer, line type and colour it was drawn on
+%! D = draw.Drawing ();
+%! D.Layer = 'DIMS';
+%! D.Colour = 'red';
+%! B = __ornament__ (D.diam ([0, 0], 5), 1, 1);
+%! assert_equal (unique ({B.Entities.layer}), {'DIMS'});
+%! assert_equal (unique ([B.Entities.colour]), 1);
+%!test  # the ornament scales with DIMSCALE
+%! D = draw.Drawing ().diam ([0, 0], 5);
+%! B1 = __ornament__ (D, 1, 1);
+%! B4 = __ornament__ (D, 1, 4);
+%! assert_equal (B4.Entities(4).height, 4 * B1.Entities(4).height);
+%!error<draw.Drawing.__ornament__: invalid number of input arguments.> ...
+%! __ornament__ (draw.Drawing ().diam ([0, 0], 5), 1)
+%!error<draw.Drawing.__ornament__: IDX must be the index of an entity of D.> ...
+%! __ornament__ (draw.Drawing ().diam ([0, 0], 5), 2, 1)
+%!error<draw.Drawing.__ornament__: DIMSCALE must be a real positive finite scalar.> ...
+%! __ornament__ (draw.Drawing ().diam ([0, 0], 5), 1, 0)
+%!error<draw.Drawing.__ornament__: entity 1 is a line, not a dimension, centre mark or leader.> ...
+%! __ornament__ (draw.Drawing ().line ([0, 0], [1, 0]), 1, 1)
 
 %!test  # every entity type reaches the TikZ backend
 %! D = __allentities__ ();
@@ -1953,3 +2191,82 @@
 %! span = cellfun (@(q) abs (q(2,1) - q(1,1)), {L.pts});
 %! dl = L(find (span == max (span), 1));
 %! assert_equal (T.pts(1,2) > dl.pts(1,2), true);
+
+%!test  # write: every entity as itself, the dimension with its picture
+%! fn = [tempname(), '.dxf'];
+%! unwind_protect
+%!   D = draw.Drawing ().line ([0, 0], [10, 0]).ellipse ([0, 0], 5, 2);
+%!   D = D.dim ([0, 0], [10, 0], -5, 'horizontal');
+%!   write (D, fn);
+%!   txt = fileread (fn);
+%!   assert_equal (numel (strfind (txt, "AC1015")), 1);
+%!   assert_equal (numel (strfind (txt, sprintf ("\n  0\nELLIPSE\n"))), 1);
+%!   assert_equal (numel (strfind (txt, sprintf ("\n  2\n*D1\n"))), 3);
+%! unwind_protect_cleanup
+%!   unlink (fn);
+%! end_unwind_protect
+%!test  # write: 'Dimensions', 'explode' writes the picture alone
+%! fn = [tempname(), '.dxf'];
+%! unwind_protect
+%!   write (draw.Drawing ().dim ([0, 0], [10, 0], -5), fn, ...
+%!          'Dimensions', 'explode');
+%!   assert_equal (isempty (strfind (fileread (fn), "AcDbDimension")), true);
+%! unwind_protect_cleanup
+%!   unlink (fn);
+%! end_unwind_protect
+%!test  # write: 'Blocks', 'expand' copies a block in place of its inserts
+%! fn = [tempname(), '.dxf'];
+%! B = draw.Drawing ().circle ([0, 0], 3);
+%! D = draw.Drawing ().block ('B', B).insert ('B', [0, 0]).insert ('B', [9, 0]);
+%! unwind_protect
+%!   write (D, fn, 'Blocks', 'expand');
+%!   txt = fileread (fn);
+%!   assert_equal (isempty (strfind (txt, "AcDbBlockReference")), true);
+%!   assert_equal (numel (strfind (txt, "AcDbCircle")), 2);
+%! unwind_protect_cleanup
+%!   unlink (fn);
+%! end_unwind_protect
+%!test  # write: R12 for lines, arcs, text and dimensions
+%! fn = [tempname(), '.dxf'];
+%! unwind_protect
+%!   D = draw.Drawing ().line ([0, 0], [10, 0]).arc ([0, 0], 3, 0, 90);
+%!   write (D.dim ([0, 0], [10, 0], -5), fn, 'Version', 'R12');
+%!   assert_equal (numel (strfind (fileread (fn), "AC1009")), 1);
+%! unwind_protect_cleanup
+%!   unlink (fn);
+%! end_unwind_protect
+%!test  # write: 'LTScale' reaches the header
+%! fn = [tempname(), '.dxf'];
+%! unwind_protect
+%!   write (draw.Drawing ().line ([0, 0], [10, 0]), fn, 'LTScale', 25);
+%!   txt = fileread (fn);
+%!   assert_equal (numel (strfind (txt, sprintf ("$LTSCALE\n 40\n25.0\n"))), ...
+%!                 1);
+%! unwind_protect_cleanup
+%!   unlink (fn);
+%! end_unwind_protect
+%!error<draw.Drawing.write: invalid number of input arguments.> ...
+%! write (draw.Drawing ())
+%!error<draw.Drawing.write: FILE must be a non-empty character vector.> ...
+%! write (draw.Drawing (), 1)
+%!error<draw.Drawing.write: FILE must end in .dxf.> ...
+%! write (draw.Drawing (), 'a.dwg')
+%!error<draw.Drawing.write: Name/Value arguments must come in pairs.> ...
+%! write (draw.Drawing (), 'a.dxf', 'Version')
+%!error<draw.Drawing.write: unknown parameter.> ...
+%! write (draw.Drawing (), 'a.dxf', 'Layer', 'A')
+%!error<draw.Drawing.write: Version must be 'R2000' or 'R12'.> ...
+%! write (draw.Drawing (), 'a.dxf', 'Version', 'R14')
+%!error<draw.Drawing.write: Dimensions must be 'associative' or 'explode'.> ...
+%! write (draw.Drawing (), 'a.dxf', 'Dimensions', 'none')
+%!error<draw.Drawing.write: Blocks must be 'reference' or 'expand'.> ...
+%! write (draw.Drawing (), 'a.dxf', 'Blocks', 'none')
+%!error<draw.Drawing.write: DimScale must be a positive finite scalar.> ...
+%! write (draw.Drawing (), 'a.dxf', 'DimScale', -1)
+%!error<draw.Drawing.write: LTScale must be a positive finite scalar.> ...
+%! write (draw.Drawing (), 'a.dxf', 'LTScale', Inf)
+%!error<draw.Drawing.write: R12 holds only lines and arcs, not an ellipse.> ...
+%! write (draw.Drawing ().ellipse ([0, 0], 5, 2), 'a.dxf', 'Version', 'R12')
+%!error<draw.Drawing.write: R12 holds only lines and arcs, not a hatch.> ...
+%! P = geom.Polyline ([0, 0; 1, 0; 1, 1], 'Closed', true);
+%! write (draw.Drawing ().hatch (geom.Region (P)), 'a.dxf', 'Version', 'R12')

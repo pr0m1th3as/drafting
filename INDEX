@@ -30,8 +30,9 @@ Construction geometry
  geom.tangentpoints
  geom.fillet
 DXF input and output
- dxf.read
- dxf.write
+ geom.read
+ geom.write
+ draw.read
 Meshes
  polymesh.Mesh
  polymesh.read
@@ -44,7 +45,6 @@ Line types and colours
  draw.colour
 Drawing model
  draw.Drawing
- draw.fromentities
 Solid modelling
  solid.Shape
  solid.box

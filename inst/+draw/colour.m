@@ -57,12 +57,13 @@
 ## above have names and known renderings.  An unnamed index renders as a mid
 ## grey rather than raising, so that a file from elsewhere still draws.
 ##
-## @strong{No true colour.}  The DXF revision this package writes carries an
-## index and nothing else, so an arbitrary RGB triple cannot be represented.
+## @strong{No true colour.}  The DXF revision this package writes, R2000,
+## carries an index and nothing else, true colour arriving only with R2004, so
+## an arbitrary RGB triple cannot be represented.
 ## That is a limit of the format, not of this function, and it is why the index
 ## is what gets stored.
 ##
-## @seealso{draw.Drawing, draw.linetype, dxf.write}
+## @seealso{draw.Drawing, draw.linetype, draw.Drawing.write}
 ## @end deftypefn
 
 function OUT = colour (varargin)

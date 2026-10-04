@@ -29,8 +29,9 @@ OCCT_RECENT := $(shell awk '/define OCC_VERSION_MAJOR/ {M = $$3} \
                  $(OCCT_HDR))
 endif
 
-# The triangle meshes behind the polymesh namespace need nothing but Octave
-OCTFILES = __mesh__.oct
+# The triangle meshes behind the polymesh namespace, and DXF reading and
+# writing, need nothing but Octave
+OCTFILES = __mesh__.oct __dxf__.oct
 
 ifeq ($(OCCT_RECENT),yes)
 OCTFILES += __occt__.oct
@@ -62,6 +63,9 @@ endif
 
 __mesh__.oct: __mesh__.cc
 	$(MKOCTFILE) -O2 __mesh__.cc -lz
+
+__dxf__.oct: __dxf__.cc
+	$(MKOCTFILE) -O2 __dxf__.cc
 
 __occtfont__.oct: __occtfont__.cc
 	$(MKOCTFILE) -I$(OCCT_INC) __occtfont__.cc $(FONT_LIBS)

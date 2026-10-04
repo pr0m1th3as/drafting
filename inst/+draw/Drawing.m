@@ -60,13 +60,10 @@ classdef Drawing
   ## when the geometry it measures moves.
   ##
   ## A drawing reports what it holds through @code{numentities}, @code{layers}
-  ## and @code{bbox}, and hands its contents to a backend through
-  ## @code{entities}, which lowers them to the primitives a file can carry.
-  ## That lowered list is what @code{plot}, @code{print}, @code{tikz} and
-  ## @code{dxf.write} all consume, so a figure shows the entities the file will
-  ## contain rather than a more flattering rendering of them.
+  ## and @code{bbox}.  @code{plot}, @code{print} and @code{tikz} render it,
+  ## and @code{write} saves it as a DXF file.
   ##
-  ## @seealso{dxf.write, geom.bbox}
+  ## @seealso{draw.Drawing.write, geom.bbox}
   ## @end deftp
 
   properties
@@ -147,14 +144,15 @@ classdef Drawing
   properties (SetAccess = private, Hidden)
 
     ## The entities, in the order they were appended.  Internal: the field
-    ## layout is not API.  Use 'entities' for the lowered list a backend sees,
-    ## 'numentities' for the count and 'layers' for the layers in use.
+    ## layout is not API.  Use 'numentities' for the count and 'layers' for
+    ## the layers in use.  'shape' holds the geom object of a spline, path,
+    ## region or hatch, in world coordinates in the xy plane facing +z.
     Entities = struct ('type', {}, 'layer', {}, 'linetype', {}, ...
                        'colour', {}, 'pts', {}, 'closed', {}, ...
                        'radius', {}, 'angles', {}, 'angle', {}, 'text', {}, ...
                        'height', {}, 'offset', {}, 'direction', {}, ...
                        'pattern', {}, 'spacing', {}, 'block', {}, ...
-                       'scale', {}, 'bulge', {});
+                       'scale', {}, 'bulge', {}, 'shape', {});
 
   endproperties
 
@@ -212,7 +210,8 @@ classdef Drawing
               this.Name, numel (this.Entities), numel (layers (this)));
       if (! isempty (this.Entities))
         types = {this.Entities.type};
-        known = {'line', 'polyline', 'arc', 'circle', 'text', 'hatch', 'dim'};
+        known = {'line', 'polyline', 'spline', 'path', 'region', 'arc', ...
+                 'circle', 'text', 'hatch', 'dim'};
         for ii = 1:numel (known)
           n = sum (strcmp (types, known{ii}));
           if (n > 0)
@@ -233,6 +232,384 @@ classdef Drawing
       printf ("%s =\n\n", name);
       disp (this);
       printf ("\n");
+
+    endfunction
+
+    ## -*- texinfo -*-
+    ## @deftypefn  {draw.Drawing} {@var{E} =} entities (@var{D})
+    ## @deftypefnx {draw.Drawing} {@var{E} =} entities (@var{D}, @var{NAME}, @var{VALUE}, @dots{})
+    ## @deftypefnx {draw.Drawing} {[@var{E}, @var{LOST}] =} entities (@dots{})
+    ## @deftypefnx {draw.Drawing} {[@var{E}, @var{LOST}, @var{BLOCKS}] =} entities (@dots{})
+    ##
+    ## Lower a drawing to the flat list of primitives @code{plot} and
+    ## @code{tikz} draw.
+    ##
+    ## @code{@var{E} = entities (@var{D})} converts the @code{draw.Drawing}
+    ## @var{D} into a struct array of @code{LINE}, @code{POLYLINE}, @code{ARC},
+    ## @code{CIRCLE}, @code{TEXT}, @code{POINT} and @code{INSERT} records, each
+    ## on the layer, line type and colour it was drawn with.  A spline, a path
+    ## and a region become polylines along them, a region one per loop; a
+    ## hatch becomes its loops and its fill lines, clear of its holes.  An
+    ## ellipse becomes a closed polyline to the chordal tolerance.
+    ##
+    ## A dimension, a centre mark and a leader become the lines and text that
+    ## draw them, the ornament in millimetres of model space scaled by
+    ## @qcode{'DimScale'}: a drawing to be plotted at @math{1:50} wants
+    ## @code{'DimScale', 50}.  Ticks are 45-degree obliques and the text is
+    ## horizontal whatever the dimension measures.
+    ##
+    ## @code{[@var{E}, @var{LOST}] = entities (@dots{})} returns what was drawn
+    ## otherwise than it is held, with fields @code{index}, @code{type} and
+    ## @code{reason}; omit @var{LOST} and each distinct reason is warned about
+    ## once.  @var{BLOCKS} holds the lowered block definitions when
+    ## @qcode{'Blocks'} is @qcode{'reference'}.
+    ##
+    ## @end deftypefn
+    function [E, LOST, BLOCKS] = entities (D, varargin)
+
+      ## Input validation
+      if (nargin < 1)
+        error ("draw.Drawing.entities: invalid number of input arguments.");
+      endif
+      if (! isa (D, 'draw.Drawing'))
+        error ("draw.Drawing.entities: D must be a draw.Drawing object.");
+      endif
+      if (mod (numel (varargin), 2) != 0)
+        error (strcat ("draw.Drawing.entities: optional arguments", ...
+               " must come in name-value pairs."));
+      endif
+
+      dimScale = 1;
+      hatchMode = 'lines';
+      blockMode = 'expand';
+      chordTol = 0.01;
+      bulgeMode = 'keep';
+      dimMode = 'associative';
+      for ii = 1:2:numel (varargin)
+        name = varargin{ii};
+        if (! ischar (name) || ! isrow (name))
+          error (strcat ("draw.Drawing.entities: option names", ...
+                 " must be character vectors."));
+        endif
+        switch (lower (name))
+          case 'dimscale'
+            dimScale = varargin{ii+1};
+            if (! isnumeric (dimScale) || ! isreal (dimScale) ...
+                || ! isscalar (dimScale) || ! isfinite (dimScale) ...
+                || dimScale <= 0)
+              error (strcat ("draw.Drawing.entities: DimScale must be a", ...
+                             " real positive", ...
+                             " finite scalar."));
+            endif
+            dimScale = double (dimScale);
+          case 'chordtol'
+            chordTol = varargin{ii+1};
+            if (! isnumeric (chordTol) || ! isreal (chordTol) ...
+                  || ! isscalar (chordTol) || ! isfinite (chordTol) ...
+                  || chordTol <= 0)
+              error (strcat ("draw.Drawing.entities: ChordTol must be a", ...
+                             " real positive", ...
+                             " finite scalar."));
+            endif
+          case 'dimensions'
+            dimMode = varargin{ii+1};
+            if (! ischar (dimMode) || ! isrow (dimMode) ...
+                || ! any (strcmpi (dimMode, {'associative', 'explode'})))
+              error (strcat ("draw.Drawing.entities: Dimensions must be", ...
+                             " 'associative' or 'explode'."));
+            endif
+            dimMode = lower (dimMode);
+
+          case 'bulges'
+            bulgeMode = varargin{ii+1};
+            if (! ischar (bulgeMode) || ! isrow (bulgeMode) ...
+                || ! any (strcmpi (bulgeMode, {'keep', 'flatten'})))
+              error (strcat ("draw.Drawing.entities: Bulges", ...
+                     " must be 'keep' or 'flatten'."));
+            endif
+            bulgeMode = lower (bulgeMode);
+          case 'blocks'
+            blockMode = varargin{ii+1};
+            if (! ischar (blockMode) || ! isrow (blockMode) ...
+                || ! any (strcmpi (blockMode, {'expand', 'reference'})))
+              error (strcat ("draw.Drawing.entities: Blocks must be", ...
+                             " 'expand' or", ...
+                             " 'reference'."));
+            endif
+            blockMode = lower (blockMode);
+          case 'hatch'
+            hatchMode = varargin{ii+1};
+            if (! ischar (hatchMode) || ! isrow (hatchMode) ...
+                || ! any (strcmpi (hatchMode, {'lines', 'boundary'})))
+              error (strcat ("draw.Drawing.entities: Hatch must be", ...
+                             " 'lines' or", ...
+                             " 'boundary'."));
+            endif
+            hatchMode = lower (hatchMode);
+          otherwise
+            error ("draw.Drawing.entities: unknown option '%s'.", name);
+        endswitch
+      endfor
+
+      E = emptyentity ();
+      LOST = struct ('index', {}, 'type', {}, 'reason', {});
+      BLOCKS = struct ('name', {}, 'entities', {});
+      nDim = 0;
+
+      ## An insert is a reference the caller may want kept, but every other
+      ## consumer needs the geometry, so expansion is the default
+      if (strcmp (blockMode, 'expand'))
+        D = D.expand ();
+      else
+        for bb = 1:numel (D.Blocks)
+          BLOCKS(bb).name = D.Blocks(bb).name;
+          BLOCKS(bb).entities = entities (D.Blocks(bb).drawing.expand (), ...
+                                               'dimscale', dimScale, ...
+                                               'hatch', hatchMode);
+        endfor
+      endif
+
+      src = D.Entities;
+      for ii = 1:numel (src)
+
+        e = src(ii);
+
+        switch (e.type)
+
+          case 'line'
+            E(end+1) = mkent ('LINE', e, e.pts);
+
+          case 'polyline'
+            if (! isempty (e.bulge) && strcmp (bulgeMode, 'flatten'))
+              p = mkent ('POLYLINE', e, flattenbulge (e, chordTol));
+              p.closed = e.closed;
+            else
+              p = mkent ('POLYLINE', e, e.pts);
+              p.closed = e.closed;
+              p.bulge = e.bulge;
+            endif
+            E(end+1) = p;
+
+          case 'arc'
+            a = mkent ('ARC', e, e.pts);
+            a.radius = e.radius;
+            a.angles = e.angles;
+            E(end+1) = a;
+
+          case 'point'
+            E(end+1) = mkent ('POINT', e, e.pts);
+
+          case 'circle'
+            c = mkent ('CIRCLE', e, e.pts);
+            c.radius = e.radius;
+            E(end+1) = c;
+
+          case 'text'
+            t = mkent ('TEXT', e, e.pts);
+            t.text = e.text;
+            t.height = e.height;
+            t.rotation = e.angle;
+            E(end+1) = t;
+
+          case 'ellipse'
+            ## A closed polyline sampled to the chordal tolerance
+            a = e.radius(1);
+            b = e.radius(2);
+            c = cosd (e.angle);
+            sn = sind (e.angle);
+            pts = geom.curvesample (@(t) ellipsepts (t, e.pts, a, b, c, sn), ...
+                                    [0, 2*pi], chordTol);
+            pts(end,:) = [];
+            q = mkent ('POLYLINE', e, pts);
+            q.closed = true;
+            E(end+1) = q;
+            LOST(end+1) = struct ('index', ii, 'type', 'ellipse', 'reason', ...
+                                  sprintf (strcat ('ellipse drawn as a', ...
+                                                   ' closed polyline of', ...
+                                                   ' %d points'), rows (pts)));
+
+          case 'spline'
+            Q = __sample__ (e.shape)(:,1:2);
+            if (e.closed)
+              Q(end,:) = [];
+            endif
+            q = mkent ('POLYLINE', e, Q);
+            q.closed = e.closed;
+            E(end+1) = q;
+
+          case 'path'
+            [Q, b] = pathlower (e.shape);
+            E(end+1) = lowerpoly (e, Q, b, e.closed, bulgeMode, chordTol);
+
+          case 'region'
+            L = [{e.shape.Outline}, e.shape.Holes(:)'];
+            for jj = 1:numel (L)
+              [Q, b] = pathlower (L{jj});
+              E(end+1) = lowerpoly (e, Q, b, true, bulgeMode, chordTol);
+            endfor
+
+          case {'diam', 'radius'}
+            parts = explodecirc (e, dimScale);
+            if (strcmp (dimMode, 'associative'))
+              nDim++;
+              bn = sprintf ('*D%d', nDim);
+              BLOCKS(end+1) = struct ('name', bn, 'entities', {parts});
+              E(end+1) = dimrecord (e, bn, e.type);
+            else
+              for kk = 1:numel (parts)
+                E(end+1) = parts(kk);
+              endfor
+            endif
+
+          case 'angdim'
+            parts = explodeang (e, dimScale);
+            if (strcmp (dimMode, 'associative'))
+              nDim++;
+              bn = sprintf ('*D%d', nDim);
+              BLOCKS(end+1) = struct ('name', bn, 'entities', {parts});
+              E(end+1) = dimrecord (e, bn, 'angdim');
+              continue;
+            endif
+            for kk = 1:numel (parts)
+              E(end+1) = parts(kk);
+            endfor
+
+          case 'ordinate'
+            parts = explodeord (e, dimScale);
+            if (strcmp (dimMode, 'associative'))
+              nDim++;
+              bn = sprintf ('*D%d', nDim);
+              BLOCKS(end+1) = struct ('name', bn, 'entities', {parts});
+              E(end+1) = dimrecord (e, bn, 'ordinate');
+            else
+              for kk = 1:numel (parts)
+                E(end+1) = parts(kk);
+              endfor
+            endif
+
+          case 'centremark'
+            parts = explodemark (e, dimScale);
+            for kk = 1:numel (parts)
+              E(end+1) = parts(kk);
+            endfor
+
+          case 'leader'
+            parts = explodeleader (e, dimScale);
+            for kk = 1:numel (parts)
+              E(end+1) = parts(kk);
+            endfor
+
+          case 'insert'
+            s = mkent ('INSERT', e, e.pts);
+            s.block = e.block;
+            s.rotation = e.angle;
+            s.radius = e.scale;
+            E(end+1) = s;
+
+          case 'hatch'
+            ## The loops, then the fill lines inside the outline and clear of
+            ## every hole
+            L = [{e.shape.Outline}, e.shape.Holes(:)'];
+            for jj = 1:numel (L)
+              [Q, b] = pathlower (L{jj});
+              E(end+1) = lowerpoly (e, Q, b, true, bulgeMode, chordTol);
+            endfor
+            if (strcmp (hatchMode, 'lines'))
+              H = cellfun (@(h) __sample__ (h)(:,1:2), L(2:end), ...
+                           'UniformOutput', false);
+              S = geom.hatchlines (__sample__ (L{1})(:,1:2), e.pattern, ...
+                                   e.angle, e.spacing);
+              S = clipholes (S, H);
+              for jj = 1:rows (S)
+                E(end+1) = mkent ('LINE', e, [S(jj,1:2); S(jj,3:4)]);
+              endfor
+            else
+              LOST(end+1) = struct ('index', ii, 'type', 'hatch', 'reason', ...
+                                    'fill dropped, boundary drawn');
+            endif
+
+          case 'dim'
+            parts = explodedim (e, dimScale);
+            if (strcmp (dimMode, 'associative'))
+              nDim++;
+              bn = sprintf ('*D%d', nDim);
+              BLOCKS(end+1) = struct ('name', bn, 'entities', {parts});
+              E(end+1) = dimrecord (e, bn, 'dim');
+            else
+              for jj = 1:numel (parts)
+                E(end+1) = parts(jj);
+              endfor
+            endif
+
+        endswitch
+
+      endfor
+
+      ## Warn only when the caller has not asked to be told properly.
+      if (nargout < 2 && ! isempty (LOST))
+        reasons = unique ({LOST.reason});
+        for ii = 1:numel (reasons)
+          n = sum (strcmp ({LOST.reason}, reasons{ii}));
+          if (n == 1)
+            warning ("draw.Drawing.entities: 1 entity: %s.", reasons{ii});
+          else
+            warning ("draw.Drawing.entities: %d entities: %s.", n, reasons{ii});
+          endif
+        endfor
+      endif
+
+    endfunction
+
+    ## The picture of the ornament IDX of D, a dimension, centre mark or
+    ## leader, as a drawing of its lines and text at DIMSCALE, and for a
+    ## dimension the record a file states it by: the definition points in the
+    ## order of DXF group codes 10, 11, 13, 14, 15 and 16, the DXF dimension
+    ## type, the text and the rotation.  One implementation of the ornament
+    ## serves every backend.
+    function [B, REC] = __ornament__ (D, IDX, DIMSCALE)
+
+      if (nargin != 3)
+        error ("draw.Drawing.__ornament__: invalid number of input arguments.");
+      endif
+      if (! isnumeric (IDX) || ! isscalar (IDX) || IDX != fix (IDX)
+                            || IDX < 1 || IDX > numel (D.Entities))
+        error (strcat ("draw.Drawing.__ornament__: IDX must be the index", ...
+                       " of an entity of D."));
+      endif
+      if (! isnumeric (DIMSCALE) || ! isreal (DIMSCALE)
+                                 || ! isscalar (DIMSCALE)
+                                 || ! isfinite (DIMSCALE) || DIMSCALE <= 0)
+        error (strcat ("draw.Drawing.__ornament__: DIMSCALE must be a real", ...
+                       " positive finite scalar."));
+      endif
+
+      e = D.Entities(IDX);
+      REC = [];
+      switch (e.type)
+        case 'dim'
+          parts = explodedim (e, DIMSCALE);
+        case {'diam', 'radius'}
+          parts = explodecirc (e, DIMSCALE);
+        case 'angdim'
+          parts = explodeang (e, DIMSCALE);
+        case 'ordinate'
+          parts = explodeord (e, DIMSCALE);
+        case 'centremark'
+          parts = explodemark (e, DIMSCALE);
+        case 'leader'
+          parts = explodeleader (e, DIMSCALE);
+        otherwise
+          error (strcat ("draw.Drawing.__ornament__: entity %d is a %s,", ...
+                         " not a dimension, centre mark or leader."), ...
+                 IDX, e.type);
+      endswitch
+      B = draw.Drawing ();
+      B.Entities = partsentities (parts);
+      if (! any (strcmp (e.type, {'centremark', 'leader'})))
+        d = dimrecord (e, '', e.type);
+        REC = struct ('pts', d.pts, 'angles', d.angles, 'text', d.text, ...
+                      'rotation', d.rotation);
+      endif
 
     endfunction
 
@@ -389,8 +766,9 @@ classdef Drawing
 ################################################################################
 ##                             Available Methods                              ##
 ##                                                                            ##
-## 'line'            'polyline'        'arc'             'circle'             ##
-## 'ellipse'         'text'            'hatch'                                ##
+## 'line'            'polyline'        'spline'          'path'               ##
+## 'region'          'arc'             'circle'          'ellipse'            ##
+## 'text'            'hatch'                                                  ##
 ################################################################################
 
   methods (Access = public)
@@ -515,6 +893,140 @@ classdef Drawing
     endfunction
 
     ## -*- texinfo -*-
+    ## @deftypefn {draw.Drawing} {@var{D} =} spline (@var{D}, @var{SP})
+    ##
+    ## Append a spline.
+    ##
+    ## @code{@var{D} = spline (@var{D}, @var{SP})} appends the
+    ## @code{geom.Spline} @var{SP}, open or closed, kept as the exact curve it
+    ## is rather than as points along it:
+    ##
+    ## @example
+    ## @group
+    ## SP = geom.Spline ([0, 0; 20, 15; 45, 10; 60, 30]);
+    ## D = draw.Drawing ().spline (SP);
+    ## @end group
+    ## @end example
+    ##
+    ## A drawing is flat, so @var{SP} must lie in its @math{xy} plane.  Its
+    ## @code{geom.UCS} may have its own origin and @math{x} axis there and may
+    ## face down: the drawing keeps the same curve, re-expressed in its own
+    ## coordinates.
+    ##
+    ## @seealso{geom.Spline, polyline, path}
+    ## @end deftypefn
+    function this = spline (this, SP)
+
+      if (nargin != 2)
+        error ("draw.Drawing.spline: invalid number of input arguments.");
+      endif
+      if (! isa (SP, 'geom.Spline') || ! isscalar (SP))
+        error ("draw.Drawing.spline: SP must be a geom.Spline object.");
+      endif
+      [errmsg, SP] = flatshape (SP);
+      if (! isempty (errmsg))
+        error ("draw.Drawing.spline: SP %s", errmsg);
+      endif
+
+      e = makeentity ('spline', this.Layer, this.Linetype, this.Colour);
+      e.closed = SP.Closed;
+      e.shape = SP;
+      this.Entities(end+1) = e;
+
+    endfunction
+
+    ## -*- texinfo -*-
+    ## @deftypefn {draw.Drawing} {@var{D} =} path (@var{D}, @var{P})
+    ##
+    ## Append a path.
+    ##
+    ## @code{@var{D} = path (@var{D}, @var{P})} appends the @code{geom.Path}
+    ## @var{P}, open or closed, its straight segments, arcs and splines kept
+    ## as they are.  A path is what joins a spline to the lines and arcs
+    ## around it, so a profile of all three is drawn as one entity:
+    ##
+    ## @example
+    ## @group
+    ## P = join (geom.Path ([0, 0; 20, 0]), ...
+    ##           geom.Spline ([20, 0; 35, 10; 50, 5]));
+    ## D = draw.Drawing ().path (P);
+    ## @end group
+    ## @end example
+    ##
+    ## A drawing is flat, so @var{P} must lie in its @math{xy} plane, whatever
+    ## its @code{geom.UCS}; the drawing keeps the same path, re-expressed in
+    ## its own coordinates.
+    ##
+    ## @seealso{geom.Path, polyline, spline}
+    ## @end deftypefn
+    function this = path (this, P)
+
+      if (nargin != 2)
+        error ("draw.Drawing.path: invalid number of input arguments.");
+      endif
+      if (! isa (P, 'geom.Path') || ! isscalar (P))
+        error ("draw.Drawing.path: P must be a geom.Path object.");
+      endif
+      [errmsg, P] = flatshape (P);
+      if (! isempty (errmsg))
+        error ("draw.Drawing.path: P %s", errmsg);
+      endif
+
+      e = makeentity ('path', this.Layer, this.Linetype, this.Colour);
+      e.closed = P.Closed;
+      e.shape = P;
+      this.Entities(end+1) = e;
+
+    endfunction
+
+    ## -*- texinfo -*-
+    ## @deftypefn {draw.Drawing} {@var{D} =} region (@var{D}, @var{R})
+    ##
+    ## Append a region, drawn as its outline and holes.
+    ##
+    ## @code{@var{D} = region (@var{D}, @var{R})} appends the
+    ## @code{geom.Region} @var{R}.  It is drawn as its loops, the outline and
+    ## every hole, and kept as one region, so a plate and its bores stay one
+    ## entity:
+    ##
+    ## @example
+    ## @group
+    ## R = geom.Region ([0, 0; 60, 0; 60, 40; 0, 40], ...
+    ##                  @{[20, 20, 1; 40, 20, 1]@});
+    ## D = draw.Drawing ().region (R);
+    ## @end group
+    ## @end example
+    ##
+    ## To fill a region as well, use @code{hatch}.
+    ##
+    ## A drawing is flat, so @var{R} must lie in its @math{xy} plane.  Its
+    ## @code{geom.UCS} may have its own origin and @math{x} axis there and may
+    ## face down: the drawing keeps the same region, re-expressed in its own
+    ## coordinates.
+    ##
+    ## @seealso{geom.Region, hatch, polyline}
+    ## @end deftypefn
+    function this = region (this, R)
+
+      if (nargin != 2)
+        error ("draw.Drawing.region: invalid number of input arguments.");
+      endif
+      if (! isa (R, 'geom.Region') || ! isscalar (R))
+        error ("draw.Drawing.region: R must be a geom.Region object.");
+      endif
+      [errmsg, R] = flatshape (R);
+      if (! isempty (errmsg))
+        error ("draw.Drawing.region: R %s", errmsg);
+      endif
+
+      e = makeentity ('region', this.Layer, this.Linetype, this.Colour);
+      e.closed = true;
+      e.shape = R;
+      this.Entities(end+1) = e;
+
+    endfunction
+
+    ## -*- texinfo -*-
     ## @deftypefn {draw.Drawing} {@var{D} =} arc (@var{D}, @var{C}, @var{R}, @var{A1}, @var{A2})
     ##
     ## Append a circular arc centred on @var{C} with radius @var{R}.
@@ -596,13 +1108,6 @@ classdef Drawing
     ## obliquely, which is most of the time on an isometric or an auxiliary
     ## view, and what a chamfer on a cylinder projects to.
     ##
-    ## @strong{The DXF revision this package writes has no ellipse entity}, so
-    ## one reaches a file as a closed polyline sampled to a chordal tolerance,
-    ## and @code{draw.Drawing.entities} records the substitution.  The shape is
-    ## right to
-    ## within that tolerance; what is lost is the ability to edit it as an
-    ## ellipse afterwards.
-    ##
     ## @seealso{circle, arc, polyline}
     ## @end deftypefn
     function this = ellipse (this, C, A, B, ROT = 0)
@@ -683,26 +1188,39 @@ classdef Drawing
     endfunction
 
     ## -*- texinfo -*-
-    ## @deftypefn  {draw.Drawing} {@var{D} =} hatch (@var{D}, @var{P})
-    ## @deftypefnx {draw.Drawing} {@var{D} =} hatch (@var{D}, @var{P}, @var{PATTERN})
-    ## @deftypefnx {draw.Drawing} {@var{D} =} hatch (@var{D}, @var{P}, @var{PATTERN}, @var{ANGLE}, @var{SPACING})
+    ## @deftypefn  {draw.Drawing} {@var{D} =} hatch (@var{D}, @var{R})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} hatch (@var{D}, @var{R}, @var{PATTERN})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} hatch (@var{D}, @var{R}, @var{PATTERN}, @var{ANGLE}, @var{SPACING})
     ##
-    ## Append a hatched region bounded by the closed polygon @var{P}.
+    ## Append a hatched region.
     ##
-    ## @var{P} is an @math{N}-by-2 matrix of at least three vertices,
-    ## implicitly closed.  @var{PATTERN} names the fill and defaults to
-    ## @qcode{'ANSI31'}, the 45-degree hatch that means cut material.
-    ## @var{ANGLE} rotates the pattern, in degrees, and @var{SPACING} sets the
-    ## line spacing in millimetres.
+    ## @code{@var{D} = hatch (@var{D}, @var{R})} fills the @code{geom.Region}
+    ## @var{R} with a hatch pattern, its holes left clear.  The region may
+    ## have arcs and splines; a polygon is made into one with
+    ## @code{geom.Region (@var{P})}:
     ##
-    ## Not every backend can render a hatch.  DXF R12 has no @code{HATCH}
-    ## entity at all, so a drawing may legitimately carry hatches that the DXF
-    ## output cannot express; see @code{dxf.write}.  The model records the
-    ## intent regardless, which is what lets the backend decide what to do
-    ## about it.
+    ## @example
+    ## @group
+    ## R = geom.Region ([0, 0; 60, 0; 60, 40; 0, 40], ...
+    ##                  @{[20, 20, 1; 40, 20, 1]@});
+    ## D = draw.Drawing ().hatch (R);
+    ## @end group
+    ## @end example
     ##
+    ## @var{PATTERN} names the fill and defaults to @qcode{'ANSI31'}, the
+    ## 45-degree hatch that means cut material; @code{geom.hatchlines ()}
+    ## lists the names.  @var{ANGLE} rotates the pattern, in degrees, and
+    ## @var{SPACING} sets the line spacing in millimetres; the two are given
+    ## together.
+    ##
+    ## A drawing is flat, so @var{R} must lie in its @math{xy} plane.  Its
+    ## @code{geom.UCS} may have its own origin and @math{x} axis there and may
+    ## face down: the drawing keeps the same region, re-expressed in its own
+    ## coordinates.
+    ##
+    ## @seealso{region, geom.Region, geom.hatchlines}
     ## @end deftypefn
-    function this = hatch (this, P, PATTERN = 'ANSI31', ANGLE = 0, ...
+    function this = hatch (this, R, PATTERN = 'ANSI31', ANGLE = 0, ...
                            SPACING = 2.5)
 
       if (nargin < 2 || nargin > 5)
@@ -712,13 +1230,12 @@ classdef Drawing
         error (strcat ("draw.Drawing.hatch: ANGLE and SPACING must be", ...
                        " given together."));
       endif
-      errmsg = checkpts (P);
-      if (! isempty (errmsg))
-        error ("draw.Drawing.hatch: P %s", errmsg);
+      if (isnumeric (R))
+        error (strcat ("draw.Drawing.hatch: R must be a geom.Region; make", ...
+                       " one from a polygon with geom.Region (P)."));
       endif
-      if (rows (P) < 3)
-        error (strcat ("draw.Drawing.hatch: P must contain at least 3", ...
-                       " vertices."));
+      if (! isa (R, 'geom.Region') || ! isscalar (R))
+        error ("draw.Drawing.hatch: R must be a geom.Region object.");
       endif
       if (! ischar (PATTERN) || ! isrow (PATTERN) || isempty (PATTERN))
         error (strcat ("draw.Drawing.hatch: PATTERN must be a non-empty", ...
@@ -733,13 +1250,17 @@ classdef Drawing
         error (strcat ("draw.Drawing.hatch: SPACING must be a real", ...
                        " positive finite scalar."));
       endif
+      [errmsg, R] = flatshape (R);
+      if (! isempty (errmsg))
+        error ("draw.Drawing.hatch: R %s", errmsg);
+      endif
 
       e = makeentity ('hatch', this.Layer, this.Linetype, this.Colour);
-      e.pts = double (P);
       e.closed = true;
       e.pattern = PATTERN;
       e.angle = double (ANGLE);
       e.spacing = double (SPACING);
+      e.shape = R;
       this.Entities(end+1) = e;
 
     endfunction
@@ -1161,9 +1682,10 @@ classdef Drawing
     ## @subheading Entities are transformed, not just their points
     ##
     ## A circle keeps its centre and scales its radius; an arc rotates its
-    ## angles; text moves, rotates and scales its height; a hatch rotates its
-    ## pattern and scales its spacing.  A dimension carries its measured points
-    ## and scales its offset.
+    ## angles; text moves, rotates and scales its height; a spline, path or
+    ## region moves as the exact curve it is; a hatch moves its region,
+    ## rotates its pattern and scales its spacing.  A dimension carries its
+    ## measured points and scales its offset.
     ##
     ## @strong{A reflection reverses the sweep of an arc.}  Arcs run
     ## counter-clockwise from the first angle to the second, so mirroring one
@@ -1175,8 +1697,9 @@ classdef Drawing
     ## @strong{A non-uniform scaling that would turn a circle into an ellipse}
     ## raises.  There is no ellipse entity to put the result in, and quietly
     ## scaling the radius by one of the two factors would move the geometry off
-    ## the part.  A drawing with no arcs or circles scales anisotropically
-    ## without complaint.
+    ## the part.  A spline, path, region or hatch refuses it too.  A drawing
+    ## of lines and polylines without arcs scales anisotropically without
+    ## complaint.
     ##
     ## @strong{A rotation that would leave an axis-locked dimension off its
     ## axis} raises, naming the entity.  A @qcode{'horizontal'} dimension
@@ -1241,9 +1764,24 @@ classdef Drawing
             e.height *= sx;
             e.angle = dirangle (M, e.angle);
 
-          case 'hatch'
-            e.angle = dirangle (M, e.angle);
-            e.spacing *= sx;
+          case {'spline', 'path', 'region', 'hatch'}
+            if (! uniform)
+              error (strcat ("draw.Drawing.transform: entity %d is a %s", ...
+                             " and the scaling is not uniform."), ii, e.type);
+            endif
+            ## Row points, so the plane's linear part enters transposed; z
+            ## takes the scale of the plane, which keeps arcs arcs
+            if (isa (e.shape, 'geom.Region'))
+              e.shape = __affine__ (e.shape, M', t);
+            else
+              A = sx * eye (3);
+              A(1:2,1:2) = M';
+              e.shape = __affine__ (e.shape, A, [t, 0]);
+            endif
+            if (strcmp (e.type, 'hatch'))
+              e.angle = dirangle (M, e.angle);
+              e.spacing *= sx;
+            endif
 
           case 'dim'
             if (! any (strcmp (e.direction, {'aligned'})) && ! onaxes)
@@ -1425,7 +1963,7 @@ classdef Drawing
     ## backstop against a construction this class does not permit, not a rule a
     ## caller can meet by accident.
     ##
-    ## @seealso{block, insert, draw.Drawing.entities}
+    ## @seealso{block, insert, draw.Drawing.plot}
     ## @end deftypefn
     function this = expand (this, depth = 0)
 
@@ -1482,381 +2020,10 @@ classdef Drawing
 ################################################################################
 ##                             Available Methods                              ##
 ##                                                                            ##
-## 'entities'        'plot'            'print'           'tikz'               ##
+## 'plot'            'print'           'tikz'            'write'              ##
 ################################################################################
 
   methods (Access = public)
-
-
-    ## -*- texinfo -*-
-    ## @deftypefn  {draw.Drawing} {@var{E} =} entities (@var{D})
-    ## @deftypefnx {draw.Drawing} {@var{E} =} entities (@var{D}, @var{NAME}, @var{VALUE}, @dots{})
-    ## @deftypefnx {draw.Drawing} {[@var{E}, @var{LOST}] =} entities (@dots{})
-    ## @deftypefnx {draw.Drawing} {[@var{E}, @var{LOST}, @var{BLOCKS}] =} entities (@dots{})
-    ##
-    ## Lower a drawing to the flat entity struct array that @code{dxf.write}
-    ## takes.
-    ##
-    ## @code{@var{E} = entities (@var{D})} converts the @code{draw.Drawing}
-    ## object @var{D} into the entity vocabulary of the DXF layer: @code{LINE},
-    ## @code{POLYLINE}, @code{ARC}, @code{CIRCLE} and @code{TEXT}, each on the
-    ## layer it was drawn on.  The result is written with
-    ## @code{dxf.write (@var{FILE}, @var{E})}.
-    ##
-    ## This is the adapter between the two representations and the only place
-    ## that
-    ## knows both.  @code{dxf} deals in a file format and knows nothing of
-    ## dimensions or hatches; @code{draw} models the drawing and knows nothing
-    ## of
-    ## group codes.
-    ##
-    ## @subheading Dimensions are exploded here
-    ##
-    ## A @code{'dim'} entity carries only geometry --- two points, an offset and
-    ## a
-    ## direction.  It becomes six entities: two extension lines, the dimension
-    ## line, two oblique ticks and the text.  Nothing associative is emitted: a
-    ## true @code{DIMENSION} needs a @code{*D} block and a @code{DIMSTYLE}
-    ## record,
-    ## and plots identically.
-    ##
-    ## Ticks are the 45-degree architectural obliques rather than arrowheads.
-    ## R12
-    ## draws a filled arrowhead only as a @code{SOLID}, and at drawing scale the
-    ## tick is the conventional mark in any case.
-    ##
-    ## The text is placed @strong{horizontally whatever the dimension measures}
-    ## --- unidirectional dimensioning, which ISO 129 permits and which keeps
-    ## every
-    ## label on the sheet readable from one side of it.
-    ##
-    ## The label always clears the dimension line, on the far side from the
-    ## geometry being measured.  A dimension across the sheet carries its label
-    ## above or below the line; one up the sheet carries it to the left or
-    ## right,
-    ## since a horizontal label beside a vertical dimension has to clear the
-    ## line
-    ## by its @emph{width}.  Which side is which follows the sign of the offset.
-    ##
-    ## Without a label a dimension is annotated with the distance it measures,
-    ## computed at the moment of conversion, so a dimension cannot fall out of
-    ## step
-    ## with the geometry it spans.
-    ##
-    ## @subheading Ornament size
-    ##
-    ## Dimension ornament --- tick length, text height, the gap between a
-    ## measured
-    ## point and the start of its extension line --- is in millimetres of
-    ## @emph{model space}, so its size on the sheet depends on the plot scale.
-    ## Pass @qcode{'DimScale'} to set it: a drawing to be plotted at @math{1:50}
-    ## wants @code{'DimScale', 50}, which makes a nominally @math{2.5} mm text
-    ## @math{125} mm in the model and therefore @math{2.5} mm on paper.  The
-    ## default is @math{1}.
-    ##
-    ## @subheading What the DXF vocabulary cannot carry
-    ##
-    ## One thing in the model has no R12 equivalent, and it is not dropped
-    ## silently: a @code{'hatch'} becomes its boundary as a closed polyline, so
-    ## the
-    ## region is outlined but not filled, R12 having no @code{HATCH} entity.
-    ##
-    ## Text rotation used to be the second such case and no longer is.
-    ## @code{dxf.write} emits group code 50, so a rotated @code{'text'} arrives
-    ## in
-    ## the CAD file at the angle it was drawn at.
-    ##
-    ## @code{[@var{E}, @var{LOST}] = entities (@dots{})} returns the losses as
-    ## a struct array with fields @code{index}, @code{type} and @code{reason},
-    ## naming the entity of @var{D} that lost something.  Ask for @var{LOST} and
-    ## nothing is printed; omit it and each distinct reason is warned about
-    ## once,
-    ## because a conversion that quietly discards part of a drawing is the one
-    ## failure mode a CAD file will not show you.
-    ##
-    ## @seealso{dxf.write, draw.Drawing}
-    ## @end deftypefn
-    function [E, LOST, BLOCKS] = entities (D, varargin)
-
-      ## Input validation
-      if (nargin < 1)
-        error ("draw.Drawing.entities: invalid number of input arguments.");
-      endif
-      if (! isa (D, 'draw.Drawing'))
-        error ("draw.Drawing.entities: D must be a draw.Drawing object.");
-      endif
-      if (mod (numel (varargin), 2) != 0)
-        error (strcat ("draw.Drawing.entities: optional arguments", ...
-               " must come in name-value pairs."));
-      endif
-
-      dimScale = 1;
-      hatchMode = 'lines';
-      blockMode = 'expand';
-      chordTol = 0.01;
-      bulgeMode = 'keep';
-      dimMode = 'associative';
-      for ii = 1:2:numel (varargin)
-        name = varargin{ii};
-        if (! ischar (name) || ! isrow (name))
-          error (strcat ("draw.Drawing.entities: option names", ...
-                 " must be character vectors."));
-        endif
-        switch (lower (name))
-          case 'dimscale'
-            dimScale = varargin{ii+1};
-            if (! isnumeric (dimScale) || ! isreal (dimScale) ...
-                || ! isscalar (dimScale) || ! isfinite (dimScale) ...
-                || dimScale <= 0)
-              error (strcat ("draw.Drawing.entities: DimScale must be a", ...
-                             " real positive", ...
-                             " finite scalar."));
-            endif
-            dimScale = double (dimScale);
-          case 'chordtol'
-            chordTol = varargin{ii+1};
-            if (! isnumeric (chordTol) || ! isreal (chordTol) ...
-                  || ! isscalar (chordTol) || ! isfinite (chordTol) ...
-                  || chordTol <= 0)
-              error (strcat ("draw.Drawing.entities: ChordTol must be a", ...
-                             " real positive", ...
-                             " finite scalar."));
-            endif
-          case 'dimensions'
-            dimMode = varargin{ii+1};
-            if (! ischar (dimMode) || ! isrow (dimMode) ...
-                || ! any (strcmpi (dimMode, {'associative', 'explode'})))
-              error (strcat ("draw.Drawing.entities: Dimensions must be", ...
-                             " 'associative' or 'explode'."));
-            endif
-            dimMode = lower (dimMode);
-
-          case 'bulges'
-            bulgeMode = varargin{ii+1};
-            if (! ischar (bulgeMode) || ! isrow (bulgeMode) ...
-                || ! any (strcmpi (bulgeMode, {'keep', 'flatten'})))
-              error (strcat ("draw.Drawing.entities: Bulges", ...
-                     " must be 'keep' or 'flatten'."));
-            endif
-            bulgeMode = lower (bulgeMode);
-          case 'blocks'
-            blockMode = varargin{ii+1};
-            if (! ischar (blockMode) || ! isrow (blockMode) ...
-                || ! any (strcmpi (blockMode, {'expand', 'reference'})))
-              error (strcat ("draw.Drawing.entities: Blocks must be", ...
-                             " 'expand' or", ...
-                             " 'reference'."));
-            endif
-            blockMode = lower (blockMode);
-          case 'hatch'
-            hatchMode = varargin{ii+1};
-            if (! ischar (hatchMode) || ! isrow (hatchMode) ...
-                || ! any (strcmpi (hatchMode, {'lines', 'boundary'})))
-              error (strcat ("draw.Drawing.entities: Hatch must be", ...
-                             " 'lines' or", ...
-                             " 'boundary'."));
-            endif
-            hatchMode = lower (hatchMode);
-          otherwise
-            error ("draw.Drawing.entities: unknown option '%s'.", name);
-        endswitch
-      endfor
-
-      E = emptyentity ();
-      LOST = struct ('index', {}, 'type', {}, 'reason', {});
-      BLOCKS = struct ('name', {}, 'entities', {});
-      nDim = 0;
-
-      ## An insert is a reference the caller may want kept, but every other
-      ## consumer needs the geometry, so expansion is the default
-      if (strcmp (blockMode, 'expand'))
-        D = D.expand ();
-      else
-        for bb = 1:numel (D.Blocks)
-          BLOCKS(bb).name = D.Blocks(bb).name;
-          BLOCKS(bb).entities = entities (D.Blocks(bb).drawing.expand (), ...
-                                               'dimscale', dimScale, ...
-                                               'hatch', hatchMode);
-        endfor
-      endif
-
-      src = D.Entities;
-      for ii = 1:numel (src)
-
-        e = src(ii);
-
-        switch (e.type)
-
-          case 'line'
-            E(end+1) = mkent ('LINE', e, e.pts);
-
-          case 'polyline'
-            if (! isempty (e.bulge) && strcmp (bulgeMode, 'flatten'))
-              p = mkent ('POLYLINE', e, flattenbulge (e, chordTol));
-              p.closed = e.closed;
-            else
-              p = mkent ('POLYLINE', e, e.pts);
-              p.closed = e.closed;
-              p.bulge = e.bulge;
-            endif
-            E(end+1) = p;
-
-          case 'arc'
-            a = mkent ('ARC', e, e.pts);
-            a.radius = e.radius;
-            a.angles = e.angles;
-            E(end+1) = a;
-
-          case 'point'
-            E(end+1) = mkent ('POINT', e, e.pts);
-
-          case 'circle'
-            c = mkent ('CIRCLE', e, e.pts);
-            c.radius = e.radius;
-            E(end+1) = c;
-
-          case 'text'
-            t = mkent ('TEXT', e, e.pts);
-            t.text = e.text;
-            t.height = e.height;
-            t.rotation = e.angle;
-            E(end+1) = t;
-
-          case 'ellipse'
-            ## R12 has no ELLIPSE, so it goes out as a closed polyline sampled
-            ## to
-            ## the chordal tolerance.  Unlike a hatch, something really is lost:
-            ## the shape survives but the entity does not, and it can no longer
-            ## be
-            ## edited as an ellipse.
-            a = e.radius(1);
-            b = e.radius(2);
-            c = cosd (e.angle);
-            sn = sind (e.angle);
-            f = @(t) e.pts + [a * cos(t) * c - b * sin(t) * sn, ...
-                              a * cos(t) * sn + b * sin(t) * c];
-            pts = geom.curvesample (@(t) ellipsepts (t, e.pts, a, b, c, sn), ...
-                                    [0, 2*pi], chordTol);
-            pts(end,:) = [];
-            q = mkent ('POLYLINE', e, pts);
-            q.closed = true;
-            E(end+1) = q;
-            LOST(end+1) = struct ('index', ii, 'type', 'ellipse', 'reason', ...
-                                  sprintf (strcat ('R12 has no ELLIPSE;', ...
-                                     ' emitted as a closed polyline of', ...
-                                           ' %d points'), rows (pts)));
-
-          case {'diam', 'radius'}
-            parts = explodecirc (e, dimScale);
-            if (strcmp (dimMode, 'associative'))
-              nDim++;
-              bn = sprintf ('*D%d', nDim);
-              BLOCKS(end+1) = struct ('name', bn, 'entities', {parts});
-              E(end+1) = dimrecord (e, bn, e.type);
-            else
-              for kk = 1:numel (parts)
-                E(end+1) = parts(kk);
-              endfor
-            endif
-
-          case 'angdim'
-            parts = explodeang (e, dimScale);
-            if (strcmp (dimMode, 'associative'))
-              nDim++;
-              bn = sprintf ('*D%d', nDim);
-              BLOCKS(end+1) = struct ('name', bn, 'entities', {parts});
-              E(end+1) = dimrecord (e, bn, 'angdim');
-              continue;
-            endif
-            for kk = 1:numel (parts)
-              E(end+1) = parts(kk);
-            endfor
-
-          case 'ordinate'
-            parts = explodeord (e, dimScale);
-            if (strcmp (dimMode, 'associative'))
-              nDim++;
-              bn = sprintf ('*D%d', nDim);
-              BLOCKS(end+1) = struct ('name', bn, 'entities', {parts});
-              E(end+1) = dimrecord (e, bn, 'ordinate');
-            else
-              for kk = 1:numel (parts)
-                E(end+1) = parts(kk);
-              endfor
-            endif
-
-          case 'centremark'
-            parts = explodemark (e, dimScale);
-            for kk = 1:numel (parts)
-              E(end+1) = parts(kk);
-            endfor
-
-          case 'leader'
-            parts = explodeleader (e, dimScale);
-            for kk = 1:numel (parts)
-              E(end+1) = parts(kk);
-            endfor
-
-          case 'insert'
-            s = mkent ('INSERT', e, e.pts);
-            s.block = e.block;
-            s.rotation = e.angle;
-            s.radius = e.scale;
-            E(end+1) = s;
-
-          case 'hatch'
-            h = mkent ('POLYLINE', e, e.pts);
-            h.closed = true;
-            E(end+1) = h;
-            if (strcmp (hatchMode, 'lines'))
-              ## R12 has no HATCH entity, so the fill is generated explicitly.
-              ## Emitting the lines is a truer degradation than dropping them:
-              ## the recipient sees the section hatched, not an empty outline.
-              S = geom.hatchlines (e.pts, e.pattern, e.angle, e.spacing);
-              for jj = 1:rows (S)
-                E(end+1) = mkent ('LINE', e, [S(jj,1:2); S(jj,3:4)]);
-              endfor
-              ## Nothing is recorded as lost: R12 has no HATCH entity, but the
-              ## fill it would have carried is present as lines, so the
-              ## recipient
-              ## sees the hatch.  LOST is for what could not be carried at all.
-            else
-              LOST(end+1) = struct ('index', ii, 'type', 'hatch', 'reason', ...
-                              strcat ('fill dropped: R12 has no HATCH,', ...
-                                            ' boundary emitted'));
-            endif
-
-          case 'dim'
-            parts = explodedim (e, dimScale);
-            if (strcmp (dimMode, 'associative'))
-              nDim++;
-              bn = sprintf ('*D%d', nDim);
-              BLOCKS(end+1) = struct ('name', bn, 'entities', {parts});
-              E(end+1) = dimrecord (e, bn, 'dim');
-            else
-              for jj = 1:numel (parts)
-                E(end+1) = parts(jj);
-              endfor
-            endif
-
-        endswitch
-
-      endfor
-
-      ## Warn only when the caller has not asked to be told properly.
-      if (nargout < 2 && ! isempty (LOST))
-        reasons = unique ({LOST.reason});
-        for ii = 1:numel (reasons)
-          n = sum (strcmp ({LOST.reason}, reasons{ii}));
-          if (n == 1)
-            warning ("draw.Drawing.entities: 1 entity: %s.", reasons{ii});
-          else
-            warning ("draw.Drawing.entities: %d entities: %s.", n, reasons{ii});
-          endif
-        endfor
-      endif
-
-    endfunction
 
     ## -*- texinfo -*-
     ## @deftypefn  {draw.Drawing} {} plot (@var{D})
@@ -1907,7 +2074,7 @@ classdef Drawing
     ## @qcode{'FontSize'}
     ## @item @qcode{'DimScale'} @tab 1 @tab multiplies the dimension ornament,
     ## which is a model dimension: a drawing meant for @math{1:50} wants 50
-    ## here, as it does in @code{entities}
+    ## here
     ## @end multitable
     ##
     ## @subheading Why the axes do not fit tight
@@ -1922,20 +2089,13 @@ classdef Drawing
     ## two
     ## spans.
     ##
-    ## @subheading What you see is what gets written
+    ## @subheading What is drawn
     ##
-    ## The drawing is lowered through @code{draw.Drawing.entities} --- the same
-    ## conversion
-    ## the DXF backend uses --- and the result of that is what is plotted. A
-    ## figure
-    ## therefore shows the entities the file will contain, not a more flattering
-    ## rendering of them.  In particular a hatch appears as its boundary alone,
-    ## because that is what the file will carry; the second output of
-    ## @code{draw.Drawing.entities} says so explicitly.
-    ##
-    ## The alternative, rendering from the drawing model directly, would let the
-    ## screen show something the recipient never receives.  For a package whose
-    ## output is meant to be manufactured, that is the wrong way round.
+    ## Every entity is drawn as the lines, arcs and text it consists of: a
+    ## dimension as its extension lines, ticks and label, a spline, path or
+    ## region along its curves, a hatch as its loops and its fill lines, clear
+    ## of its holes, or as its loops alone with @qcode{'Hatch'} set to
+    ## @qcode{'boundary'}.  @code{draw.Drawing.tikz} draws the same.
     ##
     ## @subheading Line types are drawn properly, not approximated
     ##
@@ -1979,8 +2139,8 @@ classdef Drawing
     ## text is to
     ## scale by construction, use @code{draw.Drawing.tikz}.
     ##
-    ## @seealso{draw.Drawing, draw.Drawing.entities, draw.Drawing.tikz,
-    ## dxf.write}
+    ## @seealso{draw.Drawing, draw.Drawing.tikz, draw.Drawing.print,
+    ## draw.Drawing.write}
     ## @end deftypefn
     function H = plot (varargin)
 
@@ -2255,15 +2415,14 @@ classdef Drawing
     ## Author
     ## it as the height wanted on paper times the scale denominator. The height
     ## is
-    ## therefore part of the drawing and survives into the DXF, rather than
-    ## being a
-    ## property of one particular plot.
+    ## therefore part of the drawing and survives into a file written from it,
+    ## rather than being a property of one particular plot.
     ##
     ## @qcode{'LineWidth'} is the opposite: a width on the paper, held there at
     ## every scale, because a 0.35 mm pen is 0.35 mm whatever the sheet shows.
     ##
     ## @seealso{draw.Drawing.plot, draw.Drawing.tikz, draw.titleblock,
-    ## dxf.write}
+    ## draw.Drawing.write}
     ## @end deftypefn
     function [PAPER, SCALE] = print (D, FILE, varargin)
 
@@ -2458,21 +2617,16 @@ classdef Drawing
     ##
     ## @subheading Dimensions
     ##
-    ## Dimensions are rendered here rather than reused from
-    ## @code{draw.Drawing.entities}, which is the point of storing them
-    ## semantically.  A
-    ## TikZ node anchors itself, so the label is positioned by naming the side
-    ## it
-    ## should sit on and letting TikZ measure the text --- where the DXF path
-    ## has
-    ## to estimate the width of a string from its character count.  The same
-    ## drawing therefore gets properly centred labels on the report figure and
-    ## approximately centred ones in the CAD file, from one model and without a
-    ## flag anywhere.
+    ## Dimensions are rendered here from what they measure, which is the point
+    ## of storing them semantically.  A TikZ node anchors itself, so the label
+    ## is positioned by naming the side it should sit on and letting TikZ
+    ## measure the text, where a figure or a CAD file has to estimate the width
+    ## of a string from its character count.  The same drawing therefore gets
+    ## properly centred labels on the report figure, from one model and without
+    ## a flag anywhere.
     ##
-    ## Labels are unidirectional, matching @code{draw.Drawing.entities}, and
-    ## ticks are the
-    ## 45-degree architectural obliques.
+    ## Labels are unidirectional, as @code{draw.Drawing.plot} draws them, and
+    ## ticks are the 45-degree architectural obliques.
     ##
     ## @subheading What the document needs
     ##
@@ -2486,7 +2640,7 @@ classdef Drawing
     ## property
     ## of the document, not of this output.
     ##
-    ## @seealso{draw.Drawing, draw.Drawing.entities}
+    ## @seealso{draw.Drawing, draw.Drawing.plot, draw.Drawing.write}
     ## @end deftypefn
     function S = tikz (D, varargin)
 
@@ -2623,6 +2777,71 @@ classdef Drawing
 
     endfunction
 
+
+    ## -*- texinfo -*-
+    ## @deftypefn  {draw.Drawing} {} write (@var{D}, @var{FILE})
+    ## @deftypefnx {draw.Drawing} {} write (@var{D}, @var{FILE}, @var{Name}, @var{Value}, @dots{})
+    ##
+    ## Write a drawing to a DXF file.
+    ##
+    ## @code{write (@var{D}, @var{FILE})} writes the drawing @var{D} to
+    ## @var{FILE}, which must end in @file{.dxf}, as an AutoCAD R2000
+    ## (@code{AC1015}) ASCII DXF drawing in millimetres, every entity on its
+    ## own layer with its line type and colour, the layers and line types
+    ## declared in the file's tables with the dash pattern of every line type
+    ## the package defines.
+    ##
+    ## Each entity is written as itself: a line, point, arc, circle, ellipse,
+    ## text, spline, insert and polyline, its bulges kept, as the DXF entity of
+    ## the same name, a polyline as an @code{LWPOLYLINE}; a hatch as a
+    ## @code{HATCH} over its region, the holes left clear, with its pattern,
+    ## angle and spacing; a path as its pieces and a region as its loops, each
+    ## bound by a group that names the class, so @code{draw.read} gives them
+    ## back as a path and a region.  A dimension is a @code{DIMENSION} whose
+    ## picture is an anonymous block, so a CAD program measures it again; a
+    ## centre mark and a leader are written as the lines and text they are
+    ## drawn with.  The blocks the drawing defines are written once each and
+    ## placed by @code{INSERT}.
+    ##
+    ## Name/Value pairs:
+    ##
+    ## @table @asis
+    ## @item @qcode{'Version'}
+    ## @qcode{'R2000'}, the default, or @qcode{'R12'} (@code{AC1009}) for a
+    ## program that reads nothing later.  R12 holds only lines and arcs, so a
+    ## drawing holding an ellipse, a spline, a path, a region or a hatch is an
+    ## error there, naming what R12 cannot hold.
+    ## @item @qcode{'Dimensions'}
+    ## @qcode{'associative'}, the default, or @qcode{'explode'} to write each
+    ## dimension as the lines and text it is drawn with, for a program that
+    ## cannot read a @code{DIMENSION}.
+    ## @item @qcode{'Blocks'}
+    ## @qcode{'reference'}, the default, or @qcode{'expand'} to copy each
+    ## block's contents in place of every insert, for a program that ignores
+    ## @code{INSERT}.
+    ## @item @qcode{'DimScale'}
+    ## Multiplies the dimension ornament, which is a model dimension: a drawing
+    ## meant for @math{1:50} wants 50 here.  1 by default.
+    ## @item @qcode{'LTScale'}
+    ## The drawing's line-type scale, 1 by default, written in the header so
+    ## the dashes look the same wherever the file is opened.
+    ## @end table
+    ##
+    ## Text is written with every character outside ASCII escaped as
+    ## @code{\U+XXXX}, so the file reads the same whatever the reader's code
+    ## page.
+    ##
+    ## @seealso{draw.read, draw.Drawing.print, draw.Drawing.tikz, geom.write}
+    ## @end deftypefn
+    function write (this, FILE, varargin)
+
+      if (nargin < 2)
+        error ("draw.Drawing.write: invalid number of input arguments.");
+      endif
+      __dxf__ ('write', FILE, {this}, varargin, 'draw.Drawing.write');
+
+    endfunction
+
   endmethods
 
 endclassdef
@@ -2637,7 +2856,8 @@ function e = makeentity (type, layer, linetype, colour)
               'colour', colour, 'pts', [], 'closed', false, ...
               'radius', [], 'angles', [], 'angle', [], 'text', '', ...
               'height', [], 'offset', [], 'direction', '', 'pattern', '', ...
-              'spacing', [], 'block', '', 'scale', [], 'bulge', []);
+              'spacing', [], 'block', '', 'scale', [], 'bulge', [], ...
+              'shape', []);
 
 endfunction
 
@@ -2728,6 +2948,157 @@ function errmsg = checkradius (R)
 
 endfunction
 
+## Carry a geom object lying in the xy plane into world coordinates with the
+## default UCS, so a drawing holds every shape the same way, or say why it
+## cannot be carried: an error-message body for the caller to raise.  The
+## world geometry is unchanged; a frame facing down only reads it from above.
+function [errmsg, S] = flatshape (S)
+
+  errmsg = '';
+  W0 = geom.UCS ();
+  U = S.UCS;
+  if (isa (S, 'geom.Region'))
+    if (abs (U.Normal(3)) < 1 - 1e-9 || abs (U.Origin(3)) > 1e-9)
+      errmsg = "must lie in the xy plane.";
+    elseif (! (U == W0))
+      H = cellfun (@(h) __into__ (h, W0), S.Holes, 'UniformOutput', false);
+      S = geom.Region (__into__ (S.Outline, W0), H);
+    endif
+    return;
+  endif
+
+  ## The points that fix a spline's or a path's place, in the world
+  if (isa (S, 'geom.Spline'))
+    P = S.ControlPoints;
+  else
+    P = [S.Vertices; S.Midpoints(! isnan (S.Midpoints(:,1)),:)];
+    for i = find (! cellfun (@isempty, S.Splines))'
+      P = [P; S.Splines{i}.ControlPoints];
+    endfor
+  endif
+  W = U.Origin + P * [U.XAxis; U.YAxis; U.Normal];
+  if (any (abs (W(:,3)) > 1e-9 * max (1, max (abs (W(:))))))
+    errmsg = "must lie in the xy plane.";
+    return;
+  endif
+  if (! (U == W0))
+    if (isa (S, 'geom.Spline'))
+      S = __affine__ (S, [U.XAxis; U.YAxis; U.Normal], U.Origin);
+      S.UCS = W0;
+    else
+      S = __into__ (S, W0);
+    endif
+  endif
+
+endfunction
+
+## A flat path as the vertices of a polyline: its arcs as bulges where it has
+## no spline, or points along it where it has
+function [Q, b] = pathlower (P)
+
+  V = P.Vertices;
+  M = P.Midpoints;
+  if (any (! cellfun (@isempty, P.Splines)))
+    Q = __sample__ (P)(:,1:2);
+    b = [];
+    return;
+  endif
+  n = rows (V);
+  Q = V(:,1:2);
+  b = zeros (n, 1);
+  for i = find (! isnan (M(:,1)))'
+    ## The bulge is the arc's height over half its chord, positive for an arc
+    ## to the right of the direction of travel
+    d = V(mod (i, n) + 1,1:2) - V(i,1:2);
+    c = M(i,1:2) - V(i,1:2);
+    x = d(1) * c(2) - d(2) * c(1);
+    b(i) = -sign (x) * 2 * abs (x) / sum (d .^ 2);
+  endfor
+  if (! any (b))
+    b = [];
+  endif
+
+endfunction
+
+## One lowered POLYLINE through Q with bulges b, its arcs kept or flattened
+function p = lowerpoly (e, Q, b, closed, bulgeMode, chordTol)
+
+  if (! isempty (b) && strcmp (bulgeMode, 'flatten'))
+    p = mkent ('POLYLINE', e, flattenbulge (struct ('pts', Q, 'bulge', b, ...
+                                                    'closed', closed), ...
+                                            chordTol));
+  else
+    p = mkent ('POLYLINE', e, Q);
+    p.bulge = b;
+  endif
+  p.closed = closed;
+
+endfunction
+
+## Cut the fill segments S, rows [x1, y1, x2, y2], where they cross the holes
+## H, polygons in a cell, and keep the pieces outside every hole
+function S = clipholes (S, H)
+
+  if (isempty (H) || isempty (S))
+    return;
+  endif
+  out = zeros (0, 4);
+  for k = 1:rows (S)
+    A = S(k,1:2);
+    d = S(k,3:4) - A;
+    t = [0, 1];
+    for h = 1:numel (H)
+      P = H{h};
+      E = P([2:end, 1],:) - P;
+      W = P - A;
+      den = d(1) * E(:,2) - d(2) * E(:,1);
+      u = (W(:,1) .* E(:,2) - W(:,2) .* E(:,1)) ./ den;
+      v = (W(:,1) * d(2) - W(:,2) * d(1)) ./ den;
+      hit = (den != 0) & u > 0 & u < 1 & v >= 0 & v < 1;
+      t = [t, u(hit)'];
+    endfor
+    t = unique (t);
+    for j = 1:numel (t) - 1
+      m = A + d * (t(j) + t(j+1)) / 2;
+      inside = false;
+      for h = 1:numel (H)
+        inside = inside || inpolygon (m(1), m(2), H{h}(:,1), H{h}(:,2));
+      endfor
+      if (! inside)
+        out(end+1,:) = [A + d * t(j), A + d * t(j+1)];
+      endif
+    endfor
+  endfor
+  S = out;
+
+endfunction
+
+## The lowered parts of an ornament as drawing entities, so a picture can be
+## held by a draw.Drawing of its own
+function E = partsentities (parts)
+
+  E = repmat (makeentity ('line', '0', 'CONTINUOUS', 256), 1, 0);
+  for k = 1:numel (parts)
+    p = parts(k);
+    e = makeentity (lower (p.type), p.layer, p.linetype, p.colour);
+    e.pts = p.pts;
+    switch (p.type)
+      case 'POLYLINE'
+        e.closed = logical (p.closed);
+        e.bulge = p.bulge;
+      case {'ARC', 'CIRCLE'}
+        e.radius = p.radius;
+        e.angles = p.angles;
+      case 'TEXT'
+        e.text = p.text;
+        e.height = p.height;
+        e.angle = p.rotation;
+    endswitch
+    E(end+1) = e;
+  endfor
+
+endfunction
+
 ## The points an entity contributes to the drawing extent.  For everything
 ## straight that is just its coordinates; the curved types need their sweep
 ## resolved, which is the whole reason this is a function.
@@ -2745,6 +3116,14 @@ function P = extentpoints (e)
 
     case 'ordinate'
       P = e.pts(1:2,:);
+
+    case {'spline', 'path', 'region', 'hatch'}
+      if (isa (e.shape, 'geom.Region'))
+        B = __box__ (e.shape.Outline);
+      else
+        B = __box__ (e.shape);
+      endif
+      P = B(:,1:2);
 
     otherwise
       P = e.pts;
@@ -3098,7 +3477,7 @@ function t = autolabel (e, kind)
 
 endfunction
 
-## The empty entity array, in dxf.write's vocabulary.  Field order is fixed so
+## The empty array of lowered entities.  Field order is fixed so
 ## that the array grows by assignment.
 function E = emptyentity ()
 

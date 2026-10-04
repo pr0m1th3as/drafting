@@ -377,6 +377,55 @@ classdef Polyline
 
     endfunction
 
+
+    ## -*- texinfo -*-
+    ## @deftypefn  {geom.Polyline} {} write (@var{PL}, @var{FILE})
+    ## @deftypefnx {geom.Polyline} {} write (@var{PL}, @var{FILE}, @var{Name}, @var{Value}, @dots{})
+    ##
+    ## Write a polyline to a DXF file.
+    ##
+    ## @code{write (@var{PL}, @var{FILE})} writes the polyline @var{PL} to
+    ## @var{FILE}, which must end in @file{.dxf}, as one @code{LWPOLYLINE} of
+    ## an ASCII DXF drawing.  The entity holds the polyline's plane as its
+    ## normal and elevation, and the polyline's @code{geom.UCS} goes with it
+    ## as extended data under the application @qcode{'DRAFTING'}, so
+    ## @code{geom.read} gives back the polyline that was written, frame and
+    ## all.
+    ##
+    ## Name/Value pairs:
+    ##
+    ## @table @asis
+    ## @item @qcode{'Layer'}
+    ## The layer, @qcode{'0'} by default.
+    ## @item @qcode{'Linetype'}
+    ## One of the line types of @code{draw.linetype}, or any name the
+    ## receiving program holds; @qcode{'CONTINUOUS'} by default.
+    ## @item @qcode{'Colour'}
+    ## An AutoCAD colour index from 1 to 256, 256 meaning the layer's colour,
+    ## which is the default.  True colour came only with R2004.
+    ## @item @qcode{'Version'}
+    ## @qcode{'R2000'} (@code{AC1015}), the default, or @qcode{'R12'}
+    ## (@code{AC1009}) for a program that reads nothing later.  R12 holds
+    ## lines and arcs, which is what a polyline is made of.
+    ## @item @qcode{'LTScale'}
+    ## The drawing's line-type scale, 1 by default, written in the header so
+    ## the dashes look the same wherever the file is opened.
+    ## @end table
+    ##
+    ## The drawing units are millimetres.  Several geom objects go in one file
+    ## through @code{geom.write}.
+    ##
+    ## @seealso{geom.read, geom.write, draw.Drawing.write}
+    ## @end deftypefn
+    function write (this, FILE, varargin)
+
+      if (nargin < 2)
+        error ("geom.Polyline.write: invalid number of input arguments.");
+      endif
+      __dxf__ ('write', FILE, {this}, varargin, 'geom.Polyline.write');
+
+    endfunction
+
   endmethods
 
 endclassdef
@@ -595,3 +644,42 @@ endfunction
 %! geom.Polyline ([0, 0; 0, 0], 'Closed', true)
 %!error<geom.Polyline: the last vertex of an open polyline must have a zero bulge.> ...
 %! geom.Polyline ([0, 0, 0; 10, 0, 1])
+
+%!test  # write: geom.read gives back the polyline, bulges, frame and all
+%! U = geom.UCS ([1, 1, 1], [5, 0, 3]);
+%! PL = geom.Polyline ([0, 0, 0; 10, 0, 0.5; 10, 5, 0], 'Closed', true, ...
+%!                     'UCS', U);
+%! fn = [tempname(), '.dxf'];
+%! unwind_protect
+%!   write (PL, fn);
+%!   C = geom.read (fn);
+%!   assert_equal (C{1}.Vertices, PL.Vertices, 1e-12);
+%!   assert_equal (C{1}.Closed, true);
+%!   assert_equal ([C{1}.UCS.Origin; C{1}.UCS.XAxis; C{1}.UCS.Normal], ...
+%!                 [U.Origin; U.XAxis; U.Normal], 1e-12);
+%! unwind_protect_cleanup
+%!   unlink (fn);
+%! end_unwind_protect
+%!test  # write: R12 holds a polyline, and it reads back
+%! PL = geom.Polyline ([0, 0, 1; 10, 0, 0; 10, 5, 0]);
+%! fn = [tempname(), '.dxf'];
+%! unwind_protect
+%!   write (PL, fn, 'Version', 'R12', 'Layer', 'P', 'Colour', 2);
+%!   txt = fileread (fn);
+%!   assert_equal (numel (strfind (txt, "AC1009")), 1);
+%!   C = geom.read (fn, 'Layer', 'P');
+%!   assert_equal (C{1}.Vertices, PL.Vertices, 1e-12);
+%! unwind_protect_cleanup
+%!   unlink (fn);
+%! end_unwind_protect
+
+%!error<geom.Polyline.write: invalid number of input arguments.> ...
+%! write (geom.Polyline ([0, 0; 1, 0]))
+%!error<geom.Polyline.write: FILE must end in .dxf.> ...
+%! write (geom.Polyline ([0, 0; 1, 0]), 'a.stl')
+%!error<geom.Polyline.write: Layer must be a non-empty character vector.> ...
+%! write (geom.Polyline ([0, 0; 1, 0]), 'a.dxf', 'Layer', {'A'})
+%!error<geom.Polyline.write: Colour must be an integer from 1 to 256.> ...
+%! write (geom.Polyline ([0, 0; 1, 0]), 'a.dxf', 'Colour', 1.5)
+%!error<geom.Polyline.write: unknown parameter.> ...
+%! write (geom.Polyline ([0, 0; 1, 0]), 'a.dxf', 'Fill', true)

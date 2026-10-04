@@ -1002,6 +1002,235 @@ classdef Region
 
     endfunction
 
+
+    ## -*- texinfo -*-
+    ## @deftypefn  {geom.Region} {} write (@var{R}, @var{FILE})
+    ## @deftypefnx {geom.Region} {} write (@var{R}, @var{FILE}, @var{Name}, @var{Value}, @dots{})
+    ##
+    ## Write a region to a DXF file.
+    ##
+    ## @code{write (@var{R}, @var{FILE})} writes the region @var{R} to
+    ## @var{FILE}, which must end in @file{.dxf}, as its loops in an ASCII DXF
+    ## drawing, the outline first and then the holes, bound by a group: a
+    ## loop of straight segments and arcs is one closed @code{LWPOLYLINE} on
+    ## the region's plane, a loop with a spline in it its pieces.  The
+    ## group's extended data, under the application @qcode{'DRAFTING'},
+    ## names the class and holds the region's @code{geom.UCS}, so
+    ## @code{geom.read} gives back the region that was written, its holes and
+    ## frame included.
+    ##
+    ## Name/Value pairs:
+    ##
+    ## @table @asis
+    ## @item @qcode{'Layer'}
+    ## The layer, @qcode{'0'} by default.
+    ## @item @qcode{'Linetype'}
+    ## One of the line types of @code{draw.linetype}, or any name the
+    ## receiving program holds; @qcode{'CONTINUOUS'} by default.
+    ## @item @qcode{'Colour'}
+    ## An AutoCAD colour index from 1 to 256, 256 meaning the layer's colour,
+    ## which is the default.  True colour came only with R2004.
+    ## @item @qcode{'Fill'}
+    ## @code{true} adds a solid @code{HATCH} over the region, written with its
+    ## group, so it reads back as part of the region rather than as a second
+    ## one; @code{false} by default.
+    ## @item @qcode{'Version'}
+    ## @qcode{'R2000'} (@code{AC1015}), the default, or @qcode{'R12'}
+    ## (@code{AC1009}) for a program that reads nothing later.  R12 has no
+    ## groups and no @code{HATCH}, so a region is an error there.
+    ## @item @qcode{'LTScale'}
+    ## The drawing's line-type scale, 1 by default, written in the header so
+    ## the dashes look the same wherever the file is opened.
+    ## @end table
+    ##
+    ## The drawing units are millimetres.  Several geom objects go in one file
+    ## through @code{geom.write}.
+    ##
+    ## @seealso{geom.read, geom.write, draw.Drawing.write}
+    ## @end deftypefn
+    function write (this, FILE, varargin)
+
+      if (nargin < 2)
+        error ("geom.Region.write: invalid number of input arguments.");
+      endif
+      __dxf__ ('write', FILE, {this}, varargin, 'geom.Region.write');
+
+    endfunction
+
+  endmethods
+
+  methods (Static)
+
+    ## -*- texinfo -*-
+    ## @deftypefn {geom.Region} {@var{R} =} geom.Region.nest (@var{LOOPS})
+    ##
+    ## Make regions from closed loops, each hole in the loop around it.
+    ##
+    ## @code{@var{R} = geom.Region.nest (@var{LOOPS})} takes the closed
+    ## @code{geom.Path}, @code{geom.Polyline} and @code{geom.Spline} objects
+    ## in the cell array @var{LOOPS}, in any order, and returns the regions
+    ## they bound as a row cell array, largest first, or @code{cell (1, 0)}
+    ## when @var{LOOPS} is empty.  This is how the outlines of a drawing, an
+    ## outline and the bores and slots drawn inside it, become regions to make
+    ## solids from.
+    ##
+    ## Loops nest only with loops in the same plane.  In a plane, a loop that
+    ## no other loop encloses is the outline of a region, and a loop inside it
+    ## is a hole in that region.  A loop inside a hole is an island: it is the
+    ## outline of a region of its own, with any loops inside it as its holes,
+    ## and so on inwards, since a region is one outline and its holes.  Each
+    ## region is in the UCS of the first loop of its plane in @var{LOOPS}, and,
+    ## as every region does, runs its outline anticlockwise and its holes
+    ## clockwise.
+    ##
+    ## A loop given in world coordinates need not lie in the plane of its UCS;
+    ## it must lie in a plane.  Loops that cross or touch, themselves or each
+    ## other, make no regions and are refused, as is a loop enclosing no area.
+    ##
+    ## @example
+    ## @group
+    ## ## A plate with a bore, and a disc lying in the bore
+    ## R = geom.Region.nest (@{geom.Polyline ([20, 20, 1; 40, 20, 1], ...
+    ##                                        'Closed', true), ...
+    ##                       geom.Polyline ([0, 0; 60, 0; 60, 40; 0, 40], ...
+    ##                                      'Closed', true), ...
+    ##                       geom.Polyline ([25, 20, 1; 35, 20, 1], ...
+    ##                                      'Closed', true)@});
+    ## @end group
+    ## @end example
+    ##
+    ## @seealso{geom.Path.chain, geom.Region}
+    ## @end deftypefn
+    function R = nest (LOOPS)
+
+      ## Input validation
+      if (nargin != 1)
+        error ("geom.Region.nest: invalid number of input arguments.");
+      endif
+      if (! iscell (LOOPS))
+        error ("geom.Region.nest: LOOPS must be a cell array.");
+      endif
+      n = numel (LOOPS);
+      P = cell (1, n);
+      for k = 1:n
+        L = LOOPS{k};
+        if (! isscalar (L) || ! (isa (L, 'geom.Path')
+                                 || isa (L, 'geom.Polyline')
+                                 || isa (L, 'geom.Spline')))
+          error (strcat ("geom.Region.nest: LOOPS{%d} must be a", ...
+                         " geom.Path, geom.Polyline or geom.Spline", ...
+                         " object."), k);
+        endif
+        if (! L.Closed)
+          error ("geom.Region.nest: LOOPS{%d} must be closed.", k);
+        endif
+        if (isa (L, 'geom.Path'))
+          P{k} = L;
+        else
+          P{k} = geom.Path (L);
+        endif
+      endfor
+
+      ## Each loop into the frame of the first loop of its plane
+      frames = {};
+      plane = zeros (1, n);
+      for k = 1:n
+        Q = P{k};
+        if (! flat (Q))
+          W = toworld (Q.UCS, __sample__ (Q));
+          c = mean (W, 1);
+          [~, ~, v] = svd ((W - c)' * (W - c));
+          if (max (abs ((W - c) * v(:,3))) > 1e-9 * max ([1; abs(W(:))]))
+            error ("geom.Region.nest: LOOPS{%d} must lie in one plane.", k);
+          endif
+          Q = __into__ (Q, geom.UCS (v(:,3)', c));
+        endif
+        U = Q.UCS;
+        for j = 1:numel (frames)
+          F = frames{j};
+          scale = max ([1, abs(F.Origin), abs(U.Origin)]);
+          if (abs (U.Normal * F.Normal') >= 1 - 1e-9
+              && abs ((U.Origin - F.Origin) * F.Normal') <= 1e-9 * scale)
+            plane(k) = j;
+            Q = __into__ (Q, F);
+            break;
+          endif
+        endfor
+        if (plane(k) == 0)
+          frames{end+1} = U;
+          plane(k) = numel (frames);
+        endif
+        P{k} = Q;
+      endfor
+
+      ## Each loop on its own, sampled along its arcs and splines
+      S = cell (1, n);
+      A = zeros (1, n);
+      for k = 1:n
+        S{k} = __sample__ (P{k})(:,1:2);
+        if (rows (S{k}) > 2 && geom.selfintersects (S{k}, true))
+          error (strcat ("geom.Region.nest: LOOPS{%d} must not cross or", ...
+                         " touch itself."), k);
+        endif
+        A(k) = __area__ (P{k});
+        if (abs (A(k)) <= 1e-12 * max (range (S{k})) ^ 2)
+          error (strcat ("geom.Region.nest: LOOPS{%d} must enclose a", ...
+                         " nonzero area."), k);
+        endif
+      endfor
+
+      ## Which loops lie inside which, those of a plane apart from one another
+      ## or one strictly inside the other
+      inside = false (n);
+      B = cell2mat (cellfun (@(q) [min(q, [], 1), max(q, [], 1)], S(:), ...
+                             'UniformOutput', false));
+      for j = 1:n
+        for k = j+1:n
+          if (plane(j) != plane(k) || any (B(j,3:4) < B(k,1:2))
+                                   || any (B(k,3:4) < B(j,1:2)))
+            continue;
+          endif
+          if (meets (S{j}, S{k}))
+            error (strcat ("geom.Region.nest: LOOPS{%d} and LOOPS{%d} must", ...
+                           " not cross or touch."), j, k);
+          endif
+          inside(j,k) = inpolygon (S{j}(1,1), S{j}(1,2), ...
+                                   S{k}(:,1), S{k}(:,2));
+          inside(k,j) = inpolygon (S{k}(1,1), S{k}(1,2), ...
+                                   S{j}(:,1), S{j}(:,2));
+        endfor
+      endfor
+
+      ## A loop inside an even number of others is an outline, one inside an
+      ## odd number a hole in the loop around it
+      depth = sum (inside, 2)';
+      outline = find (mod (depth, 2) == 0);
+      R = cell (1, numel (outline));
+      area = zeros (1, numel (outline));
+      for i = 1:numel (outline)
+        o = outline(i);
+        h = find (inside(:,o)' & depth == depth(o) + 1);
+        O = P{o};
+        if (A(o) < 0)
+          O = __reversed__ (O);
+        endif
+        H = P(h);
+        for j = 1:numel (h)
+          if (A(h(j)) > 0)
+            H{j} = __reversed__ (H{j});
+          endif
+        endfor
+        Q = geom.Region ([0, 0; 1, 0; 0, 1]);
+        Q.Outline = O;
+        Q.Holes = H;
+        R{i} = Q;
+        area(i) = abs (A(o)) - sum (abs (A(h)));
+      endfor
+      [~, i] = sort (area, 'descend');
+      R = R(i);
+
+    endfunction
+
   endmethods
 
   methods (Static, Hidden)
@@ -1937,3 +2166,145 @@ endfunction
 %! polararray (geom.Region ([0, 0; 1, 0; 0, 1]), 3, 90, 'Rotate', 'no')
 %!error<geom.Region.polararray: Name/Value arguments must come in pairs.> ...
 %! polararray (geom.Region ([0, 0; 1, 0; 0, 1]), 3, 90, [0, 0], 'Rotate')
+
+%!test  # nested: an outline and the two holes inside it
+%! R = geom.Region.nest ({geom.Polyline([5, 5; 10, 5; 10, 10; 5, 10], ...
+%!                                     'Closed', true), ...
+%!                       geom.Polyline([0, 0; 60, 0; 60, 40; 0, 40], ...
+%!                                     'Closed', true), ...
+%!                       geom.Polyline([20, 20, 1; 40, 20, 1], ...
+%!                                     'Closed', true)});
+%! assert_equal (numel (R), 1);
+%! assert_equal (numel (R{1}.Holes), 2);
+%! assert_equal (__area__ (R{1}.Outline), 2400, 1e-9);
+
+%!test  # nested: the outline turned anticlockwise, a hole clockwise
+%! R = geom.Region.nest ({geom.Polyline([0, 0; 0, 40; 60, 40; 60, 0], ...
+%!                                     'Closed', true), ...
+%!                       geom.Polyline([5, 5; 10, 5; 10, 10; 5, 10], ...
+%!                                     'Closed', true)});
+%! assert_equal (__area__ (R{1}.Outline), 2400, 1e-9);
+%! assert_equal (__area__ (R{1}.Holes{1}), -25, 1e-9);
+
+%!test  # nested: an island in a hole is a region of its own, largest first
+%! R = geom.Region.nest ({geom.Polyline([40, 40; 60, 40; 60, 60; 40, 60], ...
+%!                                     'Closed', true), ...
+%!                       geom.Polyline([20, 20; 80, 20; 80, 80; 20, 80], ...
+%!                                     'Closed', true), ...
+%!                       geom.Polyline([0, 0; 100, 0; 100, 100; 0, 100], ...
+%!                                     'Closed', true)});
+%! assert_equal (numel (R), 2);
+%! assert_equal (numel (R{1}.Holes), 1);
+%! assert_equal (__area__ (R{2}.Outline), 400, 1e-9);
+
+%!test  # nested: two outlines apart, the larger first
+%! R = geom.Region.nest ({geom.Polyline([0, 0; 10, 0; 10, 10; 0, 10], ...
+%!                                     'Closed', true), ...
+%!                       geom.Polyline([20, 0; 40, 0; 40, 20; 20, 20], ...
+%!                                     'Closed', true)});
+%! assert_equal (numel (R), 2);
+%! assert_equal (__area__ (R{1}.Outline), 400, 1e-9);
+
+%!test  # nested: loops of two planes do not nest together
+%! U = geom.UCS ([0, 0, 1], [0, 0, 10]);
+%! R = geom.Region.nest ({geom.Polyline([0, 0; 60, 0; 60, 40; 0, 40], ...
+%!                                     'Closed', true), ...
+%!                       geom.Polyline([5, 5; 10, 5; 10, 10; 5, 10], ...
+%!                                     'Closed', true, 'UCS', U)});
+%! assert_equal (numel (R), 2);
+%! assert_equal (numel (R{1}.Holes), 0);
+
+%!test  # nested: a hole given in another frame of the same plane
+%! U = geom.UCS ([0, 0, -1], [30, 20, 0]);
+%! R = geom.Region.nest ({geom.Polyline([0, 0; 60, 0; 60, 40; 0, 40], ...
+%!                                     'Closed', true), ...
+%!                       geom.Polyline([0, 0; 5, 0; 5, 5; 0, 5], ...
+%!                                     'Closed', true, 'UCS', U)});
+%! assert_equal (numel (R), 1);
+%! assert_equal (numel (R{1}.Holes), 1);
+
+%!test  # nested: a loop in world coordinates on a sloping plane
+%! U = geom.UCS ([1, 1, 1], [0, 0, 5]);
+%! V = toworld (U, [0, 0, 0; 10, 0, 0; 10, 10, 0; 0, 10, 0]);
+%! R = geom.Region.nest ({geom.Path(V, 'Closed', true)});
+%! assert_equal (abs (R{1}.UCS.Normal * U.Normal'), 1, 1e-12);
+%! assert_equal (abs (__area__ (R{1}.Outline)), 100, 1e-9);
+
+%!test  # nested: nothing to nest
+%! assert_equal (geom.Region.nest ({}), cell (1, 0));
+
+%!error<geom.Region.nest: invalid number of input arguments.> ...
+%! geom.Region.nest ()
+%!error<geom.Region.nest: LOOPS must be a cell array.> ...
+%! geom.Region.nest (geom.Polyline ([0, 0; 1, 0; 0, 1], 'Closed', true))
+%!error<geom.Region.nest: LOOPS\{1\} must be a geom.Path, geom.Polyline or geom.Spline object.> ...
+%! geom.Region.nest ({[0, 0; 1, 0; 0, 1]})
+%!error<geom.Region.nest: LOOPS\{1\} must be closed.> ...
+%! geom.Region.nest ({geom.Polyline([0, 0; 1, 0; 0, 1])})
+%!error<geom.Region.nest: LOOPS\{1\} must lie in one plane.> ...
+%! geom.Region.nest ({geom.Path([0, 0, 0; 10, 0, 0; 10, 10, 5; 0, 10, 0], ...
+%!                              'Closed', true)})
+%!error<geom.Region.nest: LOOPS\{1\} must not cross or touch itself.> ...
+%! geom.Region.nest ({geom.Polyline([0, 0; 10, 10; 10, 0; 0, 10], ...
+%!                                  'Closed', true)})
+%!error<geom.Region.nest: LOOPS\{1\} must enclose a nonzero area.> ...
+%! geom.Region.nest ({geom.Path([0, 0; 10, 0], 'Closed', true)})
+%!error<geom.Region.nest: LOOPS\{1\} and LOOPS\{2\} must not cross or touch.> ...
+%! geom.Region.nest ({geom.Polyline([0, 0; 10, 0; 10, 10; 0, 10], ...
+%!                                  'Closed', true), ...
+%!                    geom.Polyline([5, 5; 15, 5; 15, 15; 5, 15], ...
+%!                                  'Closed', true)})
+%!error<geom.Region.nest: LOOPS\{1\} and LOOPS\{2\} must not cross or touch.> ...
+%! geom.Region.nest ({geom.Polyline([0, 0; 10, 0; 10, 10; 0, 10], ...
+%!                                  'Closed', true), ...
+%!                    geom.Polyline([10, 0; 20, 0; 20, 10; 10, 10], ...
+%!                                  'Closed', true)})
+
+%!test  # write: geom.read gives back the region with its holes
+%! H = geom.Polyline ([20, 20, 1; 30, 20, 1], 'Closed', true);
+%! R = geom.Region (geom.Polyline ([0, 0; 60, 0; 60, 40; 0, 40], ...
+%!                                 'Closed', true), {H});
+%! fn = [tempname(), '.dxf'];
+%! unwind_protect
+%!   write (R, fn, 'Fill', true);
+%!   C = geom.read (fn);
+%!   assert_equal (numel (C), 1);
+%!   assert_equal (numel (C{1}.Holes), 1);
+%!   assert_equal (C{1}.Outline.Vertices, R.Outline.Vertices, 1e-12);
+%! unwind_protect_cleanup
+%!   unlink (fn);
+%! end_unwind_protect
+%!test  # write: a loop with a spline in it is written as its pieces
+%! R = geom.Region (geom.Spline ([-3, -2; 3, -2; 4, 2; 0, 4; -4, 2], ...
+%!                               'Closed', true));
+%! fn = [tempname(), '.dxf'];
+%! unwind_protect
+%!   write (R, fn);
+%!   C = geom.read (fn);
+%!   assert_equal (class (C{1}), 'geom.Region');
+%!   assert_equal (isempty (C{1}.Outline.Splines{1}), false);
+%! unwind_protect_cleanup
+%!   unlink (fn);
+%! end_unwind_protect
+%!test  # write: a region on a tilted plane keeps its frame
+%! U = geom.UCS ([1, 0, 1], [0, 0, 5]);
+%! R = geom.Region (geom.Polyline ([0, 0; 6, 0; 6, 4], 'Closed', true));
+%! R.UCS = U;
+%! fn = [tempname(), '.dxf'];
+%! unwind_protect
+%!   write (R, fn);
+%!   C = geom.read (fn);
+%!   assert_equal (C{1}.UCS.Normal, U.Normal, 1e-12);
+%!   assert_equal (C{1}.UCS.XAxis, U.XAxis, 1e-12);
+%! unwind_protect_cleanup
+%!   unlink (fn);
+%! end_unwind_protect
+
+%!error<geom.Region.write: invalid number of input arguments.> ...
+%! write (geom.Region (geom.Polyline ([0, 0; 1, 0; 1, 1], 'Closed', true)))
+%!error<geom.Region.write: Fill must be a logical scalar.> ...
+%! write (geom.Region (geom.Polyline ([0, 0; 1, 0; 1, 1], 'Closed', true)), ...
+%!        'a.dxf', 'Fill', 'yes')
+%!error<geom.Region.write: R12 holds only lines and arcs, not a region.> ...
+%! write (geom.Region (geom.Polyline ([0, 0; 1, 0; 1, 1], 'Closed', true)), ...
+%!        'a.dxf', 'Version', 'R12')

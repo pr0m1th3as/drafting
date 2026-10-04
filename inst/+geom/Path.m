@@ -774,6 +774,57 @@ classdef Path
 
     endfunction
 
+
+    ## -*- texinfo -*-
+    ## @deftypefn  {geom.Path} {} write (@var{P}, @var{FILE})
+    ## @deftypefnx {geom.Path} {} write (@var{P}, @var{FILE}, @var{Name}, @var{Value}, @dots{})
+    ##
+    ## Write a path to a DXF file.
+    ##
+    ## @code{write (@var{P}, @var{FILE})} writes the path @var{P} to
+    ## @var{FILE}, which must end in @file{.dxf}, as its pieces in an ASCII
+    ## DXF drawing: a @code{LINE} for each straight segment, an @code{ARC} on
+    ## its own plane for each arc and a @code{SPLINE} for each spline, in
+    ## world coordinates, bound by a group.  The group's extended data, under
+    ## the application @qcode{'DRAFTING'}, names the class and holds the
+    ## path's @code{geom.UCS}, so @code{geom.read} gives back the path that
+    ## was written, closed or not, in its frame.  A program that does not
+    ## know the package sees the pieces, which is what a path is.
+    ##
+    ## Name/Value pairs:
+    ##
+    ## @table @asis
+    ## @item @qcode{'Layer'}
+    ## The layer, @qcode{'0'} by default.
+    ## @item @qcode{'Linetype'}
+    ## One of the line types of @code{draw.linetype}, or any name the
+    ## receiving program holds; @qcode{'CONTINUOUS'} by default.
+    ## @item @qcode{'Colour'}
+    ## An AutoCAD colour index from 1 to 256, 256 meaning the layer's colour,
+    ## which is the default.  True colour came only with R2004.
+    ## @item @qcode{'Version'}
+    ## @qcode{'R2000'} (@code{AC1015}), the default, or @qcode{'R12'}
+    ## (@code{AC1009}) for a program that reads nothing later.  R12 has no
+    ## groups and holds only lines and arcs, so a path is an error there.
+    ## @item @qcode{'LTScale'}
+    ## The drawing's line-type scale, 1 by default, written in the header so
+    ## the dashes look the same wherever the file is opened.
+    ## @end table
+    ##
+    ## The drawing units are millimetres.  Several geom objects go in one file
+    ## through @code{geom.write}.
+    ##
+    ## @seealso{geom.read, geom.write, draw.Drawing.write}
+    ## @end deftypefn
+    function write (this, FILE, varargin)
+
+      if (nargin < 2)
+        error ("geom.Path.write: invalid number of input arguments.");
+      endif
+      __dxf__ ('write', FILE, {this}, varargin, 'geom.Path.write');
+
+    endfunction
+
   endmethods
 
   methods (Access = private)
@@ -906,6 +957,182 @@ classdef Path
 
     endfunction
 
+    ## -*- texinfo -*-
+    ## @deftypefn {geom.Path} {@var{C} =} geom.Path.chain (@var{PIECES})
+    ##
+    ## Join pieces that meet end to end into paths.
+    ##
+    ## @code{@var{C} = geom.Path.chain (@var{PIECES})} joins the
+    ## @code{geom.Polyline}, @code{geom.Spline} and @code{geom.Path} objects
+    ## in the cell array @var{PIECES} wherever an end of one meets an end of
+    ## another, and returns the paths they make as a row cell array, one for
+    ## each run of pieces, or @code{cell (1, 0)} when @var{PIECES} is empty.
+    ## This is how the lines, arcs and splines of a drawing, given in any
+    ## order and any direction, become the outlines they draw.
+    ##
+    ## Two ends meet when they lie within 1e-4 millimetres of each other.  The
+    ## pieces are turned round as the run needs, and the two ends of every
+    ## joint are moved to the point half way between them, so that the path
+    ## passes through one vertex there.  Nothing else is changed: arcs stay
+    ## exact arcs, splines stay the splines they were, and where pieces meet
+    ## at an angle the path has a corner.  A run whose last end meets its
+    ## first is closed, and a piece that is closed already comes back as a
+    ## closed path of its own.
+    ##
+    ## Where an end meets more than one other end, the run stops there, and
+    ## each branch is a path of its own: the pieces do not say which way the
+    ## outline goes on.  The paths come in the order of the first piece of
+    ## each in @var{PIECES}.
+    ##
+    ## The paths are in the world coordinate system, unless every piece has
+    ## the same UCS, in which case they are in that one.
+    ##
+    ## @example
+    ## @group
+    ## ## A slot drawn as two lines and two half circles, in no order
+    ## C = geom.Path.chain (@{geom.Polyline ([0, 0; 20, 0]), ...
+    ##                      geom.Polyline ([0, 10, 1; 0, 0, 0]), ...
+    ##                      geom.Polyline ([0, 10; 20, 10]), ...
+    ##                      geom.Polyline ([20, 0, 1; 20, 10, 0])@});
+    ## @end group
+    ## @end example
+    ##
+    ## @seealso{geom.Path.join, geom.Region.nest}
+    ## @end deftypefn
+    function C = chain (PIECES)
+
+      ## Input validation
+      if (nargin != 1)
+        error ("geom.Path.chain: invalid number of input arguments.");
+      endif
+      if (! iscell (PIECES))
+        error ("geom.Path.chain: PIECES must be a cell array.");
+      endif
+      n = numel (PIECES);
+      P = cell (1, n);
+      for k = 1:n
+        p = PIECES{k};
+        if (! isscalar (p) || ! (isa (p, 'geom.Polyline')
+                                 || isa (p, 'geom.Spline')
+                                 || isa (p, 'geom.Path')))
+          error (strcat ("geom.Path.chain: PIECES{%d} must be a", ...
+                         " geom.Polyline, geom.Spline or geom.Path", ...
+                         " object."), k);
+        endif
+        if (isa (p, 'geom.Path'))
+          P{k} = p;
+        else
+          P{k} = geom.Path (p);
+        endif
+      endfor
+
+      C = cell (1, 0);
+      if (n == 0)
+        return;
+      endif
+
+      ## One frame for all: the pieces' own when they share one
+      U = P{1}.UCS;
+      if (! all (cellfun (@(q) q.UCS == U, P)))
+        U = geom.UCS ();
+        P = cellfun (@(q) __into__ (q, U), P, 'UniformOutput', false);
+      endif
+
+      ## The ends of the open pieces, start then end, with their owners
+      closed = cellfun (@(q) q.Closed, P);
+      E = zeros (2 * n, 3);
+      for k = find (! closed)
+        E(2*k-1,:) = P{k}.Vertices(1,:);
+        E(2*k,:) = P{k}.Vertices(end,:);
+      endfor
+      live = repelem (! closed, 2);
+      tol = 1e-4;
+
+      used = false (1, n);
+      for k = 1:n
+        if (used(k))
+          continue;
+        endif
+        used(k) = true;
+        if (closed(k))
+          C{end+1} = P{k};
+          continue;
+        endif
+
+        ## The run as pieces and whether each is turned round, its ends as
+        ## indices into E
+        run = k;
+        turned = false;
+        head = 2 * k - 1;
+        tail = 2 * k;
+        shut = false;
+        while (true)
+          m = meeting (E, live, tail, tol);
+          if (numel (m) != 1)
+            break;
+          elseif (m == head)
+            shut = true;
+            break;
+          endif
+          j = ceil (m / 2);
+          if (used(j))
+            break;
+          endif
+          used(j) = true;
+          run(end+1) = j;
+          turned(end+1) = (m == 2 * j);
+          tail = 4 * j - 1 - m;
+        endwhile
+        while (! shut)
+          m = meeting (E, live, head, tol);
+          if (numel (m) != 1 || m == tail)
+            break;
+          endif
+          j = ceil (m / 2);
+          if (used(j))
+            break;
+          endif
+          used(j) = true;
+          run = [j, run];
+          turned = [(m == 2 * j - 1), turned];
+          head = 4 * j - 1 - m;
+        endwhile
+
+        ## Put the pieces end to end, each joint on one point
+        Q = P{run(1)};
+        if (turned(1))
+          Q = __reversed__ (Q);
+        endif
+        V = Q.Vertices;
+        M = Q.Midpoints;
+        S = Q.Splines;
+        for i = 2:numel (run)
+          R = P{run(i)};
+          if (turned(i))
+            R = __reversed__ (R);
+          endif
+          W = R.Vertices;
+          W(1,:) = (V(end,:) + W(1,:)) / 2;
+          V(end,:) = W(1,:);
+          M = [M(1:end-1,:); R.Midpoints];
+          S = [S(1:end-1); R.Splines];
+          V = [V; W(2:end,:)];
+        endfor
+        if (shut)
+          V(1,:) = (V(1,:) + V(end,:)) / 2;
+          V(end,:) = [];
+          M(end,:) = [];
+          S(end) = [];
+        endif
+        Q.Vertices = V;
+        Q.Midpoints = M;
+        Q.Splines = S;
+        Q.Closed = shut;
+        C{end+1} = Q;
+      endfor
+
+    endfunction
+
   endmethods
 
   methods
@@ -982,6 +1209,16 @@ function errmsg = fits (C, TIN, TOUT, WHAT)
       return;
     endif
   endfor
+
+endfunction
+
+## The rows of the ends E, among those LIVE, within TOL of the end K, K itself
+## left out
+function m = meeting (E, live, K, tol)
+
+  d = sqrt (sum ((E - E(K,:)) .^ 2, 2))';
+  live(K) = false;
+  m = find (live & d <= tol);
 
 endfunction
 
@@ -1299,6 +1536,91 @@ endfunction
 %! assert_equal (rows (P.Vertices), 2);
 %! assert_equal (length (P), 10 + 5 * pi, 1e-12);
 
+%!test  # chained: pieces turned round as the run needs
+%! C = geom.Path.chain ({geom.Polyline([0, 0; 10, 0]), ...
+%!                       geom.Polyline([10, 10; 10, 0]), ...
+%!                       geom.Polyline([10, 10; 0, 10])});
+%! assert_equal (numel (C), 1);
+%! assert_equal (C{1}.Vertices, [0, 0, 0; 10, 0, 0; 10, 10, 0; 0, 10, 0]);
+%! assert_equal (C{1}.Closed, false);
+
+%!test  # chained: a run that ends where it began is closed
+%! C = geom.Path.chain ({geom.Polyline([10, 0; 10, 10]), ...
+%!                       geom.Polyline([0, 0; 10, 0]), ...
+%!                       geom.Polyline([0, 10; 0, 0]), ...
+%!                       geom.Polyline([0, 10; 10, 10])});
+%! assert_equal (numel (C), 1);
+%! assert_equal (C{1}.Closed, true);
+%! assert_equal (length (C{1}), 40);
+
+%!test  # chained: the first piece found in the middle, the run grown back
+%! C = geom.Path.chain ({geom.Polyline([10, 0; 20, 0]), ...
+%!                       geom.Polyline([20, 0; 30, 0]), ...
+%!                       geom.Polyline([0, 0; 10, 0])});
+%! assert_equal (C{1}.Vertices(:,1)', [0, 10, 20, 30]);
+
+%!test  # chained: a polyline's arc stays the exact arc
+%! C = geom.Path.chain ({geom.Path([10, 0; 20, 0]), ...
+%!                       geom.Polyline([0, 0, 1; 10, 0, 0])});
+%! assert_equal (C{1}.Midpoints(1,:), [5, -5, 0], 1e-12);
+%! assert_equal (length (C{1}), 10 + 5 * pi, 1e-12);
+
+%!test  # chained: a spline stays the spline it was
+%! SP = geom.Spline ([20, 0; 25, 5; 30, 0]);
+%! C = geom.Path.chain ({geom.Polyline([10, 0; 20, 0]), SP});
+%! assert_equal (C{1}.Splines{2}.ControlPoints, SP.ControlPoints);
+
+%!test  # chained: a spline turned round to follow the run
+%! SP = geom.Spline ([30, 0; 25, 5; 20, 0]);
+%! C = geom.Path.chain ({geom.Polyline([10, 0; 20, 0]), SP});
+%! assert_equal (C{1}.Vertices, [10, 0, 0; 20, 0, 0; 30, 0, 0]);
+%! assert_equal (length (C{1}), 10 + length (SP), 1e-9);
+
+%!test  # chained: a closed piece is a closed path of its own
+%! C = geom.Path.chain ({geom.Polyline([0, 0, 1; 10, 0, 1], 'Closed', true)});
+%! assert_equal (C{1}.Closed, true);
+%! assert_equal (length (C{1}), 10 * pi, 1e-12);
+
+%!test  # chained: three ends at one point stop every run there
+%! C = geom.Path.chain ({geom.Polyline([-1, 0; 0, 0]), ...
+%!                       geom.Polyline([0, 0; 1, 0]), ...
+%!                       geom.Polyline([0, 0; 0, 1])});
+%! assert_equal (numel (C), 3);
+
+%!test  # chained: two runs apart, in the order of their first pieces
+%! C = geom.Path.chain ({geom.Polyline([0, 5; 1, 5]), ...
+%!                       geom.Polyline([0, 0; 1, 0]), ...
+%!                       geom.Polyline([1, 5; 2, 5])});
+%! assert_equal (numel (C), 2);
+%! assert_equal (C{1}.Vertices(:,2)', [5, 5, 5]);
+
+%!test  # chained: ends 5e-5 apart meet, on the point between them
+%! C = geom.Path.chain ({geom.Polyline([0, 0; 1, 0]), ...
+%!                       geom.Polyline([1 + 5e-5, 0; 2, 0])});
+%! assert_equal (numel (C), 1);
+%! assert_equal (C{1}.Vertices(2,:), [1 + 2.5e-5, 0, 0], 1e-15);
+
+%!test  # chained: ends 5e-4 apart do not
+%! C = geom.Path.chain ({geom.Polyline([0, 0; 1, 0]), ...
+%!                       geom.Polyline([1 + 5e-4, 0; 2, 0])});
+%! assert_equal (numel (C), 2);
+
+%!test  # chained: in the UCS the pieces share
+%! U = geom.UCS ([0, -1, 0], [5, 0, 0]);
+%! C = geom.Path.chain ({geom.Polyline([0, 0; 1, 0], 'UCS', U), ...
+%!                       geom.Polyline([1, 0; 1, 1], 'UCS', U)});
+%! assert_equal (C{1}.UCS == U, true);
+
+%!test  # chained: in world coordinates when the pieces' UCSs differ
+%! U = geom.UCS ([0, 0, 1], [5, 0, 0]);
+%! C = geom.Path.chain ({geom.Polyline([0, 0; 1, 0], 'UCS', U), ...
+%!                       geom.Polyline([6, 0; 6, 1])});
+%! assert_equal (C{1}.UCS == geom.UCS (), true);
+%! assert_equal (C{1}.Vertices, [5, 0, 0; 6, 0, 0; 6, 1, 0]);
+
+%!test  # chained: nothing to chain
+%! assert_equal (geom.Path.chain ({}), cell (1, 0));
+
 %!error<geom.Path: invalid number of input arguments.> geom.Path ()
 %!error<geom.Path: invalid number of input arguments.> ...
 %! geom.Path (geom.Polyline ([0, 0; 1, 0]), 'Closed', true)
@@ -1379,3 +1701,41 @@ endfunction
 %! geom.Path.arc ([0, 0, 0], [1, 1, 1], [2, 2, 2])
 %!error<geom.Path.arc: P1, PM and P2 must not lie on one line.> ...
 %! geom.Path.arc ([0, 0, 0], [1, 1, 0], [0, 0, 0])
+%!error<geom.Path.chain: invalid number of input arguments.> ...
+%! geom.Path.chain ()
+%!error<geom.Path.chain: PIECES must be a cell array.> ...
+%! geom.Path.chain (geom.Polyline ([0, 0; 1, 0]))
+%!error<geom.Path.chain: PIECES\{2\} must be a geom.Polyline, geom.Spline or geom.Path object.> ...
+%! geom.Path.chain ({geom.Polyline([0, 0; 1, 0]), [1, 0; 2, 0]})
+
+%!test  # write: geom.read gives back the path, arcs and splines exact
+%! P = fillet (geom.Path ([0, 0, 0; 40, 0, 0; 40, 20, 10; 0, 20, 10]), 5);
+%! P = join (P, geom.Spline ([0, 20, 10; -10, 30, 15; -20, 20, 20]));
+%! fn = [tempname(), '.dxf'];
+%! unwind_protect
+%!   write (P, fn);
+%!   C = geom.read (fn);
+%!   assert_equal (numel (C), 1);
+%!   assert_equal (C{1}.Vertices, P.Vertices, 1e-9);
+%!   assert_equal (length (C{1}), length (P), 1e-9);
+%! unwind_protect_cleanup
+%!   unlink (fn);
+%! end_unwind_protect
+%!test  # write: a closed path in a frame of its own comes back in it
+%! U = geom.UCS ([0, 1, 0], [0, 5, 0]);
+%! P = geom.Path ([0, 0; 10, 0; 10, 10], 'Closed', true, 'UCS', U);
+%! fn = [tempname(), '.dxf'];
+%! unwind_protect
+%!   write (P, fn);
+%!   C = geom.read (fn);
+%!   assert_equal (C{1}.Closed, true);
+%!   assert_equal (C{1}.UCS.Origin, U.Origin, 1e-12);
+%!   assert_equal (C{1}.Vertices, P.Vertices, 1e-9);
+%! unwind_protect_cleanup
+%!   unlink (fn);
+%! end_unwind_protect
+
+%!error<geom.Path.write: invalid number of input arguments.> ...
+%! write (geom.Path ([0, 0; 1, 0]))
+%!error<geom.Path.write: R12 holds only lines and arcs, not a path.> ...
+%! write (geom.Path ([0, 0; 1, 0]), 'a.dxf', 'Version', 'R12')
