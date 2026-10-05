@@ -327,6 +327,10 @@ public:
                                  Aspect_GradientFillMethod_Vertical);
     m_view->SetProj (V3d_XposYnegZpos);
 
+    // Turn about the centre of the view, which follows every pan, rather
+    // than about the middle of the part, which stays where it was
+    SetRotationMode (AIS_RotationMode_CameraAt);
+
     // The world axes in a corner, turning with the view, clear of the
     // prompts at the lower left
     m_view->TriedronDisplay (Aspect_TOTP_RIGHT_LOWER, Quantity_NOC_BLACK, 0.12,
