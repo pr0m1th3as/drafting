@@ -64,7 +64,7 @@ it changes what the package is. In rough order of value:
 | Group | Content |
 |---|---|
 | Dimensional tolerances | symmetric (`±0.05`), limit dimensions (`25.05/24.95`), and ISO fits (`H7`, `g6`) resolved to real limits from the standard tables |
-| Feature control frames | position, flatness, perpendicularity, concentricity, runout and profile, with datum references and material-condition modifiers |
+| Feature control frames | profile and runout first, the frames on every blade, vane, printed part and shaft; then position, flatness, concentricity and perpendicularity; with datum references and material-condition modifiers |
 | Baseline and chain dimensions | datum-referenced running dimensions over a point set, building on `ordinate`, and chain-dimension helpers |
 | Surface finish and welds | Ra/Rz finish symbols, and weld symbols per ISO 2553 |
 | Section and detail marks | cutting planes with view direction, circled detail callouts carrying their own scale |
@@ -170,9 +170,12 @@ same lowered list that `plot` and `tikz` take, so it is a third consumer rather
 than a new architecture. It serves documentation, the web, and everyone without
 a CAD program.
 
-**Windows and macOS.** The package builds on Linux. Windows needs Open CASCADE
-built with MinGW, since the MSVC binaries do not link against Octave, and the
-viewer, written for X11, needs porting there and on macOS.
+## Other platforms
+
+The package builds on Linux, and ports to Windows and macOS are not planned.
+A port is welcome as a contribution. Windows needs Open CASCADE built with the
+MinGW that builds Octave, since the MSVC binaries do not link against it, and
+on both the viewer, written for X11, needs a window of the platform's own.
 
 ## Deliberately out of scope
 
@@ -183,4 +186,5 @@ viewer, written for X11, needs porting there and on macOS.
 | Solids in DXF (`3DSOLID`) | the geometry is ACIS, proprietary and unreadable by Open CASCADE; solids are exchanged as STEP, and reach DXF as drawings |
 | A solid-modelling kernel of our own | decades of work that Open CASCADE already holds; the package binds it instead |
 | Parametric constraint solving | genuinely valuable and genuinely a research project: degree-of-freedom analysis, conditioning, and useful diagnostics for under- and over-constrained sketches. Its own package if ever |
+| GD&T as PMI in STEP AP242 | a maker turns PMI back into a drawing and charges for it; tolerances go on the drawing, sent as PDF and DXF beside the STEP model |
 | `minkowski` and `multmatrix` | rounding a shape is `fillet` and the offsets, a Minkowski sum of exact solids has no counterpart in Open CASCADE, and a part is placed by a `geom.UCS`, which never shears it |
