@@ -258,6 +258,12 @@ your choice with *write* permission and run:
 package_texi2html ("drafting")
 ```
 
+The guide at
+[https://pr0m1th3as.github.io/drafting/guide/](https://pr0m1th3as.github.io/drafting/guide/)
+goes beyond the reference: how the namespaces and classes fit together, how
+each class is written to DXF and read back, and twelve tutorials that build
+parts and drawings step by step, every picture made by the code above it.
+
 ## Where it is going
 
 [`ROADMAP.md`](ROADMAP.md) sets out what is planned and why, ordered by what
