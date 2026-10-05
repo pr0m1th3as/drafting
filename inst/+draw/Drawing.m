@@ -2360,22 +2360,18 @@ classdef Drawing
     ## Plot a drawing onto paper at a stated scale.
     ##
     ## @code{draw.Drawing.print (@var{D}, @var{FILE})} writes the
-    ## @code{draw.Drawing}
-    ## object @var{D} to @var{FILE} on an A4 landscape sheet, at the largest of
-    ## the
-    ## preferred scales that fits. The output format is taken from the extension
-    ## of @var{FILE}: @file{.pdf}, @file{.eps} and @file{.svg} are vector,
-    ## @file{.png}, @file{.jpg} and @file{.tif} are raster.
+    ## @code{draw.Drawing} object @var{D} to @var{FILE} on an A4 landscape
+    ## sheet, at the largest of the preferred scales that fits.  The output
+    ## format is taken from the extension of @var{FILE}: @file{.pdf},
+    ## @file{.eps} and @file{.svg} are vector, @file{.png}, @file{.jpg} and
+    ## @file{.tif} are raster.
     ##
-    ## @strong{The drawing arrives at its scale, not merely fitted to the page.}
-    ## A
-    ## distance measured on the sheet, multiplied by the scale denominator, is
-    ## the
-    ## distance in the model. That is the difference between a plot and a
-    ## picture,
-    ## and it is what @code{print} on a figure cannot give: it fits the axes to
-    ## the
-    ## paper, so a millimetre on the page means nothing.
+    ## @strong{The drawing arrives at its scale, not merely fitted to the
+    ## page.}  A distance measured on the sheet, multiplied by the scale
+    ## denominator, is the distance in the model.  That is the difference
+    ## between a plot and a picture, and it is what @code{print} on a figure
+    ## cannot give: it fits the axes to the paper, so a millimetre on the page
+    ## means nothing.
     ##
     ## @subheading Name/Value pairs
     ##
@@ -2388,48 +2384,41 @@ classdef Drawing
     ## @item @qcode{'Scale'} @tab fitted @tab plot scale denominator: 50 means
     ## 1:50.  The default picks the largest preferred scale the sheet holds
     ## @item @qcode{'Margin'} @tab 10 @tab blank border kept around the drawing,
-    ## in
-    ## millimetres of paper
+    ## in millimetres of paper; 0 for none, as a sheet framed by
+    ## @code{draw.titleblock} wants, since its frame runs along the trimmed
+    ## edge of the paper
     ## @item @qcode{'Resolution'} @tab 600 @tab dots per inch, for a raster
-    ## format
-    ## only; a vector format ignores it
+    ## format only; a vector format ignores it
     ## @item @qcode{'LineWidth'} @tab 0.35 @tab pen width in millimetres of
-    ## paper,
-    ## from the ISO 128 set 0.25, 0.35, 0.5, 0.7
+    ## paper, from the ISO 128 set 0.25, 0.35, 0.5, 0.7
     ## @end multitable
     ##
     ## @code{[@var{PAPER}, @var{SCALE}] = draw.Drawing.print (@dots{})} returns
-    ## the sheet
-    ## size actually used, in millimetres, and the scale denominator, which is
-    ## worth having when the scale was fitted rather than given.
+    ## the sheet size actually used, in millimetres, and the scale denominator,
+    ## which is worth having when the scale was fitted rather than given.
     ##
     ## @subheading The scale is chosen from the preferred series
     ##
     ## When @qcode{'Scale'} is not given, the denominator is the smallest of
     ## @code{1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000} that leaves
-    ## the
-    ## drawing inside the sheet's margins. Those are the scales ISO 5455 admits,
-    ## so an automatically chosen scale is still one a reader expects to see in
-    ## a
-    ## title block, rather than the 1:37.4 that fitting exactly would give.
+    ## the drawing inside the sheet's margins.  Those are the scales ISO 5455
+    ## admits, so an automatically chosen scale is still one a reader expects
+    ## to see in a title block, rather than the 1:37.4 that fitting exactly
+    ## would give.
     ##
     ## An explicit @qcode{'Scale'} is never overridden.  If the drawing does not
     ## fit at it, that is an error rather than a silent reduction: a sheet at
-    ## the
-    ## wrong scale is worse than no sheet.
+    ## the wrong scale is worse than no sheet.
     ##
     ## @subheading Text is a model dimension, pens are a paper one
     ##
     ## Each string is drawn at the height its entity carries, reduced by the
-    ## scale,
-    ## exactly as @code{draw.Drawing.tikz} does and as a CAD application does:
-    ## lettering
-    ## given as 125 mm in the model arrives 2.5 mm tall on a sheet at 1:50.
-    ## Author
-    ## it as the height wanted on paper times the scale denominator. The height
-    ## is
-    ## therefore part of the drawing and survives into a file written from it,
-    ## rather than being a property of one particular plot.
+    ## scale, exactly as @code{draw.Drawing.tikz} does and as a CAD application
+    ## does: lettering given as 125 mm in the model arrives 2.5 mm tall on a
+    ## sheet at 1:50.  Author it as the height wanted on paper times the scale
+    ## denominator.  The height is therefore part of the drawing and survives
+    ## into a file written from it, rather than being a property of one
+    ## particular plot.
     ##
     ## @qcode{'LineWidth'} is the opposite: a width on the paper, held there at
     ## every scale, because a 0.35 mm pen is 0.35 mm whatever the sheet shows.
@@ -2471,7 +2460,13 @@ classdef Drawing
         error (strcat ("draw.Drawing.print: Orientation must be", ...
                        " 'landscape' or 'portrait'."));
       endif
-      for f = {'Margin', 'Resolution', 'LineWidth'}
+      if (! isnumeric (opt.Margin) || ! isreal (opt.Margin)
+          || ! isscalar (opt.Margin) || ! isfinite (opt.Margin)
+          || opt.Margin < 0)
+        error (strcat ("draw.Drawing.print: Margin must be a non-negative", ...
+                       " real finite scalar."));
+      endif
+      for f = {'Resolution', 'LineWidth'}
         v = opt.(f{1});
         if (! isnumeric (v) || ! isreal (v) || ! isscalar (v)
             || ! isfinite (v) || v <= 0)

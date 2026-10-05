@@ -1339,6 +1339,157 @@ covered (const TopoDS_Edge& e, const vector<pair<Bnd_Box, TopoDS_Edge>>& taken,
   return true;
 }
 
+// Whether the edge E is straight to within TOL, its points on the chord
+// between its ends
+static bool
+straight (const TopoDS_Edge& e, double tol)
+{
+  const BRepAdaptor_Curve g (e);
+  if (g.GetType () == GeomAbs_Line)
+  {
+    return true;
+  }
+  const gp_Pnt p = g.Value (g.FirstParameter ());
+  const gp_Pnt q = g.Value (g.LastParameter ());
+  const gp_Vec d (p, q);
+  if (d.Magnitude () <= tol)
+  {
+    return false;
+  }
+  for (const double t : {0.25, 0.5, 0.75})
+  {
+    const gp_Pnt m = g.Value (g.FirstParameter ()
+                              + t * (g.LastParameter () - g.FirstParameter ()));
+    if (gp_Vec (p, m).Crossed (d).Magnitude () / d.Magnitude () > tol)
+    {
+      return false;
+    }
+  }
+  return true;
+}
+
+// The face F of the plane z = 0 with every run of straight edges that lie
+// end to end on one line joined into one line, and a straight edge held as
+// another curve, as a circle seen edge on is, made a line; every other edge
+// is kept
+static TopoDS_Face
+joinstraight (const TopoDS_Face& f, double tol)
+{
+  const TopoDS_Wire outer = BRepTools::OuterWire (f);
+  vector<TopoDS_Wire> wires;
+  bool changed = false;
+  for (TopoDS_Iterator w (f); w.More (); w.Next ())
+  {
+    const TopoDS_Wire wire = TopoDS::Wire (w.Value ());
+
+    // The edges in order round the wire, each with its ends as it runs
+    vector<TopoDS_Edge> E;
+    vector<gp_Pnt> P, Q;
+    vector<bool> S, L;
+    for (BRepTools_WireExplorer x (wire); x.More (); x.Next ())
+    {
+      const TopoDS_Edge e = x.Current ();
+      E.push_back (e);
+      P.push_back (BRep_Tool::Pnt (TopExp::FirstVertex (e, Standard_True)));
+      Q.push_back (BRep_Tool::Pnt (TopExp::LastVertex (e, Standard_True)));
+      S.push_back (straight (e, tol));
+      L.push_back (BRepAdaptor_Curve (e).GetType () == GeomAbs_Line);
+    }
+    const size_t n = E.size ();
+
+    // Whether edge k runs on along the line of the edge before it
+    auto runson = [&] (size_t k)
+    {
+      const size_t i = (k + n - 1) % n;
+      if (! S[i] || ! S[k])
+      {
+        return false;
+      }
+      const gp_Vec d (P[i], Q[i]);
+      return gp_Vec (P[i], Q[k]).Crossed (d).Magnitude () / d.Magnitude ()
+             <= tol && gp_Vec (P[k], Q[k]).Dot (d) > 0;
+    };
+    size_t start = n;
+    for (size_t k = 0; k < n; k++)
+    {
+      if (! runson (k))
+      {
+        start = k;
+        break;
+      }
+    }
+    bool work = false;
+    for (size_t k = 0; k < n; k++)
+    {
+      work = work || (S[k] && ! L[k]) || runson (k);
+    }
+    if (n < 2 || start == n || ! work)
+    {
+      if (wire.IsSame (outer))
+      {
+        wires.insert (wires.begin (), wire);
+      }
+      else
+      {
+        wires.push_back (wire);
+      }
+      continue;
+    }
+
+    BRepBuilderAPI_MakeWire mw;
+    size_t k = 0;
+    while (k < n)
+    {
+      const size_t a = (start + k) % n;
+      size_t m = 1;
+      while (k + m < n && runson ((start + k + m) % n))
+      {
+        m++;
+      }
+      if (m == 1 && ! (S[a] && ! L[a]))
+      {
+        mw.Add (E[a]);
+      }
+      else
+      {
+        mw.Add (BRepBuilderAPI_MakeEdge (P[a], Q[(start + k + m - 1) % n])
+                .Edge ());
+        changed = true;
+      }
+      k += m;
+    }
+    if (! mw.IsDone ())
+    {
+      return f;
+    }
+    TopoDS_Wire nw = mw.Wire ();
+    if (wire.IsSame (outer))
+    {
+      wires.insert (wires.begin (), nw);
+    }
+    else
+    {
+      wires.push_back (nw);
+    }
+  }
+  if (! changed)
+  {
+    return f;
+  }
+
+  // The wires laid on the plane again, the outline first and the holes in it
+  BRepBuilderAPI_MakeFace mf (gp_Pln (gp::XOY ()), wires[0]);
+  for (size_t i = 1; i < wires.size (); i++)
+  {
+    mf.Add (wires[i]);
+  }
+  if (! mf.IsDone ())
+  {
+    return f;
+  }
+  return mf.Face ();
+}
+
 // The outline of the shape S seen along z, on the plane z = 0, as facesout
 // gives it
 static Cell
@@ -1458,7 +1609,16 @@ projection (const TopoDS_Shape& s, const string& caller)
   {
     b.Add (c, withoutinternal (TopoDS::Face (x.Current ())));
   }
-  return facesout (c, (x1 - x0) * (y1 - y0) + 1);
+
+  // A circle seen edge on leaves a straight edge held as a curve, or pieces
+  // of one line
+  TopoDS_Compound j;
+  b.MakeCompound (j);
+  for (TopExp_Explorer x (c, TopAbs_FACE); x.More (); x.Next ())
+  {
+    b.Add (j, joinstraight (TopoDS::Face (x.Current ()), tol));
+  }
+  return facesout (j, (x1 - x0) * (y1 - y0) + 1);
 }
 
 // The solids of S, in the order a map of them gives

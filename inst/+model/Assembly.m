@@ -361,8 +361,10 @@ classdef Assembly
     ## sub-assembly the same way, so that a CAD program opens the product as
     ## it was built; it cannot hold a mesh part.  A 3MF file,
     ## the archive slicers take, keeps the same structure, each part a mesh
-    ## written once and placed as a component, in its colours.  An STL, OBJ
-    ## or PLY file holds @code{tessellate (@var{A})}.
+    ## written once and placed as a component, in its colours.  3MF has no
+    ## place for the name of a placement, so @code{model.read} names the
+    ## placements of a 3MF file after their parts.  An STL, OBJ or PLY file
+    ## holds @code{tessellate (@var{A})}.
     ##
     ## @code{write (@dots{}, @qcode{'Tolerance'}, @var{TOL})} sets, for a
     ## mesh, how far its facets may stray from the parts' surfaces, as

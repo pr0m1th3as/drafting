@@ -3305,6 +3305,18 @@ endfunction
 %! assert_equal (numel (R{1}.Holes), 0);
 %! assert_equal (abs (__area__ (R{1}.Outline)), 960, 1e-9);
 
+%!testif ; exist ('__occt__') == 3  # a circle seen edge on is one straight side
+%! R = projection (solid.cylinder (5, 10), geom.UCS ([0, -1, 0], [0, 0, 0]));
+%! assert_equal (sortrows (R{1}.Outline.Vertices(:,1:2)), ...
+%!               [-5, 0; -5, 10; 5, 0; 5, 10], 1e-9);
+
+%!testif ; exist ('__occt__') == 3  # pieces along one line are one side
+%! S = union (solid.cylinder (10, 5), ...
+%!            translate (solid.cylinder (5, 10), [0, 0, 5]));
+%! R = projection (S, geom.UCS ([0, -1, 0], [0, 0, 0]));
+%! assert_equal (rows (R{1}.Outline.Vertices), 8);
+%! assert_equal (abs (__area__ (R{1}.Outline)), 200, 1e-9);
+
 %!testif ; exist ('__occt__') == 3  # the xy plane by default
 %! R = projection (solid.box (10, 20, 30));
 %! assert_equal (R{1}.UCS, geom.UCS ());
