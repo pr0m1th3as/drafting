@@ -1,0 +1,163 @@
+/* Styles shared by every page of the drafting guide */
+
+:root {
+  --ink: #212529;
+  --muted: #6c757d;
+  --rule: #dee2e6;
+  --code-bg: #f6f8fa;
+  --out-bg: #ffffff;
+  --accent: #2f6db5;
+  --geom: #e8f0fb;
+  --geom-line: #2f6db5;
+  --other: #f4f5f7;
+  --other-line: #6c757d;
+}
+
+body {
+  background: #ffffff;
+  color: var(--ink);
+}
+
+main h1 {
+  font-size: 2rem;
+  margin-bottom: 0.75rem;
+}
+
+main h2 {
+  font-size: 1.5rem;
+  margin-top: 2.25rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+main h3 {
+  font-size: 1.2rem;
+  margin-top: 1.5rem;
+}
+
+main p.lead {
+  color: var(--muted);
+}
+
+code {
+  font-family: Consolas, "Courier New", monospace;
+  color: #6f42c1;
+  white-space: nowrap;
+}
+
+pre {
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 0.9rem;
+  padding: 0.75rem 1rem;
+  border-radius: 0.3rem;
+  overflow-x: auto;
+}
+
+pre code {
+  color: inherit;
+  white-space: pre;
+}
+
+pre.code-in {
+  background: var(--code-bg);
+  border: 1px solid var(--rule);
+}
+
+pre.code-out {
+  background: var(--out-bg);
+  border: 1px solid var(--rule);
+  border-left: 4px solid var(--accent);
+  color: #343a40;
+}
+
+figure.shot {
+  margin: 1rem 0 1.5rem;
+  text-align: center;
+}
+
+figure.shot img {
+  max-width: 100%;
+  height: auto;
+  border: 1px solid var(--rule);
+  border-radius: 0.3rem;
+}
+
+table.guide {
+  width: 100%;
+  margin: 1rem 0 1.5rem;
+  border-collapse: collapse;
+}
+
+table.guide th,
+table.guide td {
+  border: 1px solid var(--rule);
+  padding: 0.4rem 0.6rem;
+  vertical-align: top;
+}
+
+table.guide th {
+  background: var(--code-bg);
+}
+
+table.guide td code {
+  white-space: normal;
+}
+
+.guide-nav {
+  position: sticky;
+  top: 1rem;
+  font-size: 0.95rem;
+}
+
+.guide-nav h6 {
+  margin-top: 1rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+}
+
+.guide-nav ul {
+  list-style: none;
+  padding-left: 0;
+  margin-bottom: 0;
+}
+
+.guide-nav li a {
+  display: block;
+  padding: 0.15rem 0;
+  text-decoration: none;
+}
+
+.guide-nav li a.active {
+  font-weight: bold;
+  color: var(--ink);
+}
+
+.diagram {
+  margin: 1.25rem 0 1.75rem;
+  text-align: center;
+}
+
+.diagram svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.note {
+  border-left: 4px solid var(--accent);
+  background: var(--geom);
+  padding: 0.6rem 1rem;
+  border-radius: 0.3rem;
+  margin: 1rem 0;
+}
+
+/* The namespace diagram */
+.dg-box { fill: var(--other); stroke: var(--other-line); stroke-width: 1.5; }
+.dg-core { fill: var(--geom); stroke: var(--geom-line); stroke-width: 2; }
+.dg-title { font: bold 15px system-ui, sans-serif; fill: var(--ink); text-anchor: middle; }
+.dg-sub { font: 13px Consolas, "Courier New", monospace; fill: var(--ink); text-anchor: middle; }
+.dg-small { font: 12px system-ui, sans-serif; fill: var(--muted); text-anchor: middle; }
+.dg-label { font: 12px Consolas, "Courier New", monospace; fill: var(--accent); }
+.dg-arrow { stroke: var(--accent); stroke-width: 1.6; fill: none; }
+.dg-head { fill: var(--accent); }

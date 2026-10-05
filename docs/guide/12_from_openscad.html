@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>For OpenSCAD users - drafting guide</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" integrity="sha512-1ycn6IcaQQ40/MKBW2W4Rhis/DbILU74C1vSrLJxCq57o941Ym01SwNsOMqvEBFlcgUa6xLiPY/NS5R+E6ztJQ==" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/css/bootstrap.min.css" integrity="sha384-KyZXEAg3QhqLMpG8r+8fhAXLRk2vvoC2f3B09zVXn8CA5QIVfZOJ3BCsw2P0p/We" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-U1DAWAznBHeqEIlVSCgzq+c9gqGAJn5c/t99JyeKa9xxaYpSvHU5awsuZVVFIhvj" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="guide.css">
+  </head>
+  <body>
+    <div class="bg-dark">
+      <div class="container-xl">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+          <div class="container-fluid">
+            <a class="navbar-brand" href="index.html">
+              <img src="../assets/drafting.png" alt="drafting" class="d-inline-block align-top" width="25" height="25">
+              drafting guide
+            </a>
+            <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+              <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+              <ul class="navbar-nav">
+                <li class="nav-item">
+                  <a class="nav-link" href="../index.html">
+                    <i class="fas fa-book"></i>
+                    Function reference
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="https://github.com/pr0m1th3as/drafting">
+                    <i class="fab fa-github"></i>
+                    Source
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </nav>
+      </div>
+    </div>
+    <div class="container-xl my-4">
+      <div class="row">
+        <div class="col-md-3 col-lg-2 mb-4">
+          <nav class="guide-nav">
+<!-- guide-nav -->
+            <h6>Guide</h6>
+            <ul>
+              <li><a href="index.html">Overview</a></li>
+              <li><a href="layout.html">Package layout</a></li>
+              <li><a href="dxf.html">DXF and the classes</a></li>
+            </ul>
+            <h6>Tutorials</h6>
+            <ul>
+              <li><a href="01_first_part.html">A first part</a></li>
+              <li><a href="02_outlines.html">Outlines: polylines, splines, paths and regions</a></li>
+              <li><a href="03_regions.html">Working with regions</a></li>
+              <li><a href="04_coordinate_systems.html">Coordinate systems</a></li>
+              <li><a href="05_solids_from_regions.html">Solids from regions</a></li>
+              <li><a href="06_primitives_and_booleans.html">Primitives, booleans and transforms</a></li>
+              <li><a href="07_features.html">Features: holes, pockets, fillets, chamfers and shells</a></li>
+              <li><a href="08_sections_and_projections.html">Sections and projections</a></li>
+              <li><a href="09_drawings.html">Technical drawings</a></li>
+              <li><a href="10_meshes.html">Meshes</a></li>
+              <li><a href="11_assemblies.html">Assemblies</a></li>
+              <li><a href="12_from_openscad.html" class="active">For OpenSCAD users</a></li>
+            </ul>
+<!-- /guide-nav -->
+          </nav>
+        </div>
+        <main class="col-md-9 col-lg-10">
+<h1>For OpenSCAD users</h1>
+<p>OpenSCAD's modelling words, nearly all of them, have a counterpart here, in Octave and with exact geometry. This page maps one to the other and rebuilds a classic OpenSCAD model.</p>
+<h2>What changes</h2>
+<ul>
+<li>A shape is a value in a variable, not a node in a tree: <code>S = subtract (A, B)</code> makes a new shape and leaves <code>A</code> and <code>B</code> as they were. A module is an Octave function that returns a shape.</li>
+<li>Geometry is exact. There is no <code>$fn</code>: a cylinder is a true cylinder, and facets are made only when a mesh is written, to a tolerance <code>tessellate</code> and <code>write</code> take.</li>
+<li>A flat shape is a <a href="../geom.Region.html"><code>geom.Region</code></a> lying in a plane, a <a href="../geom.UCS.html"><code>geom.UCS</code></a>; a solid is a <a href="../solid.Shape.html"><code>solid.Shape</code></a>. Lengths are millimetres and angles degrees.</li>
+<li>Operations that can give several pieces, on regions, return a cell array of regions, largest first.</li>
+</ul>
+<h2>Solids</h2>
+<ul>
+<li><code>cube ([x, y, z])</code> is <code>solid.box (DX, DY, DZ)</code>, and <code>center = true</code> is <code>'Anchor', 'centroid'</code>.</li>
+<li><code>cylinder (h, r)</code> is <code>solid.cylinder (R, H)</code>, and <code>cylinder (h, r1, r2)</code> is <code>solid.cone (R1, R2, H)</code>; <code>center = true</code> is <code>'Anchor', 'centroid'</code>.</li>
+<li><code>sphere (r)</code> is <code>solid.sphere (R)</code>.</li>
+<li><code>polyhedron (points, faces)</code> is <code>solid.polyhedron (polymesh.Mesh (V, F))</code>, the faces given as triangles.</li>
+<li><a href="../solid.wedge.html"><code>solid.wedge</code></a>, <a href="../solid.ellipsoid.html"><code>solid.ellipsoid</code></a> and <a href="../solid.torus.html"><code>solid.torus</code></a> have no OpenSCAD counterpart.</li>
+</ul>
+<h2>Flat shapes</h2>
+<ul>
+<li><code>square</code> and <code>polygon (points, paths)</code> are <code>geom.Region (OUTLINE, HOLES)</code>, from corners.</li>
+<li><code>circle (r)</code> is <code>geom.Region ([r, 0, 1; -r, 0, 1])</code>: two half circles, the third column the bulge of each.</li>
+<li><code>text ("...")</code> is <code>geom.text ('...')</code>, the outlines of the letters in any installed font.</li>
+</ul>
+<h2>Moving and changing</h2>
+<ul>
+<li><code>translate (v)</code> is <code>translate (S, V)</code>.</li>
+<li><code>rotate (a, v)</code> is <code>rotate (S, A, V)</code>; <code>rotate ([ax, ay, az])</code> is three rotations, about <i>x</i>, then <i>y</i>, then <i>z</i>.</li>
+<li><code>mirror (v)</code> is <code>mirror (S, N)</code>.</li>
+<li><code>scale (f)</code> is <code>scale (S, F)</code>. <code>scale ([fx, fy, fz])</code> is <code>resize</code> with <code>'Uniform', false</code>, which takes sizes rather than factors: <code>resize (S, [fx, fy, fz] .* L, 'Uniform', false)</code>, with <code>L</code> the sizes from <code>[~, L] = bbox (S)</code>. It keeps the corner of the bounding box at the least <i>x</i>, <i>y</i> and <i>z</i> in place, where OpenSCAD keeps the origin.</li>
+<li><code>resize (newsize)</code> is <code>resize (S, SZ, 'Uniform', false)</code>. Without the option, <code>resize (S, SZ)</code> scales evenly, as large as fits within <code>SZ</code>.</li>
+<li><code>color ([r, g, b])</code> is <code>S.Colour = [r, g, b]</code>, kept in STEP and 3MF files.</li>
+<li>A region is moved by giving it another plane, <code>R.UCS = U</code>, and has <code>mirror</code> and <code>resize</code> of its own.</li>
+</ul>
+<h2>Booleans and hulls</h2>
+<ul>
+<li><code>union</code>, <code>difference</code> and <code>intersection</code> are <code>union</code>, <code>subtract</code> and <code>intersect</code>, for solids and for regions alike, each taking any number of shapes.</li>
+<li><code>hull</code> is <code>hull</code>. On regions it is exact, its lines tangent to the arcs; on solids it has flat faces, within a tolerance of the curved ones.</li>
+</ul>
+<h2>From flat to solid and back</h2>
+<ul>
+<li><code>linear_extrude (height = h)</code> is <code>solid.extrude (R, H)</code>; <code>center = true</code> is <code>solid.extrude (R, [H/2, H/2])</code>, and <code>twist</code> and <code>scale</code> are the options <code>'Twist'</code> and <code>'Scale'</code>. OpenSCAD turns a positive twist clockwise, the package anticlockwise, so the sign changes.</li>
+<li><code>rotate_extrude (angle = a)</code> is <code>solid.revolve (R, A)</code>. The package turns a region about the <i>y</i> axis of its own plane; laid in the <i>xz</i> plane, <code>R.UCS = geom.UCS ([0, -1, 0], [0, 0, 0])</code>, it turns about the <i>z</i> axis as in OpenSCAD.</li>
+<li><code>offset (r = d)</code> is <code>offset (R, D)</code>; <code>offset (delta = d)</code> adds <code>'Corners', 'sharp'</code>, and <code>chamfer = true</code> makes it <code>'chamfer'</code>.</li>
+<li><code>projection ()</code> is <code>projection (S)</code>, and <code>projection (cut = true)</code> is <code>section (S, geom.UCS ())</code>.</li>
+</ul>
+<h2>Repeating</h2>
+<ul>
+<li>A <code>for</code> loop of <code>translate</code> is <code>copy (S, D)</code>, a row of <code>D</code> for each copy; a grid is <code>rectarray</code>, and copies round an axis are <code>polararray</code>.</li>
+<li>Any other loop is an Octave loop with <code>union</code>.</li>
+</ul>
+<h2>Files</h2>
+<ul>
+<li><code>import</code> is <a href="../solid.read.html"><code>solid.read</code></a> for STEP, <a href="../polymesh.read.html"><code>polymesh.read</code></a> for STL, OBJ, PLY and 3MF, and <a href="../geom.read.html"><code>geom.read</code></a> for DXF.</li>
+<li><code>export</code> is <code>write</code>, a method of the shape written, the format named by the file's extension.</li>
+</ul>
+<p><code>minkowski</code> and <code>multmatrix</code> are not provided. A part is placed by a <a href="../geom.UCS.html"><code>geom.UCS</code></a>, which turns and moves it but never shears it.</p>
+<h2>A classic model, rebuilt</h2>
+<p>A cube and a sphere intersected, and three bores along the axes taken out of what is left. In OpenSCAD:</p>
+<pre class="code-in"><code>difference () {
+  intersection () {
+    cube (15, center = true);
+    sphere (10);
+  }
+  cylinder (h = 20, r = 5, center = true);
+  rotate ([90, 0, 0]) cylinder (h = 20, r = 5, center = true);
+  rotate ([0, 90, 0]) cylinder (h = 20, r = 5, center = true);
+}</code></pre>
+<p>And here:</p>
+<pre class="code-in"><code>body = intersect (solid.box (15, 15, 15, 'Anchor', 'centroid'), ...
+                  solid.sphere (10));
+c = solid.cylinder (5, 20, 'Anchor', 'centroid');
+S = subtract (body, c, rotate (c, 90, [1, 0, 0]), rotate (c, 90, [0, 1, 0]))
+show (S);</code></pre>
+<pre class="code-out"><code>S =
+
+  solid.Shape: 1 solid, 13 faces, 42 edges</code></pre>
+<figure class="shot"><img src="img/12_from_openscad-1.png" alt="For OpenSCAD users, picture 1"></figure>
+<h2>What the package adds</h2>
+<p>The edges of the result are exact circles, so they can be chosen by what they are and rounded. <code>edges</code> with <code>'Type', 'circle'</code> picks the rims of the bores and of the sphere, and <code>fillet</code> rounds them:</p>
+<pre class="code-in"><code>F = fillet (S, edges (S, 'Type', 'circle'), 0.8);
+show (F);</code></pre>
+<figure class="shot"><img src="img/12_from_openscad-2.png" alt="For OpenSCAD users, picture 2"></figure>
+<p>A section is exact too, lines, arcs and splines rather than a polygon, so it can be built from again. The cut through the middle falls into four pieces:</p>
+<pre class="code-in"><code>R = section (F, geom.UCS ());
+numel (R)
+R{1}.Outline</code></pre>
+<pre class="code-out"><code>ans = 4
+ans =
+
+  geom.Path: closed, 9 segments, 3 arcs, 2 splines</code></pre>
+<p>And the part goes to a CAD program as STEP, its curved faces kept, as well as to a slicer:</p>
+<pre class="code-in"><code>write (F, 'csg.step');
+write (F, 'csg.stl');
+volume (solid.read ('csg.step'))</code></pre>
+<pre class="code-out"><code>ans = 959.08</code></pre>
+<nav class="d-flex justify-content-between my-5">
+<a href="11_assemblies.html">&larr; Assemblies</a>
+</nav>
+
+        </main>
+      </div>
+    </div>
+  </body>
+</html>

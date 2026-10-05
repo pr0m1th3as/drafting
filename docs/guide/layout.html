@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Package layout - drafting guide</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" integrity="sha512-1ycn6IcaQQ40/MKBW2W4Rhis/DbILU74C1vSrLJxCq57o941Ym01SwNsOMqvEBFlcgUa6xLiPY/NS5R+E6ztJQ==" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/css/bootstrap.min.css" integrity="sha384-KyZXEAg3QhqLMpG8r+8fhAXLRk2vvoC2f3B09zVXn8CA5QIVfZOJ3BCsw2P0p/We" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-U1DAWAznBHeqEIlVSCgzq+c9gqGAJn5c/t99JyeKa9xxaYpSvHU5awsuZVVFIhvj" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="guide.css">
+  </head>
+  <body>
+    <div class="bg-dark">
+      <div class="container-xl">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+          <div class="container-fluid">
+            <a class="navbar-brand" href="index.html">
+              <img src="../assets/drafting.png" alt="drafting" class="d-inline-block align-top" width="25" height="25">
+              drafting guide
+            </a>
+            <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+              <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+              <ul class="navbar-nav">
+                <li class="nav-item">
+                  <a class="nav-link" href="../index.html">
+                    <i class="fas fa-book"></i>
+                    Function reference
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="https://github.com/pr0m1th3as/drafting">
+                    <i class="fab fa-github"></i>
+                    Source
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </nav>
+      </div>
+    </div>
+    <div class="container-xl my-4">
+      <div class="row">
+        <div class="col-md-3 col-lg-2 mb-4">
+          <nav class="guide-nav">
+<!-- guide-nav -->
+            <h6>Guide</h6>
+            <ul>
+              <li><a href="index.html">Overview</a></li>
+              <li><a href="layout.html" class="active">Package layout</a></li>
+              <li><a href="dxf.html">DXF and the classes</a></li>
+            </ul>
+            <h6>Tutorials</h6>
+            <ul>
+              <li><a href="01_first_part.html">A first part</a></li>
+              <li><a href="02_outlines.html">Outlines: polylines, splines, paths and regions</a></li>
+              <li><a href="03_regions.html">Working with regions</a></li>
+              <li><a href="04_coordinate_systems.html">Coordinate systems</a></li>
+              <li><a href="05_solids_from_regions.html">Solids from regions</a></li>
+              <li><a href="06_primitives_and_booleans.html">Primitives, booleans and transforms</a></li>
+              <li><a href="07_features.html">Features: holes, pockets, fillets, chamfers and shells</a></li>
+              <li><a href="08_sections_and_projections.html">Sections and projections</a></li>
+              <li><a href="09_drawings.html">Technical drawings</a></li>
+              <li><a href="10_meshes.html">Meshes</a></li>
+              <li><a href="11_assemblies.html">Assemblies</a></li>
+              <li><a href="12_from_openscad.html">For OpenSCAD users</a></li>
+            </ul>
+<!-- /guide-nav -->
+          </nav>
+        </div>
+        <main class="col-md-9 col-lg-10">
+
+<h1>Package layout</h1>
+<p class="lead">Five namespaces, ten classes and one middle layer: how the
+parts of <b>drafting</b> are arranged, and how an object made in one part
+becomes an object of another.</p>
+
+<h2 id="namespaces">Five namespaces around one middle layer</h2>
+
+<p>Every public name in the package lives in one of five namespaces.
+<code>+geom</code> sits in the middle and the other four build on it: a solid
+is made from regions and cut back into regions, a mesh is cut into regions,
+and a drawing is made of geom objects. <code>+geom</code> depends on none of
+them, so a solid never depends on the drawing model, and the drawing model
+never depends on Open CASCADE.</p>
+
+<div class="diagram">
+<svg viewBox="0 0 840 550" role="img" aria-labelledby="dg-title dg-desc">
+  <title id="dg-title">How the namespaces of drafting turn into one another</title>
+  <desc id="dg-desc">The geom namespace sits in the middle. Solids are made
+  from geom regions and cut back into them; meshes are cut into regions;
+  solids and meshes turn into each other; assemblies hold solids and meshes;
+  drawings are made of geom objects.</desc>
+  <defs>
+    <marker id="dg-arrowhead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" class="dg-head"/>
+    </marker>
+  </defs>
+
+  <rect x="20" y="15" width="800" height="55" rx="8" class="dg-box"/>
+  <text x="420" y="38" class="dg-title">+model</text>
+  <text x="420" y="59" class="dg-sub">model.Assembly   model.Viewer</text>
+
+  <rect x="40" y="130" width="200" height="64" rx="8" class="dg-box"/>
+  <text x="140" y="156" class="dg-title">+polymesh</text>
+  <text x="140" y="179" class="dg-sub">polymesh.Mesh</text>
+
+  <rect x="600" y="130" width="200" height="64" rx="8" class="dg-box"/>
+  <text x="700" y="156" class="dg-title">+solid</text>
+  <text x="700" y="179" class="dg-sub">solid.Shape</text>
+
+  <rect x="250" y="300" width="340" height="96" rx="8" class="dg-core"/>
+  <text x="420" y="326" class="dg-title">+geom</text>
+  <text x="420" y="350" class="dg-sub">Polyline  Spline  Path  Region</text>
+  <text x="420" y="376" class="dg-small">each one lying in a geom.UCS</text>
+
+  <rect x="320" y="470" width="200" height="64" rx="8" class="dg-box"/>
+  <text x="420" y="496" class="dg-title">+draw</text>
+  <text x="420" y="519" class="dg-sub">draw.Drawing</text>
+
+  <line x1="140" y1="130" x2="140" y2="72" class="dg-arrow" marker-end="url(#dg-arrowhead)"/>
+  <text x="148" y="106" class="dg-label">add</text>
+  <line x1="700" y1="130" x2="700" y2="72" class="dg-arrow" marker-end="url(#dg-arrowhead)"/>
+  <text x="708" y="106" class="dg-label">add</text>
+
+  <line x1="240" y1="152" x2="598" y2="152" class="dg-arrow" marker-end="url(#dg-arrowhead)"/>
+  <text x="420" y="145" class="dg-label" text-anchor="middle">solid.polyhedron</text>
+  <line x1="600" y1="174" x2="242" y2="174" class="dg-arrow" marker-end="url(#dg-arrowhead)"/>
+  <text x="420" y="191" class="dg-label" text-anchor="middle">tessellate</text>
+
+  <line x1="170" y1="194" x2="300" y2="298" class="dg-arrow" marker-end="url(#dg-arrowhead)"/>
+  <text x="240" y="262" class="dg-label" text-anchor="end">section</text>
+
+  <line x1="500" y1="300" x2="640" y2="196" class="dg-arrow" marker-end="url(#dg-arrowhead)"/>
+  <text x="572" y="226" class="dg-label" text-anchor="end">extrude, revolve,</text>
+  <text x="572" y="241" class="dg-label" text-anchor="end">loft, sweep, helix</text>
+  <line x1="690" y1="194" x2="592" y2="330" class="dg-arrow" marker-end="url(#dg-arrowhead)"/>
+  <text x="652" y="282" class="dg-label">section,</text>
+  <text x="652" y="297" class="dg-label">projection</text>
+
+  <line x1="420" y1="396" x2="420" y2="468" class="dg-arrow" marker-end="url(#dg-arrowhead)"/>
+  <text x="430" y="437" class="dg-label">polyline, spline, path, region, hatch</text>
+</svg>
+</div>
+
+<p>Below them, in <code>src</code>, five compiled files do the heavy work.
+None of them is called directly; each is reached through the classes and
+functions above.</p>
+
+<table class="guide">
+  <tr><th>Namespace</th><th>What it holds</th><th>What it needs</th></tr>
+  <tr>
+    <td><code>+geom</code></td>
+    <td>The classes <code>geom.Polyline</code>, <code>geom.Spline</code>,
+    <code>geom.Path</code>, <code>geom.Region</code> and
+    <code>geom.UCS</code>; planar geometry on point sets (area, offset,
+    curvature, intersections, fillets, hatch lines); <code>geom.text</code>;
+    <code>geom.read</code> and <code>geom.write</code> for DXF.</td>
+    <td>Octave alone, except region booleans, <code>offset</code> and the
+    copies and arrays of regions, which need Open CASCADE, and
+    <code>geom.text</code>, which needs its font support as well.</td>
+  </tr>
+  <tr>
+    <td><code>+draw</code></td>
+    <td><code>draw.Drawing</code>, the drawing model; sheet parts
+    (<code>draw.titleblock</code>, <code>draw.coordtable</code>,
+    <code>draw.symbol</code>); line types and colours
+    (<code>draw.linetype</code>, <code>draw.colour</code>);
+    <code>draw.read</code>.</td>
+    <td>Octave alone.</td>
+  </tr>
+  <tr>
+    <td><code>+polymesh</code></td>
+    <td><code>polymesh.Mesh</code>, a triangle mesh with colours;
+    <code>polymesh.read</code> for STL, OBJ, PLY and 3MF.</td>
+    <td>Octave alone.</td>
+  </tr>
+  <tr>
+    <td><code>+solid</code></td>
+    <td><code>solid.Shape</code>; the primitives <code>solid.box</code>,
+    <code>solid.wedge</code>, <code>solid.cylinder</code>,
+    <code>solid.cone</code>, <code>solid.sphere</code>,
+    <code>solid.ellipsoid</code>, <code>solid.torus</code>; solids from
+    regions (<code>solid.extrude</code>, <code>solid.revolve</code>,
+    <code>solid.loft</code>, <code>solid.sweep</code>,
+    <code>solid.helix</code>) and from meshes
+    (<code>solid.polyhedron</code>); <code>solid.read</code> for STEP.</td>
+    <td>Open CASCADE 7.8 or later, at build time.</td>
+  </tr>
+  <tr>
+    <td><code>+model</code></td>
+    <td><code>model.Assembly</code>, named parts placed together;
+    <code>model.Viewer</code>, the window that shows solids and meshes;
+    <code>model.read</code> for STEP and 3MF.</td>
+    <td>Open CASCADE; the viewer needs X11 as well.</td>
+  </tr>
+</table>
+
+<p>A package built without Open CASCADE works as before: every function that
+needs it raises an error saying so, and everything else is unaffected.</p>
+
+<h2 id="rules">Rules that hold everywhere</h2>
+
+<ul>
+  <li><b>Objects are values.</b> Every class except
+  <code>model.Viewer</code> is a value class: a method returns a new object
+  and leaves the one it was given unchanged, so a result is always assigned,
+  <code>S = fillet (S, E, 2)</code>. A viewer is a handle, because it stands
+  for a window.</li>
+  <li><b>Functions take objects.</b> Only constructors take plain matrices.
+  The planar geometry functions of <code>+geom</code> that work on point sets
+  carrying no arcs, such as <code>geom.offset</code> or
+  <code>geom.curvature</code>, take N-by-2 matrices, as before.</li>
+  <li><b>Lengths are millimetres and angles are degrees</b>, everywhere and
+  in every file the package writes.</li>
+  <li><b>Pieces come back as a row cell of regions.</b> Region booleans,
+  <code>offset</code>, <code>section</code>, <code>projection</code> and
+  <code>geom.text</code> can give several separate pieces, so they return a
+  row cell array of <code>geom.Region</code> objects, largest first, and
+  <code>cell (1, 0)</code> when nothing is left.</li>
+  <li><b>Reading is a function, writing is a method.</b> A file is read by a
+  function in the namespace of what it returns (<code>solid.read</code>,
+  <code>polymesh.read</code>, <code>model.read</code>, <code>geom.read</code>,
+  <code>draw.read</code>) and written by the <code>write</code> method of the
+  object written, which picks the format from the file's extension.</li>
+</ul>
+
+<h2 id="geom">The geometry classes</h2>
+
+<p>Four value classes are the package's one representation of outlines and
+curves, used by drawings and solids alike. Each lies in a
+<code>geom.UCS</code>, the world <i>xy</i> plane unless told otherwise.</p>
+
+<table class="guide">
+  <tr><th>Class</th><th>What it is</th><th>Made from</th></tr>
+  <tr>
+    <td><code>geom.Polyline</code></td>
+    <td>The DXF polyline: vertices <code>[x, y, bulge]</code> in its plane,
+    open or closed, straight segments and arcs.</td>
+    <td>An N-by-2 or N-by-3 matrix.</td>
+  </tr>
+  <tr>
+    <td><code>geom.Spline</code></td>
+    <td>A NURBS curve in its plane, open or closed; an exact ellipse among
+    them.</td>
+    <td>Points to pass through, <code>geom.Spline.nurbs</code> for control
+    points, knots and weights, <code>geom.Spline.ellipse</code>.</td>
+  </tr>
+  <tr>
+    <td><code>geom.Path</code></td>
+    <td>A route in 3-D of straight segments, arcs and splines, open or
+    closed; what a region is swept along.</td>
+    <td>An M-by-3 matrix, a polyline, a spline, <code>join</code> of paths
+    and splines, <code>geom.Path.arc</code>, <code>geom.Path.chain</code> of
+    loose pieces.</td>
+  </tr>
+  <tr>
+    <td><code>geom.Region</code></td>
+    <td>A closed area: one outline and any number of holes, each a closed
+    path of segments, arcs and splines, checked to be valid.</td>
+    <td>A closed polyline, path or spline, or a matrix, for the outline and
+    each hole; <code>geom.Region.nest</code> of loose loops.</td>
+  </tr>
+</table>
+
+<p>A region is the hub of the package. It is what a solid is made from, what
+a section of a solid or a mesh is, what <code>geom.text</code> gives and what
+a hatch fills. It combines with <code>union</code>, <code>subtract</code> and
+<code>intersect</code>, grows and shrinks with <code>offset</code>, rounds and
+bevels with <code>fillet</code> and <code>chamfer</code>, and is wrapped by
+<code>hull</code>, resized, mirrored and copied in rows, columns or round a
+point.</p>
+
+<h2 id="ucs">The UCS, the frame they share</h2>
+
+<p>A <code>geom.UCS</code> is a user coordinate system: an origin, an
+<i>x</i> axis and a normal, so a plane with coordinates of its own. It is how
+the namespaces agree on where things are. Assigning a geom object another UCS
+moves it there, keeping its shape in its own coordinates, so a profile drawn
+in the <i>xy</i> plane is laid on any face of a part by giving it that
+face's UCS.</p>
+
+<table class="guide">
+  <tr><th>Where a UCS appears</th><th>What it does there</th></tr>
+  <tr><td>The <code>UCS</code> property of a polyline, spline, path or
+  region</td><td>The plane the object lies in. A solid is made where its
+  region's plane puts it: <code>extrude</code> rises along the normal,
+  <code>revolve</code> and <code>helix</code> turn about the plane's own
+  <i>y</i> axis.</td></tr>
+  <tr><td>The last argument of a primitive, <code>solid.box (80, 40, 12,
+  U)</code></td><td>Places the primitive: a box by its corner, or by the
+  point <code>'Anchor'</code> names.</td></tr>
+  <tr><td><code>section (S, U)</code>, <code>section (M, U)</code></td>
+  <td>The plane of the cut. The regions come back lying in
+  <code>U</code>.</td></tr>
+  <tr><td><code>projection (S, U)</code></td><td>The direction the
+  outline is seen along.</td></tr>
+  <tr><td><code>add (A, NAME, X, U)</code></td><td>Where a part is placed
+  in an assembly.</td></tr>
+  <tr><td><code>geom.UCS (V)</code>, <code>pickucs (V)</code></td><td>A UCS
+  picked with the mouse on a face or three points in a viewer; the pick
+  prints the line that makes it again from coordinates.</td></tr>
+  <tr><td>A DXF file</td><td>Every geom object's UCS is kept in the file, so
+  <code>geom.read</code> gives back the frame that was written.</td></tr>
+</table>
+
+<p>A UCS is made from a normal and an origin, <code>geom.UCS (NORMAL,
+ORIGIN)</code>, with a point the <i>x</i> axis points to as a third argument,
+or from three points with <code>geom.UCS.threepoint</code>.
+<code>geom.UCS ()</code> is the world <i>xy</i> plane.
+<code>toworld</code> and <code>tolocal</code> carry points between a UCS and
+the world.</p>
+
+<h2 id="conversions">From one class to another</h2>
+
+<p>Every way an object of one class becomes an object of another:</p>
+
+<table class="guide">
+  <tr><th>From</th><th>To</th><th>How</th></tr>
+  <tr><td>Matrix</td><td><code>geom.Polyline</code>, <code>geom.Spline</code>,
+  <code>geom.Path</code>, <code>geom.Region</code></td><td>The
+  constructor.</td></tr>
+  <tr><td><code>geom.Polyline</code>, <code>geom.Spline</code></td>
+  <td><code>geom.Path</code></td><td><code>geom.Path (PL)</code>,
+  <code>geom.Path (SP)</code>; a polyline's bulges become exact
+  arcs.</td></tr>
+  <tr><td>Closed polyline, spline or path</td><td><code>geom.Region</code></td>
+  <td><code>geom.Region (OUTLINE, HOLES)</code>.</td></tr>
+  <tr><td>Loose pieces or loops</td><td><code>geom.Path</code>,
+  <code>geom.Region</code></td><td><code>geom.Path.chain</code> joins pieces
+  end to end; <code>geom.Region.nest</code> sorts loops into outlines and
+  holes.</td></tr>
+  <tr><td>Text</td><td><code>geom.Region</code></td><td><code>geom.text
+  (STR)</code>, the outlines of the letters.</td></tr>
+  <tr><td><code>geom.Region</code></td><td><code>solid.Shape</code></td>
+  <td><code>solid.extrude</code>, <code>solid.revolve</code>,
+  <code>solid.helix</code>; several regions with
+  <code>solid.loft</code>; a region and a path with
+  <code>solid.sweep</code>.</td></tr>
+  <tr><td><code>solid.Shape</code></td><td><code>geom.Region</code></td>
+  <td><code>section (S, U)</code>, a cut; <code>projection (S, U)</code>,
+  the outline seen along a direction.</td></tr>
+  <tr><td><code>polymesh.Mesh</code></td><td><code>geom.Region</code></td>
+  <td><code>section (M, U)</code>, then <code>fit</code> to turn the facets
+  back into lines, arcs and splines.</td></tr>
+  <tr><td><code>polymesh.Mesh</code></td><td><code>solid.Shape</code></td>
+  <td><code>solid.polyhedron (M)</code>, from a closed mesh.</td></tr>
+  <tr><td><code>solid.Shape</code></td><td><code>polymesh.Mesh</code></td>
+  <td><code>tessellate (S, TOL)</code>, each triangle in the colour of its
+  solid.</td></tr>
+  <tr><td>Vertices and faces, or a <code>patch</code> struct</td>
+  <td><code>polymesh.Mesh</code></td><td><code>polymesh.Mesh (V, F)</code>,
+  <code>polymesh.Mesh (S)</code>.</td></tr>
+  <tr><td><code>solid.Shape</code>, <code>polymesh.Mesh</code></td>
+  <td><code>model.Assembly</code></td><td><code>add (A, NAME, X, U)</code>,
+  a part defined once however often it is placed.</td></tr>
+  <tr><td><code>model.Assembly</code></td><td><code>solid.Shape</code>,
+  <code>polymesh.Mesh</code></td><td><code>shape (A)</code>, every placed
+  solid in one shape, kept apart rather than united, an error when a part
+  is a mesh; <code>tessellate (A)</code>, every part as one mesh.</td></tr>
+  <tr><td>Polyline, spline, path, region</td><td><code>draw.Drawing</code></td>
+  <td>The methods <code>polyline</code>, <code>spline</code>,
+  <code>path</code>, <code>region</code> and <code>hatch</code>. A drawing
+  is flat, so the object must lie in its <i>xy</i> plane.</td></tr>
+  <tr><td><code>solid.Shape</code>, <code>polymesh.Mesh</code>,
+  <code>model.Assembly</code></td><td><code>model.Viewer</code></td>
+  <td><code>show</code>, which returns the viewer.</td></tr>
+  <tr><td><code>model.Viewer</code></td><td><code>geom.UCS</code>, edges,
+  faces, points</td><td><code>geom.UCS (V)</code> or <code>pickucs
+  (V)</code>; <code>pick (V)</code> returns the edges and faces clicked on
+  a solid, or the points clicked on a mesh.</td></tr>
+</table>
+
+<h2 id="example">One object through every layer</h2>
+
+<p>A plate with a bore, made once as a region and carried through the
+package:</p>
+
+<pre class="code-in"><code>## A plate 60 by 40 with a bore of diameter 20, in the xy plane
+R = geom.Region ([0, 0; 60, 0; 60, 40; 0, 40], {[20, 20, 1; 40, 20, 1]});
+
+## A solid from the region, and a mesh from the solid
+S = solid.extrude (R, 10);
+M = tessellate (S);
+
+## A cut through the middle of the bore gives two pieces, each a region
+## lying in the plane of the cut
+C = section (S, geom.UCS ([0, -1, 0], [0, 20, 0]));
+
+## A drawing is flat, so lay a piece in the xy plane before hatching it
+Q = C{1};
+Q.UCS = geom.UCS ();
+D = draw.Drawing ('section');
+D = D.hatch (Q);
+
+## The plate twice in an assembly, the second stacked on the first
+A = model.Assembly ('stack');
+A = add (A, 'plate', S, geom.UCS ());
+A = add (A, 'plate', [], geom.UCS ([0, 0, 1], [0, 0, 10]));</code></pre>
+
+<p>The second <code>add</code> passes <code>[]</code> for the part: the
+part named <code>'plate'</code> is already defined, so the assembly places
+it again rather than storing it twice.</p>
+
+<h2 id="files">Files</h2>
+
+<table class="guide">
+  <tr><th>Object</th><th>Read</th><th>Write</th></tr>
+  <tr><td><code>solid.Shape</code></td><td><code>solid.read</code>:
+  STEP</td><td><code>write (S, FILE)</code>: STEP; STL, OBJ, PLY and 3MF
+  through <code>tessellate</code></td></tr>
+  <tr><td><code>polymesh.Mesh</code></td><td><code>polymesh.read</code>: STL,
+  OBJ, PLY, 3MF</td><td><code>write (M, FILE)</code></td></tr>
+  <tr><td><code>model.Assembly</code></td><td><code>model.read</code>: STEP,
+  3MF</td><td><code>write (A, FILE)</code>: STEP, 3MF</td></tr>
+  <tr><td>Polyline, spline, path, region</td><td><code>geom.read</code>:
+  DXF</td><td><code>write (G, FILE)</code>: DXF; <code>geom.write (C,
+  FILE)</code> for several</td></tr>
+  <tr><td><code>draw.Drawing</code></td><td><code>draw.read</code>:
+  DXF</td><td><code>write (D, FILE)</code>: DXF; <code>print</code> onto
+  paper at a stated scale, as PDF, EPS, SVG, PNG, JPEG or TIFF;
+  <code>tikz</code> for LaTeX</td></tr>
+</table>
+
+<p>How each geom class and each drawing entity is written to DXF and read
+back is set out in <a href="dxf.html">DXF and the classes</a>.</p>
+
+        </main>
+      </div>
+    </div>
+  </body>
+</html>

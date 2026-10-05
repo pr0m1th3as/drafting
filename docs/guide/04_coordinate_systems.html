@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Coordinate systems - drafting guide</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" integrity="sha512-1ycn6IcaQQ40/MKBW2W4Rhis/DbILU74C1vSrLJxCq57o941Ym01SwNsOMqvEBFlcgUa6xLiPY/NS5R+E6ztJQ==" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/css/bootstrap.min.css" integrity="sha384-KyZXEAg3QhqLMpG8r+8fhAXLRk2vvoC2f3B09zVXn8CA5QIVfZOJ3BCsw2P0p/We" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-U1DAWAznBHeqEIlVSCgzq+c9gqGAJn5c/t99JyeKa9xxaYpSvHU5awsuZVVFIhvj" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="guide.css">
+  </head>
+  <body>
+    <div class="bg-dark">
+      <div class="container-xl">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+          <div class="container-fluid">
+            <a class="navbar-brand" href="index.html">
+              <img src="../assets/drafting.png" alt="drafting" class="d-inline-block align-top" width="25" height="25">
+              drafting guide
+            </a>
+            <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+              <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+              <ul class="navbar-nav">
+                <li class="nav-item">
+                  <a class="nav-link" href="../index.html">
+                    <i class="fas fa-book"></i>
+                    Function reference
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="https://github.com/pr0m1th3as/drafting">
+                    <i class="fab fa-github"></i>
+                    Source
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </nav>
+      </div>
+    </div>
+    <div class="container-xl my-4">
+      <div class="row">
+        <div class="col-md-3 col-lg-2 mb-4">
+          <nav class="guide-nav">
+<!-- guide-nav -->
+            <h6>Guide</h6>
+            <ul>
+              <li><a href="index.html">Overview</a></li>
+              <li><a href="layout.html">Package layout</a></li>
+              <li><a href="dxf.html">DXF and the classes</a></li>
+            </ul>
+            <h6>Tutorials</h6>
+            <ul>
+              <li><a href="01_first_part.html">A first part</a></li>
+              <li><a href="02_outlines.html">Outlines: polylines, splines, paths and regions</a></li>
+              <li><a href="03_regions.html">Working with regions</a></li>
+              <li><a href="04_coordinate_systems.html" class="active">Coordinate systems</a></li>
+              <li><a href="05_solids_from_regions.html">Solids from regions</a></li>
+              <li><a href="06_primitives_and_booleans.html">Primitives, booleans and transforms</a></li>
+              <li><a href="07_features.html">Features: holes, pockets, fillets, chamfers and shells</a></li>
+              <li><a href="08_sections_and_projections.html">Sections and projections</a></li>
+              <li><a href="09_drawings.html">Technical drawings</a></li>
+              <li><a href="10_meshes.html">Meshes</a></li>
+              <li><a href="11_assemblies.html">Assemblies</a></li>
+              <li><a href="12_from_openscad.html">For OpenSCAD users</a></li>
+            </ul>
+<!-- /guide-nav -->
+          </nav>
+        </div>
+        <main class="col-md-9 col-lg-10">
+<h1>Coordinate systems</h1>
+<p>Every outline in the package lies in a <a href="../geom.UCS.html"><code>geom.UCS</code></a>, a plane with an origin and axes of its own. This tutorial makes them, moves points in and out of them, and uses them to put features on the faces of a part.</p>
+<h2>The world and other planes</h2>
+<p><code>geom.UCS ()</code> is the world: the <i>xy</i> plane, its origin at the world origin. Every polyline, spline, path and region lies in it unless told otherwise.</p>
+<pre class="code-in"><code>W = geom.UCS ()</code></pre>
+<pre class="code-out"><code>W =
+
+  geom.UCS: origin [0, 0, 0], x axis [1, 0, 0], normal [0, 0, 1]</code></pre>
+<p>Any other plane is given by its normal, the way it faces, and a point on it, its origin. A third point sets where the <i>x</i> axis points. This is the front face of a block 80 by 40 by 30 standing at the origin: it faces down the <i>y</i> axis, its origin is the lower left corner, and its <i>x</i> axis runs along the bottom edge.</p>
+<pre class="code-in"><code>front = geom.UCS ([0, -1, 0], [0, 0, 0], [80, 0, 0])</code></pre>
+<pre class="code-out"><code>front =
+
+  geom.UCS: origin [0, 0, 0], x axis [1, 0, 0], normal [0, -1, 0]</code></pre>
+<p>The <i>y</i> axis is always the normal crossed with the <i>x</i> axis, so the axes are right handed. On this face it points up.</p>
+<pre class="code-in"><code>front.YAxis</code></pre>
+<pre class="code-out"><code>ans =
+
+   0   0   1</code></pre>
+<p>Without the third point the <i>x</i> axis is chosen for you, by the rule DXF uses: level, and running to the right as the face is seen from the side it faces. So <i>y</i> points up the face again. This is the right side face.</p>
+<pre class="code-in"><code>right = geom.UCS ([1, 0, 0], [80, 0, 0])</code></pre>
+<pre class="code-out"><code>right =
+
+  geom.UCS: origin [80, 0, 0], x axis [0, 1, 0], normal [1, 0, 0]</code></pre>
+<p>Three points give a UCS as CAD programs do: the origin, a point along <i>+x</i>, and a point on the <i>+y</i> side. These three lie on the top face.</p>
+<pre class="code-in"><code>top = geom.UCS.threepoint ([0, 0, 30], [80, 0, 30], [0, 40, 30])</code></pre>
+<pre class="code-out"><code>top =
+
+  geom.UCS: origin [0, 0, 30], x axis [1, 0, 0], normal [0, 0, 1]</code></pre>
+<h2>Points in a UCS</h2>
+<p><code>toworld</code> turns coordinates in a UCS into world coordinates, and <code>tolocal</code> turns them back, with a third column for the height above the plane. The point 10 along and 5 up the front face:</p>
+<pre class="code-in"><code>toworld (front, [10, 5])</code></pre>
+<pre class="code-out"><code>ans =
+
+   10    0    5</code></pre>
+<p>A point 3 millimetres in front of that face is 3 above its plane, since the plane's normal points out of the block.</p>
+<pre class="code-in"><code>tolocal (front, [10, -3, 5])</code></pre>
+<pre class="code-out"><code>ans =
+
+   10    5    3</code></pre>
+<h2>A profile on a face</h2>
+<p>A region is drawn in its own coordinates, and its <code>UCS</code> says where those are. Draw a boss as if on paper, a ring 20 across with a bore of 8, centred 40 along and 15 up. Giving it the front face's UCS moves it onto that face, shape unchanged.</p>
+<pre class="code-in"><code>block = solid.box (80, 40, 30);
+boss = geom.Region ([30, 15, 1; 50, 15, 1], {[36, 15, 1; 44, 15, 1]});
+boss.UCS = front;</code></pre>
+<p><a href="../solid.extrude.html"><code>solid.extrude</code></a> raises a region along its plane's normal, so on the front face it grows out of the block, towards <i>-y</i>. United with the block, the boss stands 12 proud of the face.</p>
+<pre class="code-in"><code>part = union (block, solid.extrude (boss, 12));
+show (part);</code></pre>
+<figure class="shot"><img src="img/04_coordinate_systems-1.png" alt="Coordinate systems, picture 1"></figure>
+<h2>Placing primitives</h2>
+<p>The primitives take a UCS as their last argument and are built in it. A cylinder stands on the origin of its UCS, along the normal. With the origin at the middle of the top face, a pin 12 across and 15 high stands there.</p>
+<pre class="code-in"><code>U = geom.UCS ([0, 0, 1], [40, 20, 30]);
+pin = solid.cylinder (6, 15, U);</code></pre>
+<p><code>'Anchor'</code> says which point of the primitive lands on the origin. A box sits by its corner unless told otherwise; with <code>'base'</code> the centre of its bottom face lands there. With the origin at the middle of the right face, a lug 20 by 20 stands out of that face, centred on it.</p>
+<pre class="code-in"><code>lug = solid.box (20, 20, 10, geom.UCS ([1, 0, 0], [80, 20, 15]), ...
+                 'Anchor', 'base');
+part = union (part, pin, lug);
+show (part);
+
+[~, L] = bbox (part)</code></pre>
+<pre class="code-out"><code>L =
+
+   90   52   45</code></pre>
+<figure class="shot"><img src="img/04_coordinate_systems-2.png" alt="Coordinate systems, picture 2"></figure>
+<h2>Picking a UCS with the mouse</h2>
+<p>A UCS can also be picked on a shape in the viewer: click a flat face and two points along it for the axes, or with <code>'points'</code> three points, then a point for the origin. Every click snaps to a corner, the centre of a round edge or the middle of a straight one. The pick prints the line that makes the same UCS from coordinates, to paste into the script, so the script never depends on a person at the mouse. Those lines need someone at the window, so they are shown here and not run.</p>
+<pre class="code-in"><code>V = show (part);
+U = geom.UCS (V);
+U = pickucs (V, 'points');</code></pre>
+<nav class="d-flex justify-content-between my-5">
+<a href="03_regions.html">&larr; Working with regions</a>
+<a href="05_solids_from_regions.html">Solids from regions &rarr;</a>
+</nav>
+
+        </main>
+      </div>
+    </div>
+  </body>
+</html>

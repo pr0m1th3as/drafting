@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Sections and projections - drafting guide</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" integrity="sha512-1ycn6IcaQQ40/MKBW2W4Rhis/DbILU74C1vSrLJxCq57o941Ym01SwNsOMqvEBFlcgUa6xLiPY/NS5R+E6ztJQ==" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/css/bootstrap.min.css" integrity="sha384-KyZXEAg3QhqLMpG8r+8fhAXLRk2vvoC2f3B09zVXn8CA5QIVfZOJ3BCsw2P0p/We" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-U1DAWAznBHeqEIlVSCgzq+c9gqGAJn5c/t99JyeKa9xxaYpSvHU5awsuZVVFIhvj" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="guide.css">
+  </head>
+  <body>
+    <div class="bg-dark">
+      <div class="container-xl">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+          <div class="container-fluid">
+            <a class="navbar-brand" href="index.html">
+              <img src="../assets/drafting.png" alt="drafting" class="d-inline-block align-top" width="25" height="25">
+              drafting guide
+            </a>
+            <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+              <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+              <ul class="navbar-nav">
+                <li class="nav-item">
+                  <a class="nav-link" href="../index.html">
+                    <i class="fas fa-book"></i>
+                    Function reference
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="https://github.com/pr0m1th3as/drafting">
+                    <i class="fab fa-github"></i>
+                    Source
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </nav>
+      </div>
+    </div>
+    <div class="container-xl my-4">
+      <div class="row">
+        <div class="col-md-3 col-lg-2 mb-4">
+          <nav class="guide-nav">
+<!-- guide-nav -->
+            <h6>Guide</h6>
+            <ul>
+              <li><a href="index.html">Overview</a></li>
+              <li><a href="layout.html">Package layout</a></li>
+              <li><a href="dxf.html">DXF and the classes</a></li>
+            </ul>
+            <h6>Tutorials</h6>
+            <ul>
+              <li><a href="01_first_part.html">A first part</a></li>
+              <li><a href="02_outlines.html">Outlines: polylines, splines, paths and regions</a></li>
+              <li><a href="03_regions.html">Working with regions</a></li>
+              <li><a href="04_coordinate_systems.html">Coordinate systems</a></li>
+              <li><a href="05_solids_from_regions.html">Solids from regions</a></li>
+              <li><a href="06_primitives_and_booleans.html">Primitives, booleans and transforms</a></li>
+              <li><a href="07_features.html">Features: holes, pockets, fillets, chamfers and shells</a></li>
+              <li><a href="08_sections_and_projections.html" class="active">Sections and projections</a></li>
+              <li><a href="09_drawings.html">Technical drawings</a></li>
+              <li><a href="10_meshes.html">Meshes</a></li>
+              <li><a href="11_assemblies.html">Assemblies</a></li>
+              <li><a href="12_from_openscad.html">For OpenSCAD users</a></li>
+            </ul>
+<!-- /guide-nav -->
+          </nav>
+        </div>
+        <main class="col-md-9 col-lg-10">
+<h1>Sections and projections</h1>
+<p>A solid cut by a plane gives regions exact enough to build from again, and a solid seen along a direction gives its outline as regions too. Both go straight into new solids and into drawings.</p>
+<h2>A part to cut</h2>
+<p>A flanged bushing: its profile turned about the <i>z</i> axis, and four bolt holes through the flange. The profile is drawn in the <i>xz</i> plane, where <a href="../solid.revolve.html"><code>solid.revolve</code></a> turns it about the plane's own <i>y</i> axis, which is the world <i>z</i> axis.</p>
+<pre class="code-in"><code>P = geom.Region ([6, 0; 30, 0; 30, 8; 14, 8; 14, 40; 6, 40]);
+P.UCS = geom.UCS ([0, -1, 0], [0, 0, 0], [1, 0, 0]);
+S = solid.revolve (P);
+S = hole (S, [22, 0, 8; -22, 0, 8; 0, 22, 8; 0, -22, 8], 5, Inf);
+show (S);</code></pre>
+<figure class="shot"><img src="img/08_sections_and_projections-1.png" alt="Sections and projections, picture 1"></figure>
+<h2>A cut through the axis</h2>
+<p><code>section</code> cuts a solid with the plane of a <a href="../geom.UCS.html"><code>geom.UCS</code></a> and returns a row cell array of regions, one for each separate piece, largest first. The plane here holds the axis and two of the bolt holes, so the flange falls apart: two L-shaped halves of the bushing, and two small pieces outside the holes.</p>
+<pre class="code-in"><code>U = geom.UCS ([0, -1, 0], [0, 0, 0], [1, 0, 0]);
+C = section (S, U);
+numel (C)
+C{1}
+C{4}</code></pre>
+<pre class="code-out"><code>ans = 4
+ans =
+
+  geom.Region: an outline of 6 segments, 0 hole
+
+ans =
+
+  geom.Region: an outline of 4 segments, 0 hole</code></pre>
+<p>Every piece lies in the plane of the cut, in the coordinates of <code>U</code>. Its <i>x</i> axis is the world <i>x</i> axis and its <i>y</i> axis the world <i>z</i> axis, so the pieces read as the bushing seen from the front.</p>
+<h2>The cut as a drawing</h2>
+<p>A drawing is flat and lies in the <i>xy</i> plane. Giving a piece the world frame, <code>geom.UCS ()</code>, lays it there and keeps its shape in its own coordinates, so the front view lands upright on the sheet. <code>hatch</code> fills each piece with the 45 degree lines that mean cut material.</p>
+<pre class="code-in"><code>D = draw.Drawing ('section A-A');
+for k = 1:numel (C)
+  Q = C{k};
+  Q.UCS = geom.UCS ();
+  D = D.hatch (Q);
+endfor
+plot (D);</code></pre>
+<figure class="shot"><img src="img/08_sections_and_projections-2.png" alt="Sections and projections, picture 2"></figure>
+<h2>Cuts across the axis</h2>
+<p>A plane square to the axis through the flange gives one region with five holes, the bore and the four bolt holes. Higher up, through the sleeve, it gives a ring.</p>
+<pre class="code-in"><code>flange = section (S, geom.UCS ([0, 0, 1], [0, 0, 4]));
+flange{1}
+sleeve = section (S, geom.UCS ([0, 0, 1], [0, 0, 20]));
+sleeve{1}</code></pre>
+<pre class="code-out"><code>ans =
+
+  geom.Region: an outline of 2 segments, 5 holes
+
+ans =
+
+  geom.Region: an outline of 2 segments, 1 hole</code></pre>
+<p>A plane that misses the part, or only touches it, cuts nothing and returns an empty cell array.</p>
+<pre class="code-in"><code>isempty (section (S, geom.UCS ([0, 0, 1], [0, 0, 100])))</code></pre>
+<pre class="code-out"><code>ans = 1</code></pre>
+<h2>Building from a section</h2>
+<p>A section is a region like any other, its circles kept as true arcs, so it builds a new solid. Extruded 2 millimetres, the cut through the flange is a gasket with the flange's outline and every one of its holes, starting where the cut lies, 4 millimetres up.</p>
+<pre class="code-in"><code>G = solid.extrude (flange{1}, 2);
+G.Colour = [0.85, 0.55, 0.2];
+show (G);</code></pre>
+<figure class="shot"><img src="img/08_sections_and_projections-3.png" alt="Sections and projections, picture 3"></figure>
+<h2>Projections</h2>
+<p><code>projection</code> gives the outline of a solid seen along the normal of a UCS: the shadow it casts on that plane. With no UCS it looks down the <i>z</i> axis, as OpenSCAD's <code>projection</code> does; OpenSCAD's <code>projection (cut = true)</code> is <code>section</code> here. Seen from above, the bushing is a disc with the bore and the bolt holes in it. Seen from the front, the holes run across the line of sight and leave no mark.</p>
+<pre class="code-in"><code>top = projection (S);
+numel (top{1}.Holes)
+front = projection (S, U);
+numel (front{1}.Holes)</code></pre>
+<pre class="code-out"><code>ans = 5
+ans = 0</code></pre>
+<p>Both views go into one drawing. The front view is laid in the <i>xy</i> plane with its origin 80 millimetres along, so it stands beside the top view.</p>
+<pre class="code-in"><code>F = front{1};
+F.UCS = geom.UCS ([0, 0, 1], [80, 0, 0]);
+D = draw.Drawing ('views');
+D = D.region (top{1});
+D = D.region (F);
+plot (D);</code></pre>
+<figure class="shot"><img src="img/08_sections_and_projections-4.png" alt="Sections and projections, picture 4"></figure>
+<p>A mesh is cut the same way: <code>section</code> on a <a href="../polymesh.Mesh.html"><code>polymesh.Mesh</code></a> gives regions too, which <code>fit</code> turns back into lines and arcs.</p>
+<nav class="d-flex justify-content-between my-5">
+<a href="07_features.html">&larr; Features: holes, pockets, fillets, chamfers and shells</a>
+<a href="09_drawings.html">Technical drawings &rarr;</a>
+</nav>
+
+        </main>
+      </div>
+    </div>
+  </body>
+</html>

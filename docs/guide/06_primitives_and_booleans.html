@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Primitives, booleans and transforms - drafting guide</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" integrity="sha512-1ycn6IcaQQ40/MKBW2W4Rhis/DbILU74C1vSrLJxCq57o941Ym01SwNsOMqvEBFlcgUa6xLiPY/NS5R+E6ztJQ==" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/css/bootstrap.min.css" integrity="sha384-KyZXEAg3QhqLMpG8r+8fhAXLRk2vvoC2f3B09zVXn8CA5QIVfZOJ3BCsw2P0p/We" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-U1DAWAznBHeqEIlVSCgzq+c9gqGAJn5c/t99JyeKa9xxaYpSvHU5awsuZVVFIhvj" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="guide.css">
+  </head>
+  <body>
+    <div class="bg-dark">
+      <div class="container-xl">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+          <div class="container-fluid">
+            <a class="navbar-brand" href="index.html">
+              <img src="../assets/drafting.png" alt="drafting" class="d-inline-block align-top" width="25" height="25">
+              drafting guide
+            </a>
+            <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+              <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+              <ul class="navbar-nav">
+                <li class="nav-item">
+                  <a class="nav-link" href="../index.html">
+                    <i class="fas fa-book"></i>
+                    Function reference
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="https://github.com/pr0m1th3as/drafting">
+                    <i class="fab fa-github"></i>
+                    Source
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </nav>
+      </div>
+    </div>
+    <div class="container-xl my-4">
+      <div class="row">
+        <div class="col-md-3 col-lg-2 mb-4">
+          <nav class="guide-nav">
+<!-- guide-nav -->
+            <h6>Guide</h6>
+            <ul>
+              <li><a href="index.html">Overview</a></li>
+              <li><a href="layout.html">Package layout</a></li>
+              <li><a href="dxf.html">DXF and the classes</a></li>
+            </ul>
+            <h6>Tutorials</h6>
+            <ul>
+              <li><a href="01_first_part.html">A first part</a></li>
+              <li><a href="02_outlines.html">Outlines: polylines, splines, paths and regions</a></li>
+              <li><a href="03_regions.html">Working with regions</a></li>
+              <li><a href="04_coordinate_systems.html">Coordinate systems</a></li>
+              <li><a href="05_solids_from_regions.html">Solids from regions</a></li>
+              <li><a href="06_primitives_and_booleans.html" class="active">Primitives, booleans and transforms</a></li>
+              <li><a href="07_features.html">Features: holes, pockets, fillets, chamfers and shells</a></li>
+              <li><a href="08_sections_and_projections.html">Sections and projections</a></li>
+              <li><a href="09_drawings.html">Technical drawings</a></li>
+              <li><a href="10_meshes.html">Meshes</a></li>
+              <li><a href="11_assemblies.html">Assemblies</a></li>
+              <li><a href="12_from_openscad.html">For OpenSCAD users</a></li>
+            </ul>
+<!-- /guide-nav -->
+          </nav>
+        </div>
+        <main class="col-md-9 col-lg-10">
+<h1>Primitives, booleans and transforms</h1>
+<p>Solids built the way OpenSCAD builds them: primitives combined by union, difference and intersection, then moved, copied and coloured. Every curved face stays exact, so a cylinder cut into a part leaves a true cylinder.</p>
+<h2>The primitives</h2>
+<p>Seven functions make the basic solids: <a href="../solid.box.html"><code>solid.box</code></a>, <a href="../solid.wedge.html"><code>solid.wedge</code></a>, <a href="../solid.cylinder.html"><code>solid.cylinder</code></a>, <a href="../solid.cone.html"><code>solid.cone</code></a>, <a href="../solid.sphere.html"><code>solid.sphere</code></a>, <a href="../solid.ellipsoid.html"><code>solid.ellipsoid</code></a> and <a href="../solid.torus.html"><code>solid.torus</code></a>. Each takes its sizes in millimetres and, as its last argument, a <a href="../geom.UCS.html"><code>geom.UCS</code></a> that places it: a box by its corner, a cylinder or a cone by the centre of its base, a sphere or a torus by its centre. Here <code>geom.UCS ([0, 0, 1], ORIGIN)</code> is the <i>xy</i> plane moved to <code>ORIGIN</code>.</p>
+<pre class="code-in"><code>B = solid.box (20, 20, 20);
+W = solid.wedge (20, 20, 20, 0, geom.UCS ([0, 0, 1], [30, 0, 0]));
+C = solid.cylinder (10, 20, geom.UCS ([0, 0, 1], [70, 10, 0]));
+K = solid.cone (10, 0, 20, geom.UCS ([0, 0, 1], [100, 10, 0]));
+P = solid.sphere (10, geom.UCS ([0, 0, 1], [130, 10, 10]));
+T = solid.torus (8, 3, geom.UCS ([0, 0, 1], [160, 10, 3]));</code></pre>
+<p><code>union</code> takes any number of shapes at once. Shapes that do not touch stay separate solids of the one shape, so the six primitives make a shape of six solids.</p>
+<pre class="code-in"><code>A = union (B, W, C, K, P, T)
+show (A);</code></pre>
+<pre class="code-out"><code>A =
+
+  solid.Shape: 6 solids, 18 faces, 32 edges</code></pre>
+<figure class="shot"><img src="img/06_primitives_and_booleans-1.png" alt="Primitives, booleans and transforms, picture 1"></figure>
+<h2>Union, difference and intersection</h2>
+<p>OpenSCAD's best known example is a cube cut by a sphere and three cylinders. <code>'Anchor', 'centroid'</code> places a box or a cylinder by its centre rather than by its corner or its base, and a UCS whose normal is the <i>x</i> or the <i>y</i> axis lays a cylinder along that axis.</p>
+<pre class="code-in"><code>cube = solid.box (30, 30, 30, geom.UCS (), 'Anchor', 'centroid');
+ball = solid.sphere (20);
+X = solid.cylinder (9, 40, geom.UCS ([1, 0, 0], [0, 0, 0]), ...
+                    'Anchor', 'centroid');
+Y = solid.cylinder (9, 40, geom.UCS ([0, 1, 0], [0, 0, 0]), ...
+                    'Anchor', 'centroid');
+Z = solid.cylinder (9, 40, geom.UCS (), 'Anchor', 'centroid');</code></pre>
+<p><code>intersect</code> keeps what lies in every shape, and <code>subtract</code> removes from the first shape every shape after it, in one operation: OpenSCAD's <code>difference</code> of <code>intersection</code>.</p>
+<pre class="code-in"><code>S = subtract (intersect (cube, ball), X, Y, Z)
+volume (S)
+show (S);</code></pre>
+<pre class="code-out"><code>S =
+
+  solid.Shape: 1 solid, 13 faces, 41 edges
+
+ans = 1.0216e+04</code></pre>
+<figure class="shot"><img src="img/06_primitives_and_booleans-2.png" alt="Primitives, booleans and transforms, picture 2"></figure>
+<h2>Colour</h2>
+<p><code>Colour</code> gives each solid of a shape a colour, a row of red, green and blue from 0 to 1. A solid made by a boolean takes the colour of the first coloured solid it came from, and the shapes <code>subtract</code> removes give none. Coloured first, the cube wins the intersection:</p>
+<pre class="code-in"><code>cube.Colour = [0.85, 0.25, 0.2];
+ball.Colour = [0.2, 0.4, 0.8];
+S = subtract (intersect (cube, ball), X, Y, Z);
+S.Colour
+show (S);</code></pre>
+<pre class="code-out"><code>ans =
+
+   0.8500   0.2500   0.2000</code></pre>
+<figure class="shot"><img src="img/06_primitives_and_booleans-3.png" alt="Primitives, booleans and transforms, picture 3"></figure>
+<p>Order decides it: with the ball first, the part is blue.</p>
+<pre class="code-in"><code>S = subtract (intersect (ball, cube), X, Y, Z);
+S.Colour</code></pre>
+<pre class="code-out"><code>ans =
+
+   0.2000   0.4000   0.8000</code></pre>
+<h2>Moving, turning, mirroring, scaling</h2>
+<p>A bracket of two plates and a gusset, made from a union of three primitives. A union fuses shapes that touch into one solid.</p>
+<pre class="code-in"><code>L = union (solid.box (40, 20, 5), solid.box (5, 20, 30), ...
+           solid.wedge (15, 5, 15, 0, geom.UCS ([0, 0, 1], [5, 7.5, 5])))
+volume (L)</code></pre>
+<pre class="code-out"><code>L =
+
+  solid.Shape: 1 solid, 11 faces, 27 edges
+
+ans = 7062.5</code></pre>
+<p><code>translate</code> moves a shape by a vector, <code>rotate</code> turns it by an angle in degrees about an axis, <code>scale</code> multiplies every length, and <code>mirror</code> reflects it in a plane, given by its normal. The mirror image of a part is its left-handed twin, of the same volume. The second output of <code>bbox</code> is the size along each axis.</p>
+<pre class="code-in"><code>R = mirror (L, [1, 0, 0]);
+volume (R)
+[b, sz] = bbox (R)</code></pre>
+<pre class="code-out"><code>ans = 7062.5
+b =
+
+  -40    0    0    0   20   30
+
+sz =
+
+   40   20   30</code></pre>
+<p>The centre of volume, from <code>centroid</code>, moves to the other side of the mirror plane and nowhere else.</p>
+<pre class="code-in"><code>centroid (L)
+centroid (R)</code></pre>
+<pre class="code-out"><code>ans =
+
+   13.0088   10.0000    8.4071
+
+ans =
+
+  -13.0088   10.0000    8.4071</code></pre>
+<p>A quarter turn about the <i>z</i> axis swaps the lengths along <i>x</i> and <i>y</i>; about the <i>x</i> axis, those along <i>y</i> and <i>z</i>.</p>
+<pre class="code-in"><code>[~, sz] = bbox (rotate (L, 90, [0, 0, 1]))
+[~, sz] = bbox (rotate (L, 90, [1, 0, 0]))</code></pre>
+<pre class="code-out"><code>sz =
+
+   20   40   30
+
+sz =
+
+   40   30   20</code></pre>
+<p>Two shapes apart can be shown as one by uniting them.</p>
+<pre class="code-in"><code>show (union (L, translate (R, [-10, 0, 0])));</code></pre>
+<figure class="shot"><img src="img/06_primitives_and_booleans-4.png" alt="Primitives, booleans and transforms, picture 4"></figure>
+<p>Every length scales, so the volume grows by the cube of the factor.</p>
+<pre class="code-in"><code>volume (scale (L, 2)) / volume (L)</code></pre>
+<pre class="code-out"><code>ans = 8</code></pre>
+<h2>Copies and arrays</h2>
+<p>OpenSCAD repeats a shape with a <code>for</code> loop of translations. <code>copy</code> does it from a matrix of offsets, <code>rectarray</code> in rows, columns and layers, and <code>polararray</code> round an axis, the copies united in one shape. A flange with six bolt holes on a circle of 40:</p>
+<pre class="code-in"><code>H = polararray (translate (solid.cylinder (3, 8), [20, 0, 0]), 6, 360);
+F = subtract (solid.cylinder (30, 8), solid.cylinder (10, 8), H);
+show (F);</code></pre>
+<figure class="shot"><img src="img/06_primitives_and_booleans-5.png" alt="Primitives, booleans and transforms, picture 5"></figure>
+<p>A plate with six pins in two rows. The pins stand on the plate, so the union fuses them into it, and the plate, which had no colour, takes the colour of the pins, the first coloured solid it came from.</p>
+<pre class="code-in"><code>pins = rectarray (solid.cylinder (3, 10, geom.UCS ([0, 0, 1], [10, 10, 5])), ...
+                  [3, 2, 1], [20, 20, 0]);
+pins.Colour = [0.9, 0.7, 0.1];
+plate = union (solid.box (60, 40, 5), pins)
+show (plate);</code></pre>
+<pre class="code-out"><code>plate =
+
+  solid.Shape: 1 solid, 18 faces, 30 edges, coloured</code></pre>
+<figure class="shot"><img src="img/06_primitives_and_booleans-6.png" alt="Primitives, booleans and transforms, picture 6"></figure>
+<h2>Hull</h2>
+<p><code>hull</code> wraps shapes and points in the smallest convex solid that holds them, as OpenSCAD's <code>hull</code> does: four discs at the corners make a plate with rounded corners.</p>
+<pre class="code-in"><code>disc = solid.cylinder (5, 4);
+G = hull (copy (disc, [0, 0, 0; 40, 0, 0; 0, 25, 0; 40, 25, 0]));
+show (G);</code></pre>
+<figure class="shot"><img src="img/06_primitives_and_booleans-7.png" alt="Primitives, booleans and transforms, picture 7"></figure>
+<p>A hull has flat faces, wrapped round a triangulation of each shape, so round its curves it lies inside the exact hull by at most the tolerance, 0.01 millimetres unless told otherwise.</p>
+<pre class="code-in"><code>[~, sz] = bbox (G)</code></pre>
+<pre class="code-out"><code>sz =
+
+   49.9951   34.9976    4.0000</code></pre>
+<h2>Resize</h2>
+<p><code>resize</code> scales a shape to a size. Evenly, it keeps the proportions, and a size of 0 leaves that direction free; with <code>'Uniform', false</code> each direction is scaled on its own, so a sphere becomes an ellipsoid.</p>
+<pre class="code-in"><code>[~, sz] = bbox (resize (L, [80, 0, 0]))
+E = resize (solid.sphere (5), [40, 20, 0], 'Uniform', false);
+[~, sz] = bbox (E)</code></pre>
+<pre class="code-out"><code>sz =
+
+   80   40   60
+
+sz =
+
+   40   20   10</code></pre>
+<nav class="d-flex justify-content-between my-5">
+<a href="05_solids_from_regions.html">&larr; Solids from regions</a>
+<a href="07_features.html">Features: holes, pockets, fillets, chamfers and shells &rarr;</a>
+</nav>
+
+        </main>
+      </div>
+    </div>
+  </body>
+</html>

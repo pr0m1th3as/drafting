@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Technical drawings - drafting guide</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" integrity="sha512-1ycn6IcaQQ40/MKBW2W4Rhis/DbILU74C1vSrLJxCq57o941Ym01SwNsOMqvEBFlcgUa6xLiPY/NS5R+E6ztJQ==" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/css/bootstrap.min.css" integrity="sha384-KyZXEAg3QhqLMpG8r+8fhAXLRk2vvoC2f3B09zVXn8CA5QIVfZOJ3BCsw2P0p/We" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-U1DAWAznBHeqEIlVSCgzq+c9gqGAJn5c/t99JyeKa9xxaYpSvHU5awsuZVVFIhvj" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="guide.css">
+  </head>
+  <body>
+    <div class="bg-dark">
+      <div class="container-xl">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+          <div class="container-fluid">
+            <a class="navbar-brand" href="index.html">
+              <img src="../assets/drafting.png" alt="drafting" class="d-inline-block align-top" width="25" height="25">
+              drafting guide
+            </a>
+            <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+              <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+              <ul class="navbar-nav">
+                <li class="nav-item">
+                  <a class="nav-link" href="../index.html">
+                    <i class="fas fa-book"></i>
+                    Function reference
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="https://github.com/pr0m1th3as/drafting">
+                    <i class="fab fa-github"></i>
+                    Source
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </nav>
+      </div>
+    </div>
+    <div class="container-xl my-4">
+      <div class="row">
+        <div class="col-md-3 col-lg-2 mb-4">
+          <nav class="guide-nav">
+<!-- guide-nav -->
+            <h6>Guide</h6>
+            <ul>
+              <li><a href="index.html">Overview</a></li>
+              <li><a href="layout.html">Package layout</a></li>
+              <li><a href="dxf.html">DXF and the classes</a></li>
+            </ul>
+            <h6>Tutorials</h6>
+            <ul>
+              <li><a href="01_first_part.html">A first part</a></li>
+              <li><a href="02_outlines.html">Outlines: polylines, splines, paths and regions</a></li>
+              <li><a href="03_regions.html">Working with regions</a></li>
+              <li><a href="04_coordinate_systems.html">Coordinate systems</a></li>
+              <li><a href="05_solids_from_regions.html">Solids from regions</a></li>
+              <li><a href="06_primitives_and_booleans.html">Primitives, booleans and transforms</a></li>
+              <li><a href="07_features.html">Features: holes, pockets, fillets, chamfers and shells</a></li>
+              <li><a href="08_sections_and_projections.html">Sections and projections</a></li>
+              <li><a href="09_drawings.html" class="active">Technical drawings</a></li>
+              <li><a href="10_meshes.html">Meshes</a></li>
+              <li><a href="11_assemblies.html">Assemblies</a></li>
+              <li><a href="12_from_openscad.html">For OpenSCAD users</a></li>
+            </ul>
+<!-- /guide-nav -->
+          </nav>
+        </div>
+        <main class="col-md-9 col-lg-10">
+<h1>Technical drawings</h1>
+<p>A <a href="../draw.Drawing.html"><code>draw.Drawing</code></a> holds a technical drawing as data: geometry, text, hatches and dimensions on named layers, each with a line type and a colour. The same drawing is plotted, printed to scale, set in LaTeX and written to DXF.</p>
+<h2>The pen</h2>
+<p>A drawing draws the way a CAD program does, with a current pen. <code>Layer</code>, <code>Linetype</code> and <code>Colour</code> are set first, and every entity appended after takes them; nothing appended before changes. <a href="../draw.linetype.html"><code>draw.linetype</code></a> lists the line types and <a href="../draw.colour.html"><code>draw.colour</code></a> turns a colour name into the AutoCAD colour index a DXF file stores.</p>
+<pre class="code-in"><code>draw.linetype ()
+draw.colour ('red')</code></pre>
+<pre class="code-out"><code>ans =
+{
+  [1,1] = CONTINUOUS
+  [1,2] = HIDDEN
+  [1,3] = CENTER
+  [1,4] = PHANTOM
+  [1,5] = DASHED
+  [1,6] = DASHDOT
+  [1,7] = DOT
+}
+
+ans = 1</code></pre>
+<h2>Geometry</h2>
+<p>A mounting plate: its outline a polyline with rounded corners, a bore and two smaller holes as circles, all on the layer <code>OUTLINE</code>. Each append returns the new drawing, so appends chain.</p>
+<pre class="code-in"><code>D = draw.Drawing ('bracket');
+D.Layer = 'OUTLINE';
+D = D.polyline (fillet (geom.Polyline ([0, 0; 100, 0; 100, 60; 0, 60], ...
+                                       'Closed', true), 6));
+D = D.circle ([35, 30], 10);
+D = D.circle ([75, 15], 4).circle ([75, 45], 4);</code></pre>
+<p>Centre lines go on a layer of their own, in the CENTER line type and in red. <code>centremark</code> with no centre marks every circle and arc already in the drawing. A step machined on the underside, hidden from above, is a line in the HIDDEN line type; setting the colour back to <code>'byLayer'</code> lets the layer decide it, as a CAD drawing normally does.</p>
+<pre class="code-in"><code>D.Layer = 'CENTRE';
+D.Linetype = 'CENTER';
+D.Colour = 'red';
+D = D.centremark ();
+D.Layer = 'HIDDEN';
+D.Linetype = 'HIDDEN';
+D.Colour = 'byLayer';
+D = D.line ([0, 10], [100, 10]);</code></pre>
+<h2>Dimensions</h2>
+<p>A dimension is stored by what it measures, not by the number on it, so it measures again whenever the drawing is drawn. <code>dim</code> measures between two points, <code>'horizontal'</code>, <code>'vertical'</code> or, by default, along the line joining them; the sign of the offset picks the side. <code>diam</code> dimensions a circle across and <code>radius</code> an arc. A label replaces the measured figure, and the codes of <a href="../draw.symbol.html"><code>draw.symbol</code></a> put a diameter or degree sign in it. <code>leader</code> points a note at a feature.</p>
+<pre class="code-in"><code>D.Layer = 'DIMENSIONS';
+D.Linetype = 'CONTINUOUS';
+D = D.dim ([0, 0], [100, 0], -12, 'horizontal');
+D = D.dim ([100, 0], [100, 60], -12, 'vertical');
+D = D.diam ([35, 30], 10);
+D = D.diam ([75, 45], 4, 45, ['2x ', draw.symbol('diameter'), '8']);
+D = D.radius ([94, 54], 6, 45);
+D = D.leader ([50, 60; 60, 72; 75, 72], 'PLATE 6 THICK');
+D
+plot (D);</code></pre>
+<pre class="code-out"><code>D =
+
+  draw.Drawing 'bracket' with 14 entities on 4 layers
+    line        1
+    polyline    1
+    circle      3
+    dim         2
+    diam        2
+    radius      1
+    centremark  3
+    leader      1
+    current layer: 'DIMENSIONS'</code></pre>
+<figure class="shot"><img src="img/09_drawings-1.png" alt="Technical drawings, picture 1"></figure>
+<p>A part with many features is often dimensioned from one datum, a corner, with <code>ordinate</code>: each feature's distance from it along <i>x</i> or <i>y</i>, at the end of a leader. <code>angdim</code> dimensions the angle at a vertex between two arms, counter-clockwise from the first to the second, and <code>dim</code> with no direction measures the chamfer along its own length.</p>
+<pre class="code-in"><code>O = draw.Drawing ('datum');
+O = O.polyline (geom.Polyline ([0, 0; 80, 0; 80, 30; 60, 50; 0, 50], ...
+                               'Closed', true));
+O = O.circle ([20, 15], 4).circle ([50, 35], 4);
+O = O.ordinate ([0, 0], [20, 15], 'x', [20, -10]);
+O = O.ordinate ([0, 0], [50, 35], 'x', [50, -10]);
+O = O.ordinate ([0, 0], [20, 15], 'y', [-10, 15]);
+O = O.ordinate ([0, 0], [50, 35], 'y', [-10, 35]);
+O = O.angdim ([80, 30], [60, 50], [80, 0], 12);
+O = O.dim ([80, 30], [60, 50], -6);
+plot (O);</code></pre>
+<figure class="shot"><img src="img/09_drawings-2.png" alt="Technical drawings, picture 2"></figure>
+<h2>Hatches</h2>
+<p><code>hatch</code> fills a <a href="../geom.Region.html"><code>geom.Region</code></a>, its holes left clear. ANSI31, 45 degree lines, is the default and means cut material; <a href="../geom.hatchlines.html"><code>geom.hatchlines</code></a> lists the other patterns. An angle and a spacing turn and space the pattern.</p>
+<pre class="code-in"><code>geom.hatchlines ()
+sq = [0, 0; 30, 0; 30, 20; 0, 20];
+H = draw.Drawing ('hatches');
+H = H.hatch (geom.Region (sq));
+H = H.hatch (geom.Region (sq + [40, 0]), 'ANSI37');
+H = H.hatch (geom.Region (sq + [80, 0]), 'CROSS', 0, 4);
+H = H.text ([0, -6], 'ANSI31').text ([40, -6], 'ANSI37');
+H = H.text ([80, -6], 'CROSS');
+plot (H);</code></pre>
+<pre class="code-out"><code>ans =
+{
+  [1,1] = ANSI31
+  [1,2] = ANSI32
+  [1,3] = ANSI37
+  [1,4] = HORIZONTAL
+  [1,5] = VERTICAL
+  [1,6] = CROSS
+}</code></pre>
+<figure class="shot"><img src="img/09_drawings-3.png" alt="Technical drawings, picture 3"></figure>
+<h2>Blocks</h2>
+<p>A feature drawn many times is defined once as a block, from a drawing of its own, and placed with <code>insert</code>, at a point, turned and scaled if wanted. Every insert refers to the one definition, so redefining the block changes them all, and a DXF file holds it once.</p>
+<pre class="code-in"><code>B = draw.Drawing ('bolt');
+B = B.circle ([0, 0], 5).circle ([0, 0], 3);
+B = B.line ([-6, 0], [6, 0]).line ([0, -6], [0, 6]);
+F = draw.Drawing ('flange');
+F = F.circle ([0, 0], 40).circle ([0, 0], 15);
+F = F.block ('bolt', B);
+for a = 0:60:300
+  F = F.insert ('bolt', 28 * [cosd(a), sind(a)], a);
+endfor
+F
+plot (F);</code></pre>
+<pre class="code-out"><code>F =
+
+  draw.Drawing 'flange' with 8 entities on 1 layer
+    circle      2
+    insert      6
+    current layer: '0'</code></pre>
+<figure class="shot"><img src="img/09_drawings-4.png" alt="Technical drawings, picture 4"></figure>
+<h2>Moving and combining</h2>
+<p><code>transform</code> moves, turns, scales or mirrors every entity of a drawing, each as itself: a circle keeps its centre and scales its radius, a dimension keeps measuring. <code>merge</code> puts drawings together. A view drawn once at the origin is placed on a sheet this way.</p>
+<pre class="code-in"><code>G = merge (F, F.transform ('scale', 0.5).transform ('translate', [100, 0]));
+plot (G);</code></pre>
+<figure class="shot"><img src="img/09_drawings-5.png" alt="Technical drawings, picture 5"></figure>
+<h2>A sheet</h2>
+<p><a href="../draw.titleblock.html"><code>draw.titleblock</code></a> gives the border of an ISO sheet and its title block, filled in from a struct, on the layer <code>FRAME</code>. <a href="../draw.coordtable.html"><code>draw.coordtable</code></a> gives a table of point coordinates, for a profile that cannot be dimensioned. Both are drawings, and <code>merge</code> puts them on the sheet with the view.</p>
+<p>A plot draws text at a fixed size on the screen. <code>'FontScale'</code>, in points per millimetre, draws each string at its own height instead, which suits a whole sheet.</p>
+<pre class="code-in"><code>f = struct ('title', 'BRACKET', 'drawing', 'BR-001', 'material', 'S235', ...
+            'scale', '1:1', 'units', 'mm', 'drawnby', 'A. Bertsatos', ...
+            'revision', 'A');
+T = draw.titleblock ('A4', f);
+P = [0, 0; 12.5, 4.1; 25, 9.6; 37.5, 12.2; 50, 10.3];
+C = draw.coordtable (P, [190, 190]);
+sheet = merge (T, D.transform ('translate', [60, 90]), C);
+plot (sheet, 'FontScale', 2.5);</code></pre>
+<figure class="shot"><img src="img/09_drawings-6.png" alt="Technical drawings, picture 6"></figure>
+<h2>Paper, LaTeX and DXF</h2>
+<p><code>print</code> puts a drawing on paper at a stated scale, not merely fitted to the page: a distance measured on the sheet times the scale is the distance on the part. Without a <code>'Scale'</code> it takes the largest of the ISO scales that fits. The format follows the extension: PDF, EPS and SVG, or PNG, JPEG and TIFF. It returns the sheet size and the scale it used.</p>
+<pre class="code-in"><code>[paper, scale] = print (D, 'bracket.pdf')</code></pre>
+<pre class="code-out"><code>paper =
+
+   297   210
+
+scale = 1</code></pre>
+<p><code>tikz</code> returns the drawing as TikZ code, for a LaTeX report, at a stated scale. Its first lines:</p>
+<pre class="code-in"><code>t = tikz (D, 'Scale', 1);
+L = strsplit (t, "\n");
+printf ("%s\n", L{1:5});</code></pre>
+<pre class="code-out"><code>% Generated by the drafting package: draw.Drawing.tikz
+% Drawing: bracket
+% Plot scale 1:1. Coordinates are model millimetres.
+\tikzset{
+  drCENTRE/.style={}, % layer 'CENTRE'</code></pre>
+<p><code>write</code> saves the drawing as a DXF file for a CAD program, every entity on its layer with its line type and colour, and <a href="../draw.read.html"><code>draw.read</code></a> reads one back. Dimensions come back as dimensions, measuring again. Centre marks and leaders, which DXF has no entity for, come back as the lines and text they are drawn with, which is why the count grows. How each entity is written and read is set out in <a href="dxf.html">DXF and the classes</a>.</p>
+<pre class="code-in"><code>write (sheet, 'sheet.dxf');
+E = draw.read ('sheet.dxf')</code></pre>
+<pre class="code-out"><code>E =
+
+  draw.Drawing 'imported' with 60 entities on 6 layers
+    line        20
+    polyline    6
+    circle      3
+    text        26
+    dim         2
+    diam        2
+    radius      1
+    current layer: '0'</code></pre>
+<nav class="d-flex justify-content-between my-5">
+<a href="08_sections_and_projections.html">&larr; Sections and projections</a>
+<a href="10_meshes.html">Meshes &rarr;</a>
+</nav>
+
+        </main>
+      </div>
+    </div>
+  </body>
+</html>

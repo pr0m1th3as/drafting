@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>A first part - drafting guide</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" integrity="sha512-1ycn6IcaQQ40/MKBW2W4Rhis/DbILU74C1vSrLJxCq57o941Ym01SwNsOMqvEBFlcgUa6xLiPY/NS5R+E6ztJQ==" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/css/bootstrap.min.css" integrity="sha384-KyZXEAg3QhqLMpG8r+8fhAXLRk2vvoC2f3B09zVXn8CA5QIVfZOJ3BCsw2P0p/We" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-U1DAWAznBHeqEIlVSCgzq+c9gqGAJn5c/t99JyeKa9xxaYpSvHU5awsuZVVFIhvj" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="guide.css">
+  </head>
+  <body>
+    <div class="bg-dark">
+      <div class="container-xl">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+          <div class="container-fluid">
+            <a class="navbar-brand" href="index.html">
+              <img src="../assets/drafting.png" alt="drafting" class="d-inline-block align-top" width="25" height="25">
+              drafting guide
+            </a>
+            <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+              <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+              <ul class="navbar-nav">
+                <li class="nav-item">
+                  <a class="nav-link" href="../index.html">
+                    <i class="fas fa-book"></i>
+                    Function reference
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="https://github.com/pr0m1th3as/drafting">
+                    <i class="fab fa-github"></i>
+                    Source
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </nav>
+      </div>
+    </div>
+    <div class="container-xl my-4">
+      <div class="row">
+        <div class="col-md-3 col-lg-2 mb-4">
+          <nav class="guide-nav">
+<!-- guide-nav -->
+            <h6>Guide</h6>
+            <ul>
+              <li><a href="index.html">Overview</a></li>
+              <li><a href="layout.html">Package layout</a></li>
+              <li><a href="dxf.html">DXF and the classes</a></li>
+            </ul>
+            <h6>Tutorials</h6>
+            <ul>
+              <li><a href="01_first_part.html" class="active">A first part</a></li>
+              <li><a href="02_outlines.html">Outlines: polylines, splines, paths and regions</a></li>
+              <li><a href="03_regions.html">Working with regions</a></li>
+              <li><a href="04_coordinate_systems.html">Coordinate systems</a></li>
+              <li><a href="05_solids_from_regions.html">Solids from regions</a></li>
+              <li><a href="06_primitives_and_booleans.html">Primitives, booleans and transforms</a></li>
+              <li><a href="07_features.html">Features: holes, pockets, fillets, chamfers and shells</a></li>
+              <li><a href="08_sections_and_projections.html">Sections and projections</a></li>
+              <li><a href="09_drawings.html">Technical drawings</a></li>
+              <li><a href="10_meshes.html">Meshes</a></li>
+              <li><a href="11_assemblies.html">Assemblies</a></li>
+              <li><a href="12_from_openscad.html">For OpenSCAD users</a></li>
+            </ul>
+<!-- /guide-nav -->
+          </nav>
+        </div>
+        <main class="col-md-9 col-lg-10">
+<h1>A first part</h1>
+<p>A mounting plate from sketch to files: an outline drawn as a region, made solid, drilled, edged, measured, and saved for a CAD program and a slicer.</p>
+<h2>The outline</h2>
+<p>A part starts as a flat shape. Its outline here is a rectangle 90 by 50 millimetres, given by its corners as a closed <a href="../geom.Polyline.html"><code>geom.Polyline</code></a>, and <code>fillet</code> rounds every corner of it.</p>
+<pre class="code-in"><code>outline = geom.Polyline ([0, 0; 90, 0; 90, 50; 0, 50], 'Closed', true);
+outline = fillet (outline, 8)</code></pre>
+<pre class="code-out"><code>outline =
+
+  geom.Polyline: closed, 8 vertices, 4 arcs</code></pre>
+<p>A slot is two straight sides and two half circles. A polyline draws it as one shape: each vertex is <code>[x, y, bulge]</code>, and a bulge of 1 makes the segment leaving that vertex a half circle.</p>
+<pre class="code-in"><code>slot = geom.Polyline ([35, 19, 0; 55, 19, 1; 55, 31, 0; 35, 31, 1], ...
+                      'Closed', true)</code></pre>
+<pre class="code-out"><code>slot =
+
+  geom.Polyline: closed, 4 vertices, 2 arcs</code></pre>
+<p><a href="../geom.Region.html"><code>geom.Region</code></a> holds a flat area: one outline, and any holes in it given as a cell array. It checks that they make a valid shape, so a hole that crossed the outline would be refused here and not later.</p>
+<pre class="code-in"><code>R = geom.Region (outline, {slot})</code></pre>
+<pre class="code-out"><code>R =
+
+  geom.Region: an outline of 8 segments, 1 hole</code></pre>
+<p>A region is drawn by putting it in a <a href="../draw.Drawing.html"><code>draw.Drawing</code></a> and plotting that.</p>
+<pre class="code-in"><code>plot (draw.Drawing ().region (R));</code></pre>
+<figure class="shot"><img src="img/01_first_part-1.png" alt="A first part, picture 1"></figure>
+<h2>The solid</h2>
+<p><a href="../solid.extrude.html"><code>solid.extrude</code></a> raises the region along the normal of its plane, here the <i>z</i> axis, into a solid 6 millimetres thick. <code>show</code> draws it in a window of its own; the picture below is that window.</p>
+<pre class="code-in"><code>S = solid.extrude (R, 6);
+show (S);</code></pre>
+<figure class="shot"><img src="img/01_first_part-2.png" alt="A first part, picture 2"></figure>
+<h2>Holes and edges</h2>
+<p><code>hole</code> drills at points on the surface, straight down unless told otherwise, and a depth of <code>Inf</code> goes right through. Four clearance holes for M5 countersunk screws, 5.5 millimetres across, each with a 90 degree seat 10.4 millimetres across at the surface:</p>
+<pre class="code-in"><code>P = [10, 10, 6; 80, 10, 6; 10, 40, 6; 80, 40, 6];
+S = hole (S, P, 5.5, Inf, 'Countersink', 10.4);</code></pre>
+<p>Edges are chosen by what they are rather than by number. <code>faces</code> with a <code>'Normal'</code> picks the faces looking up, <code>edges</code> with <code>'Face'</code> the edges round them, and <code>chamfer</code> bevels those, 0.5 millimetres each way.</p>
+<pre class="code-in"><code>F = faces (S, 'Normal', [0, 0, 1]);
+S = chamfer (S, edges (S, 'Face', F), 0.5);
+show (S);</code></pre>
+<figure class="shot"><img src="img/01_first_part-3.png" alt="A first part, picture 3"></figure>
+<h2>Measuring</h2>
+<p>A solid knows its volume in cubic millimetres, its surface area, and its size along each axis, the second output of <code>bbox</code>.</p>
+<pre class="code-in"><code>volume (S)
+area (S)
+[~, L] = bbox (S)</code></pre>
+<pre class="code-out"><code>ans = 2.3658e+04
+ans = 1.0294e+04
+L =
+
+   90   50    6</code></pre>
+<h2>Files</h2>
+<p><code>write</code> saves the part in the format the file's extension names. A STEP file keeps the exact geometry, for a CAD program; an STL file holds triangles, for a slicer. A colour set on the solid travels with it into the STEP file and into the viewer.</p>
+<pre class="code-in"><code>S.Colour = [0.25, 0.45, 0.75];
+write (S, 'plate.step');
+write (S, 'plate.stl');
+show (S);</code></pre>
+<figure class="shot"><img src="img/01_first_part-4.png" alt="A first part, picture 4"></figure>
+<p>Reading the STEP file back gives the same solid.</p>
+<pre class="code-in"><code>B = solid.read ('plate.step');
+volume (B)</code></pre>
+<pre class="code-out"><code>ans = 2.3658e+04</code></pre>
+<nav class="d-flex justify-content-between my-5">
+<span></span>
+<a href="02_outlines.html">Outlines: polylines, splines, paths and regions &rarr;</a>
+</nav>
+
+        </main>
+      </div>
+    </div>
+  </body>
+</html>

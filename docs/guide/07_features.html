@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Features: holes, pockets, fillets, chamfers and shells - drafting guide</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" integrity="sha512-1ycn6IcaQQ40/MKBW2W4Rhis/DbILU74C1vSrLJxCq57o941Ym01SwNsOMqvEBFlcgUa6xLiPY/NS5R+E6ztJQ==" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/css/bootstrap.min.css" integrity="sha384-KyZXEAg3QhqLMpG8r+8fhAXLRk2vvoC2f3B09zVXn8CA5QIVfZOJ3BCsw2P0p/We" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-U1DAWAznBHeqEIlVSCgzq+c9gqGAJn5c/t99JyeKa9xxaYpSvHU5awsuZVVFIhvj" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="guide.css">
+  </head>
+  <body>
+    <div class="bg-dark">
+      <div class="container-xl">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+          <div class="container-fluid">
+            <a class="navbar-brand" href="index.html">
+              <img src="../assets/drafting.png" alt="drafting" class="d-inline-block align-top" width="25" height="25">
+              drafting guide
+            </a>
+            <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+              <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+              <ul class="navbar-nav">
+                <li class="nav-item">
+                  <a class="nav-link" href="../index.html">
+                    <i class="fas fa-book"></i>
+                    Function reference
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="https://github.com/pr0m1th3as/drafting">
+                    <i class="fab fa-github"></i>
+                    Source
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </nav>
+      </div>
+    </div>
+    <div class="container-xl my-4">
+      <div class="row">
+        <div class="col-md-3 col-lg-2 mb-4">
+          <nav class="guide-nav">
+<!-- guide-nav -->
+            <h6>Guide</h6>
+            <ul>
+              <li><a href="index.html">Overview</a></li>
+              <li><a href="layout.html">Package layout</a></li>
+              <li><a href="dxf.html">DXF and the classes</a></li>
+            </ul>
+            <h6>Tutorials</h6>
+            <ul>
+              <li><a href="01_first_part.html">A first part</a></li>
+              <li><a href="02_outlines.html">Outlines: polylines, splines, paths and regions</a></li>
+              <li><a href="03_regions.html">Working with regions</a></li>
+              <li><a href="04_coordinate_systems.html">Coordinate systems</a></li>
+              <li><a href="05_solids_from_regions.html">Solids from regions</a></li>
+              <li><a href="06_primitives_and_booleans.html">Primitives, booleans and transforms</a></li>
+              <li><a href="07_features.html" class="active">Features: holes, pockets, fillets, chamfers and shells</a></li>
+              <li><a href="08_sections_and_projections.html">Sections and projections</a></li>
+              <li><a href="09_drawings.html">Technical drawings</a></li>
+              <li><a href="10_meshes.html">Meshes</a></li>
+              <li><a href="11_assemblies.html">Assemblies</a></li>
+              <li><a href="12_from_openscad.html">For OpenSCAD users</a></li>
+            </ul>
+<!-- /guide-nav -->
+          </nav>
+        </div>
+        <main class="col-md-9 col-lg-10">
+<h1>Features: holes, pockets, fillets, chamfers and shells</h1>
+<p>A bearing block made from three primitives and finished as a machinist would finish it: edges rounded and bevelled, a bearing seat bored, holes drilled and tapped, a relief cut underneath. Then a box hollowed into an enclosure.</p>
+<h2>The blank</h2>
+<p>A base plate, an upright web and a boss lying along the <i>y</i> axis, united into one solid. The boss is a cylinder whose UCS has its normal along <i>-y</i>, so it runs from the back face at <i>y</i> = 30 to the front at <i>y</i> = 0.</p>
+<pre class="code-in"><code>base = solid.box (90, 30, 12);
+web = solid.box (40, 30, 32, geom.UCS ([0, 0, 1], [25, 0, 0]));
+boss = solid.cylinder (20, 30, geom.UCS ([0, -1, 0], [45, 30, 32]));
+S = union (base, web, boss)
+show (S);</code></pre>
+<pre class="code-out"><code>S =
+
+  solid.Shape: 1 solid, 10 faces, 24 edges</code></pre>
+<figure class="shot"><img src="img/07_features-1.png" alt="Features: holes, pockets, fillets, chamfers and shells, picture 1"></figure>
+<h2>Choosing edges</h2>
+<p>A feature works on edges or faces given by index, and the indices belong to the shape they came from: every operation numbers the new shape's edges afresh. So edges are chosen by what they are, just before they are used. <code>edges</code> with <code>'Direction'</code> keeps straight edges running along a direction, and <code>'Within'</code> those lying inside a box <code>[xmin, ymin, zmin, xmax, ymax, zmax]</code>. The four upright corners of the base:</p>
+<pre class="code-in"><code>E = edges (S, 'Direction', [0, 0, 1], 'Within', [0, 0, 0, 90, 30, 12])
+S = fillet (S, E, 6);</code></pre>
+<pre class="code-out"><code>E =
+
+    1    3   11   18</code></pre>
+<p>The two edges where the web meets the top of the base run along <i>y</i> at <i>z</i> = 12. They are inside corners, so <code>fillet</code> adds material there, as a casting has it.</p>
+<pre class="code-in"><code>E = edges (S, 'Direction', [0, 1, 0], 'Within', [1, 0, 12, 89, 30, 12])
+S = fillet (S, E, 4);
+show (S);</code></pre>
+<pre class="code-out"><code>E =
+
+    7   36</code></pre>
+<figure class="shot"><img src="img/07_features-2.png" alt="Features: holes, pockets, fillets, chamfers and shells, picture 2"></figure>
+<p>Rounding before drilling keeps the choice simple: the walls of a drilled hole bring straight edges of their own, which the same query would pick up with the corners.</p>
+<h2>Holes</h2>
+<p><code>hole</code> drills from a point on the surface along <code>'Direction'</code>, straight down by default. The bore enters the front face and runs along <i>y</i>; a <code>'Counterbore'</code> of 32 by 8 is the seat of a bearing 32 millimetres across.</p>
+<pre class="code-in"><code>S = hole (S, [45, 0, 32], 25, Inf, 'Direction', [0, 1, 0], ...
+          'Counterbore', [32, 8]);</code></pre>
+<p>Two clearance holes for M6 screws through the base, with a countersunk seat for flat heads, and a blind hole on top of the boss for a grease nipple. Naming a thread, <code>'M6'</code>, drills at its tapping size, 5 millimetres; <code>'Tip'</code> leaves the cone of a 118 degree twist drill at the bottom of the blind hole.</p>
+<pre class="code-in"><code>S = hole (S, [9, 15, 12; 81, 15, 12], 6.6, Inf, 'Countersink', 13);
+S = hole (S, [45, 15, 52], 'M6', 10, 'Tip', 118);</code></pre>
+<h2>Choosing faces</h2>
+<p><code>faces</code> chooses faces as <code>edges</code> chooses edges: by <code>'Type'</code> of surface, by <code>'Normal'</code> for flat faces, by <code>'Axis'</code> for faces turned about an axis, and by <code>'Within'</code>. The faces round the <i>y</i> axis that are cylinders are the outside of the boss, the bore and the bearing seat:</p>
+<pre class="code-in"><code>F = faces (S, 'Type', 'cylinder', 'Axis', [0, 1, 0])</code></pre>
+<pre class="code-out"><code>F =
+
+    3   11   15   16   18</code></pre>
+<p>A chamfer of 1 millimetre breaks the rim of the bore on the back face: the circular edges at <i>y</i> = 30 inside a box round the bore's axis, which leaves out the larger rim of the boss.</p>
+<pre class="code-in"><code>E = edges (S, 'Type', 'circle', 'Within', [32, 30, 19, 58, 30, 45]);
+S = chamfer (S, E, 1);</code></pre>
+<h2>A pocket underneath</h2>
+<p><code>pocket</code> cuts a region into the part, from the region's plane against the normal of its UCS. The region goes on the underside, so its UCS faces down, out of the part, with its <i>x</i> axis along the world <i>x</i> axis. Rounded corners, as a milling cutter leaves them, come from <code>fillet</code> on the region, and <code>'Taper'</code> leans the walls in by 10 degrees as they go deeper.</p>
+<pre class="code-in"><code>U = geom.UCS ([0, 0, -1], [45, 15, 0], [46, 15, 0]);
+R = fillet (geom.Region ([-25, -8; 25, -8; 25, 8; -25, 8]), 3);
+R.UCS = U;
+v = volume (S);
+S = pocket (S, R, 3, 'Taper', 10);
+v - volume (S)</code></pre>
+<pre class="code-out"><code>ans = 2277.1</code></pre>
+<p>The part is done, with its holes, its chamfered bore and its relief. A colour for the viewer:</p>
+<pre class="code-in"><code>S.Colour = [0.3, 0.45, 0.65];
+show (S);</code></pre>
+<figure class="shot"><img src="img/07_features-3.png" alt="Features: holes, pockets, fillets, chamfers and shells, picture 3"></figure>
+<h2>Angled and uneven chamfers</h2>
+<p>A chamfer can also cut back by a distance along one face at an angle to it, as a drawing calls it out with <code>3 x 30</code>, or by two different distances along the two faces. The face is given by index, and every edge chamfered must bound it. On a plain block, the top edge along the front:</p>
+<pre class="code-in"><code>K = solid.box (40, 20, 10);
+F = faces (K, 'Normal', [0, 0, 1]);
+E = edges (K, 'Face', F, 'Within', [0, 0, 10, 40, 0, 10]);
+A = chamfer (K, E, 3, F, 'Angle', 30);
+volume (K) - volume (A)</code></pre>
+<pre class="code-out"><code>ans = 103.92</code></pre>
+<p>Along the top face it cuts back 3, and down the front <code>3 * tand (30)</code>, so the triangle removed along the 40 millimetre edge is</p>
+<pre class="code-in"><code>0.5 * 3 * 3 * tand (30) * 40</code></pre>
+<pre class="code-out"><code>ans = 103.92</code></pre>
+<p>Two distances instead, 3 along the top face and 6 down the front:</p>
+<pre class="code-in"><code>A = chamfer (K, E, [3, 6], F);
+volume (K) - volume (A)
+show (A);</code></pre>
+<pre class="code-out"><code>ans = 360.00</code></pre>
+<figure class="shot"><img src="img/07_features-4.png" alt="Features: holes, pockets, fillets, chamfers and shells, picture 4"></figure>
+<h2>Shells</h2>
+<p><code>shell</code> hollows a shape to walls of a given thickness and opens the faces named. A box with rounded upright edges, open at the top, with walls of 2 and a floor of 4:</p>
+<pre class="code-in"><code>B = solid.box (80, 50, 30);
+B = fillet (B, edges (B, 'Direction', [0, 0, 1]), 6);
+top = faces (B, 'Normal', [0, 0, 1]);
+bottom = faces (B, 'Normal', [0, 0, -1]);
+C = shell (B, top, 2, 'Thickness', {bottom, 4});
+show (C);</code></pre>
+<figure class="shot"><img src="img/07_features-5.png" alt="Features: holes, pockets, fillets, chamfers and shells, picture 5"></figure>
+<p>The walls grow inwards, so the outside keeps the size of the box. With <code>'Outward', true</code> they grow outwards instead, so the inside keeps it: the way to make a case that a part of that shape fits into.</p>
+<pre class="code-in"><code>[~, sz] = bbox (C)
+O = shell (B, top, 2, 'Outward', true);
+[~, sz] = bbox (O)</code></pre>
+<pre class="code-out"><code>sz =
+
+   80   50   30
+
+sz =
+
+   84   54   32</code></pre>
+<nav class="d-flex justify-content-between my-5">
+<a href="06_primitives_and_booleans.html">&larr; Primitives, booleans and transforms</a>
+<a href="08_sections_and_projections.html">Sections and projections &rarr;</a>
+</nav>
+
+        </main>
+      </div>
+    </div>
+  </body>
+</html>

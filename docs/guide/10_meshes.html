@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Meshes - drafting guide</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" integrity="sha512-1ycn6IcaQQ40/MKBW2W4Rhis/DbILU74C1vSrLJxCq57o941Ym01SwNsOMqvEBFlcgUa6xLiPY/NS5R+E6ztJQ==" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/css/bootstrap.min.css" integrity="sha384-KyZXEAg3QhqLMpG8r+8fhAXLRk2vvoC2f3B09zVXn8CA5QIVfZOJ3BCsw2P0p/We" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-U1DAWAznBHeqEIlVSCgzq+c9gqGAJn5c/t99JyeKa9xxaYpSvHU5awsuZVVFIhvj" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="guide.css">
+  </head>
+  <body>
+    <div class="bg-dark">
+      <div class="container-xl">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+          <div class="container-fluid">
+            <a class="navbar-brand" href="index.html">
+              <img src="../assets/drafting.png" alt="drafting" class="d-inline-block align-top" width="25" height="25">
+              drafting guide
+            </a>
+            <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+              <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+              <ul class="navbar-nav">
+                <li class="nav-item">
+                  <a class="nav-link" href="../index.html">
+                    <i class="fas fa-book"></i>
+                    Function reference
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="https://github.com/pr0m1th3as/drafting">
+                    <i class="fab fa-github"></i>
+                    Source
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </nav>
+      </div>
+    </div>
+    <div class="container-xl my-4">
+      <div class="row">
+        <div class="col-md-3 col-lg-2 mb-4">
+          <nav class="guide-nav">
+<!-- guide-nav -->
+            <h6>Guide</h6>
+            <ul>
+              <li><a href="index.html">Overview</a></li>
+              <li><a href="layout.html">Package layout</a></li>
+              <li><a href="dxf.html">DXF and the classes</a></li>
+            </ul>
+            <h6>Tutorials</h6>
+            <ul>
+              <li><a href="01_first_part.html">A first part</a></li>
+              <li><a href="02_outlines.html">Outlines: polylines, splines, paths and regions</a></li>
+              <li><a href="03_regions.html">Working with regions</a></li>
+              <li><a href="04_coordinate_systems.html">Coordinate systems</a></li>
+              <li><a href="05_solids_from_regions.html">Solids from regions</a></li>
+              <li><a href="06_primitives_and_booleans.html">Primitives, booleans and transforms</a></li>
+              <li><a href="07_features.html">Features: holes, pockets, fillets, chamfers and shells</a></li>
+              <li><a href="08_sections_and_projections.html">Sections and projections</a></li>
+              <li><a href="09_drawings.html">Technical drawings</a></li>
+              <li><a href="10_meshes.html" class="active">Meshes</a></li>
+              <li><a href="11_assemblies.html">Assemblies</a></li>
+              <li><a href="12_from_openscad.html">For OpenSCAD users</a></li>
+            </ul>
+<!-- /guide-nav -->
+          </nav>
+        </div>
+        <main class="col-md-9 col-lg-10">
+<h1>Meshes</h1>
+<p>A triangle mesh is how a slicer, a scanner or a download hands over a shape. This tutorial makes meshes, colours them, saves and reads them, cuts them back into regions and takes them into booleans.</p>
+<h2>A mesh from vertices and faces</h2>
+<p><a href="../polymesh.Mesh.html"><code>polymesh.Mesh</code></a> takes the corners as an N-by-3 matrix and the triangles as rows of three indices into it. A tetrahedron needs four of each. The mesh is closed, every edge shared by two triangles, so it encloses a volume.</p>
+<pre class="code-in"><code>V = [0, 0, 0; 30, 0, 0; 15, 26, 0; 15, 8.7, 24.5];
+F = [1, 3, 2; 1, 2, 4; 2, 3, 4; 3, 1, 4];
+M = polymesh.Mesh (V, F)
+isclosed (M)
+volume (M)
+show (M);</code></pre>
+<pre class="code-out"><code>M =
+
+  polymesh.Mesh: 4 vertices, 4 triangles
+
+ans = 1
+ans = 3185</code></pre>
+<figure class="shot"><img src="img/10_meshes-1.png" alt="Meshes, picture 1"></figure>
+<h2>A mesh from a surface Octave computes</h2>
+<p><code>isosurface</code> returns a struct with the fields <code>vertices</code> and <code>faces</code>, the form <code>patch</code> takes, and the constructor takes it as it is. Two blobs joined at a waist:</p>
+<pre class="code-in"><code>[x, y, z] = meshgrid (linspace (-20, 20, 41));
+v = 1 ./ ((x - 8) .^ 2 + y .^ 2 + z .^ 2 + 1) ...
+    + 1 ./ ((x + 8) .^ 2 + y .^ 2 + z .^ 2 + 1);
+B = polymesh.Mesh (isosurface (x, y, z, v, 0.025))</code></pre>
+<pre class="code-out"><code>B =
+
+  polymesh.Mesh: 1750 vertices, 3496 triangles</code></pre>
+<h2>Colours</h2>
+<p>A mesh carries a colour for each vertex, <code>VertexColour</code>, or for each triangle, <code>FaceColour</code>, as rows of red, green and blue from 0 to 1. Here each vertex is coloured by its height, blue at the bottom and red at the top. In the viewer the key C turns between the colours a mesh has.</p>
+<pre class="code-in"><code>h = B.Vertices(:,3);
+t = (h - min (h)) / (max (h) - min (h));
+B.VertexColour = [t, 0.3 * ones(size (t)), 1 - t];
+show (B);</code></pre>
+<figure class="shot"><img src="img/10_meshes-2.png" alt="Meshes, picture 2"></figure>
+<p>Moving, turning, mirroring and scaling return a new mesh, as every method of the package does. <code>bbox</code> gives the extent, and its second output the size along each axis.</p>
+<pre class="code-in"><code>B2 = scale (rotate (B, 90, [0, 0, 1]), 2);
+[~, L] = bbox (B2)</code></pre>
+<pre class="code-out"><code>L =
+
+   27.034   58.271   27.034</code></pre>
+<h2>Files</h2>
+<p>A part from a CAD program reaches a slicer as a mesh. <code>tessellate</code> makes one of a solid, here a plate with a bore, and <code>write</code> saves it in the format its extension names: STL, OBJ, PLY or 3MF. <a href="../polymesh.read.html"><code>polymesh.read</code></a> reads all four back, and every one keeps the mesh whole.</p>
+<pre class="code-in"><code>S = solid.extrude (geom.Region ([0, 0; 60, 0; 60, 30; 0, 30], ...
+                                {[22, 15, 1; 38, 15, 1]}), 8);
+T = tessellate (S, 0.05);
+files = {'plate.stl', 'plate.obj', 'plate.ply', 'plate.3mf'};
+for k = 1:numel (files)
+  write (T, files{k});
+  R = polymesh.read (files{k});
+  printf ("%-10s %d vertices, %d triangles\n", files{k}, ...
+          numvertices (R), numfaces (R));
+endfor</code></pre>
+<pre class="code-out"><code>plate.stl  88 vertices, 176 triangles
+plate.obj  88 vertices, 176 triangles
+plate.ply  88 vertices, 176 triangles
+plate.3mf  88 vertices, 176 triangles</code></pre>
+<p>STL repeats every corner for each triangle that uses it; <a href="../polymesh.read.html"><code>polymesh.read</code></a> welds them back into one vertex, so the counts agree.</p>
+<h2>Cutting a mesh</h2>
+<p><code>section</code> cuts a mesh with the plane of a <a href="../geom.UCS.html"><code>geom.UCS</code></a>, as it cuts a solid, and returns the cut as regions. The cut of a mesh is made of its facets, so the bore comes back as a polygon of straight segments.</p>
+<pre class="code-in"><code>C = section (T, geom.UCS ([0, 0, 1], [0, 0, 4]));
+C{1}.Holes{1}</code></pre>
+<pre class="code-out"><code>ans =
+
+  geom.Path: closed, 40 segments, 0 arc, 0 spline</code></pre>
+<p><code>fit</code> turns the segments back into lines and arcs where they follow them within a tolerance, a thousandth of the region's size by default. The bore is two arcs again, a circle, and the outline four straight sides.</p>
+<pre class="code-in"><code>R = fit (C{1});
+R.Holes{1}
+R.Outline</code></pre>
+<pre class="code-out"><code>ans =
+
+  geom.Path: closed, 2 segments, 2 arcs, 0 spline
+
+ans =
+
+  geom.Path: closed, 4 segments, 0 arc, 0 spline</code></pre>
+<h2>A mesh with a gap</h2>
+<p>A mesh from a scan or a careless export may have holes in its surface. Taking away one triangle of the bore makes one here. The cut through the gap no longer closes: <code>section</code> returns what it can make into regions, the plate without its bore, and the rest in a second output, as chains of points.</p>
+<pre class="code-in"><code>c = (T.Vertices(T.Faces(:,1),:) + T.Vertices(T.Faces(:,2),:) ...
+     + T.Vertices(T.Faces(:,3),:)) / 3;
+[~, k] = min (sum ((c - [30, 7, 4]) .^ 2, 2));
+G = polymesh.Mesh (T.Vertices, T.Faces([1:k-1, k+1:end],:));
+isclosed (G)
+[C, OPEN] = section (G, geom.UCS ([0, 0, 1], [0, 0, 4]));
+C{1}
+numel (OPEN)
+gap = norm (OPEN{1}(1,:) - OPEN{1}(end,:))</code></pre>
+<pre class="code-out"><code>ans = 0
+ans =
+
+  geom.Region: an outline of 4 segments, 0 hole
+
+ans = 1
+gap = 0.6277</code></pre>
+<p>The gap is one facet wide. A <code>'Tolerance'</code> just larger than it joins the ends and closes the bore again, and <code>fit</code> makes it round. Keep it small: one much larger than the gap merges points of the cut and coarsens it.</p>
+<pre class="code-in"><code>C = section (G, geom.UCS ([0, 0, 1], [0, 0, 4]), 'Tolerance', 0.7);
+R = fit (C{1});
+R.Holes{1}</code></pre>
+<pre class="code-out"><code>ans =
+
+  geom.Path: closed, 2 segments, 2 arcs, 0 spline</code></pre>
+<h2>Meshes in booleans</h2>
+<p><a href="../solid.polyhedron.html"><code>solid.polyhedron</code></a> makes a solid of a closed mesh, so a mesh takes part in booleans like any other shape. A hole through one of the blobs:</p>
+<pre class="code-in"><code>P = solid.polyhedron (B);
+H = subtract (P, solid.cylinder (3, 50, geom.UCS ([0, 1, 0], [8, -25, 0])));
+show (H);</code></pre>
+<figure class="shot"><img src="img/10_meshes-3.png" alt="Meshes, picture 3"></figure>
+<h2>How fine a tessellation is</h2>
+<p>The second argument of <code>tessellate</code> is how far, in millimetres, a triangle may stray from the true surface, 0.01 by default. No triangle spans more than 20 degrees of a curve either, which is why the two coarser tolerances give the same mesh of this plate.</p>
+<pre class="code-in"><code>for tol = [1, 0.1, 0.01, 0.001]
+  printf ("%6.3f mm: %d triangles\n", tol, numfaces (tessellate (S, tol)));
+endfor</code></pre>
+<pre class="code-out"><code> 1.000 mm: 160 triangles
+ 0.100 mm: 160 triangles
+ 0.010 mm: 376 triangles
+ 0.001 mm: 1144 triangles</code></pre>
+<nav class="d-flex justify-content-between my-5">
+<a href="09_drawings.html">&larr; Technical drawings</a>
+<a href="11_assemblies.html">Assemblies &rarr;</a>
+</nav>
+
+        </main>
+      </div>
+    </div>
+  </body>
+</html>

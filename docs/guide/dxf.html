@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>DXF and the classes - drafting guide</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" integrity="sha512-1ycn6IcaQQ40/MKBW2W4Rhis/DbILU74C1vSrLJxCq57o941Ym01SwNsOMqvEBFlcgUa6xLiPY/NS5R+E6ztJQ==" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/css/bootstrap.min.css" integrity="sha384-KyZXEAg3QhqLMpG8r+8fhAXLRk2vvoC2f3B09zVXn8CA5QIVfZOJ3BCsw2P0p/We" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-U1DAWAznBHeqEIlVSCgzq+c9gqGAJn5c/t99JyeKa9xxaYpSvHU5awsuZVVFIhvj" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="guide.css">
+  </head>
+  <body>
+    <div class="bg-dark">
+      <div class="container-xl">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+          <div class="container-fluid">
+            <a class="navbar-brand" href="index.html">
+              <img src="../assets/drafting.png" alt="drafting" class="d-inline-block align-top" width="25" height="25">
+              drafting guide
+            </a>
+            <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+              <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+              <ul class="navbar-nav">
+                <li class="nav-item">
+                  <a class="nav-link" href="../index.html">
+                    <i class="fas fa-book"></i>
+                    Function reference
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="https://github.com/pr0m1th3as/drafting">
+                    <i class="fab fa-github"></i>
+                    Source
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </nav>
+      </div>
+    </div>
+    <div class="container-xl my-4">
+      <div class="row">
+        <div class="col-md-3 col-lg-2 mb-4">
+          <nav class="guide-nav">
+<!-- guide-nav -->
+            <h6>Guide</h6>
+            <ul>
+              <li><a href="index.html">Overview</a></li>
+              <li><a href="layout.html">Package layout</a></li>
+              <li><a href="dxf.html" class="active">DXF and the classes</a></li>
+            </ul>
+            <h6>Tutorials</h6>
+            <ul>
+              <li><a href="01_first_part.html">A first part</a></li>
+              <li><a href="02_outlines.html">Outlines: polylines, splines, paths and regions</a></li>
+              <li><a href="03_regions.html">Working with regions</a></li>
+              <li><a href="04_coordinate_systems.html">Coordinate systems</a></li>
+              <li><a href="05_solids_from_regions.html">Solids from regions</a></li>
+              <li><a href="06_primitives_and_booleans.html">Primitives, booleans and transforms</a></li>
+              <li><a href="07_features.html">Features: holes, pockets, fillets, chamfers and shells</a></li>
+              <li><a href="08_sections_and_projections.html">Sections and projections</a></li>
+              <li><a href="09_drawings.html">Technical drawings</a></li>
+              <li><a href="10_meshes.html">Meshes</a></li>
+              <li><a href="11_assemblies.html">Assemblies</a></li>
+              <li><a href="12_from_openscad.html">For OpenSCAD users</a></li>
+            </ul>
+<!-- /guide-nav -->
+          </nav>
+        </div>
+        <main class="col-md-9 col-lg-10">
+
+<h1>DXF and the classes</h1>
+<p class="lead">What each class becomes in a DXF file, what each entity of a
+file becomes when it is read, and how a frame, a layer and a version are
+kept.</p>
+
+<h2 id="sides">Two sides: geometry and drawings</h2>
+
+<p>DXF is read and written by compiled code, <code>src/__dxf__.cc</code>,
+which needs nothing but Octave. It takes the objects themselves and builds
+them by their constructors, so there is no list of entities to handle in
+between. The package meets DXF from two sides:</p>
+
+<table class="guide">
+  <tr><th></th><th>Geometry</th><th>Drawings</th></tr>
+  <tr><td>Classes</td><td><code>geom.Polyline</code>,
+  <code>geom.Spline</code>, <code>geom.Path</code>,
+  <code>geom.Region</code></td><td><code>draw.Drawing</code></td></tr>
+  <tr><td>Write</td><td><code>write (G, FILE)</code> for one object,
+  <code>geom.write (C, FILE)</code> for a cell of them</td>
+  <td><code>write (D, FILE)</code></td></tr>
+  <tr><td>Read</td><td><code>geom.read (FILE)</code></td>
+  <td><code>draw.read (FILE)</code></td></tr>
+  <tr><td>For</td><td>Profiles to build solids from, parts for a laser or a
+  router, outlines exchanged with a CAD program. Objects keep their frame in
+  3-D.</td><td>Technical drawings: dimensions, text, hatches, blocks, layers,
+  line types and colours. Everything lies in the plane <i>z</i> = 0.</td></tr>
+</table>
+
+<p>Both sides write the same format, R2000 by default, and both read files
+from R12 to R2018, so a file written from one side can be read by the
+other.</p>
+
+<h2 id="geom-write">Writing geom objects</h2>
+
+<p>Each geom class has a <code>write</code> method, and
+<code>geom.write</code> writes a cell array of any mix of them in one pass.
+The file name must end in <code>.dxf</code>.</p>
+
+<table class="guide">
+  <tr><th>Class</th><th>Written as</th></tr>
+  <tr><td><code>geom.Polyline</code></td><td>One <code>LWPOLYLINE</code> with
+  its bulges, its plane held as the entity's normal and elevation.</td></tr>
+  <tr><td><code>geom.Spline</code></td><td>One <code>SPLINE</code>, with its
+  fit points where it was drawn through points.</td></tr>
+  <tr><td><code>geom.Path</code></td><td>Its pieces, <code>LINE</code>,
+  <code>ARC</code> in its own plane and <code>SPLINE</code>, bound by a
+  <code>GROUP</code>.</td></tr>
+  <tr><td><code>geom.Region</code></td><td>Its loops, the outline first, bound
+  by a <code>GROUP</code>: a loop of lines and arcs as one closed
+  <code>LWPOLYLINE</code>, a loop with a spline in it as its pieces. With
+  <code>'Fill', true</code>, a solid <code>HATCH</code> as well, written with
+  the group.</td></tr>
+</table>
+
+<p>Geom objects carry no layer, line type or colour of their own; the
+options give them, one value for every object or, in
+<code>geom.write</code>, a cell array of one per object:</p>
+
+<table class="guide">
+  <tr><th>Option</th><th>Value</th></tr>
+  <tr><td><code>'Layer'</code></td><td>The layer, <code>'0'</code> by
+  default.</td></tr>
+  <tr><td><code>'Linetype'</code></td><td><code>'CONTINUOUS'</code> by
+  default, or a line type of <code>draw.linetype</code>: HIDDEN, CENTER,
+  PHANTOM, DASHED, DASHDOT, DOT.</td></tr>
+  <tr><td><code>'Colour'</code></td><td>An AutoCAD colour index from 1 to
+  256, 256 meaning the layer's colour, the default. True colour came only
+  with R2004.</td></tr>
+  <tr><td><code>'Fill'</code></td><td><code>true</code> adds a solid hatch
+  over a region; <code>false</code> by default.</td></tr>
+  <tr><td><code>'Version'</code></td><td><code>'R2000'</code>, the default,
+  or <code>'R12'</code>, which holds only lines and arcs, so only polylines
+  may be written as R12.</td></tr>
+  <tr><td><code>'LTScale'</code></td><td>The line-type scale written in the
+  header, 1 by default, so dashes look the same wherever the file is
+  opened.</td></tr>
+</table>
+
+<pre class="code-in"><code>R = geom.Region ([0, 0; 60, 0; 60, 40; 0, 40], {[20, 20, 1; 40, 20, 1]});
+P = geom.Path ([0, 0, 0; 0, 0, 50; 30, 0, 80]);
+
+write (R, 'plate.dxf', 'Layer', 'PLATE', 'Fill', true);
+geom.write ({R, P}, 'parts.dxf', 'Layer', {'PLATE', 'ROUTE'});</code></pre>
+
+<p>A DXF file is not appended to. Adding to one rewrites its tables, its
+handles and its objects section, so a file is written whole, from every
+object it is to hold.</p>
+
+<h2 id="geom-read">Reading geom objects</h2>
+
+<h3>What is in the file</h3>
+
+<p>Without options, <code>geom.read</code> returns what is in the file: a
+row cell array with one geom object per entity, in the order of the file,
+nothing joined and nothing reclassified.</p>
+
+<table class="guide">
+  <tr><th>Entity</th><th>Read as</th></tr>
+  <tr><td><code>LINE</code>, <code>ARC</code>, <code>CIRCLE</code>,
+  <code>LWPOLYLINE</code>, a flat <code>POLYLINE</code></td>
+  <td><code>geom.Polyline</code></td></tr>
+  <tr><td><code>SPLINE</code>, <code>ELLIPSE</code></td>
+  <td><code>geom.Spline</code>, an ellipse as its exact rational
+  spline</td></tr>
+  <tr><td><code>HATCH</code></td><td>The <code>geom.Region</code> objects
+  it fills</td></tr>
+  <tr><td>A <code>LINE</code> slanting in 3-D, a 3-D
+  <code>POLYLINE</code></td><td><code>geom.Path</code>, since no single
+  plane holds them</td></tr>
+  <tr><td>A group the package wrote</td><td>One object, of the class its
+  extended data names</td></tr>
+  <tr><td>Text, dimensions, inserts, points, meshes, solids</td>
+  <td>Skipped</td></tr>
+</table>
+
+<p>A group the package wrote comes back whole, so what was written is what is
+read: a region keeps its holes, a closed path stays a path, and the hatch
+written with <code>'Fill'</code> is part of its region, never a second one.
+<code>'Layer'</code> keeps only what lies on one layer, its name compared
+without regard to case, as CAD programs compare them.</p>
+
+<pre class="code-in"><code>C = geom.read ('plate.dxf')                     # one region, with its bore
+C = geom.read ('parts.dxf')                     # a region and a path
+C = geom.read ('parts.dxf', 'Layer', 'route')   # the path alone</code></pre>
+
+<h3>Building one object from loose entities</h3>
+
+<p>A file from another program holds loose lines and arcs, not regions.
+<code>'Type'</code> builds one object of a class from them:</p>
+
+<table class="guide">
+  <tr><th><code>'Type'</code></th><th>Builds</th></tr>
+  <tr><td><code>'polyline'</code></td><td>A <code>geom.Polyline</code>, from
+  one entity.</td></tr>
+  <tr><td><code>'spline'</code></td><td>A <code>geom.Spline</code>, from one
+  entity.</td></tr>
+  <tr><td><code>'path'</code></td><td>A <code>geom.Path</code>, the entities
+  chained end to end by <code>geom.Path.chain</code>.</td></tr>
+  <tr><td><code>'region'</code></td><td>A <code>geom.Region</code>, the
+  entities chained into closed loops and the loops that share a plane nested
+  by <code>geom.Region.nest</code> into an outline and its holes.</td></tr>
+</table>
+
+<p>Ends closer than 1e-4 mm are joined and snapped to one point, which is
+above the rounding of coordinates in a file and below anything that can be
+made. The package's own groups count as already built. Exactly one object
+must result: more than one is an error naming the layer, as is finding
+candidates on several layers with no <code>'Layer'</code> given, and finding
+none. Separate parts belong on separate layers, and <code>'Layer'</code>
+picks one.</p>
+
+<p>Four separate lines, as a CAD program would leave them, become one region
+ready to extrude:</p>
+
+<pre class="code-in"><code>L = {geom.Polyline([0, 0; 50, 0]), geom.Polyline([50, 0; 50, 30]), ...
+     geom.Polyline([50, 30; 0, 30]), geom.Polyline([0, 30; 0, 0])};
+geom.write (L, 'lines.dxf', 'Layer', 'PROFILE');
+
+C = geom.read ('lines.dxf');                    # four open polylines
+R = geom.read ('lines.dxf', 'Type', 'region');  # one closed region
+S = solid.extrude (R, 10);</code></pre>
+
+<p>Whatever is skipped, and with <code>'Type'</code> whatever is left over,
+is reported in one warning per read, counted by entity type.</p>
+
+<h2 id="frames">Frames</h2>
+
+<p>Every geom object lies in a <code>geom.UCS</code>, and DXF has no place
+for one, so the package keeps it as extended data under the registered
+application <code>DRAFTING</code>: the origin in group 1011 and the <i>x</i>
+axis in group 1013, and for a path, a spline or a region the normal in a
+second 1013, since a flat entity keeps its normal in group 210. On a group,
+the same data names the class, <code>geom.Path</code> or
+<code>geom.Region</code>, in group 1000.</p>
+
+<p><code>geom.read</code> restores the frame, for a flat object only when the
+stored normal still matches the entity's and the origin still lies in its
+plane. The coordinates of the entities stay authoritative, so a frame left
+stale by an edit elsewhere can never move the geometry.</p>
+
+<pre class="code-in"><code>## A region in the plane x = 5, written and read back in the same frame
+T = geom.Region ([0, 0; 30, 0; 30, 20; 0, 20]);
+T.UCS = geom.UCS ([1, 0, 0], [5, 0, 0]);
+write (T, 'tilted.dxf');
+B = geom.read ('tilted.dxf', 'Type', 'region');
+B.UCS == T.UCS</code></pre>
+
+<p>A file without that data is read in any plane. An entity whose normal is
+the world <i>z</i> axis is moved to its height. One whose normal points down
+the <i>z</i> axis is mirrored into the plane facing up first, as 2-D CAD
+programs treat it. Any other is read in DXF's own frame for its plane. Paths
+and splines are read in world coordinates.</p>
+
+<h2 id="drawings">Drawings</h2>
+
+<p><code>write (D, FILE)</code> writes a <code>draw.Drawing</code> with every
+entity on its own layer, line type and colour, the layers and line types
+declared in the file's tables with the dash pattern of every line type the
+package defines. Each entity is written as itself:</p>
+
+<table class="guide">
+  <tr><th>Entity in the drawing</th><th>Written as</th></tr>
+  <tr><td>line, point, arc, circle, ellipse, text, spline</td><td>The DXF
+  entity of the same name</td></tr>
+  <tr><td>polyline</td><td><code>LWPOLYLINE</code>, its bulges kept</td></tr>
+  <tr><td>path, region</td><td>Its pieces or loops, bound by a group that
+  names the class</td></tr>
+  <tr><td>hatch</td><td><code>HATCH</code> over its region, the holes left
+  clear, with its pattern, angle and spacing</td></tr>
+  <tr><td>dimension</td><td><code>DIMENSION</code>, its picture in an
+  anonymous block, so a CAD program measures it again</td></tr>
+  <tr><td>centre mark, leader</td><td>The lines and text they are drawn
+  with</td></tr>
+  <tr><td>block and insert</td><td>The block once, placed by
+  <code>INSERT</code> however often it is used</td></tr>
+</table>
+
+<p>A drawing writes no frames, since everything in it lies in <i>z</i> =
+0: its path and region groups carry only their class name.</p>
+
+<table class="guide">
+  <tr><th>Option</th><th>Value</th></tr>
+  <tr><td><code>'Version'</code></td><td><code>'R2000'</code>, the default,
+  or <code>'R12'</code>; a drawing holding an ellipse, a spline, a path, a
+  region or a hatch is an error under R12, naming what it cannot
+  hold.</td></tr>
+  <tr><td><code>'Dimensions'</code></td><td><code>'associative'</code>, the
+  default, or <code>'explode'</code> to write each dimension as its lines
+  and text, for a program that cannot read a <code>DIMENSION</code>.</td></tr>
+  <tr><td><code>'Blocks'</code></td><td><code>'reference'</code>, the
+  default, or <code>'expand'</code> to copy each block's contents in place of
+  every insert, for a program that ignores <code>INSERT</code>.</td></tr>
+  <tr><td><code>'DimScale'</code></td><td>Multiplies the dimension
+  ornament: a drawing meant for 1:50 wants 50. 1 by default.</td></tr>
+  <tr><td><code>'LTScale'</code></td><td>The line-type scale, 1 by
+  default.</td></tr>
+</table>
+
+<p><code>draw.read</code> gives the drawing back as a
+<code>draw.Drawing</code> named <code>'imported'</code>, each entity on its
+own layer, line type and colour. Dimensions return as dimensions, rebuilt
+from their definition points as the method that would have made them, so
+they measure the geometry again rather than repeating a number. Blocks
+return with their inserts, nested blocks included, hatches over their
+regions, and a path or region the package wrote as that path or region. A
+hatch pattern the package does not define is drawn as
+<code>'ANSI31'</code>, and an <code>MTEXT</code> returns as one line of text,
+its formatting removed.</p>
+
+<pre class="code-in"><code>R = geom.Region ([0, 0; 60, 0; 60, 40; 0, 40], {[20, 20, 1; 40, 20, 1]});
+
+D = draw.Drawing ('plate');
+D.Layer = 'OUTLINE';
+D = D.region (R);
+D.Layer = 'DIMENSIONS';
+D = D.dim ([0, 0], [60, 0], -10, 'horizontal');
+D = D.diam ([30, 20], 10);
+write (D, 'drawing.dxf');
+
+E = draw.read ('drawing.dxf');                  # the region and two dimensions
+layers (E)                                      # DIMENSIONS and OUTLINE
+
+write (D, 'exploded.dxf', 'Dimensions', 'explode');</code></pre>
+
+<p>A drawing lies in the plane <i>z</i> = 0, so <code>draw.read</code>
+mirrors an entity facing down into the plane facing up and drops heights.
+An entity on any other plane, a mesh, a solid, an entity in paper space and
+an insert of a block the file does not define are skipped and reported. A
+geom object can go into a drawing only if it lies in the <i>xy</i> plane;
+one in another plane is written with <code>geom.write</code> instead.</p>
+
+<h2 id="versions">Versions, units and text</h2>
+
+<ul>
+  <li><b>Written:</b> R2000 (<code>AC1015</code>) by default, which holds what
+  the package draws as itself: <code>LWPOLYLINE</code> with its bulges,
+  <code>SPLINE</code>, <code>ELLIPSE</code>, <code>HATCH</code>, groups and
+  extended data. R12 (<code>AC1009</code>) on request, for lines and arcs
+  only.</li>
+  <li><b>Read:</b> ASCII DXF from R12 (<code>AC1009</code>) to R2018
+  (<code>AC1032</code>). A binary DXF is an error.</li>
+  <li><b>Units:</b> the writer declares millimetres. The reader converts
+  coordinates to millimetres from the units the file declares in
+  <code>$INSUNITS</code>, and reads a file declaring none as
+  millimetres.</li>
+  <li><b>Text:</b> written with every character outside ASCII escaped as
+  <code>\U+XXXX</code>, so it reads the same whatever the reader's code page.
+  Read from the code page the header names before R2007, and as UTF-8 from
+  R2007 on.</li>
+</ul>
+
+        </main>
+      </div>
+    </div>
+  </body>
+</html>

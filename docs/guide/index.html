@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Overview - drafting guide</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" integrity="sha512-1ycn6IcaQQ40/MKBW2W4Rhis/DbILU74C1vSrLJxCq57o941Ym01SwNsOMqvEBFlcgUa6xLiPY/NS5R+E6ztJQ==" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/css/bootstrap.min.css" integrity="sha384-KyZXEAg3QhqLMpG8r+8fhAXLRk2vvoC2f3B09zVXn8CA5QIVfZOJ3BCsw2P0p/We" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-U1DAWAznBHeqEIlVSCgzq+c9gqGAJn5c/t99JyeKa9xxaYpSvHU5awsuZVVFIhvj" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="guide.css">
+  </head>
+  <body>
+    <div class="bg-dark">
+      <div class="container-xl">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+          <div class="container-fluid">
+            <a class="navbar-brand" href="index.html">
+              <img src="../assets/drafting.png" alt="drafting" class="d-inline-block align-top" width="25" height="25">
+              drafting guide
+            </a>
+            <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+              <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+              <ul class="navbar-nav">
+                <li class="nav-item">
+                  <a class="nav-link" href="../index.html">
+                    <i class="fas fa-book"></i>
+                    Function reference
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="https://github.com/pr0m1th3as/drafting">
+                    <i class="fab fa-github"></i>
+                    Source
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </nav>
+      </div>
+    </div>
+    <div class="container-xl my-4">
+      <div class="row">
+        <div class="col-md-3 col-lg-2 mb-4">
+          <nav class="guide-nav">
+<!-- guide-nav -->
+            <h6>Guide</h6>
+            <ul>
+              <li><a href="index.html" class="active">Overview</a></li>
+              <li><a href="layout.html">Package layout</a></li>
+              <li><a href="dxf.html">DXF and the classes</a></li>
+            </ul>
+            <h6>Tutorials</h6>
+            <ul>
+              <li><a href="01_first_part.html">A first part</a></li>
+              <li><a href="02_outlines.html">Outlines: polylines, splines, paths and regions</a></li>
+              <li><a href="03_regions.html">Working with regions</a></li>
+              <li><a href="04_coordinate_systems.html">Coordinate systems</a></li>
+              <li><a href="05_solids_from_regions.html">Solids from regions</a></li>
+              <li><a href="06_primitives_and_booleans.html">Primitives, booleans and transforms</a></li>
+              <li><a href="07_features.html">Features: holes, pockets, fillets, chamfers and shells</a></li>
+              <li><a href="08_sections_and_projections.html">Sections and projections</a></li>
+              <li><a href="09_drawings.html">Technical drawings</a></li>
+              <li><a href="10_meshes.html">Meshes</a></li>
+              <li><a href="11_assemblies.html">Assemblies</a></li>
+              <li><a href="12_from_openscad.html">For OpenSCAD users</a></li>
+            </ul>
+<!-- /guide-nav -->
+          </nav>
+        </div>
+        <main class="col-md-9 col-lg-10">
+<h1>The drafting guide</h1>
+<p class="lead">What the package is made of, how it meets DXF, and tutorials that build parts and drawings step by step.  Every picture is made by the code above it, and every output is what that code printed.</p>
+<h2>How the package is built</h2>
+<ul>
+<li><a href="layout.html">Package layout</a>: the five namespaces, the classes, and how an object of one becomes an object of another.</li>
+<li><a href="dxf.html">DXF and the classes</a>: what each class is written as, what each entity is read as, and how frames, layers and versions are kept.</li>
+</ul>
+<h2>Tutorials</h2>
+<ol>
+<li><a href="01_first_part.html">A first part</a>: A mounting plate from sketch to files: an outline drawn as a region, made solid, drilled, edged, measured, and saved for a CAD program and a slicer.</li>
+<li><a href="02_outlines.html">Outlines: polylines, splines, paths and regions</a>: The four classes every shape in the package is drawn with: a polyline of lines and arcs, a smooth spline, a path that runs through space, and a region, the flat area a solid is made from.</li>
+<li><a href="03_regions.html">Working with regions</a>: Regions combine, grow, shrink, round off and repeat, as OpenSCAD's 2-D shapes do, but with arcs kept exact: the profile of a part is finished flat, before it becomes a solid.</li>
+<li><a href="04_coordinate_systems.html">Coordinate systems</a>: Every outline in the package lies in a <code>geom.UCS</code>, a plane with an origin and axes of its own. This tutorial makes them, moves points in and out of them, and uses them to put features on the faces of a part.</li>
+<li><a href="05_solids_from_regions.html">Solids from regions</a>: Five ways to turn a flat region into a solid: raise it, turn it, pass a surface through several of it, carry it along a path, and coil it. Each makes the solid where the region's plane puts it.</li>
+<li><a href="06_primitives_and_booleans.html">Primitives, booleans and transforms</a>: Solids built the way OpenSCAD builds them: primitives combined by union, difference and intersection, then moved, copied and coloured. Every curved face stays exact, so a cylinder cut into a part leaves a true cylinder.</li>
+<li><a href="07_features.html">Features: holes, pockets, fillets, chamfers and shells</a>: A bearing block made from three primitives and finished as a machinist would finish it: edges rounded and bevelled, a bearing seat bored, holes drilled and tapped, a relief cut underneath. Then a box hollowed into an enclosure.</li>
+<li><a href="08_sections_and_projections.html">Sections and projections</a>: A solid cut by a plane gives regions exact enough to build from again, and a solid seen along a direction gives its outline as regions too. Both go straight into new solids and into drawings.</li>
+<li><a href="09_drawings.html">Technical drawings</a>: A <code>draw.Drawing</code> holds a technical drawing as data: geometry, text, hatches and dimensions on named layers, each with a line type and a colour. The same drawing is plotted, printed to scale, set in LaTeX and written to DXF.</li>
+<li><a href="10_meshes.html">Meshes</a>: A triangle mesh is how a slicer, a scanner or a download hands over a shape. This tutorial makes meshes, colours them, saves and reads them, cuts them back into regions and takes them into booleans.</li>
+<li><a href="11_assemblies.html">Assemblies</a>: A product is named parts placed together, a part defined once however often it is used. This tutorial builds a fixture, stacks it, adds a part that exists only as a mesh, and saves the whole for a CAD program and a slicer.</li>
+<li><a href="12_from_openscad.html">For OpenSCAD users</a>: OpenSCAD's modelling words, nearly all of them, have a counterpart here, in Octave and with exact geometry. This page maps one to the other and rebuilds a classic OpenSCAD model.</li>
+</ol>
+
+        </main>
+      </div>
+    </div>
+  </body>
+</html>

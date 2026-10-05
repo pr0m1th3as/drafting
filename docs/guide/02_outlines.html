@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Outlines: polylines, splines, paths and regions - drafting guide</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" integrity="sha512-1ycn6IcaQQ40/MKBW2W4Rhis/DbILU74C1vSrLJxCq57o941Ym01SwNsOMqvEBFlcgUa6xLiPY/NS5R+E6ztJQ==" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/css/bootstrap.min.css" integrity="sha384-KyZXEAg3QhqLMpG8r+8fhAXLRk2vvoC2f3B09zVXn8CA5QIVfZOJ3BCsw2P0p/We" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-U1DAWAznBHeqEIlVSCgzq+c9gqGAJn5c/t99JyeKa9xxaYpSvHU5awsuZVVFIhvj" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="guide.css">
+  </head>
+  <body>
+    <div class="bg-dark">
+      <div class="container-xl">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+          <div class="container-fluid">
+            <a class="navbar-brand" href="index.html">
+              <img src="../assets/drafting.png" alt="drafting" class="d-inline-block align-top" width="25" height="25">
+              drafting guide
+            </a>
+            <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+              <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+              <ul class="navbar-nav">
+                <li class="nav-item">
+                  <a class="nav-link" href="../index.html">
+                    <i class="fas fa-book"></i>
+                    Function reference
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="https://github.com/pr0m1th3as/drafting">
+                    <i class="fab fa-github"></i>
+                    Source
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </nav>
+      </div>
+    </div>
+    <div class="container-xl my-4">
+      <div class="row">
+        <div class="col-md-3 col-lg-2 mb-4">
+          <nav class="guide-nav">
+<!-- guide-nav -->
+            <h6>Guide</h6>
+            <ul>
+              <li><a href="index.html">Overview</a></li>
+              <li><a href="layout.html">Package layout</a></li>
+              <li><a href="dxf.html">DXF and the classes</a></li>
+            </ul>
+            <h6>Tutorials</h6>
+            <ul>
+              <li><a href="01_first_part.html">A first part</a></li>
+              <li><a href="02_outlines.html" class="active">Outlines: polylines, splines, paths and regions</a></li>
+              <li><a href="03_regions.html">Working with regions</a></li>
+              <li><a href="04_coordinate_systems.html">Coordinate systems</a></li>
+              <li><a href="05_solids_from_regions.html">Solids from regions</a></li>
+              <li><a href="06_primitives_and_booleans.html">Primitives, booleans and transforms</a></li>
+              <li><a href="07_features.html">Features: holes, pockets, fillets, chamfers and shells</a></li>
+              <li><a href="08_sections_and_projections.html">Sections and projections</a></li>
+              <li><a href="09_drawings.html">Technical drawings</a></li>
+              <li><a href="10_meshes.html">Meshes</a></li>
+              <li><a href="11_assemblies.html">Assemblies</a></li>
+              <li><a href="12_from_openscad.html">For OpenSCAD users</a></li>
+            </ul>
+<!-- /guide-nav -->
+          </nav>
+        </div>
+        <main class="col-md-9 col-lg-10">
+<h1>Outlines: polylines, splines, paths and regions</h1>
+<p>The four classes every shape in the package is drawn with: a polyline of lines and arcs, a smooth spline, a path that runs through space, and a region, the flat area a solid is made from.</p>
+<h2>Polylines</h2>
+<p>A <a href="../geom.Polyline.html"><code>geom.Polyline</code></a> is made from its vertices, one row each. Two columns give straight segments; it is open unless <code>'Closed'</code> joins the last vertex back to the first.</p>
+<pre class="code-in"><code>L = geom.Polyline ([0, 0; 40, 0; 40, 25])
+T = geom.Polyline ([0, 0; 40, 0; 40, 25], 'Closed', true)</code></pre>
+<pre class="code-out"><code>L =
+
+  geom.Polyline: open, 3 vertices, 0 arc
+
+T =
+
+  geom.Polyline: closed, 3 vertices, 0 arc</code></pre>
+<p>A third column is the bulge of the segment leaving each vertex: 0 for a straight segment, 1 for a half circle running anticlockwise, -1 for one running clockwise. In between, a bulge is the tangent of a quarter of the angle the arc turns through, so <code>tand (90 / 4)</code> is a quarter circle.</p>
+<pre class="code-in"><code>A = geom.Polyline ([50, 0, 0; 80, 0, tand(90 / 4); 90, 10, 0; 90, 25, 0])</code></pre>
+<pre class="code-out"><code>A =
+
+  geom.Polyline: open, 4 vertices, 1 arc</code></pre>
+<p><code>fillet</code> rounds the corners where two straight segments meet, and <code>chamfer</code> cuts them. Each turns a corner vertex into two, joined by an arc or a straight cut.</p>
+<pre class="code-in"><code>F = fillet (geom.Polyline ([0, 35; 40, 35; 40, 60; 0, 60], 'Closed', true), 5)
+C = chamfer (geom.Polyline ([50, 35; 90, 35; 90, 60; 50, 60], ...
+                            'Closed', true), 4)</code></pre>
+<pre class="code-out"><code>F =
+
+  geom.Polyline: closed, 8 vertices, 4 arcs
+
+C =
+
+  geom.Polyline: closed, 8 vertices, 0 arc</code></pre>
+<p>A <a href="../draw.Drawing.html"><code>draw.Drawing</code></a> holds them for plotting, each appended by its <code>polyline</code> method.</p>
+<pre class="code-in"><code>D = draw.Drawing ();
+D = D.polyline (L);
+D = D.polyline (A);
+D = D.polyline (F);
+D = D.polyline (C);
+plot (D);</code></pre>
+<figure class="shot"><img src="img/02_outlines-1.png" alt="Outlines: polylines, splines, paths and regions, picture 1"></figure>
+<h2>Splines</h2>
+<p>A <a href="../geom.Spline.html"><code>geom.Spline</code></a> drawn through points is a smooth cubic curve that passes through every one of them. It keeps the points, as DXF does, and its <code>length</code> is measured along the curve.</p>
+<pre class="code-in"><code>SP = geom.Spline ([0, 0; 15, 10; 30, 5; 45, 15])
+length (SP)</code></pre>
+<pre class="code-out"><code>SP =
+
+  geom.Spline: open, degree 3, 6 control points, through 4 points
+
+ans = 55.702</code></pre>
+<p>With <code>'Closed'</code> the curve runs on from the last point back to the first, smooth all round. <code>geom.Spline.ellipse</code> is an ellipse, exactly rather than as a curve close to one, and a circle when its two semi-axes are equal; this one is centred at (20, -25).</p>
+<pre class="code-in"><code>blob = geom.Spline ([60, 0; 85, -3; 90, 15; 75, 25; 62, 15], 'Closed', true);
+E = geom.Spline.ellipse (20, 10, 'UCS', geom.UCS ([0, 0, 1], [20, -25, 0]))
+length (E)</code></pre>
+<pre class="code-out"><code>E =
+
+  geom.Spline: closed, rational, degree 2, 9 control points
+
+ans = 96.884</code></pre>
+<p>A spline can also be given by its control points, its knots and, for a rational curve, its weights, with <code>geom.Spline.nurbs</code>. This is a quarter circle of radius 10, whose length is a quarter of 20 times pi.</p>
+<pre class="code-in"><code>Q = geom.Spline.nurbs ([10, 0; 10, 10; 0, 10], [0, 0, 0, 1, 1, 1], ...
+                       [1; sqrt(2) / 2; 1]);
+length (Q)
+
+D = draw.Drawing ();
+D = D.spline (SP);
+D = D.spline (blob);
+D = D.spline (E);
+plot (D);</code></pre>
+<pre class="code-out"><code>ans = 15.708</code></pre>
+<figure class="shot"><img src="img/02_outlines-2.png" alt="Outlines: polylines, splines, paths and regions, picture 2"></figure>
+<h2>Paths</h2>
+<p>A <a href="../geom.Path.html"><code>geom.Path</code></a> is a route through space rather than a shape in a plane: a chain of straight segments, arcs and splines in three dimensions, along which a section is swept. Made from points, it has straight segments and sharp corners; <code>fillet</code> bends each corner round an arc, as a tube is bent.</p>
+<pre class="code-in"><code>P = geom.Path ([0, 0, 0; 0, 0, 40; 30, 0, 40; 30, 30, 40]);
+length (P)
+P = fillet (P, 10)
+length (P)</code></pre>
+<pre class="code-out"><code>ans = 100
+P =
+
+  geom.Path: open, 5 segments, 2 arcs, 0 spline
+
+ans = 91.416</code></pre>
+<p><code>join</code> puts paths and splines end to end, each starting where the last ended. <code>geom.Path.arc</code> is an arc through three points. A hairpin, up, over and down:</p>
+<pre class="code-in"><code>H = join (geom.Path ([0, 0, 0; 0, 0, 50]), ...
+          geom.Path.arc ([0, 0, 50], [10, 0, 60], [20, 0, 50]), ...
+          geom.Path ([20, 0, 50; 20, 0, 0]))</code></pre>
+<pre class="code-out"><code>H =
+
+  geom.Path: open, 3 segments, 1 arc, 0 spline</code></pre>
+<p>A path is seen best as what it is for. <a href="../solid.sweep.html"><code>solid.sweep</code></a> carries a small disc along it, which makes the bent route above a rod.</p>
+<pre class="code-in"><code>rod = solid.sweep (geom.Region ([-2, 0, 1; 2, 0, 1]), P);
+show (rod);</code></pre>
+<figure class="shot"><img src="img/02_outlines-3.png" alt="Outlines: polylines, splines, paths and regions, picture 3"></figure>
+<h2>Regions</h2>
+<p>A <a href="../geom.Region.html"><code>geom.Region</code></a> is a flat area: one closed outline, and any number of holes inside it given as a cell array. The outline and each hole may be a closed polyline, path or spline, or the matrix a polyline is made from.</p>
+<pre class="code-in"><code>hole = geom.Spline ([35, 12; 50, 15; 52, 28; 38, 30], 'Closed', true);
+R = geom.Region ([0, 0; 60, 0; 60, 40; 0, 40], {[10, 20, 1; 24, 20, 1], hole})
+plot (draw.Drawing ().region (R));</code></pre>
+<pre class="code-out"><code>R =
+
+  geom.Region: an outline of 4 segments, 2 holes</code></pre>
+<figure class="shot"><img src="img/02_outlines-4.png" alt="Outlines: polylines, splines, paths and regions, picture 4"></figure>
+<p>A region is checked when it is made, and one that cannot be a solid's face is refused with the reason. A hole that reaches past the outline:</p>
+<pre class="code-in"><code>try
+  geom.Region ([0, 0; 60, 0; 60, 40; 0, 40], {[50, 20, 1; 70, 20, 1]});
+catch err
+  disp (err.message);
+end_try_catch</code></pre>
+<pre class="code-out"><code>geom.Region: HOLES{1} must lie strictly inside OUTLINE.</code></pre>
+<p>and an outline that crosses itself:</p>
+<pre class="code-in"><code>try
+  geom.Region ([0, 0; 40, 30; 40, 0; 0, 30]);
+catch err
+  disp (err.message);
+end_try_catch</code></pre>
+<pre class="code-out"><code>geom.Region: OUTLINE must not cross or touch itself.</code></pre>
+<p>The direction an outline is drawn in does not matter. A region keeps its outline anticlockwise and its holes clockwise, whichever way they were given, so this rectangle drawn clockwise still has a positive area.</p>
+<pre class="code-in"><code>Rc = geom.Region ([0, 0; 0, 40; 60, 40; 60, 0]);
+geom.signedarea (Rc.Outline.Vertices(:,1:2))</code></pre>
+<pre class="code-out"><code>ans = 2400</code></pre>
+<nav class="d-flex justify-content-between my-5">
+<a href="01_first_part.html">&larr; A first part</a>
+<a href="03_regions.html">Working with regions &rarr;</a>
+</nav>
+
+        </main>
+      </div>
+    </div>
+  </body>
+</html>
