@@ -70,6 +70,13 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 //   click PX PY    a click at a pixel: during a pick replies "selected N",
 //                  how many items the pick now holds, and during a pickone
 //                  replies as the pick does
+//   dblclick PX PY a double click at a pixel outside a pick: replies "centre
+//                  X Y Z", the point of the shape there, about which the view
+//                  now turns, or "centre none" where the pixel misses the
+//                  shape and the view turns about its centre again
+//   drag PX PY QX QY
+//                  the left button pressed at one pixel and released at the
+//                  other, which turns the view; replies "dragged"
 //   dump FILE      writes the view to an image file (PPM); replies "dumped"
 //   close          closes the window
 //
@@ -328,8 +335,10 @@ public:
     m_view->SetProj (V3d_XposYnegZpos);
 
     // Turn about the centre of the view, which follows every pan, rather
-    // than about the middle of the part, which stays where it was
+    // than about the middle of the part, which stays where it was; or about
+    // the point a double click chose
     SetRotationMode (AIS_RotationMode_CameraAt);
+    SetShowRotateCenter (Standard_True);
 
     // The world axes in a corner, turning with the view, clear of the
     // prompts at the lower left
@@ -577,6 +586,39 @@ public:
         reply ("selected " + to_string (m_context->NbSelected ()));
       }
     }
+    else if (cmd == "dblclick")
+    {
+      int px, py;
+      in >> px >> py;
+      if (setcentre (px, py))
+      {
+        ostringstream o;
+        o.precision (17);
+        o << "centre " << m_centre.X () << " " << m_centre.Y () << " "
+          << m_centre.Z ();
+        reply (o.str ());
+      }
+      else
+      {
+        reply ("centre none");
+      }
+    }
+    else if (cmd == "drag")
+    {
+      int px, py, qx, qy;
+      in >> px >> py >> qx >> qy;
+      const Aspect_VKeyFlags none = Aspect_VKeyFlags_NONE;
+      PressMouseButton (Graphic3d_Vec2i (px, py), Aspect_VKeyMouse_LeftButton,
+                        none, false);
+      FlushViewEvents (m_context, m_view, Standard_True);
+      UpdateMousePosition (Graphic3d_Vec2i (qx, qy),
+                           Aspect_VKeyMouse_LeftButton, none, false);
+      FlushViewEvents (m_context, m_view, Standard_True);
+      ReleaseMouseButton (Graphic3d_Vec2i (qx, qy),
+                          Aspect_VKeyMouse_LeftButton, none, false);
+      FlushViewEvents (m_context, m_view, Standard_True);
+      reply ("dragged");
+    }
     else if (cmd == "dump")
     {
       string file;
@@ -659,6 +701,7 @@ public:
         break;
       case Aspect_VKey_F:
         m_view->FitAll (0.05, Standard_False);
+        m_hascentre = false;
         break;
       case Aspect_VKey_C:
         if (m_mesh)
@@ -699,6 +742,29 @@ public:
   }
 
 protected:
+
+  // A double click outside a pick chooses the centre the view turns about
+  bool UpdateMouseClick (const Graphic3d_Vec2i& p, Aspect_VKeyMouse b,
+                         Aspect_VKeyFlags m, bool dbl) override
+  {
+    if (dbl && b == Aspect_VKeyMouse_LeftButton && m_pick == 0 && m_one == 0)
+    {
+      setcentre (p.x (), p.y ());
+      return true;
+    }
+    return AIS_ViewController::UpdateMouseClick (p, b, m, dbl);
+  }
+
+  // The chosen centre, where there is one
+  gp_Pnt GravityPoint (const Handle (AIS_InteractiveContext)& ctx,
+                       const Handle (V3d_View)& view) override
+  {
+    if (m_hascentre)
+    {
+      return m_centre;
+    }
+    return AIS_ViewController::GravityPoint (ctx, view);
+  }
 
   // A click during a pickone answers at once instead of selecting
   void handleSelectionPick (const Handle (AIS_InteractiveContext)& ctx,
@@ -1043,6 +1109,25 @@ private:
   {
     m_view->SetProj (o);
     m_view->FitAll (0.05, Standard_False);
+    m_hascentre = false;
+  }
+
+  // The point of the shape at the pixel PX, PY made the centre the view
+  // turns about; false, and the centre of the view again, where the pixel
+  // misses the shape.  Faces are made pickable for the moment it takes,
+  // since outside a pick nothing is.
+  bool setcentre (int px, int py)
+  {
+    activate (2);
+    gp_Pnt p;
+    m_hascentre = PickPoint (p, m_context, m_view, Graphic3d_Vec2i (px, py),
+                             false);
+    activate (m_pick);
+    if (m_hascentre)
+    {
+      m_centre = p;
+    }
+    return m_hascentre;
   }
 
   // Show the shape S, or the face of a triangle mesh when MESH is true
@@ -1165,6 +1250,7 @@ private:
     if (first)
     {
       m_view->FitAll (0.05, Standard_False);
+      m_hascentre = false;
     }
   }
 
@@ -1304,6 +1390,8 @@ private:
   set<int> m_vskip;
   vector<Handle (AIS_Point)> m_marks;
   int m_pick = 0;
+  gp_Pnt m_centre;
+  bool m_hascentre = false;
   int m_one = 0;
   bool m_mesh = false;
   bool m_quit = false;

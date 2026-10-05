@@ -36,10 +36,15 @@ classdef Viewer < handle
   ## model turns smoothly and never holds up the Octave prompt.  The world
   ## axes are drawn in the lower right corner, turning with the view, @math{x}
   ## red, @math{y} green and @math{z} blue.  The left mouse button rotates,
-  ## the middle one pans and the wheel zooms.  Keys:
+  ## the middle one pans and the wheel zooms.  The view turns about the
+  ## centre of the window, wherever it has been panned to, or about a point
+  ## of the shape chosen by double-clicking it; a double click that misses
+  ## the shape, or fitting the view, returns to the centre of the window.
+  ## During a pick a double click is a click like any other.  Keys:
   ##
   ## @multitable @columnfractions 0.15 0.85
-  ## @item @kbd{F} @tab fit the shape to the window
+  ## @item @kbd{F} @tab fit the shape to the window, and turn about the
+  ## centre of the window again
   ## @item @kbd{0} @tab isometric view
   ## @item @kbd{1} @tab front view, looking along @math{+y}
   ## @item @kbd{2} @tab top view, looking down @math{z}
@@ -140,6 +145,27 @@ classdef Viewer < handle
 
       send (this, sprintf ("click %d %d", round (PX)));
       r = receive (this, 10);
+
+    endfunction
+
+    ## A double click at the pixel PX outside a pick: the point the view now
+    ## turns about, empty where the pixel misses the shape
+    function C = __dblclick__ (this, PX)
+
+      send (this, sprintf ("dblclick %d %d", round (PX)));
+      r = strsplit (receive (this, 10));
+      C = str2double (r(2:end));
+      if (any (isnan (C)))
+        C = [];
+      endif
+
+    endfunction
+
+    ## The left button dragged from the pixel PX to the pixel QX
+    function __drag__ (this, PX, QX)
+
+      send (this, sprintf ("drag %d %d %d %d", round (PX), round (QX)));
+      receive (this, 10);
 
     endfunction
 
@@ -1037,6 +1063,40 @@ endfunction
 %! assert_equal (volume (V.Shape), 6000, 1e-9);
 %! close (V);
 %! assert_equal (isopen (V), false);
+
+%!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
+%! ## A double click takes the point of the shape under it
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Shape = solid.box (10, 20, 30);
+%!   C = V.__dblclick__ (V.__project__ ([5, 10, 30]));
+%!   assert_equal (C, [5, 10, 30], 0.05);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
+%! ## and the view turns about it: the point stays where it is on screen
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Shape = solid.box (10, 20, 30);
+%!   C = V.__dblclick__ (V.__project__ ([10, 20, 30]));
+%!   PX = V.__project__ (C);
+%!   V.__drag__ ([450, 350], [520, 300]);
+%!   assert_equal (V.__project__ (C), PX, 1);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
+%! ## A double click that misses the shape takes nothing
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Shape = solid.box (10, 20, 30);
+%!   assert_equal (V.__dblclick__ ([2, 2]), []);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
 
 %!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
 %! ## A pixel picks the face and the edge the queries name
