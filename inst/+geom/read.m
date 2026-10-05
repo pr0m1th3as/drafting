@@ -76,8 +76,9 @@
 ## several layers with no @qcode{'Layer'} given, and finding none: separate
 ## parts belong on separate layers, and @qcode{'Layer'} picks one.
 ##
-## Whatever is skipped, and with @qcode{'Type'} whatever is left over, is
-## reported in one warning, counted by entity type.
+## The width of a polyline is dropped, since a geom object has none.
+## Whatever is skipped, the widths dropped, and with @qcode{'Type'} whatever
+## is left over, are reported in one warning, counted by entity type.
 ##
 ## Coordinates are converted to millimetres from the units the file declares
 ## in @code{$INSUNITS}; a file declaring none is read as millimetres.  The
@@ -440,6 +441,19 @@ endfunction
 %!                 {'geom.Polyline', 'geom.Polyline'});
 %! unwind_protect_cleanup
 %!   warning (ws);
+%! end_unwind_protect
+
+%!warning<geom.read: skipped 1 LWPOLYLINE width.> ...
+%! fid = fopen (tmpf, 'w');
+%! fputs (fid, ["0\nSECTION\n2\nENTITIES\n" ...
+%!              "0\nLWPOLYLINE\n8\n0\n90\n2\n70\n0\n10\n0\n20\n0\n" ...
+%!              "40\n0\n41\n1\n10\n10\n20\n0\n0\nENDSEC\n0\nEOF\n"]);
+%! fclose (fid);
+%! unwind_protect
+%!   C = geom.read (tmpf);
+%!   assert_equal (class (C{1}), 'geom.Polyline');
+%! unwind_protect_cleanup
+%!   unlink (tmpf);
 %! end_unwind_protect
 
 %!test  # an empty file section gives an empty row cell

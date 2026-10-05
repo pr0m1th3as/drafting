@@ -2623,6 +2623,14 @@ public:
     vector<Tag> xdata;
   };
   vector<Grp> groups;
+  // The colour and line type of each layer the table defines, by the name
+  // in upper case, as layer names are compared
+  struct Lay
+  {
+    int colour = 7;
+    string ltype = "CONTINUOUS";
+  };
+  map<string, Lay> layers;
 
   void load (const string& f);
   string decode (const string& s) const;
@@ -2838,6 +2846,22 @@ Reader::load (const string& f)
     }
     else if (name == "ENTITIES")
       ents = records (i + 2, j);
+    else if (name == "TABLES")
+    {
+      for (const auto& r : records (i + 2, j))
+        if (r.type == "LAYER" && ! trim (r.str (2)).empty ())
+        {
+          Lay l;
+          // A negative colour is a layer switched off, in its colour
+          int c = abs (static_cast<int> (r.num (62, 7)));
+          if (c >= 1 && c <= 255)
+            l.colour = c;
+          string lt = trim (r.str (6));
+          if (! lt.empty ())
+            l.ltype = lt;
+          layers[upper (trim (r.str (2)))] = l;
+        }
+    }
     else if (name == "BLOCKS")
     {
       vector<Rec> all = records (i + 2, j);
@@ -3660,6 +3684,23 @@ natural (const Rec& r, double sc, bool useframe)
   return out;
 }
 
+// Whether the polyline R has a width, which the package does not draw: a
+// constant width, a default width, or a width at any vertex
+static bool
+haswidth (const Rec& r)
+{
+  if (r.type != "LWPOLYLINE" && r.type != "POLYLINE")
+    return false;
+  for (const auto& t : r.tags)
+    if ((t.first == 40 || t.first == 41 || t.first == 43)
+        && tonum (t.second) != 0)
+      return true;
+  for (const auto& v : r.sub)
+    if (v.num (40) != 0 || v.num (41) != 0)
+      return true;
+  return false;
+}
+
 static string
 skiplabel (const Rec& r, const string& why)
 {
@@ -3858,6 +3899,8 @@ cmdreadgeom (const octave_value_list& args, octave_value_list& out)
         layers.push_back (r.layer);
         types.push_back (r.type);
       }
+      if (haswidth (r))
+        sk.add (r.type + " width");
     }
     catch (const Bad& b)
     {
@@ -4159,10 +4202,23 @@ private:
   octave_value attrs (octave_value D, const Rec& r)
   {
     string layer = r.layer.empty () ? "0" : r.layer;
-    string lt = drawltype (r.ltype);
+    string lt = r.ltype;
     int c = abs (r.colour);
     if (c > 256)
       c = 256;
+
+    // What the entity takes from its layer, the layer's own colour and line
+    // type, since a drawing has no layer table to defer to
+    auto lay = m_rd.layers.find (upper (layer));
+    if (lay != m_rd.layers.end ())
+    {
+      string u = upper (trim (lt));
+      if (u.empty () || u == "BYLAYER")
+        lt = lay->second.ltype;
+      if (c == 256)
+        c = lay->second.colour;
+    }
+    lt = drawltype (lt);
     if (layer != m_layer)
     {
       D = setprop (D, "Layer", octave_value (layer));
@@ -4241,8 +4297,12 @@ private:
         for (const auto& x : r.sub)
           if (! (static_cast<int> (x.num (70)) & 16))
             v.push_back ({x.num (10) * sc, x.num (20) * sc, x.num (42)});
-      return call ("polyline", ovl (D, ocspolyline (v, closed, n, 0,
-                                                    nullptr)));
+      octave_value out = call ("polyline", ovl (D, ocspolyline (v, closed,
+                                                                 n, 0,
+                                                                 nullptr)));
+      if (haswidth (r))
+        m_sk.add (T + " width");
+      return out;
     }
     if (T == "SPLINE")
     {

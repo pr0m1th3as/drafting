@@ -24,7 +24,10 @@
 ## as a @code{draw.Drawing} named @qcode{'imported'}, which can then be
 ## transformed, merged into a sheet, dimensioned further and written out
 ## again.  Each entity is appended on its own layer, line type and colour,
-## and the drawing is left on its defaults afterwards.
+## and the drawing is left on its defaults afterwards.  An entity that takes
+## its colour or line type from its layer is given those of the layer, as
+## the file's layer table defines them, since a drawing has no layer table
+## of its own: a dashed yellow layer's lines come back dashed and yellow.
 ##
 ## Geometry returns as itself: lines, points, arcs, circles, ellipses,
 ## polylines with their bulges, splines, text, and inserts of the blocks the
@@ -47,8 +50,8 @@
 ## programs treat it; heights are dropped.  An entity on any other plane, a
 ## mesh, a solid, an entity in paper space, an insert of a block the file
 ## does not define and an entity type the package does not draw are skipped,
-## and whatever is skipped is reported in one warning, counted by entity
-## type.
+## as is the width of a polyline, which the package does not draw; whatever
+## is skipped is reported in one warning, counted by entity type.
 ##
 ## Coordinates are converted to millimetres from the units the file declares
 ## in @code{$INSUNITS}; a file declaring none is read as millimetres.  The
@@ -321,6 +324,49 @@ endfunction
 %! unwind_protect_cleanup
 %!   unlink (tmpf);
 %! end_unwind_protect
+
+## The drawing in a file whose layer table makes HIDDEN yellow and dashed
+## and OFF red and switched off, its entities ENT
+%!function D = readlayers (f, ent)
+%!  fid = fopen (f, 'w');
+%!  fputs (fid, ["0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLAYER\n70\n2\n" ...
+%!               "0\nLAYER\n2\nHIDDEN\n70\n0\n62\n2\n6\nDASHED\n" ...
+%!               "0\nLAYER\n2\nOFF\n70\n0\n62\n-1\n6\nCENTER\n" ...
+%!               "0\nENDTAB\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n", ent, ...
+%!               "0\nENDSEC\n0\nEOF\n"]);
+%!  fclose (fid);
+%!  unwind_protect
+%!    D = draw.read (f);
+%!  unwind_protect_cleanup
+%!    unlink (f);
+%!  end_unwind_protect
+%!endfunction
+
+%!test  # an entity takes its colour and line type from its layer
+%! D = readlayers (tmpf, "0\nLINE\n8\nHIDDEN\n10\n0\n20\n0\n11\n10\n21\n0\n");
+%! assert_equal ({D.Entities.linetype, D.Entities.colour}, {'DASHED', 2});
+
+%!test  # a layer is found whatever the case of its name
+%! D = readlayers (tmpf, "0\nLINE\n8\nhidden\n10\n0\n20\n0\n11\n10\n21\n0\n");
+%! assert_equal ({D.Entities.linetype, D.Entities.colour}, {'DASHED', 2});
+
+%!test  # an entity's own colour and line type are kept
+%! D = readlayers (tmpf, ["0\nLINE\n8\nHIDDEN\n6\nCONTINUOUS\n62\n5\n" ...
+%!                        "10\n0\n20\n0\n11\n10\n21\n0\n"]);
+%! assert_equal ({D.Entities.linetype, D.Entities.colour}, {'CONTINUOUS', 5});
+
+%!test  # a layer switched off still lends its colour
+%! D = readlayers (tmpf, "0\nLINE\n8\nOFF\n10\n0\n20\n0\n11\n10\n21\n0\n");
+%! assert_equal ({D.Entities.linetype, D.Entities.colour}, {'CENTER', 1});
+
+%!test  # a layer the table does not define lends nothing
+%! D = readlayers (tmpf, "0\nLINE\n8\nOTHER\n10\n0\n20\n0\n11\n10\n21\n0\n");
+%! assert_equal ({D.Entities.linetype, D.Entities.colour}, {'CONTINUOUS', 256});
+
+%!warning<draw.read: skipped 1 LWPOLYLINE width.> ...
+%! D = readlayers (tmpf, ["0\nLWPOLYLINE\n8\n0\n90\n2\n70\n0\n43\n0.5\n" ...
+%!                        "10\n0\n20\n0\n10\n10\n20\n0\n"]);
+%! assert_equal (numentities (D), 1);
 
 %!error<draw.read: invalid number of input arguments.> draw.read ()
 %!error<draw.read: FILE must be a non-empty character vector.> draw.read (1)
