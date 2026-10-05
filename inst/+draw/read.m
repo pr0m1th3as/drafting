@@ -307,7 +307,7 @@ endfunction
 %!   unlink (tmpf);
 %! end_unwind_protect
 
-%!test  # what is skipped is reported once, counted
+%!warning<draw.read: skipped 2 3DFACE.> ...
 %! txt = ["0\nSECTION\n2\nENTITIES\n" ...
 %!        "0\n3DFACE\n8\n0\n0\n3DFACE\n8\n0\n" ...
 %!        "0\nLINE\n8\n0\n10\n0\n20\n0\n11\n1\n21\n1\n" ...
@@ -315,16 +315,11 @@ endfunction
 %! fid = fopen (tmpf, 'w');
 %! fputs (fid, txt);
 %! fclose (fid);
-%! ws = warning ('off', 'all');
 %! unwind_protect
-%!   lastwarn ('');
 %!   R = draw.read (tmpf);
-%!   msg = lastwarn ();
 %!   assert_equal (numentities (R), 1);
-%!   assert_equal (msg, 'draw.read: skipped 2 3DFACE.');
 %! unwind_protect_cleanup
 %!   unlink (tmpf);
-%!   warning (ws);
 %! end_unwind_protect
 
 %!error<draw.read: invalid number of input arguments.> draw.read ()

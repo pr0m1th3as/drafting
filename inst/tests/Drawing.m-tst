@@ -1521,13 +1521,14 @@
 %! assert_equal (isempty (L0), true);
 %! assert_equal (isempty (L9), true);
 
-%!test  # asking for LOST silences the warning, omitting it does not
+%!test  # asking for LOST silences the warning
 %! D = draw.Drawing ().hatch (geom.Region ([0, 0; 10, 0; 10, 10]));
 %! lastwarn ('');
 %! [E, LOST] = entities (D, 'hatch', 'boundary', 'dimensions', 'explode');
 %! assert_equal (lastwarn (), '');
+%!warning<draw.Drawing.entities: 1 entity: fill dropped, boundary drawn.> ...
+%! D = draw.Drawing ().hatch (geom.Region ([0, 0; 10, 0; 10, 10]));
 %! E = entities (D, 'hatch', 'boundary', 'dimensions', 'explode');
-%! assert_equal (isempty (lastwarn ()), false);
 
 %!test  # a drawing survives a DXF round trip
 %! fn = [tempname(), '.dxf'];

@@ -361,17 +361,13 @@ endfunction
 %!   unlink (tmpf);
 %! end_unwind_protect
 
-%!test  # what is left over under Type is reported
-%! ws = warning ('off', 'all');
+%!warning<geom.read: skipped 1 LWPOLYLINE.> ...
 %! unwind_protect
 %!   geom.write ({geom.Polyline([0, 0; 1, 0]), ...
 %!                geom.Spline([0, 0; 1, 1; 2, 0])}, tmpf);
-%!   lastwarn ('');
 %!   geom.read (tmpf, 'Type', 'spline');
-%!   assert_equal (lastwarn (), 'geom.read: skipped 1 LWPOLYLINE.');
 %! unwind_protect_cleanup
 %!   unlink (tmpf);
-%!   warning (ws);
 %! end_unwind_protect
 
 %!test  # an ARC whose normal points down is mirrored into the plane facing up
@@ -389,7 +385,7 @@ endfunction
 %!   unlink (tmpf);
 %! end_unwind_protect
 
-%!test  # a slanting LINE is a path, a TEXT is skipped and reported
+%!warning<geom.read: skipped 1 TEXT.> ...
 %! txt = ["0\nSECTION\n2\nENTITIES\n" ...
 %!        "0\nLINE\n8\n0\n10\n0\n20\n0\n30\n0\n11\n1\n21\n1\n31\n1\n" ...
 %!        "0\nTEXT\n8\n0\n10\n0\n20\n0\n40\n2.5\n1\nA\n" ...
@@ -397,16 +393,11 @@ endfunction
 %! fid = fopen (tmpf, 'w');
 %! fputs (fid, txt);
 %! fclose (fid);
-%! ws = warning ('off', 'all');
 %! unwind_protect
-%!   lastwarn ('');
 %!   C = geom.read (tmpf);
-%!   msg = lastwarn ();
 %!   assert_equal (class (C{1}), 'geom.Path');
-%!   assert_equal (msg, 'geom.read: skipped 1 TEXT.');
 %! unwind_protect_cleanup
 %!   unlink (tmpf);
-%!   warning (ws);
 %! end_unwind_protect
 
 %!test  # an inch file is read in millimetres
