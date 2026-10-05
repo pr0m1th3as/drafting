@@ -1,17 +1,21 @@
 Name: drafting
-Version: 0.1.0
-Date: 2026-08-18
+Version: 0.2.0
+Date: 2026-10-05
 Author: Andreas Bertsatos
 Maintainer: Andreas Bertsatos <abertsatos@biol.uoa.gr>
 Title: Geometry, CAD Input/Output and Technical Drawing
-Description: Planar geometry primitives, ASCII DXF reading and writing,
- and a format-agnostic technical drawing model with DXF and TikZ backends.
- Solid modelling with STEP and STL through Open CASCADE, when the package
- is built with it.  Provides the drafting layer for engineering design
+Description: Planar geometry, technical drawing and solid modelling:
+ polylines, splines, paths and regions with booleans, offsets and hulls;
+ a technical drawing model plotted, printed to scale, set in TikZ and
+ written to DXF; DXF read and written from R12 to R2018; triangle meshes
+ in STL, OBJ, PLY and 3MF; and, when built with Open CASCADE, exact solids
+ with holes, fillets, sections and projections, assemblies in STEP and
+ 3MF, and a viewer.  Provides the drafting layer for engineering design
  packages.
 Categories: Graphics
 Depends: octave (>= 11.1.0)
-SystemRequirements: Open CASCADE (>= 7.8.0), optional, for solid modelling;
- X11, optional, for the solid viewer
+BuildRequires: libocct-foundation-dev (>= 7.8.0), libocct-modeling-data-dev,
+ libocct-modeling-algorithms-dev, libocct-data-exchange-dev,
+ libocct-visualization-dev, libx11-dev
 Url: https://github.com/pr0m1th3as/drafting
 Tracker: https://github.com/pr0m1th3as/drafting/issues
