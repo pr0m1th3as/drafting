@@ -407,11 +407,11 @@
  pocket, worked on the solid.
 </p>
 <p> A region is always valid: every outline closed, none crossing or touching
- itself or enclosing no area, every hole in the plane of the outline and
- strictly inside it, and no two holes overlapping or touching.  An island
- inside a hole is not a region; union a second solid made from it.  Arcs
- are followed to within 2 degrees, and splines as closely, when the loops
- are checked against one another.
+ itself, every hole in the plane of the outline and strictly inside it,
+ and no two holes overlapping or touching.  An island
+ inside a hole is not a region; union a second solid made from it.  Open
+ CASCADE checks the loops on their exact curves, at its own tolerance of
+ 1e-7 mm: two curves closer than that touch.
 </p>
 <p> The outline and holes may be drawn either way round.  The region stores
  the outline anticlockwise and the holes clockwise, all in the
@@ -428,7 +428,7 @@
   <a href="solid.extrude.html">solid.extrude</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/af8b63d/inst/+geom/Region.m">geom.Region</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/be1130e/inst/+geom/Region.m">geom.Region</a>
 </p>
 </div>
         <p class="lead my-3">The <code>geom.Region</code> class contains the following properties:</p>
@@ -1315,7 +1315,7 @@ Make regions from closed loops, each hole in the loop around it.
 </p>
 <p> A loop given in world coordinates need not lie in the plane of its UCS;
  it must lie in a plane.  Loops that cross or touch, themselves or each
- other, make no regions and are refused, as is a loop enclosing no area.
+ other, make no regions and are refused.
 </p>
 <table><tr><td>&nbsp;</td><td><pre class="example"> ## A plate with a bore, and a disc lying in the bore
  R = geom.Region.nest ({geom.Polyline ([20, 20, 1; 40, 20, 1], ...

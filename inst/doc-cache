@@ -3192,7 +3192,7 @@ geom.Region
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1361
+# length: 1350
 drafting: geom.Region
 A closed area of a plane, an outline with holes in it.
 
@@ -3207,11 +3207,11 @@ through whatever is made from the region; a recess of limited depth is a
 pocket, worked on the solid.
 
 A region is always valid: every outline closed, none crossing or touching
-itself or enclosing no area, every hole in the plane of the outline and
-strictly inside it, and no two holes overlapping or touching. An island
-inside a hole is not a region; union a second solid made from it. Arcs
-are followed to within 2 degrees, and splines as closely, when the loops
-are checked against one another.
+itself, every hole in the plane of the outline and strictly inside it,
+and no two holes overlapping or touching. An island
+inside a hole is not a region; union a second solid made from it. Open
+CASCADE checks the loops on their exact curves, at its own tolerance of
+1e-7 mm: two curves closer than that touch.
 
 The outline and holes may be drawn either way round. The region stores
 the outline anticlockwise and the holes clockwise, all in the
@@ -3694,7 +3694,7 @@ geom.Region.nest
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1502
+# length: 1470
 geom.Region: R = geom.Region.nest (LOOPS)
 Make regions from closed loops, each hole in the loop around it.
 
@@ -3717,7 +3717,7 @@ clockwise.
 
 A loop given in world coordinates need not lie in the plane of its UCS;
 it must lie in a plane. Loops that cross or touch, themselves or each
-other, make no regions and are refused, as is a loop enclosing no area.
+other, make no regions and are refused.
 
 ## A plate with a bore, and a disc lying in the bore
 R = geom.Region.nest ({geom.Polyline ([20, 20, 1; 40, 20, 1], ...
@@ -6012,7 +6012,7 @@ geom.selfintersects
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1622
+# length: 1778
 drafting: TF = geom.selfintersects (P)
 drafting: TF = geom.selfintersects (P, CLOSED)
 drafting: [TF, IDX] = geom.selfintersects (...)
@@ -6033,9 +6033,11 @@ k runs from point k to point k+1.
 
 Segments that merely share an end point are not crossings, so consecutive
 segments are never reported, nor are the first and last segments of a closed
-curve. A curve that touches itself without crossing --- two segments meeting
-at a point that is an end of both --- is reported, since for the purposes
-this test serves, touching and crossing are equally fatal.
+curve. A curve that touches itself without crossing, where two segments
+meet at a point that is an end of both, is reported, since for the purposes
+this test serves, touching and crossing are equally fatal. Touching means
+meeting: segments any distance apart, however small, do not touch, where a
+geom.Region counts curves within 1e-7 mm of one another as touching.
 
 This is the global companion to the local criterion in
 geom.curveoffset. An offset curve can satisfy the curvature condition

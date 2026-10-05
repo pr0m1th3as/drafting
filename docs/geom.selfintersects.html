@@ -413,9 +413,11 @@
 </p>
 <p> Segments that merely share an end point are not crossings, so consecutive
  segments are never reported, nor are the first and last segments of a closed
- curve.  A curve that touches itself without crossing &mdash; two segments meeting
- at a point that is an end of both &mdash; is reported, since for the purposes
- this test serves, touching and crossing are equally fatal.
+ curve.  A curve that touches itself without crossing, where two segments
+ meet at a point that is an end of both, is reported, since for the purposes
+ this test serves, touching and crossing are equally fatal.  Touching means
+ meeting: segments any distance apart, however small, do not touch, where a
+ <code>geom.Region</code> counts curves within 1e-7 mm of one another as touching.
 </p>
 <p> This is the global companion to the local criterion in
  <code>geom.curveoffset</code>.  An offset curve can satisfy the curvature condition
@@ -433,7 +435,7 @@
   <a href="geom.signedarea.html">geom.signedarea</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/af8b63d/inst/+geom/selfintersects.m">geom.selfintersects</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/be1130e/inst/+geom/selfintersects.m">geom.selfintersects</a>
 </p>
 </div>
         <div class="card rounded my-4">
