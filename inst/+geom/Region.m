@@ -169,52 +169,6 @@ classdef Region
 
   methods (Access = public)
 
-    ## -*- texinfo -*-
-    ## @deftypefn  {geom.Region} {@var{R} =} geom.Region (@var{OUTLINE})
-    ## @deftypefnx {geom.Region} {@var{R} =} geom.Region (@var{OUTLINE}, @var{HOLES})
-    ##
-    ## Make a region.
-    ##
-    ## @code{@var{R} = geom.Region (@var{OUTLINE})} makes the area inside
-    ## @var{OUTLINE}, a closed @code{geom.Polyline}, @code{geom.Path} or
-    ## @code{geom.Spline} lying in the plane of its UCS.
-    ##
-    ## @code{@var{R} = geom.Region (@var{OUTLINE}, @var{HOLES})} cuts out of
-    ## it the areas inside the closed polylines, paths and splines in the cell
-    ## array @var{HOLES}.  A hole given in another frame of the same plane is
-    ## carried into the frame of the outline.  The region keeps each as a
-    ## @code{geom.Path}.
-    ##
-    ## @var{OUTLINE} and each hole may also be given as the matrix of vertices
-    ## a @code{geom.Polyline} is made from, @code{[@var{x}, @var{y},
-    ## @var{bulge}]} rows or @code{[@var{x}, @var{y}]} rows for straight
-    ## segments.  An outline given so lies in the @math{xy} plane, and a hole
-    ## given so lies in the plane of the outline:
-    ##
-    ## @example
-    ## @group
-    ## ## A plate 60 by 40 with a bore of diameter 20 and two square holes
-    ## R = geom.Region ([0, 0; 60, 0; 60, 40; 0, 40], ...
-    ##                  @{[20, 20, 1; 40, 20, 1], ...
-    ##                   [4, 4; 10, 4; 10, 10; 4, 10], ...
-    ##                   [50, 30; 56, 30; 56, 36; 50, 36]@});
-    ## @end group
-    ## @end example
-    ##
-    ## A hole with a smooth outline is a closed spline:
-    ##
-    ## @example
-    ## @group
-    ## H = geom.Spline ([20, 15; 35, 12; 40, 25; 28, 35; 18, 28], ...
-    ##                  'Closed', true);
-    ## R = geom.Region ([0, 0; 80, 0; 80, 50; 0, 50], @{H@});
-    ## @end group
-    ## @end example
-    ##
-    ## An invalid region is refused with an error naming the outline or hole at
-    ## fault.
-    ##
-    ## @end deftypefn
     function U = get.UCS (this)
 
       U = this.Outline.UCS;
@@ -934,6 +888,52 @@ classdef Region
 
     endfunction
 
+    ## -*- texinfo -*-
+    ## @deftypefn  {geom.Region} {@var{R} =} geom.Region (@var{OUTLINE})
+    ## @deftypefnx {geom.Region} {@var{R} =} geom.Region (@var{OUTLINE}, @var{HOLES})
+    ##
+    ## Make a region.
+    ##
+    ## @code{@var{R} = geom.Region (@var{OUTLINE})} makes the area inside
+    ## @var{OUTLINE}, a closed @code{geom.Polyline}, @code{geom.Path} or
+    ## @code{geom.Spline} lying in the plane of its UCS.
+    ##
+    ## @code{@var{R} = geom.Region (@var{OUTLINE}, @var{HOLES})} cuts out of
+    ## it the areas inside the closed polylines, paths and splines in the cell
+    ## array @var{HOLES}.  A hole given in another frame of the same plane is
+    ## carried into the frame of the outline.  The region keeps each as a
+    ## @code{geom.Path}.
+    ##
+    ## @var{OUTLINE} and each hole may also be given as the matrix of vertices
+    ## a @code{geom.Polyline} is made from, @code{[@var{x}, @var{y},
+    ## @var{bulge}]} rows or @code{[@var{x}, @var{y}]} rows for straight
+    ## segments.  An outline given so lies in the @math{xy} plane, and a hole
+    ## given so lies in the plane of the outline:
+    ##
+    ## @example
+    ## @group
+    ## ## A plate 60 by 40 with a bore of diameter 20 and two square holes
+    ## R = geom.Region ([0, 0; 60, 0; 60, 40; 0, 40], ...
+    ##                  @{[20, 20, 1; 40, 20, 1], ...
+    ##                   [4, 4; 10, 4; 10, 10; 4, 10], ...
+    ##                   [50, 30; 56, 30; 56, 36; 50, 36]@});
+    ## @end group
+    ## @end example
+    ##
+    ## A hole with a smooth outline is a closed spline:
+    ##
+    ## @example
+    ## @group
+    ## H = geom.Spline ([20, 15; 35, 12; 40, 25; 28, 35; 18, 28], ...
+    ##                  'Closed', true);
+    ## R = geom.Region ([0, 0; 80, 0; 80, 50; 0, 50], @{H@});
+    ## @end group
+    ## @end example
+    ##
+    ## An invalid region is refused with an error naming the outline or hole at
+    ## fault.
+    ##
+    ## @end deftypefn
     function this = Region (OUTLINE, HOLES = {})
 
       ## Input validation
