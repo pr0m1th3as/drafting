@@ -17,6 +17,7 @@ You should have received a copy of the GNU General Public License along with
 this program; if not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <functional>
@@ -66,6 +67,8 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <BRepBuilderAPI_Transform.hxx>
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepClass3d_SolidClassifier.hxx>
+#include <BRepClass_FaceClassifier.hxx>
+#include <BRepExtrema_DistShapeShape.hxx>
 #include <BRep_Builder.hxx>
 #include <ShapeUpgrade_UnifySameDomain.hxx>
 #include <BRepFilletAPI_MakeChamfer.hxx>
@@ -97,7 +100,17 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <GeomConvert_ApproxCurve.hxx>
 #include <Geom_BSplineCurve.hxx>
 #include <GeomLib_IsPlanarSurface.hxx>
+#include <Geom2d_BSplineCurve.hxx>
 #include <Geom2d_Line.hxx>
+#include <Geom2dAPI_InterCurveCurve.hxx>
+#include <GCE2d_MakeArcOfCircle.hxx>
+#include <GCE2d_MakeSegment.hxx>
+#include <GeomAPI.hxx>
+#include <BndLib_Add2dCurve.hxx>
+#include <Bnd_Box2d.hxx>
+#include <IntRes2d_IntersectionSegment.hxx>
+#include <TColgp_Array1OfPnt2d.hxx>
+#include <gp_Pln.hxx>
 #include <Geom_CylindricalSurface.hxx>
 #include <Geom_Plane.hxx>
 #include <GProp_GProps.hxx>
@@ -342,6 +355,296 @@ planarface (const region& r)
     f.Add (h);
   }
   return f.Face ();
+}
+
+// One piece of a closed loop lying in a plane: a straight segment, an arc or
+// one span of a spline between two knots, as a curve in the coordinates of
+// the plane, with the loop it belongs to and its place there, its ends, its
+// box and the edge it makes in the xy plane
+struct piece
+{
+  Handle (Geom2d_Curve) curve;
+  int loop, index;
+  bool spline;
+  gp_Pnt2d a, b;
+  double x0, y0, x1, y1;
+  TopoDS_Edge edge;
+};
+
+// Row I of the points P, in world coordinates, in the plane of the frame F,
+// rows origin, x axis, y axis and normal
+static gp_Pnt2d
+inplane (const Matrix& p, octave_idx_type i, const Matrix& f)
+{
+  const double d[3] = {p(i,0) - f(0,0), p(i,1) - f(0,1), p(i,2) - f(0,2)};
+  return gp_Pnt2d (d[0] * f(1,0) + d[1] * f(1,1) + d[2] * f(1,2),
+                   d[0] * f(2,0) + d[1] * f(2,1) + d[2] * f(2,2));
+}
+
+// The pieces of the closed path P, as chain reads it, in the plane of the
+// frame F, appended to OUT as loop LOOP; returns how many there are
+static int
+pieces (const octave_value& p, const Matrix& f, int loop, vector<piece>& out)
+{
+  const octave_scalar_map s = p.scalar_map_value ();
+  const Matrix v = s.contents ("vertices").matrix_value ();
+  const Matrix m = s.contents ("midpoints").matrix_value ();
+  const Cell sp = s.contents ("splines").cell_value ();
+  const octave_idx_type n = v.rows ();
+  int count = 0;
+  for (octave_idx_type i = 0; i < n; i++)
+  {
+    const gp_Pnt2d a = inplane (v, i, f);
+    const gp_Pnt2d b = inplane (v, (i + 1) % n, f);
+    vector<Handle (Geom2d_Curve)> c;
+    if (! sp(i).isempty ())
+    {
+      const octave_scalar_map q = sp(i).scalar_map_value ();
+      const Matrix pl = q.contents ("poles").matrix_value ();
+      const ColumnVector w = q.contents ("weights").column_vector_value ();
+      const ColumnVector t = q.contents ("knots").column_vector_value ();
+      const ColumnVector mu = q.contents ("mults").column_vector_value ();
+      TColgp_Array1OfPnt2d poles (1, pl.rows ());
+      TColStd_Array1OfReal weights (1, pl.rows ());
+      for (octave_idx_type k = 0; k < pl.rows (); k++)
+      {
+        poles.SetValue (k + 1, inplane (pl, k, f));
+        weights.SetValue (k + 1, w(k));
+      }
+      TColStd_Array1OfReal knots (1, t.numel ());
+      TColStd_Array1OfInteger mults (1, t.numel ());
+      for (octave_idx_type k = 0; k < t.numel (); k++)
+      {
+        knots.SetValue (k + 1, t(k));
+        mults.SetValue (k + 1, static_cast<int> (mu(k)));
+      }
+      const Handle (Geom2d_BSplineCurve) whole
+        = new Geom2d_BSplineCurve (poles, weights, knots, mults,
+                                   q.contents ("degree").int_value ());
+      for (int k = whole->FirstUKnotIndex (); k < whole->LastUKnotIndex ();
+           k++)
+      {
+        Handle (Geom2d_BSplineCurve) span
+          = Handle (Geom2d_BSplineCurve)::DownCast (whole->Copy ());
+        span->Segment (whole->Knot (k), whole->Knot (k + 1));
+        c.push_back (span);
+      }
+    }
+    else if (octave::math::isnan (m(i,0)))
+    {
+      c.push_back (GCE2d_MakeSegment (a, b).Value ());
+    }
+    else
+    {
+      c.push_back (GCE2d_MakeArcOfCircle (a, inplane (m, i, f), b).Value ());
+    }
+    for (const Handle (Geom2d_Curve)& k : c)
+    {
+      piece q;
+      q.curve = k;
+      q.loop = loop;
+      q.index = count++;
+      q.spline = ! sp(i).isempty ();
+      q.a = k->Value (k->FirstParameter ());
+      q.b = k->Value (k->LastParameter ());
+      Bnd_Box2d box;
+      BndLib_Add2dCurve::AddOptimal (k, k->FirstParameter (),
+                                     k->LastParameter (),
+                                     Precision::Confusion (), box);
+      box.Get (q.x0, q.y0, q.x1, q.y1);
+      q.edge = BRepBuilderAPI_MakeEdge (GeomAPI::To3d (k, gp_Pln (gp::XOY ())))
+                 .Edge ();
+      out.push_back (q);
+    }
+  }
+  return count;
+}
+
+// Whether the pieces P and Q, next to one another in a loop, meet anywhere
+// but at the ends they share, within Open CASCADE's tolerance
+static bool
+meetapart (const piece& p, const piece& q)
+{
+  const double tol = Precision::Confusion ();
+  vector<gp_Pnt2d> shared;
+  for (const gp_Pnt2d& s : {p.a, p.b})
+  {
+    for (const gp_Pnt2d& t : {q.a, q.b})
+    {
+      if (s.Distance (t) <= tol)
+      {
+        shared.push_back (s);
+      }
+    }
+  }
+  // The shared end a point lies at, or -1
+  auto atshared = [&shared, tol] (const gp_Pnt2d& z)
+  {
+    for (size_t i = 0; i < shared.size (); i++)
+    {
+      if (z.Distance (shared[i]) <= tol)
+      {
+        return static_cast<int> (i);
+      }
+    }
+    return -1;
+  };
+  Geom2dAPI_InterCurveCurve x (p.curve, q.curve, tol);
+  for (int i = 1; i <= x.NbPoints (); i++)
+  {
+    if (atshared (x.Point (i)) < 0)
+    {
+      return true;
+    }
+  }
+  // A run along which the two lie together is allowed only as a point at a
+  // shared end; it is read from the intersector, since a run of no length
+  // cannot be made a curve
+  for (int i = 1; i <= x.NbSegments (); i++)
+  {
+    const IntRes2d_IntersectionSegment& g = x.Intersector ().Segment (i);
+    if (! g.HasFirstPoint () || ! g.HasLastPoint ())
+    {
+      return true;
+    }
+    const int e = atshared (g.FirstPoint ().Value ());
+    if (e < 0 || e != atshared (g.LastPoint ().Value ()))
+    {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Which of the closed loops L, paths as chain reads them lying in the plane
+// of the frame F, cross or touch themselves, which cross or touch one
+// another, and which lie inside which: a struct of CROSS, a logical row, and
+// MEET and INSIDE, logical matrices, INSIDE(J,K) true when loop J lies inside
+// loop K.  Each is judged on the exact curves, a spline span by span, two
+// curves meeting where they come within Open CASCADE's tolerance; pieces are
+// paired only where their boxes overlap.  INSIDE is found only when no loop
+// crosses itself, and only for loops that do not meet.
+static octave_value
+loopcheck (const Cell& L, const Matrix& f)
+{
+  const double tol = Precision::Confusion ();
+  const int n = L.numel ();
+  vector<piece> P;
+  vector<int> count (n);
+  for (int k = 0; k < n; k++)
+  {
+    count[k] = pieces (L(k), f, k, P);
+  }
+  boolMatrix cross (1, n, false);
+  boolMatrix meet (n, n, false);
+  boolMatrix inside (n, n, false);
+
+  // A span of a spline may loop on itself
+  for (const piece& p : P)
+  {
+    if (p.spline && ! cross(p.loop))
+    {
+      Geom2dAPI_InterCurveCurve x (p.curve, tol);
+      cross(p.loop) = x.NbPoints () > 0 || x.NbSegments () > 0;
+    }
+  }
+
+  // The pairs whose boxes overlap, swept along x
+  vector<size_t> o (P.size ());
+  for (size_t i = 0; i < o.size (); i++)
+  {
+    o[i] = i;
+  }
+  sort (o.begin (), o.end (),
+        [&P] (size_t i, size_t j) { return P[i].x0 < P[j].x0; });
+  for (size_t i = 0; i < o.size (); i++)
+  {
+    const piece& p = P[o[i]];
+    for (size_t j = i + 1; j < o.size () && P[o[j]].x0 <= p.x1; j++)
+    {
+      const piece& q = P[o[j]];
+      if (q.y0 > p.y1 || q.y1 < p.y0)
+      {
+        continue;
+      }
+      if (p.loop == q.loop)
+      {
+        const int d = abs (p.index - q.index);
+        if (cross(p.loop))
+        {
+          continue;
+        }
+        else if (d == 1 || d == count[p.loop] - 1)
+        {
+          cross(p.loop) = meetapart (p, q);
+        }
+        else
+        {
+          BRepExtrema_DistShapeShape x (p.edge, q.edge);
+          cross(p.loop) = x.IsDone () && x.Value () <= tol;
+        }
+      }
+      else if (! meet(p.loop, q.loop))
+      {
+        BRepExtrema_DistShapeShape x (p.edge, q.edge);
+        meet(p.loop, q.loop) = x.IsDone () && x.Value () <= tol;
+        meet(q.loop, p.loop) = meet(p.loop, q.loop);
+      }
+    }
+  }
+
+  // A loop lies inside another, which it does not meet, when its first point
+  // does and its box lies within the other's
+  bool any = false;
+  for (int k = 0; k < n; k++)
+  {
+    any = any || cross(k);
+  }
+  if (! any && n > 1)
+  {
+    vector<TopoDS_Face> face (n);
+    vector<Bnd_Box2d> box (n);
+    vector<gp_Pnt2d> first (n);
+    vector<BRepBuilderAPI_MakeWire> wire (n);
+    for (const piece& p : P)
+    {
+      if (p.index == 0)
+      {
+        first[p.loop] = p.a;
+      }
+      wire[p.loop].Add (p.edge);
+      box[p.loop].Update (p.x0, p.y0, p.x1, p.y1);
+    }
+    for (int k = 0; k < n; k++)
+    {
+      face[k] = BRepBuilderAPI_MakeFace (gp_Pln (gp::XOY ()), wire[k].Wire (),
+                                         Standard_True).Face ();
+    }
+    for (int j = 0; j < n; j++)
+    {
+      double a0, b0, a1, b1, c0, d0, c1, d1;
+      box[j].Get (a0, b0, a1, b1);
+      for (int k = 0; k < n; k++)
+      {
+        box[k].Get (c0, d0, c1, d1);
+        if (j != k && ! meet(j,k)
+            && a0 >= c0 && b0 >= d0 && a1 <= c1 && b1 <= d1)
+        {
+          BRepClass_FaceClassifier c (face[k],
+                                      gp_Pnt (first[j].X (), first[j].Y (),
+                                              0),
+                                      tol);
+          inside(j,k) = c.State () == TopAbs_IN;
+        }
+      }
+    }
+  }
+
+  octave_scalar_map r;
+  r.assign ("cross", cross);
+  r.assign ("meet", meet);
+  r.assign ("inside", inside);
+  return octave_value (r);
 }
 
 // One side of an extrusion of R, height H along its normal, its walls leaning
@@ -3324,6 +3627,11 @@ function directly. \n\
     else if (cmd == "faces")
     {
       out = faceinfo (toshape (args(2), caller));
+    }
+    // Closed loops in a plane checked as a region's loops are: see loopcheck
+    else if (cmd == "loopcheck")
+    {
+      out = loopcheck (args(2).cell_value (), args(3).matrix_value ());
     }
     else if (cmd == "valid")
     {

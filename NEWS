@@ -9,8 +9,8 @@ Summary of important user-visible changes for drafting 0.2.0:
  ** New geometry classes, each lying in a coordinate system of its own,
     `geom.UCS`: `geom.Polyline`, `geom.Spline`, `geom.Path` and
     `geom.Region`.  Regions combine, offset, fillet, chamfer, hull, resize,
-    mirror and repeat, with arcs kept exact; `geom.text` gives letters as
-    regions.
+    mirror and repeat, with arcs kept exact, and Open CASCADE checks them on
+    their exact curves; `geom.text` gives letters as regions.
 
  ** `solid.Shape`, exact solids: seven primitives; solids made from regions
     by `solid.extrude`, `revolve`, `loft`, `sweep` and `helix`; booleans,

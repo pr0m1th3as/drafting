@@ -32,11 +32,11 @@ classdef Region
   ## pocket, worked on the solid.
   ##
   ## A region is always valid: every outline closed, none crossing or touching
-  ## itself or enclosing no area, every hole in the plane of the outline and
-  ## strictly inside it, and no two holes overlapping or touching.  An island
-  ## inside a hole is not a region; union a second solid made from it.  Arcs
-  ## are followed to within 2 degrees, and splines as closely, when the loops
-  ## are checked against one another.
+  ## itself, every hole in the plane of the outline and strictly inside it,
+  ## and no two holes overlapping or touching.  An island
+  ## inside a hole is not a region; union a second solid made from it.  Open
+  ## CASCADE checks the loops on their exact curves, at its own tolerance of
+  ## 1e-7 mm: two curves closer than that touch.
   ##
   ## The outline and holes may be drawn either way round.  The region stores
   ## the outline anticlockwise and the holes clockwise, all in the
@@ -125,8 +125,7 @@ classdef Region
     ## The region with the outline O and the holes in the cell H, N-by-2
     ## vertices of straight segments in the xy plane, O anticlockwise and the
     ## holes clockwise, already known to be valid, as a cut through a mesh
-    ## is: they are taken without the checks, which take time quadratic in the
-    ## number of vertices
+    ## is: they are taken without the checks
     function this = __trusted__ (this, O, H)
 
       this.Outline = geom.Path (O, 'Closed', true);
@@ -635,8 +634,7 @@ classdef Region
         A = [A; a];
       endfor
 
-      ## Convex and anticlockwise by its making, so taken without the checks,
-      ## which take time quadratic in its vertices
+      ## Convex and anticlockwise by its making, so taken without the checks
       R = geom.Region ([0, 0; 1, 0; 0, 1]);
       R.Outline = geom.Path.__loop__ (__mesh__ ('hull', 'geom.Region.hull', ...
                                                 P, A));
@@ -946,43 +944,28 @@ classdef Region
         endif
       endfor
 
-      ## Each loop on its own, sampled along its arcs and splines
+      ## Each loop on its own, then the holes against the outline and against
+      ## one another, judged by Open CASCADE on the exact curves
       names = [{'OUTLINE'}, arrayfun(@(k) sprintf ("HOLES{%d}", k), ...
                                      1:numel (H), 'UniformOutput', false)];
       all_ = [{O}, H];
-      S = cell (size (all_));
+      K = loopcheck (all_, O.UCS, 'geom.Region');
       A = zeros (size (all_));
       for k = 1:numel (all_)
-        S{k} = __sample__ (all_{k})(:,1:2);
-        if (rows (S{k}) > 2 && geom.selfintersects (S{k}, true))
+        if (K.cross(k))
           error ("geom.Region: %s must not cross or touch itself.", names{k});
         endif
         A(k) = __area__ (all_{k});
-        if (abs (A(k)) <= 1e-12 * max (range (S{k})) ^ 2)
-          error ("geom.Region: %s must enclose a nonzero area.", names{k});
-        endif
       endfor
-
-      ## The holes against the outline and against one another
-      for k = 2:numel (S)
-        [in, on] = inpolygon (S{k}(:,1), S{k}(:,2), S{1}(:,1), S{1}(:,2));
-        if (! all (in & ! on) || meets (S{k}, S{1}))
+      for k = 2:numel (all_)
+        if (K.meet(1,k) || ! K.inside(k,1))
           error ("geom.Region: %s must lie strictly inside OUTLINE.", ...
                  names{k});
         endif
       endfor
-      ## Holes whose boxes are apart can neither overlap nor touch, which
-      ## spares most pairs the polygon tests
-      B = cell2mat (cellfun (@(q) [min(q, [], 1), max(q, [], 1)], S(:), ...
-                             'UniformOutput', false));
-      for j = 2:numel (S)
-        for k = j+1:numel (S)
-          if (any (B(j,3:4) < B(k,1:2)) || any (B(k,3:4) < B(j,1:2)))
-            continue;
-          endif
-          jink = inpolygon (S{j}(:,1), S{j}(:,2), S{k}(:,1), S{k}(:,2));
-          kinj = inpolygon (S{k}(:,1), S{k}(:,2), S{j}(:,1), S{j}(:,2));
-          if (meets (S{j}, S{k}) || any (jink) || any (kinj))
+      for j = 2:numel (all_)
+        for k = j+1:numel (all_)
+          if (K.meet(j,k) || K.inside(j,k) || K.inside(k,j))
             error ("geom.Region: %s and %s must not overlap or touch.", ...
                    names{j}, names{k});
           endif
@@ -1086,7 +1069,7 @@ classdef Region
     ##
     ## A loop given in world coordinates need not lie in the plane of its UCS;
     ## it must lie in a plane.  Loops that cross or touch, themselves or each
-    ## other, make no regions and are refused, as is a loop enclosing no area.
+    ## other, make no regions and are refused.
     ##
     ## @example
     ## @group
@@ -1164,43 +1147,32 @@ classdef Region
         P{k} = Q;
       endfor
 
-      ## Each loop on its own, sampled along its arcs and splines
-      S = cell (1, n);
+      ## The loops of each plane judged by Open CASCADE on the exact curves:
+      ## each on its own, then which lie inside which, those of a plane apart
+      ## from one another or one strictly inside the other
+      cross = false (1, n);
+      meet = false (n);
+      inside = false (n);
+      for j = 1:numel (frames)
+        k = find (plane == j);
+        K = loopcheck (P(k), frames{j}, 'geom.Region.nest');
+        cross(k) = K.cross;
+        meet(k,k) = K.meet;
+        inside(k,k) = K.inside;
+      endfor
       A = zeros (1, n);
       for k = 1:n
-        S{k} = __sample__ (P{k})(:,1:2);
-        if (rows (S{k}) > 2 && geom.selfintersects (S{k}, true))
+        if (cross(k))
           error (strcat ("geom.Region.nest: LOOPS{%d} must not cross or", ...
                          " touch itself."), k);
         endif
         A(k) = __area__ (P{k});
-        if (abs (A(k)) <= 1e-12 * max (range (S{k})) ^ 2)
-          error (strcat ("geom.Region.nest: LOOPS{%d} must enclose a", ...
-                         " nonzero area."), k);
-        endif
       endfor
-
-      ## Which loops lie inside which, those of a plane apart from one another
-      ## or one strictly inside the other
-      inside = false (n);
-      B = cell2mat (cellfun (@(q) [min(q, [], 1), max(q, [], 1)], S(:), ...
-                             'UniformOutput', false));
-      for j = 1:n
-        for k = j+1:n
-          if (plane(j) != plane(k) || any (B(j,3:4) < B(k,1:2))
-                                   || any (B(k,3:4) < B(j,1:2)))
-            continue;
-          endif
-          if (meets (S{j}, S{k}))
-            error (strcat ("geom.Region.nest: LOOPS{%d} and LOOPS{%d} must", ...
-                           " not cross or touch."), j, k);
-          endif
-          inside(j,k) = inpolygon (S{j}(1,1), S{j}(1,2), ...
-                                   S{k}(:,1), S{k}(:,2));
-          inside(k,j) = inpolygon (S{k}(1,1), S{k}(1,2), ...
-                                   S{j}(:,1), S{j}(:,2));
-        endfor
-      endfor
+      [k, j] = find (triu (meet, 1)', 1);
+      if (! isempty (j))
+        error (strcat ("geom.Region.nest: LOOPS{%d} and LOOPS{%d} must", ...
+                       " not cross or touch."), j, k);
+      endif
 
       ## A loop inside an even number of others is an outline, one inside an
       ## odd number a hole in the loop around it
@@ -1240,8 +1212,7 @@ classdef Region
     ## loop and the inner loops as geom.Path.__loop__ takes them, in the
     ## frame of the UCS U where its plane is z = 0, laid in U, largest first.
     ## Open CASCADE has made and checked the faces, so the checks a region is
-    ## made with, which take time growing with the square of the number of
-    ## holes, are not run again; the loops are only turned to run as a
+    ## made with are not run again; the loops are only turned to run as a
     ## region's do, the outline anticlockwise and the holes clockwise.
     function R = __faces__ (F, U)
 
@@ -1555,38 +1526,15 @@ function TF = flat (P)
 
 endfunction
 
-## True when any segment of the closed polygon A meets any of the closed
-## polygon B, crossing or touching
-function TF = meets (A, B)
+## Open CASCADE's judgement of the closed paths in the cell L, lying in the
+## plane of the geom.UCS U, raised under CALLER: which cross or touch
+## themselves, which cross or touch one another, and which lie inside which,
+## as __occt__'s loopcheck gives them
+function K = loopcheck (L, U, caller)
 
-  a1 = A;
-  a2 = A([2:end, 1],:);
-  b1 = B;
-  b2 = B([2:end, 1],:);
-  tol = 1e-12 * max ([range(A(:)), range(B(:)), 1]) ^ 2;
-  orient = @(p, q, r) (q(:,1) - p(:,1)) .* (r(:,2)' - p(:,2)) ...
-                      - (q(:,2) - p(:,2)) .* (r(:,1)' - p(:,1));
-  o1 = orient (a1, a2, b1);
-  o2 = orient (a1, a2, b2);
-  o3 = orient (b1, b2, a1)';
-  o4 = orient (b1, b2, a2)';
-  o1(abs (o1) < tol) = 0;
-  o2(abs (o2) < tol) = 0;
-  o3(abs (o3) < tol) = 0;
-  o4(abs (o4) < tol) = 0;
-  hit = (o1 .* o2 <= 0) & (o3 .* o4 <= 0);
-  ## Collinear segments meet only where their extents overlap
-  col = (o1 == 0) & (o2 == 0);
-  if (any (col(:)))
-    lo = @(u, v) min (u, v);
-    hi = @(u, v) max (u, v);
-    ox = hi (lo (a1(:,1), a2(:,1)), lo (b1(:,1), b2(:,1))') ...
-         <= lo (hi (a1(:,1), a2(:,1)), hi (b1(:,1), b2(:,1))');
-    oy = hi (lo (a1(:,2), a2(:,2)), lo (b1(:,2), b2(:,2))') ...
-         <= lo (hi (a1(:,2), a2(:,2)), hi (b1(:,2), b2(:,2))');
-    hit(col) = ox(col) & oy(col);
-  endif
-  TF = any (hit(:));
+  K = __occt__ ('loopcheck', caller, cellfun (@__data__, L, ...
+                                              'UniformOutput', false), ...
+                [U.Origin; U.XAxis; U.YAxis; U.Normal]);
 
 endfunction
 
@@ -1683,6 +1631,19 @@ endfunction
 %! R = geom.Region (P);
 %! assert_equal (rows (fillet (R, 1).Outline.Vertices), 6);
 %! assert_equal (rows (chamfer (R, 1).Outline.Vertices), 6);
+
+%!test  # judged on the curves: a corner of a hole 0.005 inside an arc
+%! c = 99.995 * [cosd(1), sind(1)];
+%! R = geom.Region ([100, 0, 1; -100, 0, 1], {[c; c - [10, 0]; c - [10, 5]]});
+%! assert_equal (numel (R.Holes), 1);
+
+%!test  # a hole 1e-6 from the outline, beyond Open CASCADE's tolerance
+%! R = geom.Region ([10, 0, 1; -10, 0, 1], {[10 - 1e-6, 0, 1; 0, 0, 1]});
+%! assert_equal (numel (R.Holes), 1);
+
+%!test  # a vertex 1e-6 from an edge, beyond Open CASCADE's tolerance
+%! R = geom.Region ([0, 0; 10, 0; 10, 10; 5, 1e-6; 0, 10]);
+%! assert_equal (rows (R.Outline.Vertices), 5);
 
 %!error<geom.Region: HOLES\{1\} must lie strictly inside OUTLINE.> ...
 %! geom.Region ([0, 0; 30, 0; 30, 30; 0, 30], ...
@@ -2025,8 +1986,21 @@ endfunction
 %! geom.Region ([0, 0; 10, 10; 10, 0; 0, 10])
 %!error<geom.Region: HOLES\{1\} must not cross or touch itself.> ...
 %! geom.Region ([0, 0; 20, 0; 20, 20; 0, 20], {[5, 5; 15, 15; 15, 5; 5, 15]})
-%!error<geom.Region: OUTLINE must enclose a nonzero area.> ...
+%!error<geom.Region: OUTLINE must not cross or touch itself.> ...
 %! geom.Region ([0, 0; 5, 0; 10, 0])
+%!error<geom.Region: OUTLINE must not cross or touch itself.> ...
+%! geom.Region ([0, 0; 10, 0; 10, 10; 5, 1e-8; 0, 10])
+%!error<geom.Region: HOLES\{1\} must lie strictly inside OUTLINE.> ...
+%! geom.Region ([-200, -200; 99.99, -200; 99.99, 200; -200, 200], ...
+%!              {[100 * cosd(1), 100 * sind(1), 1; ...
+%!                -100 * cosd(1), -100 * sind(1), 1]})
+%!error<geom.Region: HOLES\{1\} must lie strictly inside OUTLINE.> ...
+%! geom.Region ([10, 0, 1; -10, 0, 1], {[10, 0, 1; 0, 0, 1]})
+%!error<geom.Region: HOLES\{1\} must lie strictly inside OUTLINE.> ...
+%! geom.Region ([10, 0, 1; -10, 0, 1], {[10 - 1e-8, 0, 1; 0, 0, 1]})
+%!error<geom.Region: HOLES\{1\} and HOLES\{2\} must not overlap or touch.> ...
+%! geom.Region ([20, 0, 1; -20, 0, 1], ...
+%!              {[10, 0, 1; 0, 0, 1], [0, 0, 1; -10, 0, 1]})
 %!error<geom.Region: HOLES\{1\} must lie strictly inside OUTLINE.> ...
 %! geom.Region ([0, 0; 20, 0; 20, 20; 0, 20], {[30, 5; 35, 5; 35, 10]})
 %!error<geom.Region: HOLES\{1\} must lie strictly inside OUTLINE.> ...
@@ -2245,7 +2219,7 @@ endfunction
 %!error<geom.Region.nest: LOOPS\{1\} must not cross or touch itself.> ...
 %! geom.Region.nest ({geom.Polyline([0, 0; 10, 10; 10, 0; 0, 10], ...
 %!                                  'Closed', true)})
-%!error<geom.Region.nest: LOOPS\{1\} must enclose a nonzero area.> ...
+%!error<geom.Region.nest: LOOPS\{1\} must not cross or touch itself.> ...
 %! geom.Region.nest ({geom.Path([0, 0; 10, 0], 'Closed', true)})
 %!error<geom.Region.nest: LOOPS\{1\} and LOOPS\{2\} must not cross or touch.> ...
 %! geom.Region.nest ({geom.Polyline([0, 0; 10, 0; 10, 10; 0, 10], ...

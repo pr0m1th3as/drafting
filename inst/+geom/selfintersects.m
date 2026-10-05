@@ -37,9 +37,11 @@
 ##
 ## Segments that merely share an end point are not crossings, so consecutive
 ## segments are never reported, nor are the first and last segments of a closed
-## curve.  A curve that touches itself without crossing --- two segments meeting
-## at a point that is an end of both --- is reported, since for the purposes
-## this test serves, touching and crossing are equally fatal.
+## curve.  A curve that touches itself without crossing, where two segments
+## meet at a point that is an end of both, is reported, since for the purposes
+## this test serves, touching and crossing are equally fatal.  Touching means
+## meeting: segments any distance apart, however small, do not touch, where a
+## @code{geom.Region} counts curves within 1e-7 mm of one another as touching.
 ##
 ## This is the global companion to the local criterion in
 ## @code{geom.curveoffset}.  An offset curve can satisfy the curvature condition
@@ -69,80 +71,8 @@ function [TF, IDX] = selfintersects (P, CLOSED = false)
     error ("geom.selfintersects: %s", errmsg);
   endif
 
-  n = rows (P);
-
-  ## Segment k runs from A(k,:) to B(k,:)
-  if (CLOSED)
-    A = P;
-    B = P([2:n, 1],:);
-  else
-    A = P(1:n-1,:);
-    B = P(2:n,:);
-  endif
-  m = rows (A);
-
-  IDX = zeros (0, 2);
-
-  ## Each segment against every later one, vectorised over the later segments.
-  ## Adjacency is skipped by construction: segment i never meets i+1, and on a
-  ## closed curve segment 1 never meets segment m.
-  for i = 1:m-2
-    if (CLOSED && i == 1)
-      j = (i+2):(m-1);
-    else
-      j = (i+2):m;
-    endif
-    if (isempty (j))
-      continue;
-    endif
-
-    p = A(i,:);
-    r = B(i,:) - A(i,:);
-    q = A(j,:);
-    s = B(j,:) - A(j,:);
-
-    ## Standard parametric crossing test: p + t r meets q + u s
-    rxs = r(1) * s(:,2) - r(2) * s(:,1);
-    qp = q - p;
-    qpxr = qp(:,1) * r(2) - qp(:,2) * r(1);
-    qpxs = qp(:,1) .* s(:,2) - qp(:,2) .* s(:,1);
-
-    hit = false (numel (j), 1);
-
-    ## Segments are parallel when the sine of the angle between them is below
-    ## 1e-12, and in line too when the gap between their lines is: comparing
-    ## rounding residue with rounding residue says nothing
-    lr = norm (r);
-    ls = sqrt (sum (s .^ 2, 2));
-    par = abs (rxs) <= 1e-12 * lr * ls;
-    inline = par & abs (qpxr) <= 1e-12 * lr * (lr + sqrt (sum (qp .^ 2, 2)));
-
-    ## Non-parallel segments cross when both parameters lie in [0, 1]
-    np = ! par;
-    if (any (np))
-      t = qpxs(np) ./ rxs(np);
-      u = qpxr(np) ./ rxs(np);
-      hit(np) = (t >= 0 & t <= 1 & u >= 0 & u <= 1);
-    endif
-
-    ## Collinear segments cross when their parameter ranges overlap
-    col = inline;
-    if (any (col))
-      rr = dot (r, r);
-      if (rr > 0)
-        t0 = (qp(col,1) * r(1) + qp(col,2) * r(2)) / rr;
-        t1 = t0 + (s(col,1) * r(1) + s(col,2) * r(2)) / rr;
-        lo = min (t0, t1);
-        hi = max (t0, t1);
-        hit(col) = (hi >= 0 & lo <= 1);
-      endif
-    endif
-
-    if (any (hit))
-      IDX = [IDX; repmat(i, sum (hit), 1), j(hit)'];
-    endif
-  endfor
-
+  ## Only segments whose boxes overlap are tested
+  IDX = __mesh__ ('crossings', 'geom.selfintersects', P, CLOSED);
   TF = ! isempty (IDX);
 
 endfunction
@@ -205,6 +135,10 @@ endfunction
 
 %!test  # a curve returning to an earlier point is reported
 %! assert_equal (geom.selfintersects ([0, 0; 2, 0; 2, 2; 0, 2; 1, 0]), true);
+
+%!test  # segments in line within rounding, 1e-14 apart, overlap
+%! [~, IDX] = geom.selfintersects ([0, 0; 10, 1e-14; 20, 0; 15, 0; 5, 0]);
+%! assert_equal (IDX, [1, 4; 2, 4]);
 
 %!error<geom.selfintersects: invalid number of input arguments.> ...
 %! geom.selfintersects ()

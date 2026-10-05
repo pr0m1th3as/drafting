@@ -2463,6 +2463,108 @@ hullpieces (const vector<piece>& pieces)
   return c;
 }
 
+
+// Crossings of a sampled curve
+
+// The pairs of segments of the curve through the rows of P, closed by the
+// segment from the last point back to the first when CLOSED, that cross or
+// touch, as rows of their indices from 1, the lower first, in order.
+// Segments next to one another are never paired.  Only segments whose boxes
+// overlap are tested, found by sweeping along x; the boxes are widened by
+// more than the tolerance of the test for segments lying in line, so no pair
+// it would find is left out.  The test is geom.selfintersects's: segments
+// not in line meet where both run through their crossing point, ends
+// included, and segments in line where they overlap.
+Matrix
+crossings (const Matrix& P, bool closed)
+{
+  const octave_idx_type n = P.rows ();
+  const octave_idx_type m = closed ? n : n - 1;
+  vector<double> ax (m), ay (m), bx (m), by (m), x0 (m), x1 (m), y0 (m),
+                 y1 (m);
+  double lo = P(0,0), hi = P(0,0);
+  for (octave_idx_type i = 0; i < n; i++)
+  {
+    lo = std::min ({lo, P(i,0), P(i,1)});
+    hi = std::max ({hi, P(i,0), P(i,1)});
+  }
+  const double slack = 1e-11 * (hi - lo);
+  for (octave_idx_type i = 0; i < m; i++)
+  {
+    const octave_idx_type j = (i + 1) % n;
+    ax[i] = P(i,0);
+    ay[i] = P(i,1);
+    bx[i] = P(j,0);
+    by[i] = P(j,1);
+    x0[i] = std::min (ax[i], bx[i]) - slack;
+    x1[i] = std::max (ax[i], bx[i]) + slack;
+    y0[i] = std::min (ay[i], by[i]) - slack;
+    y1[i] = std::max (ay[i], by[i]) + slack;
+  }
+  vector<octave_idx_type> o (m);
+  for (octave_idx_type i = 0; i < m; i++)
+  {
+    o[i] = i;
+  }
+  std::sort (o.begin (), o.end (), [&x0] (octave_idx_type a,
+                                          octave_idx_type b)
+             { return x0[a] < x0[b]; });
+
+  vector<std::pair<octave_idx_type, octave_idx_type>> hits;
+  for (octave_idx_type a = 0; a < m; a++)
+  {
+    for (octave_idx_type b = a + 1; b < m && x0[o[b]] <= x1[o[a]]; b++)
+    {
+      const octave_idx_type i = std::min (o[a], o[b]);
+      const octave_idx_type j = std::max (o[a], o[b]);
+      if (y0[j] > y1[i] || y1[j] < y0[i] || j - i < 2
+          || (closed && i == 0 && j == m - 1))
+      {
+        continue;
+      }
+      const double rx = bx[i] - ax[i], ry = by[i] - ay[i];
+      const double sx = bx[j] - ax[j], sy = by[j] - ay[j];
+      const double qx = ax[j] - ax[i], qy = ay[j] - ay[i];
+      const double rxs = rx * sy - ry * sx;
+      const double qpxr = qx * ry - qy * rx;
+      const double qpxs = qx * sy - qy * sx;
+      const double lr = std::sqrt (rx * rx + ry * ry);
+      const double ls = std::sqrt (sx * sx + sy * sy);
+      const bool par = std::abs (rxs) <= 1e-12 * lr * ls;
+      bool hit = false;
+      if (! par)
+      {
+        const double t = qpxs / rxs;
+        const double u = qpxr / rxs;
+        hit = t >= 0 && t <= 1 && u >= 0 && u <= 1;
+      }
+      else if (std::abs (qpxr)
+               <= 1e-12 * lr * (lr + std::sqrt (qx * qx + qy * qy)))
+      {
+        const double rr = rx * rx + ry * ry;
+        if (rr > 0)
+        {
+          const double t0 = (qx * rx + qy * ry) / rr;
+          const double t1 = t0 + (sx * rx + sy * ry) / rr;
+          hit = std::max (t0, t1) >= 0 && std::min (t0, t1) <= 1;
+        }
+      }
+      if (hit)
+      {
+        hits.emplace_back (i, j);
+      }
+    }
+  }
+  std::sort (hits.begin (), hits.end ());
+  Matrix idx (hits.size (), 2);
+  for (size_t k = 0; k < hits.size (); k++)
+  {
+    idx(k,0) = hits[k].first + 1;
+    idx(k,1) = hits[k].second + 1;
+  }
+  return idx;
+}
+
 // The triangles of the polygon with the corners C, x, y and z of each in
 // turn, appended to T as indices into C, each turned as the polygon is.  It
 // is cut an ear at a time in the plane its Newell normal is nearest, so a
@@ -4690,6 +4792,14 @@ Undocumented internal function.\n\
       a[i].arc = true;
     }
     return ovl (hullpieces (hull (q, a)));
+  }
+
+  // IDX = __mesh__ ('crossings', caller, P, CLOSED): the pairs of segments
+  // of the curve through the points P, N-by-2, that cross or touch, as
+  // geom.selfintersects returns them
+  else if (cmd == "crossings")
+  {
+    return ovl (crossings (args(2).matrix_value (), args(3).bool_value ()));
   }
 
   error ("__mesh__: unknown command '%s'.", cmd.c_str ());

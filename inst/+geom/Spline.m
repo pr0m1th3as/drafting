@@ -213,12 +213,26 @@ classdef Spline
     function G = __green__ (this)
 
       u = unique (this.Knots);
-      G = 0;
-      tol = 1e-14 * max ([1; abs(this.ControlPoints(:))]) ^ 2;
-      for j = 1:numel (u) - 1
-        G += integral (@(s) green (this, s), u(j), u(j+1), ...
-                       'RelTol', 1e-12, 'AbsTol', tol);
-      endfor
+      W = this.Weights;
+      if (all (W == W(1)))
+        ## On each span a polynomial of degree 2p-1, which Gauss-Legendre
+        ## quadrature on p points integrates exactly
+        p = this.Degree;
+        b = (1:p-1) ./ sqrt (4 * (1:p-1) .^ 2 - 1);
+        [V, x] = eig (diag (b, 1) + diag (b, -1), 'vector');
+        w = 2 * V(1,:)' .^ 2;
+        h = diff (u(:))' / 2;
+        c = (u(1:end-1)(:)' + u(2:end)(:)') / 2;
+        g = green (this, c + h .* x);
+        G = sum (reshape (g, p, []) .* (w .* h), 'all');
+      else
+        G = 0;
+        tol = 1e-14 * max ([1; abs(this.ControlPoints(:))]) ^ 2;
+        for j = 1:numel (u) - 1
+          G += integral (@(s) green (this, s), u(j), u(j+1), ...
+                         'RelTol', 1e-12, 'AbsTol', tol);
+        endfor
+      endif
 
     endfunction
 
