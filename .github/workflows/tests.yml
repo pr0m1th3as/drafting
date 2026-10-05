@@ -1,0 +1,143 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # The package as most users build it, without Open CASCADE: everything
+  # else must work, and the solid tests skip
+  test:
+    uses: pr0m1th3as/octave-ci/.github/workflows/package-test.yml@v1
+    with:
+      windows-versions: '[]'
+      macos: false
+
+  # As the Octave Packages index tests a release: the latest Octave image,
+  # Ubuntu 26.04, with the build packages DESCRIPTION lists installed first
+  occt:
+    name: Ubuntu 26.04 with Open CASCADE, latest Octave
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build the package archive
+        id: archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          git archive --format=tar.gz --prefix=package/ -o package.tar.gz HEAD
+          name="$(tr -d '\r' < DESCRIPTION \
+                  | sed -n 's/^Name: *//p' | tr '[:upper:]' '[:lower:]')"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+
+      - name: Install the build packages, then install and test
+        shell: bash
+        env:
+          NAME: ${{ steps.archive.outputs.name }}
+          PACKAGES: >-
+            libocct-foundation-dev libocct-modeling-data-dev
+            libocct-modeling-algorithms-dev libocct-data-exchange-dev
+            libocct-visualization-dev libx11-dev
+        run: |
+          set -euo pipefail
+          # Open CASCADE must be built: without it the solid tests skip and
+          # the suite passes regardless
+          code="pkg ('install', '-local', '/work/package.tar.gz'); "
+          code+="pkg ('load', '$NAME'); "
+          code+="if (exist ('__occt__') != 3 || exist ('__occtfont__') != 3 "
+          code+="|| isempty (file_in_loadpath ('__occtview__'))); "
+          code+="error ('Open CASCADE parts were not built'); endif; "
+          code+="printf ('Open CASCADE parts built\\n'); "
+          code+="pkg ('test', '$NAME');"
+          docker run --rm --volume "$PWD:/work" --workdir /work \
+            --env PACKAGES --env CODE="$code" \
+            ghcr.io/gnu-octave/octave:latest bash -c '
+              set -euo pipefail
+              S=""
+              if [ "$(id -u)" != 0 ]; then S=sudo; fi
+              . /etc/os-release
+              echo "$PRETTY_NAME"
+              $S apt-get update -qq
+              $S env DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC \
+                apt-get install --yes -qq $PACKAGES > /dev/null
+              dpkg-query -W libocct-foundation-dev
+              octave-cli --norc --no-history --eval "$CODE"
+            ' 2>&1 | tee test.log
+
+      - name: Show the failed tests
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p test-logs
+          see='s/^See the file (.*) for additional details\.$/\1/p'
+          log=""
+          if [ -f test.log ]; then
+            log="$(tr -d '\r' < test.log | sed -nE "$see" \
+                   | tail -1 | sed 's#.*[\\/]##')"
+          fi
+          for f in "$log" test_suite.log fntests.log; do
+            if [ -n "$f" ] && [ -f "$f" ]; then
+              cp "$f" test-logs/
+              tr -d '\r' < "$f" | awk '
+                function flush() {
+                  if (bad) {
+                    if (!shown) { print "==> " file; shown = 1 }
+                    printf "%s", block
+                  }
+                  block = ""; bad = 0
+                }
+                /^>>>>> processing / {
+                  flush(); file = substr ($0, 18); shown = 0; next
+                }
+                /^Files with no tests:/ { flush(); exit }
+                /^\*\*\*\*\* / { flush(); block = $0 "\n"; next }
+                block != "" { block = block $0 "\n"; if (/^!!!!! /) bad = 1 }
+                END { flush() }'
+              break
+            fi
+          done
+          if [ -f test.log ]; then
+            cp test.log test-logs/
+          fi
+
+      - name: Upload the test logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-logs-occt
+          path: test-logs/
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Check the test results
+        shell: bash
+        run: |
+          set -euo pipefail
+          summary="$(tr -d '\r' < test.log | sed -n '/^Summary:$/,$p')"
+          count () {
+            printf '%s\n' "$summary" | sed -nE "s/^  $1 +([0-9]+)\$/\1/p"
+          }
+          pass="$(count PASS)"
+          fail="$(count FAIL)"
+          regr="$(count REGRESSION)"
+          if [ -z "$pass" ] || [ "$pass" -eq 0 ]; then
+            echo "::error::no test passed"
+            exit 1
+          fi
+          if [ "${fail:-1}" -ne 0 ] || [ "${regr:-0}" -ne 0 ]; then
+            echo "::error::${fail:-unknown} failed, ${regr:-0} regressions"
+            exit 1
+          fi
+          echo "$pass tests passed"
