@@ -312,7 +312,3 @@ After installation, type:
 - `pkg test drafting` to run a test suite for all 56 functions and class
   definitions currently available and ensure that they work properly on your
   system.
-
-## License
-
-GPLv3. See [`COPYING`](COPYING).
