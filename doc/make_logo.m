@@ -9,7 +9,7 @@ set (0, 'defaultfigurevisible', 'off');
 P = [0, 0; 92, 0; 92, 62; 62, 62; 62, 40; 0, 40];
 
 D = draw.Drawing ('drafting');
-D = D.polyline (P, true);
+D = D.polyline (geom.Polyline (P, 'Closed', true));
 D = D.circle ([30, 20], 13);
 
 D.Linetype = 'CENTER';
