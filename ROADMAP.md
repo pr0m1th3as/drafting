@@ -170,6 +170,13 @@ same lowered list that `plot` and `tikz` take, so it is a third consumer rather
 than a new architecture. It serves documentation, the web, and everyone without
 a CAD program.
 
+**Surfaces through a grid.** A shape written as a grid of points, rows and
+columns as `meshgrid` makes them, is how many OpenSCAD users think, and it
+suits Octave. `solid.surface (X, Y, Z)` would have Open CASCADE fit an exact
+B-spline surface through the grid and, with a thickness, make a solid of it
+along its normals: the grid stays the input, and what comes out is exact and
+smooth, where `solid.polyhedron` on the same grid gives facets.
+
 ## Other platforms
 
 The package builds on Linux, and ports to Windows and macOS are not planned.
