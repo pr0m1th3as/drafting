@@ -145,8 +145,8 @@ packaged version is 7.8 or later, install them before the package with:
 
 If the headers are elsewhere, name their directories before installing, for
 example `setenv ("OCCT_INC", "/opt/occt/include/opencascade")` or `X11_INC`;
-the libraries must be where the linker finds them. Linux is supported first;
-Windows and macOS are not yet.
+the libraries must be where the linker finds them. The package builds on
+Linux; ports to Windows and macOS are not planned.
 
 After installation, type:
 - `pkg load drafting` to load the **drafting** package.
