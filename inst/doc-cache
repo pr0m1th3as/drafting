@@ -3419,7 +3419,7 @@ geom.Region.copy
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 510
+# length: 439
 geom.Region: C = copy (R, D)
 Copies of a region, united.
 
@@ -3429,8 +3429,6 @@ UCS, and returns their union as geom.Region.union returns it, a
 cell array of regions, largest first. The region itself is among them
 only where a row of D is zero. Copies that overlap become one
 region.
-
-Open CASCADE unites the copies, so the package must be built with it.
 
 See also:
 geom.Region.rectarray,
@@ -3752,7 +3750,7 @@ geom.Region.offset
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1420
+# length: 1358
 geom.Region: R = offset (R, D)
 geom.Region: R = offset (R, D, 'Corners', C)
 Grow or shrink a region by a distance.
@@ -3775,8 +3773,7 @@ offset (delta = D, chamfer = true) does.
 
 The edges of the result are those of the region moved, straight edges
 straight and arcs exact; a spline's offset is a spline that Open CASCADE
-fits to it, to about a part in ten million. It computes the offset, so
-the package must be built with it.
+fits to it, to about a part in ten million.
 
 ## A band 2 wide round a flange, G{1}; G{2} is the band 2 wide
 ## inside its bore, which grows into it too
@@ -3974,7 +3971,7 @@ geom.Region.union
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 946
+# length: 881
 geom.Region: R = union (R1, R2, ...)
 The area of any of several regions.
 
@@ -3992,8 +3989,6 @@ the regions, arcs and splines exact. This is OpenSCAD's union of
 R = union (geom.Region ([0, 0; 60, 0; 60, 40; 0, 40]), ...
 geom.Region ([50, 10; 80, 10; 80, 30; 50, 30]));
 S = solid.extrude (R{1}, 5);
-
-Open CASCADE computes it, so the package must be built with it.
 
 See also:
 geom.Region.subtract,
@@ -6227,7 +6222,7 @@ geom.text
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 2093
+# length: 1985
 drafting: R = geom.text (STR)
 drafting: R = geom.text (STR, Name, Value, ...)
 The outlines of text, as regions.
@@ -6278,9 +6273,7 @@ for k = 1:numel (R)
 P = union (P, solid.extrude (R{k}, 1));
 endfor
 
-Open CASCADE builds the outlines from the font, and its visualization
-libraries must be present when the package is built, as for the viewer,
-model.Viewer.
+Open CASCADE builds the outlines from the font.
 
 See also:
 geom.Region,
@@ -6934,7 +6927,7 @@ model.Viewer
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 2026
+# length: 1959
 drafting: model.Viewer
 A window showing a solid or a triangle mesh, in which edges, faces and
 coordinate systems can be picked.
@@ -6976,8 +6969,7 @@ after, where the mesh has that colouring.
 Closing the window ends the viewer; assigning a shape again opens a new
 one. The window closes with Octave.
 
-The viewer is built with the package when Open CASCADE and X11 are found,
-and needs a display to run. It runs on Linux.
+The viewer needs a display to run. It runs on Linux.
 
 See also:
 solid.Shape.show,
@@ -8126,7 +8118,7 @@ solid.Shape
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 2309
+# length: 2062
 drafting: solid.Shape
 A solid in millimetres, modelled through Open CASCADE.
 
@@ -8174,11 +8166,6 @@ original. The empty shape adds nothing to a union and empties an
 intersection, and a boolean whose result holds no material, such as the
 intersection of two solids that do not meet, returns it. A shape is
 saved and loaded with save and load like any other value.
-
-The solid namespace needs Open CASCADE, which the package uses
-where it is found when the package is built. On a build without it, the
-empty shape can still be made, but every function and method that needs
-the library raises an error saying so.
 
 See also:
 solid.box,

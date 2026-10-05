@@ -428,7 +428,7 @@
   <a href="solid.extrude.html">solid.extrude</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/0f84b98/inst/+geom/Region.m">geom.Region</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/af8b63d/inst/+geom/Region.m">geom.Region</a>
 </p>
 </div>
         <p class="lead my-3">The <code>geom.Region</code> class contains the following properties:</p>
@@ -788,8 +788,6 @@ The area of any of several regions.
  S = solid.extrude (R{1}, 5);
 </pre></td></tr></table>
 
-<p> Open CASCADE computes it, so the package must be built with it.
-</p>
 <p> <strong>See also: </strong>
   <a href="geom.Region.html#geom_Region_subtract">geom.Region.subtract</a>, 
   <a href="geom.Region.html#geom_Region_intersect">geom.Region.intersect</a>, 
@@ -911,8 +909,7 @@ Grow or shrink a region by a distance.
 </p>
 <p> The edges of the result are those of the region moved, straight edges
  straight and arcs exact; a spline&rsquo;s offset is a spline that Open CASCADE
- fits to it, to about a part in ten million.  It computes the offset, so
- the package must be built with it.
+ fits to it, to about a part in ten million.
 </p>
 <table><tr><td>&nbsp;</td><td><pre class="example"> ## A band 2 wide round a flange, G{1}; G{2} is the band 2 wide
  ## inside its bore, which grows into it too
@@ -1102,8 +1099,6 @@ Copies of a region, united.
  cell array of regions, largest first.  The region itself is among them
  only where a row of <var>D</var> is zero.  Copies that overlap become one
  region.
-</p>
-<p> Open CASCADE unites the copies, so the package must be built with it.
 </p>
 <p> <strong>See also: </strong>
   <a href="geom.Region.html#geom_Region_rectarray">geom.Region.rectarray</a>, 
