@@ -208,12 +208,12 @@ classdef Drawing
 
       en = numel (this.Entities);
       ew = 'entity';
-      if (en > 1)
+      if (en != 1)
         ew = 'entities';
       endif
       ln = numel (layers (this));
       lw = 'layer';
-      if (ln > 1)
+      if (ln != 1)
         lw = 'layers';
       endif
       printf ("  draw.Drawing '%s' with %d %s on %d %s\n", this.Name, ...

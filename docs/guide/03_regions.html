@@ -83,7 +83,7 @@ U{1}</code></pre>
 <pre class="code-out"><code>ans = 1
 ans =
 
-  geom.Region: an outline of 8 segments, 0 hole</code></pre>
+  geom.Region: an outline of 8 segments, 0 holes</code></pre>
 <p>Subtracting a bar that runs right across the plate cuts it in two, and each piece is a region of its own.</p>
 <pre class="code-in"><code>bar = geom.Region ([-10, 15; 70, 15; 70, 25; -10, 25]);
 P = subtract (plate, bar);
@@ -128,7 +128,7 @@ D = D.region (moved (C, [0, 50]));
 plot (D);</code></pre>
 <pre class="code-out"><code>F =
 
-  geom.Region: an outline of 16 segments, 0 hole</code></pre>
+  geom.Region: an outline of 16 segments, 0 holes</code></pre>
 <figure class="shot"><img src="img/03_regions-3.png" alt="Working with regions, picture 3"></figure>
 <h2>Hulls</h2>
 <p><code>hull</code> is the shape a band stretched round regions takes, with its straight sides truly tangent to the arcs. Two circles make the outline of a lever, and subtracting two smaller ones gives it its bores.</p>
@@ -138,7 +138,7 @@ L = subtract (L, circle (0, 5), circle (40, 2.5));
 plot (draw.Drawing ().hatch (L{1}));</code></pre>
 <pre class="code-out"><code>L =
 
-  geom.Region: an outline of 6 segments, 0 hole</code></pre>
+  geom.Region: an outline of 6 segments, 0 holes</code></pre>
 <figure class="shot"><img src="img/03_regions-4.png" alt="Working with regions, picture 4"></figure>
 <h2>Size, mirror and copies</h2>
 <p><code>resize</code> scales a region to a size. Evenly by default; with <code>'Uniform'</code> false each direction on its own, so a circle stretched becomes an exact ellipse. <code>mirror</code> reflects a region in a line, here the <i>y</i> axis.</p>

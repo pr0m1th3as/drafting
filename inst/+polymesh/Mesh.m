@@ -120,12 +120,12 @@ classdef Mesh
       endif
       vn = rows (this.Vertices);
       vw = 'vertex';
-      if (vn > 1)
+      if (vn != 1)
         vw = 'vertices';
       endif
       tn = rows (this.Faces);
       tw = 'triangle';
-      if (tn > 1)
+      if (tn != 1)
         tw = 'triangles';
       endif
       printf ("  polymesh.Mesh: %d %s, %d %s%s\n", vn, vw, tn, tw, c);

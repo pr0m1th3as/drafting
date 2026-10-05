@@ -123,17 +123,17 @@ classdef Shape
         endif
         sn = numsolids (this);
         sw = 'solid';
-        if (sn > 1)
+        if (sn != 1)
           sw = 'solids';
         endif
         fn = numfaces (this);
         fw = 'face';
-        if (fn > 1)
+        if (fn != 1)
           fw = 'faces';
         endif
         en = numedges (this);
         ew = 'edge';
-        if (en > 1)
+        if (en != 1)
           ew = 'edges';
         endif
         printf ("  solid.Shape: %d %s, %d %s, %d %s%s\n", sn, sw, fn, fw, ...

@@ -79,11 +79,11 @@
 T = geom.Polyline ([0, 0; 40, 0; 40, 25], 'Closed', true)</code></pre>
 <pre class="code-out"><code>L =
 
-  geom.Polyline: open, 3 vertices, 0 arc
+  geom.Polyline: open, 3 vertices, 0 arcs
 
 T =
 
-  geom.Polyline: closed, 3 vertices, 0 arc</code></pre>
+  geom.Polyline: closed, 3 vertices, 0 arcs</code></pre>
 <p>A third column is the bulge of the segment leaving each vertex: 0 for a straight segment, 1 for a half circle running anticlockwise, -1 for one running clockwise. In between, a bulge is the tangent of a quarter of the angle the arc turns through, so <code>tand (90 / 4)</code> is a quarter circle.</p>
 <pre class="code-in"><code>A = geom.Polyline ([50, 0, 0; 80, 0, tand(90 / 4); 90, 10, 0; 90, 25, 0])</code></pre>
 <pre class="code-out"><code>A =
@@ -99,7 +99,7 @@ C = chamfer (geom.Polyline ([50, 35; 90, 35; 90, 60; 50, 60], ...
 
 C =
 
-  geom.Polyline: closed, 8 vertices, 0 arc</code></pre>
+  geom.Polyline: closed, 8 vertices, 0 arcs</code></pre>
 <p>A <a href="../draw.Drawing.html"><code>draw.Drawing</code></a> holds them for plotting, each appended by its <code>polyline</code> method.</p>
 <pre class="code-in"><code>D = draw.Drawing ();
 D = D.polyline (L);
@@ -147,7 +147,7 @@ length (P)</code></pre>
 <pre class="code-out"><code>ans = 100
 P =
 
-  geom.Path: open, 5 segments, 2 arcs, 0 spline
+  geom.Path: open, 5 segments, 2 arcs, 0 splines
 
 ans = 91.416</code></pre>
 <p><code>join</code> puts paths and splines end to end, each starting where the last ended. <code>geom.Path.arc</code> is an arc through three points. A hairpin, up, over and down:</p>
@@ -156,7 +156,7 @@ ans = 91.416</code></pre>
           geom.Path ([20, 0, 50; 20, 0, 0]))</code></pre>
 <pre class="code-out"><code>H =
 
-  geom.Path: open, 3 segments, 1 arc, 0 spline</code></pre>
+  geom.Path: open, 3 segments, 1 arc, 0 splines</code></pre>
 <p>A path is seen best as what it is for. <a href="../solid.sweep.html"><code>solid.sweep</code></a> carries a small disc along it, which makes the bent route above a rod.</p>
 <pre class="code-in"><code>rod = solid.sweep (geom.Region ([-2, 0, 1; 2, 0, 1]), P);
 show (rod);</code></pre>

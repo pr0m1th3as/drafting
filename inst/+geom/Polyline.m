@@ -100,12 +100,12 @@ classdef Polyline
       endif
       vn = rows (this.Vertices);
       vw = 'vertex';
-      if (vn > 1)
+      if (vn != 1)
         vw = 'vertices';
       endif
       an = nnz (this.Vertices(:,3));
       aw = 'arc';
-      if (an > 1)
+      if (an != 1)
         aw = 'arcs';
       endif
       printf ("  geom.Polyline: %s, %d %s, %d %s\n", c, vn, vw, an, aw);

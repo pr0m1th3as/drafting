@@ -133,18 +133,18 @@ plate.3mf  88 vertices, 176 triangles</code></pre>
 C{1}.Holes{1}</code></pre>
 <pre class="code-out"><code>ans =
 
-  geom.Path: closed, 40 segments, 0 arc, 0 spline</code></pre>
+  geom.Path: closed, 40 segments, 0 arcs, 0 splines</code></pre>
 <p><code>fit</code> turns the segments back into lines and arcs where they follow them within a tolerance, a thousandth of the region's size by default. The bore is two arcs again, a circle, and the outline four straight sides.</p>
 <pre class="code-in"><code>R = fit (C{1});
 R.Holes{1}
 R.Outline</code></pre>
 <pre class="code-out"><code>ans =
 
-  geom.Path: closed, 2 segments, 2 arcs, 0 spline
+  geom.Path: closed, 2 segments, 2 arcs, 0 splines
 
 ans =
 
-  geom.Path: closed, 4 segments, 0 arc, 0 spline</code></pre>
+  geom.Path: closed, 4 segments, 0 arcs, 0 splines</code></pre>
 <h2>A mesh with a gap</h2>
 <p>A mesh from a scan or a careless export may have holes in its surface. Taking away one triangle of the bore makes one here. The cut through the gap no longer closes: <code>section</code> returns what it can make into regions, the plate without its bore, and the rest in a second output, as chains of points.</p>
 <pre class="code-in"><code>c = (T.Vertices(T.Faces(:,1),:) + T.Vertices(T.Faces(:,2),:) ...
@@ -159,7 +159,7 @@ gap = norm (OPEN{1}(1,:) - OPEN{1}(end,:))</code></pre>
 <pre class="code-out"><code>ans = 0
 ans =
 
-  geom.Region: an outline of 4 segments, 0 hole
+  geom.Region: an outline of 4 segments, 0 holes
 
 ans = 1
 gap = 0.6277</code></pre>
@@ -169,7 +169,7 @@ R = fit (C{1});
 R.Holes{1}</code></pre>
 <pre class="code-out"><code>ans =
 
-  geom.Path: closed, 2 segments, 2 arcs, 0 spline</code></pre>
+  geom.Path: closed, 2 segments, 2 arcs, 0 splines</code></pre>
 <h2>Meshes in booleans</h2>
 <p><a href="../solid.polyhedron.html"><code>solid.polyhedron</code></a> makes a solid of a closed mesh, so a mesh takes part in booleans like any other shape. A hole through one of the blobs:</p>
 <pre class="code-in"><code>P = solid.polyhedron (B);

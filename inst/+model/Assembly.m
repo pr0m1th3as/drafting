@@ -91,7 +91,7 @@ classdef Assembly
 
       pn = numparts (this);
       pw = 'part';
-      if (pn > 1)
+      if (pn != 1)
         pw = 'parts';
       endif
       printf ("  model.Assembly '%s': %d %s, %d placed\n", this.Name, pn, ...
