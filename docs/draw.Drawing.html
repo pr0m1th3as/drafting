@@ -47,11 +47,63 @@
             window.location.pathname + window.location.search);
         }
       });
+      // Let the browser's find-in-page reach the text inside a collapsed
+      // panel.  The attribute "hidden=until-found" is what makes content
+      // searchable and revealable; the style block below clears the
+      // "display: none" that would otherwise stop the attribute meaning
+      // anything, a box that is not generated having nothing to reveal.  Set
+      // it only where it is understood, which "content-visibility" is no test
+      // for, Firefox having shipped the two apart.  Where it is not, the panel
+      // keeps the user agent's plain [hidden] and the page behaves as before.
+      window.addEventListener ("DOMContentLoaded", () => {
+        if (! ("onbeforematch" in document.body)) { return; }
+        document.documentElement.classList.add ("until-found");
+        let panels = document.querySelectorAll (
+          ".collapse:not(.show):not(.navbar-collapse)");
+        for (let el of panels) {
+          el.setAttribute ("hidden", "until-found");
+          // Fired on a find-in-page hit, before the browser drops the
+          // attribute and scrolls to it.  Bootstrap keeps a panel's state in
+          // its class list, so adding the class here opens the panel in the
+          // same frame and leaves the button shutting it correctly afterwards.
+          // Bootstrap's own show () would animate against that scroll, and the
+          // attribute once dropped, "display: none" would take the panel back
+          // part way through.
+          el.addEventListener ("beforematch", () => {
+            el.classList.add ("show");
+            for (let b of document.querySelectorAll ("[data-bs-target]")) {
+              if (b.getAttribute ("data-bs-target") === "#" + el.id) {
+                b.setAttribute ("aria-expanded", "true");
+              }
+            }
+          });
+        }
+        // Drop the attribute before Bootstrap measures the panel it is opening,
+        // which it does after firing this; a revealable one measures nothing.
+        document.addEventListener ("show.bs.collapse", (e) => {
+          e.target.removeAttribute ("hidden");
+        });
+        // Restore it once the panel is shut, rather than while it is shutting.
+        document.addEventListener ("hidden.bs.collapse", (e) => {
+          if (! e.target.classList.contains ("navbar-collapse")) {
+            e.target.setAttribute ("hidden", "until-found");
+          }
+        });
+      });
     </script>
     <style>
-    h5.fs {
+    .fs {
     margin-top: -0.15em;
     margin-bottom: -0.15em;
+    }
+    .fs-last {
+    margin-bottom: calc(1rem - 0.15em);
+    }
+    p.description {
+    font-family: Consolas, "Courier New", monospace;
+    }
+    p.description code {
+    font-size: inherit;
     }
     h6:hover {
       color: gray;
@@ -90,6 +142,19 @@
     }
     [id^="togList"]:checked ~ .list{
       display:block;                        /* SHOW LIST (IF CHECKED) */
+    }
+    /* Bootstrap hides a collapsed panel with "display: none", which generates
+       no box, so the "content-visibility: hidden" the user agent gives
+       "hidden=until-found" could never apply and the text would stay beyond
+       find-in-page.  Clear that one declaration, and only where the script
+       above has found the attribute to be understood: an attribute selector
+       matches a value the browser does not understand, so an ungated rule
+       would leave every panel of an older browser standing open.  The
+       "!important" is required rather than decoration: the reboot carries
+       "[hidden] {display: none !important}", which the attribute itself brings
+       into play, and only another "!important" can outrank it. */
+    html.until-found .collapse[hidden="until-found"]:not(.show) {
+      display: block !important;
     }
     </style>
   </head>
@@ -141,6 +206,23 @@
 			<div class="row">
 				<input id="togList1" type="checkbox">
 				<label for="togList1">
+					<span><h6>Polylines and regions</h6></span>
+					<span><h6>Polylines and regions</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="geom.Polyline.html" class="text-decoration-none font-monospace"><small>geom.Polyline</small></a></li>
+					<li><a href="geom.Spline.html" class="text-decoration-none font-monospace"><small>geom.Spline</small></a></li>
+					<li><a href="geom.Region.html" class="text-decoration-none font-monospace"><small>geom.Region</small></a></li>
+					<li><a href="geom.Path.html" class="text-decoration-none font-monospace"><small>geom.Path</small></a></li>
+					<li><a href="geom.UCS.html" class="text-decoration-none font-monospace"><small>geom.UCS</small></a></li>
+					<li><a href="geom.text.html" class="text-decoration-none font-monospace"><small>geom.text</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList2" type="checkbox">
+				<label for="togList2">
 					<span><h6>Geometry primitives</h6></span>
 					<span><h6>Geometry primitives</h6></span>
 				</label>
@@ -159,8 +241,8 @@
 				</div>
 			</div>
 			<div class="row">
-				<input id="togList2" type="checkbox">
-				<label for="togList2">
+				<input id="togList3" type="checkbox">
+				<label for="togList3">
 					<span><h6>Curve geometry</h6></span>
 					<span><h6>Curve geometry</h6></span>
 				</label>
@@ -177,8 +259,8 @@
 				</div>
 			</div>
 			<div class="row">
-				<input id="togList3" type="checkbox">
-				<label for="togList3">
+				<input id="togList4" type="checkbox">
+				<label for="togList4">
 					<span><h6>Construction geometry</h6></span>
 					<span><h6>Construction geometry</h6></span>
 				</label>
@@ -193,33 +275,35 @@
 				</div>
 			</div>
 			<div class="row">
-				<input id="togList4" type="checkbox">
-				<label for="togList4">
-					<span><h6>DXF input and output</h6></span>
-					<span><h6>DXF input and output</h6></span>
-				</label>
-				<div class="list">
-				<ul style="list-style-type: none; padding-left: 20px;">
-					<li><a href="dxf.read.html" class="text-decoration-none font-monospace"><small>dxf.read</small></a></li>
-					<li><a href="dxf.write.html" class="text-decoration-none font-monospace"><small>dxf.write</small></a></li>
-				</ul>
-				</div>
-			</div>
-			<div class="row">
 				<input id="togList5" type="checkbox">
 				<label for="togList5">
-					<span><h6>STL output</h6></span>
-					<span><h6>STL output</h6></span>
+					<span><h6>DXF input and output</h6></span>
+					<span><h6>DXF input and output</h6></span>
 				</label>
 				<div class="list">
 				<ul style="list-style-type: none; padding-left: 20px;">
-					<li><a href="stl.write.html" class="text-decoration-none font-monospace"><small>stl.write</small></a></li>
+					<li><a href="geom.read.html" class="text-decoration-none font-monospace"><small>geom.read</small></a></li>
+					<li><a href="geom.write.html" class="text-decoration-none font-monospace"><small>geom.write</small></a></li>
+					<li><a href="draw.read.html" class="text-decoration-none font-monospace"><small>draw.read</small></a></li>
 				</ul>
 				</div>
 			</div>
 			<div class="row">
 				<input id="togList6" type="checkbox">
 				<label for="togList6">
+					<span><h6>Meshes</h6></span>
+					<span><h6>Meshes</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="polymesh.Mesh.html" class="text-decoration-none font-monospace"><small>polymesh.Mesh</small></a></li>
+					<li><a href="polymesh.read.html" class="text-decoration-none font-monospace"><small>polymesh.read</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList7" type="checkbox">
+				<label for="togList7">
 					<span><h6>Sheet composition</h6></span>
 					<span><h6>Sheet composition</h6></span>
 				</label>
@@ -232,8 +316,8 @@
 				</div>
 			</div>
 			<div class="row">
-				<input id="togList7" type="checkbox">
-				<label for="togList7">
+				<input id="togList8" type="checkbox">
+				<label for="togList8">
 					<span><h6>Line types and colours</h6></span>
 					<span><h6>Line types and colours</h6></span>
 				</label>
@@ -245,15 +329,54 @@
 				</div>
 			</div>
 			<div class="row">
-				<input id="togList8" type="checkbox" checked>
-				<label for="togList8">
+				<input id="togList9" type="checkbox" checked>
+				<label for="togList9">
 					<span><h6>Drawing model</h6></span>
 					<span><h6>Drawing model</h6></span>
 				</label>
 				<div class="list">
 				<ul style="list-style-type: none; padding-left: 20px;">
 					<li><a href="draw.Drawing.html" class="text-decoration-none font-monospace fw-bolder"><small>draw.Drawing</small></a></li>
-					<li><a href="draw.fromentities.html" class="text-decoration-none font-monospace"><small>draw.fromentities</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList10" type="checkbox">
+				<label for="togList10">
+					<span><h6>Solid modelling</h6></span>
+					<span><h6>Solid modelling</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="solid.Shape.html" class="text-decoration-none font-monospace"><small>solid.Shape</small></a></li>
+					<li><a href="solid.box.html" class="text-decoration-none font-monospace"><small>solid.box</small></a></li>
+					<li><a href="solid.wedge.html" class="text-decoration-none font-monospace"><small>solid.wedge</small></a></li>
+					<li><a href="solid.cylinder.html" class="text-decoration-none font-monospace"><small>solid.cylinder</small></a></li>
+					<li><a href="solid.cone.html" class="text-decoration-none font-monospace"><small>solid.cone</small></a></li>
+					<li><a href="solid.sphere.html" class="text-decoration-none font-monospace"><small>solid.sphere</small></a></li>
+					<li><a href="solid.ellipsoid.html" class="text-decoration-none font-monospace"><small>solid.ellipsoid</small></a></li>
+					<li><a href="solid.torus.html" class="text-decoration-none font-monospace"><small>solid.torus</small></a></li>
+					<li><a href="solid.polyhedron.html" class="text-decoration-none font-monospace"><small>solid.polyhedron</small></a></li>
+					<li><a href="solid.extrude.html" class="text-decoration-none font-monospace"><small>solid.extrude</small></a></li>
+					<li><a href="solid.revolve.html" class="text-decoration-none font-monospace"><small>solid.revolve</small></a></li>
+					<li><a href="solid.loft.html" class="text-decoration-none font-monospace"><small>solid.loft</small></a></li>
+					<li><a href="solid.sweep.html" class="text-decoration-none font-monospace"><small>solid.sweep</small></a></li>
+					<li><a href="solid.helix.html" class="text-decoration-none font-monospace"><small>solid.helix</small></a></li>
+					<li><a href="solid.read.html" class="text-decoration-none font-monospace"><small>solid.read</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList11" type="checkbox">
+				<label for="togList11">
+					<span><h6>Assemblies and viewing</h6></span>
+					<span><h6>Assemblies and viewing</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="model.Assembly.html" class="text-decoration-none font-monospace"><small>model.Assembly</small></a></li>
+					<li><a href="model.read.html" class="text-decoration-none font-monospace"><small>model.read</small></a></li>
+					<li><a href="model.Viewer.html" class="text-decoration-none font-monospace"><small>model.Viewer</small></a></li>
 				</ul>
 				</div>
 			</div>
@@ -269,7 +392,7 @@
               </div>
             </div>
             <div class="card-body">
-<dl><code><h5 class="description">drafting: draw.Drawing</h5></code></dl>
+<p class="h5 description mb-3"><code>drafting: draw.Drawing</code></p>
 <p> A two-dimensional drawing in model space.
 </p>
 <div class="ms-5">
@@ -285,40 +408,47 @@
 </p>
 <table><tr><td>&nbsp;</td><td><pre class="example"> D = draw.Drawing ('plate');
  D.Layer = 'outline';
- D = D.polyline ([0, 0; 160, 0; 160, 180; 0, 180], true);
+ D = D.polyline (geom.Polyline ([0, 0; 160, 0; 160, 180; 0, 180], ...
+                                'Closed', true));
  D = D.circle ([80, 90], 25).text ([0, -20], 'PLATE', 3.5);
 </pre></td></tr></table>
 
-<p> New entities take the layer, line type and colour that are current when
- they are appended, exactly as a CAD application draws on its current layer
- with its current pen.  Set <code>Layer</code>, <code>Linetype</code> or <code>Colour</code>
- first and then draw; no append method takes any of the three as an argument.
- Each governs what follows it and never what came before.
+<p> New entities take the layer, line type, colour and line weight that are
+ current when they are appended, exactly as a CAD application draws on its
+ current layer with its current pen.  Set <code>Layer</code>, <code>Linetype</code>,
+ <code>Colour</code> or <code>LineWeight</code> first and then draw; no append method
+ takes any of them as an argument.  Each governs what follows it and never
+ what came before.
+</p>
+<p> The drawing keeps a layer table, <code>Layers</code>, as a CAD drawing does:
+ each layer has a colour, a line type, a line weight, and whether it is
+ visible and printed.  Line type, colour and line weight are
+ <code>'byLayer'</code> unless set otherwise, so an entity takes them from its
+ layer, and with the layers defined by <code>layer</code>, choosing the current
+ layer is the one step that sets the pen.  Every output resolves them the
+ same way, and a DXF file carries the table itself.
 </p>
 <p> Properties rather than arguments is what lets a caller state a drawing
  convention once and then draw against it, which is how a draughtsman works
  and how CAD is built.  It is also why a dimension&rsquo;s exploded parts inherit
- all three: the rule has no exceptions.
+ the pen: the rule has no exceptions.
 </p>
-<p> Dimensions are stored <strong>semantically</strong> &mdash; the two measured points, a
- perpendicular offset and a direction &mdash; and are turned into lines,
+<p> Dimensions are stored <strong>semantically</strong>, as the two measured points, a
+ perpendicular offset and a direction, and are turned into lines,
  arrowheads and text by whichever backend renders them.  Nothing about how a
  dimension looks is decided here, which is what keeps a dimension truthful
  when the geometry it measures moves.
 </p>
 <p> A drawing reports what it holds through <code>numentities</code>, <code>layers</code>
- and <code>bbox</code>, and hands its contents to a backend through
- <code>entities</code>, which lowers them to the primitives a file can carry.  That
- lowered list is what <code>plot</code>, <code>print</code>, <code>tikz</code> and
- <code>dxf.write</code> all consume, so a figure shows the entities the file will
- contain rather than a more flattering rendering of them.
+ and <code>bbox</code>.  <code>plot</code>, <code>print</code> and <code>tikz</code> render it,
+ and <code>write</code> saves it as a DXF file.
 </p>
 <p> <strong>See also: </strong>
-  <a href="dxf.write.html">dxf.write</a>, 
+  <a href="draw.Drawing.write.html">draw.Drawing.write</a>, 
   <a href="geom.bbox.html">geom.bbox</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/tree/main/inst/+draw/Drawing.m">draw.Drawing</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/0f84b98/inst/+draw/Drawing.m">draw.Drawing</a>
 </p>
 </div>
         <p class="lead my-3">The <code>draw.Drawing</code> class contains the following properties:</p>
@@ -326,8 +456,8 @@
         <div class="container-xl my-1">
           <div class="row">
             <button class="btn btn-light btn-sm w-100 text-start" type="button"
-              data-bs-toggle="collapse" data-bs-target="#collapseProperty1"
-              aria-expanded="false" aria-controls="collapseProperty1">
+              data-bs-toggle="collapse" data-bs-target="#draw_Drawing_Name"
+              aria-expanded="false" aria-controls="draw_Drawing_Name">
               <div class="row align-items-center">
                 <div class="col-4">
                   <h4 class="d-inline-block mr-4">
@@ -339,9 +469,8 @@ Drawing name
                 </div>
               </div>
           </div>
-          <div class="collapse multi-collapse" id="collapseProperty1">
+          <div class="collapse multi-collapse" id="draw_Drawing_Name">
             <div class="border-bottom py-2">
-
 <p> </p>
 <p> The name of the drawing, as a character vector.  It is carried into the
  output wherever the format has somewhere to put it: a DXF file records
@@ -366,7 +495,8 @@ Drawing name
             <div class="card-body">
                 <p>The name travels with the drawing into whatever the output can hold: a DXF file records it, a TikZ picture writes it into a comment.  It never affects the geometry.</p>
                 <pre style="overflow-x: auto; white-space: pre; padding: 0.6rem 0.8rem; margin: 0.3rem 0; border: 1px solid #cfe0e6; border-left: 4px solid #4a90a4; border-radius: 4px; background-color: #eef5f8;"> D = draw.Drawing ('bracket');
- D = D.polyline ([0, 0; 60, 0; 60, 40; 0, 40], true);
+ D = D.polyline (geom.Polyline ([0, 0; 60, 0; 60, 40; 0, 40], ...
+                                'Closed', true));
  D.Name</pre>
                 <pre style="overflow-x: auto; white-space: pre; padding: 0.6rem 0.8rem; margin: 0.3rem 0 0.8rem 0; border: 1px solid #e2e2e2; border-left: 4px solid #b7b7b7; border-radius: 4px; background-color: #fafafa;">ans = bracket</pre>
                 <p>Renaming an existing drawing is an ordinary assignment, because the name is a property and not something fixed at construction.</p>
@@ -386,8 +516,8 @@ Drawing name
         <div class="container-xl my-1">
           <div class="row">
             <button class="btn btn-light btn-sm w-100 text-start" type="button"
-              data-bs-toggle="collapse" data-bs-target="#collapseProperty2"
-              aria-expanded="false" aria-controls="collapseProperty2">
+              data-bs-toggle="collapse" data-bs-target="#draw_Drawing_Layer"
+              aria-expanded="false" aria-controls="draw_Drawing_Layer">
               <div class="row align-items-center">
                 <div class="col-4">
                   <h4 class="d-inline-block mr-4">
@@ -399,9 +529,8 @@ The current layer
                 </div>
               </div>
           </div>
-          <div class="collapse multi-collapse" id="collapseProperty2">
+          <div class="collapse multi-collapse" id="draw_Drawing_Layer">
             <div class="border-bottom py-2">
-
 <p> </p>
 <p> The layer that entities are placed on as they are appended, as a
  character vector.  It defaults to <code>'0'</code>, the layer every CAD
@@ -429,28 +558,42 @@ The current layer
           </div>
           <div class="collapse" id="draw_Drawing_Layer-example1">
             <div class="card-body">
-                <p>Layer, line type and colour are properties, not arguments: they apply to what is appended after they are set and never to what came before.  That is how a draughtsman works, and how CAD is built.</p>
+                <p>The current layer is where entities go as they are appended.  A layer carries a colour, a line type and a line weight, and an entity takes them from its layer unless told otherwise, so with the layers defined, changing the current layer is the one step that changes the pen.</p>
                 <pre style="overflow-x: auto; white-space: pre; padding: 0.6rem 0.8rem; margin: 0.3rem 0; border: 1px solid #cfe0e6; border-left: 4px solid #4a90a4; border-radius: 4px; background-color: #eef5f8;"> D = draw.Drawing ('shaft');
+ D = D.layer ('BODY', 'LineWeight', 0.5);
+ D = D.layer ('HIDDEN', 'Linetype', 'HIDDEN', 'LineWeight', 0.25);
+ D = D.layer ('AXES', 'Linetype', 'CENTER', 'Colour', 'red', ...
+              'LineWeight', 0.25);
  D.Layer = 'BODY';
- D = D.polyline ([0, -15; 70, -15; 70, 15; 0, 15], true);
+ D = D.polyline (geom.Polyline ([0, -15; 70, -15; 70, 15; 0, 15], ...
+                                'Closed', true));
  D.Layer = 'HIDDEN';
- D.Linetype = 'HIDDEN';
  D = D.line ([25, -15], [25, 15]).line ([50, -15], [50, 15]);
  D.Layer = 'AXES';
- D.Linetype = 'CENTER';
- D.Colour = 'red';
  D = D.line ([-6, 0], [76, 0]);
  D.layers ()</pre>
                 <pre style="overflow-x: auto; white-space: pre; padding: 0.6rem 0.8rem; margin: 0.3rem 0 0.8rem 0; border: 1px solid #e2e2e2; border-left: 4px solid #b7b7b7; border-radius: 4px; background-color: #fafafa;">ans =
 {
-  [1,1] = AXES
-  [1,2] = BODY
-  [1,3] = HIDDEN
+  [1,1] = 0
+  [1,2] = AXES
+  [1,3] = BODY
+  [1,4] = HIDDEN
 }</pre>
                 <pre style="overflow-x: auto; white-space: pre; padding: 0.6rem 0.8rem; margin: 0.3rem 0; border: 1px solid #cfe0e6; border-left: 4px solid #4a90a4; border-radius: 4px; background-color: #eef5f8;"> plot (D);
- title ('three layers, each with its own line type');</pre>
+ title ('three layers, each with its own line type and weight');</pre>
+                <p><code>layer</code> also changes a layer already there, and everything drawn on it follows: the axes turn blue without touching a single entity.  A layer that is not plotted is drawn on screen and left off paper.</p>
+                <pre style="overflow-x: auto; white-space: pre; padding: 0.6rem 0.8rem; margin: 0.3rem 0; border: 1px solid #cfe0e6; border-left: 4px solid #4a90a4; border-radius: 4px; background-color: #eef5f8;"> D = D.layer ('AXES', 'Colour', 'blue');
+ D = D.layer ('NOTES', 'Plot', false);
+ D.Layer = 'NOTES';
+ D = D.text ([0, 22], 'check the bore spacing', 3.5);</pre>
                 <div class="text-center">
                   <img src="assets/draw.Drawing.Layer-101.png" class="rounded img-thumbnail" width= "70%" alt="plotted figure">
+                </div><p></p>
+                <pre style="overflow-x: auto; white-space: pre; padding: 0.6rem 0.8rem; margin: 0.3rem 0; border: 1px solid #cfe0e6; border-left: 4px solid #4a90a4; border-radius: 4px; background-color: #eef5f8;"> figure ();
+ plot (D);
+ title ('the axes restyled, and a note that will not print');</pre>
+                <div class="text-center">
+                  <img src="assets/draw.Drawing.Layer-102.png" class="rounded img-thumbnail" width= "70%" alt="plotted figure">
                 </div><p></p>
 
             </div>
@@ -465,8 +608,8 @@ The current layer
         <div class="container-xl my-1">
           <div class="row">
             <button class="btn btn-light btn-sm w-100 text-start" type="button"
-              data-bs-toggle="collapse" data-bs-target="#collapseProperty3"
-              aria-expanded="false" aria-controls="collapseProperty3">
+              data-bs-toggle="collapse" data-bs-target="#draw_Drawing_Linetype"
+              aria-expanded="false" aria-controls="draw_Drawing_Linetype">
               <div class="row align-items-center">
                 <div class="col-4">
                   <h4 class="d-inline-block mr-4">
@@ -478,13 +621,15 @@ The current line type
                 </div>
               </div>
           </div>
-          <div class="collapse multi-collapse" id="collapseProperty3">
+          <div class="collapse multi-collapse" id="draw_Drawing_Linetype">
             <div class="border-bottom py-2">
-
 <p> </p>
 <p> The line type that entities are drawn with as they are appended, named
  as a character vector: one of CONTINUOUS, HIDDEN, CENTER, PHANTOM,
- DASHED, DASHDOT or DOT.  It defaults to <code>'CONTINUOUS'</code>.
+ DASHED, DASHDOT or DOT, or any name a CAD program holds.  It defaults
+ to <code>'byLayer'</code>, which takes the line type of the entity&rsquo;s layer
+ from <code>Layers</code>; <code>'byBlock'</code> takes that of the insert placing
+ the entity when it is part of a block.
 </p>
 <p> It governs what is appended after it is set, never what came before.
  The dash lengths themselves are model dimensions scaled by each
@@ -534,8 +679,8 @@ The current line type
         <div class="container-xl my-1">
           <div class="row">
             <button class="btn btn-light btn-sm w-100 text-start" type="button"
-              data-bs-toggle="collapse" data-bs-target="#collapseProperty4"
-              aria-expanded="false" aria-controls="collapseProperty4">
+              data-bs-toggle="collapse" data-bs-target="#draw_Drawing_Colour"
+              aria-expanded="false" aria-controls="draw_Drawing_Colour">
               <div class="row align-items-center">
                 <div class="col-4">
                   <h4 class="d-inline-block mr-4">
@@ -547,15 +692,15 @@ The current colour
                 </div>
               </div>
           </div>
-          <div class="collapse multi-collapse" id="collapseProperty4">
+          <div class="collapse multi-collapse" id="draw_Drawing_Colour">
             <div class="border-bottom py-2">
-
 <p> </p>
 <p> The colour that entities are drawn in as they are appended, as an
  AutoCAD colour index from 0 to 256 or as a colour name accepted by
- <code>draw.colour</code>.  It defaults to 256, which is <code>'byLayer'</code> &mdash;
- the entity takes whatever colour its layer carries, which is how a CAD
- drawing is normally organised.
+ <code>draw.colour</code>.  It defaults to 256, which is <code>'byLayer'</code>:
+ the entity takes the colour of its layer from <code>Layers</code>, which is
+ how a CAD drawing is normally organised.  0 is <code>'byBlock'</code>, the
+ colour of the insert placing the entity when it is part of a block.
 </p>
 <p> It governs what is appended after it is set, never what came before.
 </p>
@@ -601,6 +746,89 @@ The current colour
           </div>
         </div>
 
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#draw_Drawing_LineWeight"
+              aria-expanded="false" aria-controls="draw_Drawing_LineWeight">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>LineWeight</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+The current line weight
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="draw_Drawing_LineWeight">
+            <div class="border-bottom py-2">
+<p> </p>
+<p> The width entities are drawn with as they are appended, in millimetres
+ of paper, or <code>'byLayer'</code>, the default, to take the weight of the
+ entity&rsquo;s layer from <code>Layers</code>, or <code>'byBlock'</code>, to take that of
+ the insert placing the entity when it is part of a block.  A weight is
+ a width on paper and holds at every scale, as the pens of ISO 128 do.
+</p>
+<p> It governs what is appended after it is set, never what came before.
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#draw_Drawing_Layers"
+              aria-expanded="false" aria-controls="draw_Drawing_Layers">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>Layers</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+The layer table
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="draw_Drawing_Layers">
+            <div class="border-bottom py-2">
+<p> </p>
+<p> A struct array with one element for each layer of the drawing and the
+ fields <code>name</code>, <code>colour</code>, <code>linetype</code>, <code>lineweight</code>,
+ <code>visible</code> and <code>plot</code>.  An entity drawn <code>'byLayer'</code> takes
+ its colour, line type or line weight from its layer here.
+</p>
+<dl compact="compact">
+<dt> <code>colour</code></dt>
+<dd> An AutoCAD colour index from 1 to 255.</dd>
+<dt> <code>linetype</code></dt>
+<dd> A line type name.</dd>
+<dt> <code>lineweight</code></dt>
+<dd> The width in millimetres of paper, or empty for the output&rsquo;s own pen.</dd>
+<dt> <code>visible</code></dt>
+<dd> False keeps the layer and what is on it, writes them to a file, and
+ draws none of it.</dd>
+<dt> <code>plot</code></dt>
+<dd> False draws the layer on screen and leaves it off paper.</dd>
+</dl>
+
+<p> Layer <code>'0'</code> is always there, and so is every layer an entity is
+ on: making a layer current adds it, with colour 7, line type
+ CONTINUOUS, the output&rsquo;s own pen, visible and printed.  Names are
+ compared without regard to case, as CAD programs compare them.
+ <code>layer</code> sets the properties of a layer.
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
         <p class="lead my-3">The <code>draw.Drawing</code> class offers the following public methods:</p>
 
         <div class="container-xl my-1">
@@ -632,7 +860,11 @@ The current colour
                       </tr>
                       <tr>
                         <td><b><code><a href="draw.Drawing.layers.html">layers</a></code></b></td>
-                        <td>Return the layers the drawing actually uses, as a sorted cellstr.</td>
+                        <td>Return the names of the layers of the drawing, as a sorted cellstr.</td>
+                      </tr>
+                      <tr>
+                        <td><b><code><a href="draw.Drawing.layer.html">layer</a></code></b></td>
+                        <td>Define a layer, or set its properties.</td>
                       </tr>
                       <tr>
                         <td><b><code><a href="draw.Drawing.bbox.html">bbox</a></code></b></td>
@@ -673,7 +905,19 @@ millimetres.
                       </tr>
                       <tr>
                         <td><b><code><a href="draw.Drawing.polyline.html">polyline</a></code></b></td>
-                        <td>Append a polyline through the vertices given as rows of P.</td>
+                        <td>Append a polyline.</td>
+                      </tr>
+                      <tr>
+                        <td><b><code><a href="draw.Drawing.spline.html">spline</a></code></b></td>
+                        <td>Append a spline.</td>
+                      </tr>
+                      <tr>
+                        <td><b><code><a href="draw.Drawing.path.html">path</a></code></b></td>
+                        <td>Append a path.</td>
+                      </tr>
+                      <tr>
+                        <td><b><code><a href="draw.Drawing.region.html">region</a></code></b></td>
+                        <td>Append a region, drawn as its outline and holes.</td>
                       </tr>
                       <tr>
                         <td><b><code><a href="draw.Drawing.arc.html">arc</a></code></b></td>
@@ -693,7 +937,7 @@ millimetres.
                       </tr>
                       <tr>
                         <td><b><code><a href="draw.Drawing.hatch.html">hatch</a></code></b></td>
-                        <td>Append a hatched region bounded by the closed polygon P.</td>
+                        <td>Append a hatched region.</td>
                       </tr>
                     </tbody>
                   </table>
@@ -732,6 +976,10 @@ millimetres.
                       <tr>
                         <td><b><code><a href="draw.Drawing.angdim.html">angdim</a></code></b></td>
                         <td>Append an angular dimension at a vertex.</td>
+                      </tr>
+                      <tr>
+                        <td><b><code><a href="draw.Drawing.ordinate.html">ordinate</a></code></b></td>
+                        <td>Append an ordinate dimension, the distance of a point from a datum.</td>
                       </tr>
                       <tr>
                         <td><b><code><a href="draw.Drawing.centremark.html">centremark</a></code></b></td>
@@ -806,12 +1054,6 @@ millimetres.
                   <table class="table table-striped">
                     <tbody>
                       <tr>
-                        <td><b><code><a href="draw.Drawing.entities.html">entities</a></code></b></td>
-                        <td>Lower a drawing to the flat entity struct array that ‘dxf.write’ takes.
-
-  </td>
-                      </tr>
-                      <tr>
                         <td><b><code><a href="draw.Drawing.plot.html">plot</a></code></b></td>
                         <td>Draw a ‘draw.Drawing’ into a figure, to look at it.
 
@@ -824,6 +1066,10 @@ millimetres.
                       <tr>
                         <td><b><code><a href="draw.Drawing.tikz.html">tikz</a></code></b></td>
                         <td>Render a drawing as a TikZ picture for inclusion in the LaTeX report.</td>
+                      </tr>
+                      <tr>
+                        <td><b><code><a href="draw.Drawing.write.html">write</a></code></b></td>
+                        <td>Write a drawing to a DXF file.</td>
                       </tr>
                     </tbody>
                   </table>

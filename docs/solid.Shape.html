@@ -1,0 +1,2095 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Geometry, CAD Input/Output and Technical Drawing: solid.Shape</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" integrity="sha512-1ycn6IcaQQ40/MKBW2W4Rhis/DbILU74C1vSrLJxCq57o941Ym01SwNsOMqvEBFlcgUa6xLiPY/NS5R+E6ztJQ==" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/css/bootstrap.min.css" integrity="sha384-KyZXEAg3QhqLMpG8r+8fhAXLRk2vvoC2f3B09zVXn8CA5QIVfZOJ3BCsw2P0p/We" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-U1DAWAznBHeqEIlVSCgzq+c9gqGAJn5c/t99JyeKa9xxaYpSvHU5awsuZVVFIhvj" crossorigin="anonymous"></script>
+    <script type="text/javascript" async
+      src="https://cdn.jsdelivr.net/npm/mathjax@2/MathJax.js?config=TeX-AMS_CHTML">
+    </script>
+    <script type="text/javascript">
+      window.addEventListener("load", () => {
+        for (let i of document.querySelectorAll(".collapse ul")) {
+          let tog = document.createElement("div");
+          tog.innerHTML = i.previousSibling.textContent;
+          tog.className = "toggle";
+          tog.onclick = () => tog.classList.toggle("show");
+          i.parentElement.removeChild(i.previousSibling);
+          i.parentElement.insertBefore(tog, i);
+        }
+      });
+      // Open the collapsible demo an "#example" link points to, then scroll to
+      // it.  getElementById (not querySelector) matches ids that contain a dot,
+      // e.g. "Class.method-example1".
+      function openHashTarget () {
+        if (! window.location.hash) { return; }
+        let el = document.getElementById (
+          decodeURIComponent (window.location.hash.slice (1)));
+        if (! el) { return; }
+        if (el.classList.contains ("collapse") &&
+            ! el.classList.contains ("show")) {
+          bootstrap.Collapse.getOrCreateInstance (el).show ();
+        }
+        el.scrollIntoView ();
+      }
+      window.addEventListener ("DOMContentLoaded", openHashTarget);
+      window.addEventListener ("hashchange", openHashTarget);
+      // When the collapsible named by the current URL fragment is collapsed,
+      // drop the fragment (replaceState: no scroll, no history entry).  Otherwise
+      // the fragment would still equal this id, so clicking the same #example
+      // link again fires no "hashchange" and the example would not re-expand.
+      document.addEventListener ("hide.bs.collapse", (e) => {
+        if (e.target.id && window.location.hash === "#" + e.target.id) {
+          history.replaceState (null, "",
+            window.location.pathname + window.location.search);
+        }
+      });
+      // Let the browser's find-in-page reach the text inside a collapsed
+      // panel.  The attribute "hidden=until-found" is what makes content
+      // searchable and revealable; the style block below clears the
+      // "display: none" that would otherwise stop the attribute meaning
+      // anything, a box that is not generated having nothing to reveal.  Set
+      // it only where it is understood, which "content-visibility" is no test
+      // for, Firefox having shipped the two apart.  Where it is not, the panel
+      // keeps the user agent's plain [hidden] and the page behaves as before.
+      window.addEventListener ("DOMContentLoaded", () => {
+        if (! ("onbeforematch" in document.body)) { return; }
+        document.documentElement.classList.add ("until-found");
+        let panels = document.querySelectorAll (
+          ".collapse:not(.show):not(.navbar-collapse)");
+        for (let el of panels) {
+          el.setAttribute ("hidden", "until-found");
+          // Fired on a find-in-page hit, before the browser drops the
+          // attribute and scrolls to it.  Bootstrap keeps a panel's state in
+          // its class list, so adding the class here opens the panel in the
+          // same frame and leaves the button shutting it correctly afterwards.
+          // Bootstrap's own show () would animate against that scroll, and the
+          // attribute once dropped, "display: none" would take the panel back
+          // part way through.
+          el.addEventListener ("beforematch", () => {
+            el.classList.add ("show");
+            for (let b of document.querySelectorAll ("[data-bs-target]")) {
+              if (b.getAttribute ("data-bs-target") === "#" + el.id) {
+                b.setAttribute ("aria-expanded", "true");
+              }
+            }
+          });
+        }
+        // Drop the attribute before Bootstrap measures the panel it is opening,
+        // which it does after firing this; a revealable one measures nothing.
+        document.addEventListener ("show.bs.collapse", (e) => {
+          e.target.removeAttribute ("hidden");
+        });
+        // Restore it once the panel is shut, rather than while it is shutting.
+        document.addEventListener ("hidden.bs.collapse", (e) => {
+          if (! e.target.classList.contains ("navbar-collapse")) {
+            e.target.setAttribute ("hidden", "until-found");
+          }
+        });
+      });
+    </script>
+    <style>
+    .fs {
+    margin-top: -0.15em;
+    margin-bottom: -0.15em;
+    }
+    .fs-last {
+    margin-bottom: calc(1rem - 0.15em);
+    }
+    p.description {
+    font-family: Consolas, "Courier New", monospace;
+    }
+    p.description code {
+    font-size: inherit;
+    }
+    h6:hover {
+      color: gray;
+    }
+    code {
+    font-family: Consolas, "Courier New", monospace;
+    border-radius: 0.3em;
+    white-space: nowrap;
+    color: gray;
+    }
+    code.description {
+    font-family: Consolas, "Courier New", monospace;
+    border-radius: 0.3em;
+    white-space: normal;
+    font-size:1.2em;
+    color: gray;
+    }
+    var {
+    font-family: Consolas, "Courier New", monospace;
+    border-radius: 0.3em;
+    font-style: normal;
+    font-weight: bold;
+    color: gray;
+    }
+    td {
+      vertical-align: top;
+    }
+    [id^="togList"],                        /* HIDE CHECKBOX */
+    [id^="togList"] ~ .list,                /* HIDE LIST */
+    [id^="togList"] + label  span + span,   /* HIDE "Collapse" */
+    [id^="togList"]:checked + label span{   /* HIDE "Expand" (IF CHECKED) */
+      display:none;
+    }
+    [id^="togList"]:checked + label span + span{
+      display:inline-block;                 /* SHOW "Collapse" (IF CHECKED) */
+    }
+    [id^="togList"]:checked ~ .list{
+      display:block;                        /* SHOW LIST (IF CHECKED) */
+    }
+    /* Bootstrap hides a collapsed panel with "display: none", which generates
+       no box, so the "content-visibility: hidden" the user agent gives
+       "hidden=until-found" could never apply and the text would stay beyond
+       find-in-page.  Clear that one declaration, and only where the script
+       above has found the attribute to be understood: an attribute selector
+       matches a value the browser does not understand, so an ungated rule
+       would leave every panel of an older browser standing open.  The
+       "!important" is required rather than decoration: the reboot carries
+       "[hidden] {display: none !important}", which the attribute itself brings
+       into play, and only another "!important" can outrank it. */
+    html.until-found .collapse[hidden="until-found"]:not(.show) {
+      display: block !important;
+    }
+    </style>
+  </head>
+  <body>
+    <div class="bg-dark">
+      <div class="container-xl">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+          <div class="container-fluid">
+            <a class="navbar-brand" href=index.html>
+              <img src="assets/drafting.png" alt="drafting" class="d-inline-block align-top" width="25" height="25">
+              Geometry, CAD Input/Output and Technical Drawing
+            </a>
+            <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+              <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+              <ul class="navbar-nav">
+                <li class="nav-item">
+                  <a class="nav-link" href="index.html#Solid modelling">
+                    <i class="fas fa-list-alt"></i>
+                    Solid modelling
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="https://gnu-octave.github.io/packages/">
+                  <img src="assets/octave-logo.svg" alt="GNU Octave logo" class="d-inline-block align-top" width="25" height="25">
+                    Octave Packages
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="https://www.octave.org">
+                    <i class="fas fa-home"></i>
+                    GNU Octave website
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </nav>
+      </div>
+    </div>
+    <div class="container-xl my-4">
+      <div class="row flex-nowrap" style="min-height:0">
+        <div class="col-md-2 bg-light" style="overflow-y: scroll; width: 250px;">
+          <div class="p-2" style="text-align: center;">
+            <h3>Categories &</h3>
+            <h4 style="color: blue">Functions List</h4>
+          </div>
+			<div class="row">
+				<input id="togList1" type="checkbox">
+				<label for="togList1">
+					<span><h6>Polylines and regions</h6></span>
+					<span><h6>Polylines and regions</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="geom.Polyline.html" class="text-decoration-none font-monospace"><small>geom.Polyline</small></a></li>
+					<li><a href="geom.Spline.html" class="text-decoration-none font-monospace"><small>geom.Spline</small></a></li>
+					<li><a href="geom.Region.html" class="text-decoration-none font-monospace"><small>geom.Region</small></a></li>
+					<li><a href="geom.Path.html" class="text-decoration-none font-monospace"><small>geom.Path</small></a></li>
+					<li><a href="geom.UCS.html" class="text-decoration-none font-monospace"><small>geom.UCS</small></a></li>
+					<li><a href="geom.text.html" class="text-decoration-none font-monospace"><small>geom.text</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList2" type="checkbox">
+				<label for="togList2">
+					<span><h6>Geometry primitives</h6></span>
+					<span><h6>Geometry primitives</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="geom.signedarea.html" class="text-decoration-none font-monospace"><small>geom.signedarea</small></a></li>
+					<li><a href="geom.bbox.html" class="text-decoration-none font-monospace"><small>geom.bbox</small></a></li>
+					<li><a href="geom.centroid.html" class="text-decoration-none font-monospace"><small>geom.centroid</small></a></li>
+					<li><a href="geom.transform.html" class="text-decoration-none font-monospace"><small>geom.transform</small></a></li>
+					<li><a href="geom.isrectilinear.html" class="text-decoration-none font-monospace"><small>geom.isrectilinear</small></a></li>
+					<li><a href="geom.offset.html" class="text-decoration-none font-monospace"><small>geom.offset</small></a></li>
+					<li><a href="geom.largestrect.html" class="text-decoration-none font-monospace"><small>geom.largestrect</small></a></li>
+					<li><a href="geom.triangulate.html" class="text-decoration-none font-monospace"><small>geom.triangulate</small></a></li>
+					<li><a href="geom.hatchlines.html" class="text-decoration-none font-monospace"><small>geom.hatchlines</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList3" type="checkbox">
+				<label for="togList3">
+					<span><h6>Curve geometry</h6></span>
+					<span><h6>Curve geometry</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="geom.curvature.html" class="text-decoration-none font-monospace"><small>geom.curvature</small></a></li>
+					<li><a href="geom.curvesample.html" class="text-decoration-none font-monospace"><small>geom.curvesample</small></a></li>
+					<li><a href="geom.curveoffset.html" class="text-decoration-none font-monospace"><small>geom.curveoffset</small></a></li>
+					<li><a href="geom.selfintersects.html" class="text-decoration-none font-monospace"><small>geom.selfintersects</small></a></li>
+					<li><a href="geom.arclength.html" class="text-decoration-none font-monospace"><small>geom.arclength</small></a></li>
+					<li><a href="geom.resample.html" class="text-decoration-none font-monospace"><small>geom.resample</small></a></li>
+					<li><a href="geom.simplify.html" class="text-decoration-none font-monospace"><small>geom.simplify</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList4" type="checkbox">
+				<label for="togList4">
+					<span><h6>Construction geometry</h6></span>
+					<span><h6>Construction geometry</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="geom.intersectlines.html" class="text-decoration-none font-monospace"><small>geom.intersectlines</small></a></li>
+					<li><a href="geom.intersectcircle.html" class="text-decoration-none font-monospace"><small>geom.intersectcircle</small></a></li>
+					<li><a href="geom.intersectcircles.html" class="text-decoration-none font-monospace"><small>geom.intersectcircles</small></a></li>
+					<li><a href="geom.tangentpoints.html" class="text-decoration-none font-monospace"><small>geom.tangentpoints</small></a></li>
+					<li><a href="geom.fillet.html" class="text-decoration-none font-monospace"><small>geom.fillet</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList5" type="checkbox">
+				<label for="togList5">
+					<span><h6>DXF input and output</h6></span>
+					<span><h6>DXF input and output</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="geom.read.html" class="text-decoration-none font-monospace"><small>geom.read</small></a></li>
+					<li><a href="geom.write.html" class="text-decoration-none font-monospace"><small>geom.write</small></a></li>
+					<li><a href="draw.read.html" class="text-decoration-none font-monospace"><small>draw.read</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList6" type="checkbox">
+				<label for="togList6">
+					<span><h6>Meshes</h6></span>
+					<span><h6>Meshes</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="polymesh.Mesh.html" class="text-decoration-none font-monospace"><small>polymesh.Mesh</small></a></li>
+					<li><a href="polymesh.read.html" class="text-decoration-none font-monospace"><small>polymesh.read</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList7" type="checkbox">
+				<label for="togList7">
+					<span><h6>Sheet composition</h6></span>
+					<span><h6>Sheet composition</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="draw.titleblock.html" class="text-decoration-none font-monospace"><small>draw.titleblock</small></a></li>
+					<li><a href="draw.coordtable.html" class="text-decoration-none font-monospace"><small>draw.coordtable</small></a></li>
+					<li><a href="draw.symbol.html" class="text-decoration-none font-monospace"><small>draw.symbol</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList8" type="checkbox">
+				<label for="togList8">
+					<span><h6>Line types and colours</h6></span>
+					<span><h6>Line types and colours</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="draw.linetype.html" class="text-decoration-none font-monospace"><small>draw.linetype</small></a></li>
+					<li><a href="draw.colour.html" class="text-decoration-none font-monospace"><small>draw.colour</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList9" type="checkbox">
+				<label for="togList9">
+					<span><h6>Drawing model</h6></span>
+					<span><h6>Drawing model</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="draw.Drawing.html" class="text-decoration-none font-monospace"><small>draw.Drawing</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList10" type="checkbox" checked>
+				<label for="togList10">
+					<span><h6>Solid modelling</h6></span>
+					<span><h6>Solid modelling</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="solid.Shape.html" class="text-decoration-none font-monospace fw-bolder"><small>solid.Shape</small></a></li>
+					<li><a href="solid.box.html" class="text-decoration-none font-monospace"><small>solid.box</small></a></li>
+					<li><a href="solid.wedge.html" class="text-decoration-none font-monospace"><small>solid.wedge</small></a></li>
+					<li><a href="solid.cylinder.html" class="text-decoration-none font-monospace"><small>solid.cylinder</small></a></li>
+					<li><a href="solid.cone.html" class="text-decoration-none font-monospace"><small>solid.cone</small></a></li>
+					<li><a href="solid.sphere.html" class="text-decoration-none font-monospace"><small>solid.sphere</small></a></li>
+					<li><a href="solid.ellipsoid.html" class="text-decoration-none font-monospace"><small>solid.ellipsoid</small></a></li>
+					<li><a href="solid.torus.html" class="text-decoration-none font-monospace"><small>solid.torus</small></a></li>
+					<li><a href="solid.polyhedron.html" class="text-decoration-none font-monospace"><small>solid.polyhedron</small></a></li>
+					<li><a href="solid.extrude.html" class="text-decoration-none font-monospace"><small>solid.extrude</small></a></li>
+					<li><a href="solid.revolve.html" class="text-decoration-none font-monospace"><small>solid.revolve</small></a></li>
+					<li><a href="solid.loft.html" class="text-decoration-none font-monospace"><small>solid.loft</small></a></li>
+					<li><a href="solid.sweep.html" class="text-decoration-none font-monospace"><small>solid.sweep</small></a></li>
+					<li><a href="solid.helix.html" class="text-decoration-none font-monospace"><small>solid.helix</small></a></li>
+					<li><a href="solid.read.html" class="text-decoration-none font-monospace"><small>solid.read</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList11" type="checkbox">
+				<label for="togList11">
+					<span><h6>Assemblies and viewing</h6></span>
+					<span><h6>Assemblies and viewing</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="model.Assembly.html" class="text-decoration-none font-monospace"><small>model.Assembly</small></a></li>
+					<li><a href="model.read.html" class="text-decoration-none font-monospace"><small>model.read</small></a></li>
+					<li><a href="model.Viewer.html" class="text-decoration-none font-monospace"><small>model.Viewer</small></a></li>
+				</ul>
+				</div>
+			</div>
+
+			  </div>
+			  <div class="col-md-10">
+          <div class="card rounded">
+            <div class="card-header card-header-mod">
+              <div class="row d-flex flex-wrap align-items-center">
+                <h3 class="d-inline-block mr-2">
+                Class&nbsp;Definition: <b><code>solid.Shape</code></b>
+                </h3>
+              </div>
+            </div>
+            <div class="card-body">
+<p class="h5 description mb-3"><code>drafting: solid.Shape</code></p>
+<p> A solid in millimetres, modelled through Open CASCADE.
+</p>
+<div class="ms-5">
+<p> <code>solid.Shape</code> holds the exact boundary of one or more solids: every
+ face a plane, cylinder, cone, sphere, torus or spline surface, every edge
+ a line, circle or curve, with nothing approximated by facets.  It is what
+ the functions of the <code>solid</code> namespace create, what the boolean
+ operators combine, and what its <code>write</code> method saves as STEP for
+ exchange or STL for printing.
+</p>
+<p> Shapes are made by <code>solid.box</code>, <code>solid.cylinder</code>,
+ <code>solid.cone</code>, <code>solid.sphere</code> and <code>solid.torus</code>, from
+ regions by <code>solid.extrude</code>, <code>solid.revolve</code>, <code>solid.loft</code>,
+ <code>solid.sweep</code> and <code>solid.helix</code>, and from files by
+ <code>solid.read</code>, and combined by three methods, each taking any number
+ of shapes:
+</p>
+<div class="table-responsive">
+<table class="table table-striped table-bordered table-sm">
+<thead class="table-primary"><tr><th width="25%">Method</th><th width="75%">Result</th></tr></thead>
+<tr><td width="25%"><code>union</code></td><td width="75%">the material of any of them</td></tr>
+<tr><td width="25%"><code>subtract</code></td><td width="75%">the material of the first that is in none of
+ the others</td></tr>
+<tr><td width="25%"><code>intersect</code></td><td width="75%">the material common to all of them</td></tr>
+</table>
+</div>
+
+<p> <code>hull</code> wraps shapes and points in their convex hull.
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example"> plate = solid.box (80, 40, 12);
+ bore = translate (solid.cylinder (4, 12), [20, 20, 0]);
+ part = subtract (plate, bore);
+ volume (part)
+ &rArr; 3.7797e+04
+</pre></td></tr></table>
+
+<p> Features are worked on a shape by methods: <code>hole</code> drills plain,
+ counterbored, countersunk and tapping holes, <code>pocket</code> cuts a region
+ into it, <code>fillet</code> and <code>chamfer</code> round or bevel edges, and
+ <code>shell</code> hollows the shape.  The edges and faces they act on are
+ chosen by <code>edges</code> and <code>faces</code>, by the kind of curve or surface,
+ by direction and by position.  <code>section</code> cuts a shape with a plane
+ into regions, which the <code>solid</code> functions build from again, and
+ <code>projection</code> gives the outline of a shape seen along a direction as
+ regions in the same way.
+</p>
+<p> The class is a <em>value</em> class.  Every operation returns a new shape
+ and leaves its operands unchanged, and a copy is independent of the
+ original.  The empty shape adds nothing to a union and empties an
+ intersection, and a boolean whose result holds no material, such as the
+ intersection of two solids that do not meet, returns it.  A shape is
+ saved and loaded with <code>save</code> and <code>load</code> like any other value.
+</p>
+<p> The <code>solid</code> namespace needs Open CASCADE, which the package uses
+ where it is found when the package is built.  On a build without it, the
+ empty shape can still be made, but every function and method that needs
+ the library raises an error saying so.
+</p>
+<p> <strong>See also: </strong>
+  <a href="solid.box.html">solid.box</a>, 
+  <a href="solid.read.html">solid.read</a>, 
+  <a href="solid.Shape.html#solid_Shape_write">solid.Shape.write</a>, 
+  <a href="solid.Shape.html#solid_Shape_show">solid.Shape.show</a>
+</p>
+<p><strong>Source Code: </strong>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/0f84b98/inst/+solid/Shape.m">solid.Shape</a>
+</p>
+</div>
+        <p class="lead my-3">The <code>solid.Shape</code> class contains the following properties:</p>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#solid_Shape_Colour"
+              aria-expanded="false" aria-controls="solid_Shape_Colour">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>Colour</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Colour of each solid
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="solid_Shape_Colour">
+            <div class="border-bottom py-2">
+<p> </p>
+<p> An <em class="math">N</em>-by-3 matrix of red, green and blue from 0 to 1, a row for
+ each of the shape&rsquo;s <em class="math">N</em> solids in the order
+ <code>solid.Shape.numsolids</code> counts them, a row of <code>NaN</code> for a
+ solid without a colour, or empty when none has one.  Assigning a single
+ row colours every solid.  The viewer shows it, and a STEP file carries
+ it out and in.  A transform keeps it, and each solid a boolean or a
+ feature makes takes the colour of the first coloured solid it came
+ from, so parts apart keep their own; the tools of <code>subtract</code> give
+ none.
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <p class="lead my-3">The <code>solid.Shape</code> class offers the following public methods:</p>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#solid_Shape_Shape"
+              aria-expanded="false" aria-controls="solid_Shape_Shape">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>solid.Shape</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Make a shape.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="solid_Shape_Shape">
+            <div class="border-bottom py-2">
+<p class="h5 fs"><code>solid.Shape: <var>S</var> = <b>solid.Shape</b> ()</code></p>
+<p class="h5 fs fs-last"><code>solid.Shape: <var>S</var> = <b>solid.Shape</b> (<var>DATA</var>)</code></p>
+<p> </p>
+<p> <code><var>S</var> = solid.Shape ()</code> returns the empty shape, which holds
+ nothing.
+</p>
+<p> <code><var>S</var> = solid.Shape (<var>DATA</var>)</code> wraps <var>DATA</var>, the bytes of
+ a shape in Open CASCADE&rsquo;s binary format.  This is how the functions of
+ the <code>solid</code> namespace return what Open CASCADE computed, and it is
+ not for direct use: bytes that do not begin with that format&rsquo;s signature
+ are refused.
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#solid_Shape_union"
+              aria-expanded="false" aria-controls="solid_Shape_union">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>union</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+The union of shapes, the material of any of them.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="solid_Shape_union">
+            <div class="border-bottom py-2">
+<p class="h5 fs fs-last"><code>solid.Shape: <var>C</var> = <b>union</b> (<var>A</var>, <var>B</var>, &hellip;)</code></p>
+<p> </p>
+<p> <code><var>C</var> = union (<var>A</var>, <var>B</var>, &hellip;)</code> takes any number of
+ <code>solid.Shape</code> objects and combines them in one operation, which is
+ several times faster than combining them a pair at a time.  Faces that
+ end up in one plane and edges that end up on one line are merged, so
+ the union of two blocks that share a face reads as one block of six
+ faces.  Empty shapes add nothing, and the union of a single shape is
+ that shape.
+</p>
+<p> <strong>See also: </strong>
+  <a href="solid.Shape.html#solid_Shape_subtract">solid.Shape.subtract</a>, 
+  <a href="solid.Shape.html#solid_Shape_intersect">solid.Shape.intersect</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#solid_Shape_subtract"
+              aria-expanded="false" aria-controls="solid_Shape_subtract">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>subtract</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+The difference of shapes, the material of the first in none of the
+ others.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="solid_Shape_subtract">
+            <div class="border-bottom py-2">
+<p class="h5 fs fs-last"><code>solid.Shape: <var>C</var> = <b>subtract</b> (<var>A</var>, <var>B</var>, &hellip;)</code></p>
+<p> </p>
+<p> <code><var>C</var> = subtract (<var>A</var>, <var>B</var>, &hellip;)</code> removes from
+ <var>A</var> the material of every later shape, all in one operation.  This
+ is how a hole, a pocket or a slot is cut: model the material to remove
+ and subtract it.  Drilling a plate with a hundred holes in one call is
+ an order of magnitude faster than a hundred calls of one hole each.
+</p>
+<p> Removing empty shapes, or nothing, leaves <var>A</var>, and removing
+ anything from the empty shape leaves the empty shape.
+</p>
+<p> <strong>See also: </strong>
+  <a href="solid.Shape.html#solid_Shape_union">solid.Shape.union</a>, 
+  <a href="solid.Shape.html#solid_Shape_intersect">solid.Shape.intersect</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#solid_Shape_intersect"
+              aria-expanded="false" aria-controls="solid_Shape_intersect">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>intersect</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+The intersection of shapes, the material common to all of them.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="solid_Shape_intersect">
+            <div class="border-bottom py-2">
+<p class="h5 fs fs-last"><code>solid.Shape: <var>C</var> = <b>intersect</b> (<var>A</var>, <var>B</var>, &hellip;)</code></p>
+<p> </p>
+<p> <code><var>C</var> = intersect (<var>A</var>, <var>B</var>, &hellip;)</code> keeps only what
+ lies inside every shape given.  Shapes that do not all meet, and an
+ empty shape among them, give the empty shape.  The intersection of a
+ single shape is that shape.
+</p>
+<p> <strong>See also: </strong>
+  <a href="solid.Shape.html#solid_Shape_union">solid.Shape.union</a>, 
+  <a href="solid.Shape.html#solid_Shape_subtract">solid.Shape.subtract</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#solid_Shape_tessellate"
+              aria-expanded="false" aria-controls="solid_Shape_tessellate">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>tessellate</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+A triangle mesh of a shape.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="solid_Shape_tessellate">
+            <div class="border-bottom py-2">
+<p class="h5 fs"><code>solid.Shape: <var>M</var> = <b>tessellate</b> (<var>S</var>)</code></p>
+<p class="h5 fs fs-last"><code>solid.Shape: <var>M</var> = <b>tessellate</b> (<var>S</var>, <var>TOL</var>)</code></p>
+<p> </p>
+<p> <code><var>M</var> = tessellate (<var>S</var>, <var>TOL</var>)</code> returns a
+ <code>polymesh.Mesh</code> of the surface of <var>S</var>: flat triangles whose
+ corners lie on it and which stray from it by at most <var>TOL</var>
+ millimetres, 0.01 by default, nor span more than 20 degrees of a
+ curved face.  The triangles meet edge to edge, sharing their corners,
+ and are turned outwards, so the mesh of a solid is closed.  A coloured
+ shape gives each triangle the colour of its solid as the mesh&rsquo;s
+ <code>FaceColour</code>, and the grey <code>[0.72, 0.74, 0.78]</code> where its
+ solid has none.  The empty shape gives the empty mesh.
+</p>
+<p> This is the mesh <code>write</code> writes to STL, OBJ, PLY and 3MF, and it
+ can be shown, cut, measured, coloured and written as any other.
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example"> M = tessellate (solid.cylinder (4, 12), 0.05);
+ write (M, 'pin.obj');
+</pre></td></tr></table>
+
+<p> <strong>See also: </strong>
+  <a href="polymesh.Mesh.html">polymesh.Mesh</a>, 
+  <a href="solid.Shape.html#solid_Shape_write">solid.Shape.write</a>, 
+  <a href="solid.polyhedron.html">solid.polyhedron</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#solid_Shape_show"
+              aria-expanded="false" aria-controls="solid_Shape_show">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>show</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Show a shape in a viewer of its own, redrawing in place.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="solid_Shape_show">
+            <div class="border-bottom py-2">
+<p class="h5 fs"><code>solid.Shape: <b>show</b> (<var>S</var>)</code></p>
+<p class="h5 fs fs-last"><code>solid.Shape: <var>V</var> = <b>show</b> (<var>S</var>)</code></p>
+<p> </p>
+<p> <code>show (<var>S</var>)</code> shows the shape <var>S</var> in a
+ <code>model.Viewer</code>, a window drawn by Open CASCADE in a process of
+ its own.  Every variable gets a viewer of its own, titled with its
+ name: the first <code>show (part)</code> opens the window for <code>part</code>,
+ and every later one redraws that window in place and keeps the camera
+ where it was, while <code>show (tool)</code> uses another.  So a script that
+ ends by showing its parts can be run again and again, <code>clear all</code>
+ and all, and each part changes in its own window.  A shape given as an
+ expression rather than a variable, such as <code>show (fillet (part,
+ E, 3))</code>, has no name, and all such shapes share one window.
+</p>
+<p> Drag with the left mouse button to rotate, the middle one to pan, and
+ turn the wheel to zoom; <code>F</code> fits the part to the window and
+ <code>0</code>, <code>1</code>, <code>2</code> and <code>3</code> turn it to the isometric, front,
+ top and right views.  Closing a window ends its viewer, and the next
+ <code>show</code> of that variable opens a new one.  Showing the empty shape
+ opens a variable&rsquo;s window before there is anything to draw in it.
+</p>
+<p> <code><var>V</var> = show (<var>S</var>)</code> also returns the viewer.  Assigning to
+ <code><var>V</var>.Shape</code> redraws it at once, and
+ <code>model.Viewer.pick</code> picks edges and faces with the mouse:
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example"> part = solid.box (80, 40, 12);
+ V = show (part);
+ E = pick (V, 'edge');     # click the edges, then press Enter
+ V.Shape = fillet (V.Shape, E, 3);
+</pre></td></tr></table>
+
+<p> Calling <code>show (<var>S</var>)</code> is the same as assigning <var>S</var> to the
+ <code>Shape</code> of the variable&rsquo;s viewer.  Nothing else redraws it:
+ changing the variable that was shown does not, until it is shown again.
+</p>
+<p> The viewer is built with the package when Open CASCADE and X11 are
+ found, and needs a display to run.  It runs on Linux.
+</p>
+<p> <strong>See also: </strong>
+  <a href="model.Viewer.html">model.Viewer</a>, 
+  <a href="model.Viewer.html#model_Viewer_pick">model.Viewer.pick</a>, 
+  <a href="polymesh.Mesh.html#polymesh_Mesh_show">polymesh.Mesh.show</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#solid_Shape_write"
+              aria-expanded="false" aria-controls="solid_Shape_write">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>write</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Write a solid to a STEP, STL, OBJ, PLY or 3MF file.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="solid_Shape_write">
+            <div class="border-bottom py-2">
+<p class="h5 fs"><code>solid.Shape: <b>write</b> (<var>S</var>, <var>FILE</var>)</code></p>
+<p class="h5 fs fs-last"><code>solid.Shape: <b>write</b> (<var>S</var>, <var>FILE</var>, <code>'Tolerance'</code>, <var>TOL</var>)</code></p>
+<p> </p>
+<p> <code>write (<var>S</var>, <var>FILE</var>)</code> writes the shape <var>S</var> in the format
+ named by the extension of <var>FILE</var>, in either case:
+</p>
+<dl compact="compact">
+<dt> <code>.step</code></dt>
+<dd> STEP (ISO 10303-21, application protocol 214), in millimetres.  The
+ exact geometry is kept, so this is the file to send to a CAD program or
+ to another manufacturer.  The part is named after the base name of
+ <var>FILE</var>, and each solid carries its <code>solid.Shape.Colour</code>.</dd>
+<dt> <code>.stl</code>, <code>.obj</code>, <code>.ply</code>, <code>.3mf</code></dt>
+<dd> A mesh of triangles in millimetres, the mesh
+ <code>solid.Shape.tessellate</code> makes, written by
+ <code>polymesh.Mesh.write</code>: binary STL, OBJ, binary PLY, or 3MF, the
+ archive slicers take.  The facets approximate every curved surface;
+ their vertices lie on it.  OBJ, PLY and 3MF carry the solids&rsquo; colours on
+ their triangles; STL has none.</dd>
+</dl>
+
+<p> <code>write (&hellip;, <code>'Tolerance'</code>, <var>TOL</var>)</code> sets, for a
+ mesh, the largest distance in millimetres between a facet and the true
+ surface.  It is 0.01 by default, well below what a printer resolves; a
+ larger value gives a smaller file.  No facet spans more than 20 degrees
+ of a curved surface, whatever <var>TOL</var>.  A STEP file is exact and takes
+ no tolerance.
+</p>
+<p> <strong>See also: </strong>
+  <a href="solid.read.html">solid.read</a>, 
+  <a href="solid.Shape.html#solid_Shape_tessellate">solid.Shape.tessellate</a>, 
+  <a href="polymesh.Mesh.html#polymesh_Mesh_write">polymesh.Mesh.write</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#solid_Shape_translate"
+              aria-expanded="false" aria-controls="solid_Shape_translate">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>translate</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Move a shape by the vector <var>V</var>.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="solid_Shape_translate">
+            <div class="border-bottom py-2">
+<p class="h5 fs fs-last"><code>solid.Shape: <var>S</var> = <b>translate</b> (<var>S</var>, <var>V</var>)</code></p>
+<p> </p>
+<p> <var>V</var> is a 3-element vector in millimetres.
+</p>
+<p> <strong>See also: </strong>
+  <a href="solid.Shape.html#solid_Shape_rotate">solid.Shape.rotate</a>, 
+  <a href="solid.Shape.html#solid_Shape_mirror">solid.Shape.mirror</a>, 
+  <a href="solid.Shape.html#solid_Shape_scale">solid.Shape.scale</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#solid_Shape_rotate"
+              aria-expanded="false" aria-controls="solid_Shape_rotate">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>rotate</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Rotate a shape about an axis.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="solid_Shape_rotate">
+            <div class="border-bottom py-2">
+<p class="h5 fs"><code>solid.Shape: <var>S</var> = <b>rotate</b> (<var>S</var>, <var>ANGLE</var>, <var>AXIS</var>)</code></p>
+<p class="h5 fs fs-last"><code>solid.Shape: <var>S</var> = <b>rotate</b> (<var>S</var>, <var>ANGLE</var>, <var>AXIS</var>, <var>P</var>)</code></p>
+<p> </p>
+<p> <var>ANGLE</var> is in degrees and turns the shape anticlockwise when seen
+ from the tip of <var>AXIS</var> looking back, the right-hand rule.
+ <var>AXIS</var> is a nonzero 3-element direction, and <var>P</var> a point on the
+ axis, the origin by default.
+</p>
+<p> <strong>See also: </strong>
+  <a href="solid.Shape.html#solid_Shape_translate">solid.Shape.translate</a>, 
+  <a href="solid.Shape.html#solid_Shape_mirror">solid.Shape.mirror</a>, 
+  <a href="solid.Shape.html#solid_Shape_scale">solid.Shape.scale</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#solid_Shape_mirror"
+              aria-expanded="false" aria-controls="solid_Shape_mirror">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>mirror</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Reflect a shape in a plane.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="solid_Shape_mirror">
+            <div class="border-bottom py-2">
+<p class="h5 fs"><code>solid.Shape: <var>S</var> = <b>mirror</b> (<var>S</var>, <var>N</var>)</code></p>
+<p class="h5 fs fs-last"><code>solid.Shape: <var>S</var> = <b>mirror</b> (<var>S</var>, <var>N</var>, <var>P</var>)</code></p>
+<p> </p>
+<p> The plane passes through the point <var>P</var>, the origin by default, with
+ the nonzero 3-element normal <var>N</var>.  <code>mirror (<var>S</var>, [1, 0,
+ 0])</code> reflects in the <em class="math">yz</em> plane.  A reflection turns a right-handed
+ part into its left-handed twin; the result is a valid solid of the same
+ volume.
+</p>
+<p> <strong>See also: </strong>
+  <a href="solid.Shape.html#solid_Shape_translate">solid.Shape.translate</a>, 
+  <a href="solid.Shape.html#solid_Shape_rotate">solid.Shape.rotate</a>, 
+  <a href="solid.Shape.html#solid_Shape_scale">solid.Shape.scale</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#solid_Shape_scale"
+              aria-expanded="false" aria-controls="solid_Shape_scale">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>scale</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Scale a shape uniformly about a point.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="solid_Shape_scale">
+            <div class="border-bottom py-2">
+<p class="h5 fs"><code>solid.Shape: <var>S</var> = <b>scale</b> (<var>S</var>, <var>F</var>)</code></p>
+<p class="h5 fs fs-last"><code>solid.Shape: <var>S</var> = <b>scale</b> (<var>S</var>, <var>F</var>, <var>P</var>)</code></p>
+<p> </p>
+<p> Every length is multiplied by the positive factor <var>F</var>, so the volume
+ grows by its cube.  <var>P</var>, the origin by default, is the point that
+ stays where it is.
+</p>
+<p> <strong>See also: </strong>
+  <a href="solid.Shape.html#solid_Shape_translate">solid.Shape.translate</a>, 
+  <a href="solid.Shape.html#solid_Shape_rotate">solid.Shape.rotate</a>, 
+  <a href="solid.Shape.html#solid_Shape_mirror">solid.Shape.mirror</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#solid_Shape_volume"
+              aria-expanded="false" aria-controls="solid_Shape_volume">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>volume</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+The volume of a shape in cubic millimetres.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="solid_Shape_volume">
+            <div class="border-bottom py-2">
+<p class="h5 fs fs-last"><code>solid.Shape: <var>V</var> = <b>volume</b> (<var>S</var>)</code></p>
+<p> </p>
+<p> The volume is computed from the exact surfaces, not from facets, to a
+ relative error of about 1e-9.  The empty shape has volume zero.
+</p>
+<p> <strong>See also: </strong>
+  <a href="solid.Shape.html#solid_Shape_area">solid.Shape.area</a>, 
+  <a href="solid.Shape.html#solid_Shape_centroid">solid.Shape.centroid</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#solid_Shape_area"
+              aria-expanded="false" aria-controls="solid_Shape_area">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>area</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+The surface area of a shape in square millimetres.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="solid_Shape_area">
+            <div class="border-bottom py-2">
+<p class="h5 fs fs-last"><code>solid.Shape: <var>A</var> = <b>area</b> (<var>S</var>)</code></p>
+<p> </p>
+<p> The area is the sum over every face, computed from the exact surfaces.
+ A flat face is measured to a relative error of about 1e-9, whatever its
+ edges.  A curved face is measured as Open CASCADE integrates it: exactly
+ for a cylinder, a cone, a sphere or a torus, to about 1e-4 for a face
+ swept from a spline.  The empty shape has area zero.
+</p>
+<p> <strong>See also: </strong>
+  <a href="solid.Shape.html#solid_Shape_volume">solid.Shape.volume</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#solid_Shape_centroid"
+              aria-expanded="false" aria-controls="solid_Shape_centroid">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>centroid</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+The centre of volume of a shape, as a 1-by-3 vector in millimetres.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="solid_Shape_centroid">
+            <div class="border-bottom py-2">
+<p class="h5 fs fs-last"><code>solid.Shape: <var>C</var> = <b>centroid</b> (<var>S</var>)</code></p>
+<p> </p>
+<p> For a part of uniform density this is its centre of mass, computed as
+ the volume is.  The empty shape has no centroid and returns an empty
+ <var>C</var>, and a shape that encloses no volume returns <code>NaN</code> in every
+ coordinate.
+</p>
+<p> <strong>See also: </strong>
+  <a href="solid.Shape.html#solid_Shape_volume">solid.Shape.volume</a>, 
+  <a href="solid.Shape.html#solid_Shape_bbox">solid.Shape.bbox</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#solid_Shape_bbox"
+              aria-expanded="false" aria-controls="solid_Shape_bbox">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>bbox</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Axis-aligned extents of a shape.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="solid_Shape_bbox">
+            <div class="border-bottom py-2">
+<p class="h5 fs"><code>solid.Shape: <var>B</var> = <b>bbox</b> (<var>S</var>)</code></p>
+<p class="h5 fs fs-last"><code>solid.Shape: [<var>B</var>, <var>L</var>] = <b>bbox</b> (<var>S</var>)</code></p>
+<p> </p>
+<p> <var>B</var> is the 1-by-6 vector <code>[<var>xmin</var>, <var>ymin</var>, <var>zmin</var>,
+ <var>xmax</var>, <var>ymax</var>, <var>zmax</var>]</code> in millimetres, and <var>L</var> the
+ 1-by-3 vector of the lengths along each axis.
+</p>
+<p> The box is computed from the exact surfaces, with no allowance for the
+ tolerance Open CASCADE carries on its edges, so a cylinder of radius 4
+ reaches exactly 4 from its axis.  On planes, cylinders, cones and
+ spheres it is tight; on a torus or a spline surface it may exceed the
+ true extent by up to 1e-7 millimetres, the precision Open CASCADE
+ computes it to there.  The empty shape has no extent and returns an
+ empty <var>B</var> and <var>L</var>.
+</p>
+<p> <strong>See also: </strong>
+  <a href="solid.Shape.html#solid_Shape_centroid">solid.Shape.centroid</a>, 
+  <a href="geom.bbox.html">geom.bbox</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#solid_Shape_isvalid"
+              aria-expanded="false" aria-controls="solid_Shape_isvalid">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>isvalid</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+True if a shape passes Open CASCADE&rsquo;s validity check.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="solid_Shape_isvalid">
+            <div class="border-bottom py-2">
+<p class="h5 fs fs-last"><code>solid.Shape: <var>TF</var> = <b>isvalid</b> (<var>S</var>)</code></p>
+<p> </p>
+<p> The check confirms that the faces close up, that the edges lie on the
+ surfaces they bound, and that nothing intersects itself.  Every shape
+ made by the <code>solid</code> namespace should pass; a failure means that an
+ operation went wrong, usually a boolean between faces that nearly but
+ not quite coincide, and the shape should not be written or drawn.  The
+ empty shape is valid.
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#solid_Shape_isempty"
+              aria-expanded="false" aria-controls="solid_Shape_isempty">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>isempty</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+True for the empty shape, which holds no material.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="solid_Shape_isempty">
+            <div class="border-bottom py-2">
+<p class="h5 fs fs-last"><code>solid.Shape: <var>TF</var> = <b>isempty</b> (<var>S</var>)</code></p>
+<p> </p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#solid_Shape_numsolids"
+              aria-expanded="false" aria-controls="solid_Shape_numsolids">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>numsolids</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+The number of separate solids in a shape.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="solid_Shape_numsolids">
+            <div class="border-bottom py-2">
+<p class="h5 fs fs-last"><code>solid.Shape: <var>N</var> = <b>numsolids</b> (<var>S</var>)</code></p>
+<p> </p>
+<p> A boolean can leave more than one: cutting a bar across its whole
+ section leaves two.
+</p>
+<p> <strong>See also: </strong>
+  <a href="solid.Shape.html#solid_Shape_numfaces">solid.Shape.numfaces</a>, 
+  <a href="solid.Shape.html#solid_Shape_numedges">solid.Shape.numedges</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#solid_Shape_numfaces"
+              aria-expanded="false" aria-controls="solid_Shape_numfaces">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>numfaces</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+The number of faces of a shape.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="solid_Shape_numfaces">
+            <div class="border-bottom py-2">
+<p class="h5 fs fs-last"><code>solid.Shape: <var>N</var> = <b>numfaces</b> (<var>S</var>)</code></p>
+<p> </p>
+<p> A box has six.  A cylinder has three, its curved side being one face.
+</p>
+<p> <strong>See also: </strong>
+  <a href="solid.Shape.html#solid_Shape_numsolids">solid.Shape.numsolids</a>, 
+  <a href="solid.Shape.html#solid_Shape_numedges">solid.Shape.numedges</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#solid_Shape_numedges"
+              aria-expanded="false" aria-controls="solid_Shape_numedges">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>numedges</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+The number of edges of a shape, each counted once.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="solid_Shape_numedges">
+            <div class="border-bottom py-2">
+<p class="h5 fs fs-last"><code>solid.Shape: <var>N</var> = <b>numedges</b> (<var>S</var>)</code></p>
+<p> </p>
+<p> An edge shared by two faces is one edge.  A box has twelve.  A cylinder
+ has three: its two circles and the seam where its curved face closes on
+ itself, which bounds that face but is not a feature of the part.
+</p>
+<p> <strong>See also: </strong>
+  <a href="solid.Shape.html#solid_Shape_numsolids">solid.Shape.numsolids</a>, 
+  <a href="solid.Shape.html#solid_Shape_numfaces">solid.Shape.numfaces</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#solid_Shape_edges"
+              aria-expanded="false" aria-controls="solid_Shape_edges">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>edges</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Choose edges of a shape, to round, chamfer or inspect.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="solid_Shape_edges">
+            <div class="border-bottom py-2">
+<p class="h5 fs"><code>solid.Shape: <var>E</var> = <b>edges</b> (<var>S</var>)</code></p>
+<p class="h5 fs fs-last"><code>solid.Shape: <var>E</var> = <b>edges</b> (<var>S</var>, <var>Name</var>, <var>Value</var>, &hellip;)</code></p>
+<p> </p>
+<p> <code><var>E</var> = edges (<var>S</var>)</code> returns the indices of the edges of
+ <var>S</var> as a row vector, in the order <code>solid.Shape.numedges</code>
+ counts them.  Seam edges, where a curved face closes on itself, and the
+ degenerate edges at the poles of a sphere are left out: they bound
+ faces without being features of the part, and nothing can be done to
+ them.
+</p>
+<p> The indices belong to <var>S</var> alone.  Every operation that makes a new
+ shape numbers its edges afresh, so choose edges from the shape the
+ feature is applied to, immediately before applying it.
+</p>
+<p> Name/Value pairs narrow the choice, and an edge is returned only when
+ it meets all of them:
+</p>
+<dl compact="compact">
+<dt> <code>'Type'</code></dt>
+<dd> The kind of curve the edge lies on: <code>'line'</code>, <code>'circle'</code>,
+ <code>'ellipse'</code>, <code>'bspline'</code> or <code>'other'</code>, or a cell
+ array of several.</dd>
+<dt> <code>'Direction'</code></dt>
+<dd> A nonzero 3-element vector.  A straight edge is chosen when it runs
+ parallel to it, either way; a circle or an ellipse when its axis does.
+ Other edges have no direction and are never chosen.</dd>
+<dt> <code>'Within'</code></dt>
+<dd> A box <code>[<var>xmin</var>, <var>ymin</var>, <var>zmin</var>, <var>xmax</var>,
+ <var>ymax</var>, <var>zmax</var>]</code>, as <code>solid.Shape.bbox</code> returns one.  An
+ edge is chosen when it lies wholly inside, to within 1e-6 millimetres.</dd>
+<dt> <code>'Face'</code></dt>
+<dd> Face indices, as <code>solid.Shape.faces</code> returns them.  An edge is
+ chosen when it bounds any of these faces, so all the edges round a
+ face can be rounded or chamfered in one step:
+ <code>fillet (<var>S</var>, edges (<var>S</var>, 'Face', <var>F</var>), <var>R</var>)</code>.</dd>
+</dl>
+
+<table><tr><td>&nbsp;</td><td><pre class="example"> B = solid.box (10, 20, 30);
+ E = edges (B, 'Direction', [0, 0, 1]);    # the four upright edges
+ B = fillet (B, E, 2);
+</pre></td></tr></table>
+
+<p> The empty shape has no edges.
+</p>
+<p> <strong>See also: </strong>
+  <a href="solid.Shape.html#solid_Shape_faces">solid.Shape.faces</a>, 
+  <a href="solid.Shape.html#solid_Shape_fillet">solid.Shape.fillet</a>, 
+  <a href="solid.Shape.html#solid_Shape_chamfer">solid.Shape.chamfer</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#solid_Shape_faces"
+              aria-expanded="false" aria-controls="solid_Shape_faces">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>faces</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Choose faces of a shape, to open when hollowing it or to inspect.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="solid_Shape_faces">
+            <div class="border-bottom py-2">
+<p class="h5 fs"><code>solid.Shape: <var>F</var> = <b>faces</b> (<var>S</var>)</code></p>
+<p class="h5 fs fs-last"><code>solid.Shape: <var>F</var> = <b>faces</b> (<var>S</var>, <var>Name</var>, <var>Value</var>, &hellip;)</code></p>
+<p> </p>
+<p> <code><var>F</var> = faces (<var>S</var>)</code> returns the indices of the faces of
+ <var>S</var> as a row vector, in the order <code>solid.Shape.numfaces</code>
+ counts them.  The indices belong to <var>S</var> alone: every operation that
+ makes a new shape numbers its faces afresh, so choose faces from the
+ shape the feature is applied to, immediately before applying it.
+</p>
+<p> Name/Value pairs narrow the choice, and a face is returned only when it
+ meets all of them:
+</p>
+<dl compact="compact">
+<dt> <code>'Type'</code></dt>
+<dd> The kind of surface the face lies on: <code>'plane'</code>,
+ <code>'cylinder'</code>, <code>'cone'</code>, <code>'sphere'</code>, <code>'torus'</code>,
+ <code>'revolution'</code>, <code>'extrusion'</code>, <code>'bspline'</code> or
+ <code>'other'</code>, or a cell array of several.</dd>
+<dt> <code>'Normal'</code></dt>
+<dd> A nonzero 3-element vector.  A flat face is chosen when its outward
+ normal points the same way, so <code>[0, 0, 1]</code> picks faces looking up
+ and not those looking down.  Curved faces are never chosen.</dd>
+<dt> <code>'Axis'</code></dt>
+<dd> A nonzero 3-element vector.  A face on a cylinder, cone, torus or
+ other surface of revolution is chosen when its axis runs parallel to
+ it, either way.</dd>
+<dt> <code>'Within'</code></dt>
+<dd> A box <code>[<var>xmin</var>, <var>ymin</var>, <var>zmin</var>, <var>xmax</var>,
+ <var>ymax</var>, <var>zmax</var>]</code>, as <code>solid.Shape.bbox</code> returns one.  A
+ face is chosen when it lies wholly inside, to within 1e-6 millimetres.</dd>
+</dl>
+
+<p> The empty shape has no faces.
+</p>
+<p> <strong>See also: </strong>
+  <a href="solid.Shape.html#solid_Shape_edges">solid.Shape.edges</a>, 
+  <a href="solid.Shape.html#solid_Shape_shell">solid.Shape.shell</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#solid_Shape_fillet"
+              aria-expanded="false" aria-controls="solid_Shape_fillet">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>fillet</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Round edges of a shape to a radius.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="solid_Shape_fillet">
+            <div class="border-bottom py-2">
+<p class="h5 fs fs-last"><code>solid.Shape: <var>S</var> = <b>fillet</b> (<var>S</var>, <var>E</var>, <var>R</var>)</code></p>
+<p> </p>
+<p> <code><var>S</var> = fillet (<var>S</var>, <var>E</var>, <var>R</var>)</code> rounds the edges
+ of <var>S</var> indexed by <var>E</var>, as <code>solid.Shape.edges</code> returns
+ them, to the radius <var>R</var> millimetres.  An outside edge loses
+ material and an inside edge gains it, as a fillet on a casting or a
+ radius left by a cutter does.  Where rounded edges meet at a corner the
+ corner is blended.
+</p>
+<p> An edge is rounded together with every edge that runs on from it
+ smoothly, tangent where they meet, as Open CASCADE rounds a chain.  On
+ a box whose upright edges are already rounded, choosing one top edge
+ rounds the whole top rim.
+</p>
+<p> A radius too large for the faces beside an edge cannot be built and
+ raises an error, as does an edge that cannot be rounded at all.
+</p>
+<p> <strong>See also: </strong>
+  <a href="solid.Shape.html#solid_Shape_edges">solid.Shape.edges</a>, 
+  <a href="solid.Shape.html#solid_Shape_chamfer">solid.Shape.chamfer</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#solid_Shape_chamfer"
+              aria-expanded="false" aria-controls="solid_Shape_chamfer">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>chamfer</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Bevel edges of a shape.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="solid_Shape_chamfer">
+            <div class="border-bottom py-2">
+<p class="h5 fs"><code>solid.Shape: <var>S</var> = <b>chamfer</b> (<var>S</var>, <var>E</var>, <var>D</var>)</code></p>
+<p class="h5 fs"><code>solid.Shape: <var>S</var> = <b>chamfer</b> (<var>S</var>, <var>E</var>, [<var>D1</var>, <var>D2</var>], <var>F</var>)</code></p>
+<p class="h5 fs fs-last"><code>solid.Shape: <var>S</var> = <b>chamfer</b> (<var>S</var>, <var>E</var>, <var>D</var>, <var>F</var>, <code>'Angle'</code>, <var>A</var>)</code></p>
+<p> </p>
+<p> <code><var>S</var> = chamfer (<var>S</var>, <var>E</var>, <var>D</var>)</code> cuts the edges of
+ <var>S</var> indexed by <var>E</var>, as <code>solid.Shape.edges</code> returns them,
+ back by <var>D</var> millimetres on both faces, so a chamfer on a square
+ corner is the 45 degree bevel a drawing calls <code><var>D</var> x 45</code>.
+ An edge is bevelled together with every edge that runs on from it
+ smoothly, tangent where they meet, as Open CASCADE bevels a chain.  On
+ a box whose upright edges are already rounded, choosing one top edge
+ bevels the whole top rim.
+</p>
+<p> <code><var>S</var> = chamfer (<var>S</var>, <var>E</var>, [<var>D1</var>, <var>D2</var>],
+ <var>F</var>)</code> cuts each edge back by <var>D1</var> along the face <var>F</var>, a face
+ index as <code>solid.Shape.faces</code> returns one, and by <var>D2</var> along the
+ other face of the edge.  Every edge must bound <var>F</var>, as the edges
+ round a face do: <code>edges (<var>S</var>, 'Face', <var>F</var>)</code>.
+</p>
+<p> <code><var>S</var> = chamfer (<var>S</var>, <var>E</var>, <var>D</var>, <var>F</var>,
+ <code>'Angle'</code>, <var>A</var>)</code> cuts each edge back by <var>D</var> along the face
+ <var>F</var>, with the chamfer face meeting <var>F</var> at <var>A</var> degrees, in
+ the range <em class="math">(0, 90)</em>: the chamfer a drawing calls <code><var>D</var> x
+ <var>A</var></code>.  Along the other face it reaches <code><var>D</var> * tand
+ (<var>A</var>)</code>, so 45 degrees is the equal chamfer.
+</p>
+<p> A chamfer too large for the faces beside an edge cannot be built and
+ raises an error, as does an edge that cannot be chamfered at all.
+</p>
+<p> <strong>See also: </strong>
+  <a href="solid.Shape.html#solid_Shape_edges">solid.Shape.edges</a>, 
+  <a href="solid.Shape.html#solid_Shape_fillet">solid.Shape.fillet</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#solid_Shape_shell"
+              aria-expanded="false" aria-controls="solid_Shape_shell">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>shell</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Hollow a shape to a uniform wall thickness.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="solid_Shape_shell">
+            <div class="border-bottom py-2">
+<p class="h5 fs"><code>solid.Shape: <var>S</var> = <b>shell</b> (<var>S</var>, <var>F</var>, <var>T</var>)</code></p>
+<p class="h5 fs"><code>solid.Shape: <var>S</var> = <b>shell</b> (&hellip;, <code>'Outward'</code>, <var>TF</var>)</code></p>
+<p class="h5 fs fs-last"><code>solid.Shape: <var>S</var> = <b>shell</b> (&hellip;, <code>'Thickness'</code>, {<var>FACES</var>, <var>T2</var>, &hellip;})</code></p>
+<p> </p>
+<p> <code><var>S</var> = shell (<var>S</var>, <var>F</var>, <var>T</var>)</code> removes the faces of
+ <var>S</var> indexed by <var>F</var>, as <code>solid.Shape.faces</code> returns them,
+ and hollows what is left to walls <var>T</var> millimetres thick, as a box,
+ a cup or an enclosure is made.  The walls grow inwards, so the outside
+ of the part keeps its size and the inner corners stay sharp.  With
+ <var>F</var> empty no face is removed and the result is a closed shell
+ around a sealed cavity.
+</p>
+<p> <code><var>S</var> = shell (&hellip;, <code>'Outward'</code>, true)</code> grows the
+ walls outwards instead, so the inside keeps the size and shape of
+ <var>S</var> and the outside grows by <var>T</var>: the way to make a box that a
+ part of the shape of <var>S</var> fits into.  It is <code>false</code> by default.
+</p>
+<p> <code><var>S</var> = shell (&hellip;, <code>'Thickness'</code>, {<var>FACES</var>,
+ <var>T2</var>, &hellip;})</code> gives the faces indexed by <var>FACES</var> walls
+ <var>T2</var> thick instead of <var>T</var>, and so on for every pair in the cell
+ array: a thicker floor, a thinner lid.  The faces come from
+ <code>solid.Shape.faces</code>, none may be opened, and none may be given two
+ thicknesses:
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example"> ## A box of 2 walls with a floor 4 thick, open at the top
+ B = solid.box (60, 40, 30);
+ B = shell (B, faces (B, 'Normal', [0, 0, 1]), 2, ...
+            'Thickness', {faces(B, 'Normal', [0, 0, -1]), 4});
+</pre></td></tr></table>
+
+<p> Walls too thick for the shape, which would meet in the middle, cannot
+ be built and raise an error.
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example"> ## An open box of 1 mm walls
+ B = solid.box (10, 20, 30);
+ B = shell (B, faces (B, 'Normal', [0, 0, 1]), 1);
+ volume (B)
+ &rArr; 1824.0
+</pre></td></tr></table>
+
+<p> <strong>See also: </strong>
+  <a href="solid.Shape.html#solid_Shape_faces">solid.Shape.faces</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#solid_Shape_hole"
+              aria-expanded="false" aria-controls="solid_Shape_hole">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>hole</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Drill holes into a shape.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="solid_Shape_hole">
+            <div class="border-bottom py-2">
+<p class="h5 fs"><code>solid.Shape: <var>S</var> = <b>hole</b> (<var>S</var>, <var>P</var>, <var>D</var>, <var>DEPTH</var>)</code></p>
+<p class="h5 fs fs-last"><code>solid.Shape: <var>S</var> = <b>hole</b> (&hellip;, <var>Name</var>, <var>Value</var>, &hellip;)</code></p>
+<p> </p>
+<p> <code><var>S</var> = hole (<var>S</var>, <var>P</var>, <var>D</var>, <var>DEPTH</var>)</code> drills a
+ hole of diameter <var>D</var> millimetres at every row of the
+ <em class="math">M</em>-by-3 matrix <var>P</var>, each starting at its point and running
+ down the <em class="math">z</em> axis, <var>DEPTH</var> millimetres deep.  An
+ <code>Inf</code> <var>DEPTH</var> drills right through, however thick the part.
+ The point is where the hole&rsquo;s axis meets the surface of the part, and
+ <var>DEPTH</var> is measured from it, as a drawing dimensions a hole.  The
+ drill comes from outside: everything on the axis before the point is
+ cleared too, at the widest diameter of the hole, so a hole entering a
+ sloping or curved face is clean all round.  A hole started under
+ material that its axis passes through first cuts that material as
+ well.  All the holes are cut in one operation.
+</p>
+<p> <var>D</var> may instead name an ISO metric coarse thread, such as
+ <code>'M6'</code> or <code>'M2.5'</code>, from M1 to M64: the hole is then drilled
+ at the tapping size for that thread, its nominal diameter less its
+ pitch, so <code>'M6'</code> drills 5 millimetres.  The thread itself is not
+ modelled.
+</p>
+<p> Name/Value pairs shape the hole:
+</p>
+<dl compact="compact">
+<dt> <code>'Direction'</code></dt>
+<dd> The nonzero 3-element direction the holes run in from their points,
+ <code>[0, 0, -1]</code> by default.</dd>
+<dt> <code>'Counterbore'</code></dt>
+<dd> <code>[<var>CD</var>, <var>CDEPTH</var>]</code>: a flat-bottomed bore of diameter
+ <var>CD</var>, wider than the hole, <var>CDEPTH</var> deep, shallower than the
+ hole, for the head of a cap screw.</dd>
+<dt> <code>'Countersink'</code></dt>
+<dd> <var>CD</var> or <code>[<var>CD</var>, <var>ANGLE</var>]</code>: a conical seat of diameter
+ <var>CD</var> at the surface, wider than the hole, with an included angle of
+ <var>ANGLE</var> degrees, 90 by default as for ISO countersunk screws.  It
+ must be shallower than the hole.</dd>
+<dt> <code>'Tip'</code></dt>
+<dd> The included angle in degrees of the cone a twist drill leaves at the
+ bottom of a blind hole, 118 for a standard drill.  It is beyond
+ <var>DEPTH</var>, which is measured to the full diameter as a drawing
+ dimensions it.  By default a blind hole is flat-bottomed.</dd>
+</dl>
+
+<p> A counterbore and a countersink cannot both be given, and a tip applies
+ only to a blind hole.  Drilling the empty shape leaves it empty.
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example"> ## A plate with four counterbored holes for M6 cap screws
+ S = solid.box (80, 40, 12);
+ P = [10, 10, 12; 70, 10, 12; 10, 30, 12; 70, 30, 12];
+ S = hole (S, P, 6.6, Inf, 'Counterbore', [11, 6.5]);
+</pre></td></tr></table>
+
+<p> <strong>See also: </strong>
+  <a href="solid.Shape.html#solid_Shape_subtract">solid.Shape.subtract</a>, 
+  <a href="solid.cylinder.html">solid.cylinder</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#solid_Shape_pocket"
+              aria-expanded="false" aria-controls="solid_Shape_pocket">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>pocket</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Cut a pocket into a shape.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="solid_Shape_pocket">
+            <div class="border-bottom py-2">
+<p class="h5 fs"><code>solid.Shape: <var>S</var> = <b>pocket</b> (<var>S</var>, <var>R</var>, <var>DEPTH</var>)</code></p>
+<p class="h5 fs fs-last"><code>solid.Shape: <var>S</var> = <b>pocket</b> (&hellip;, <code>'Taper'</code>, <var>A</var>)</code></p>
+<p> </p>
+<p> <code><var>S</var> = pocket (<var>S</var>, <var>R</var>, <var>DEPTH</var>)</code> cuts the
+ <code>geom.Region</code> <var>R</var> into <var>S</var>, <var>DEPTH</var> millimetres deep
+ from the region&rsquo;s plane, against the normal of its <code>geom.UCS</code>:
+ a recess, a slot, a cavity.  Lay the region on a face with the face&rsquo;s
+ UCS, whose normal points out of the part, as <code>geom.UCS (<var>V</var>)</code>
+ picks one.  An <code>Inf</code> <var>DEPTH</var> cuts right through.
+</p>
+<p> The holes of the region are left standing as islands, so a pocket round
+ a boss is one region with the boss as its hole, and <code>fillet</code> on
+ the region rounds the pocket&rsquo;s corners as a milling cutter leaves them.
+</p>
+<p> The cutter comes from outside, as for <code>solid.Shape.hole</code>:
+ everything inside the outline beyond the region&rsquo;s plane, on the side its
+ normal points to, is cleared too, so a pocket drawn on a sloping or
+ uneven face is clean all round.  A pocket drawn under material that its
+ outline passes through first cuts that material as well.
+</p>
+<p> <code><var>S</var> = pocket (&hellip;, <code>'Taper'</code>, <var>A</var>)</code> leans the
+ pocket&rsquo;s walls in by <var>A</var> degrees as they go deeper, the draft of a
+ moulded recess, as <code>solid.extrude</code> tapers a wall; the islands
+ widen to match.  <var>A</var> is in the range <em class="math">(-90, 90)</em>.  A region
+ with splines takes no taper, as for <code>solid.extrude</code>.
+</p>
+<p> Pocketing the empty shape leaves it empty.
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example"> ## A slot 30 by 8 with round ends, 4 deep in the top of a plate
+ S = solid.box (80, 40, 12);
+ R = geom.Region ([25, 16, 0; 55, 16, 1; 55, 24, 0; 25, 24, 1]);
+ R.UCS = geom.UCS ([0, 0, 1], [0, 0, 12]);
+ S = pocket (S, R, 4);
+</pre></td></tr></table>
+
+<p> <strong>See also: </strong>
+  <a href="solid.Shape.html#solid_Shape_hole">solid.Shape.hole</a>, 
+  <a href="solid.extrude.html">solid.extrude</a>, 
+  <a href="geom.Region.html#geom_Region_fillet">geom.Region.fillet</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#solid_Shape_section"
+              aria-expanded="false" aria-controls="solid_Shape_section">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>section</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Cut a shape with a plane.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="solid_Shape_section">
+            <div class="border-bottom py-2">
+<p class="h5 fs fs-last"><code>solid.Shape: <var>R</var> = <b>section</b> (<var>S</var>, <var>U</var>)</code></p>
+<p> </p>
+<p> <code><var>R</var> = section (<var>S</var>, <var>U</var>)</code> cuts the shape <var>S</var> with
+ the plane of the <code>geom.UCS</code> <var>U</var> and returns the cut as a
+ 1-by-<em class="math">N</em> cell array of <code>geom.Region</code> objects in <var>U</var>, one
+ for each separate piece of it, largest first.  A piece is an outline
+ with the holes in it; a piece standing in a hole of another is a piece
+ of its own.  A face of <var>S</var> lying in the plane is part of the cut, so
+ a box cut in the plane of its base gives its base.  Where the plane
+ only touches <var>S</var>, along an edge or at a point, or misses it, the cut
+ has no area and <var>R</var> is the empty <code>cell (1, 0)</code>.
+</p>
+<p> The cut is exact enough to build from again.  Straight edges are
+ straight segments and circles are arcs, a whole circle two half arcs.
+ An ellipse or another conic, as a plane cuts from a cylinder or a cone at
+ a slant, is a rational <code>geom.Spline</code> that follows it exactly; any
+ other curve, as from a torus or a spline surface, is the B-spline Open
+ CASCADE computes for it.
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example"> ## A plate with a bore, cut through the middle and made again
+ S = solid.extrude (geom.Region ([0, 0; 60, 0; 60, 40; 0, 40], ...
+                                 {[20, 20, 1; 40, 20, 1]}), 8);
+ R = section (S, geom.UCS ([0, 0, 1], [0, 0, 4]));
+ T = solid.extrude (R{1}, 2);
+</pre></td></tr></table>
+
+<p> <strong>See also: </strong>
+  <a href="geom.Region.html">geom.Region</a>, 
+  <a href="geom.UCS.html">geom.UCS</a>, 
+  <a href="solid.extrude.html">solid.extrude</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#solid_Shape_projection"
+              aria-expanded="false" aria-controls="solid_Shape_projection">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>projection</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Outline of a shape seen along a direction.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="solid_Shape_projection">
+            <div class="border-bottom py-2">
+<p class="h5 fs"><code>solid.Shape: <var>R</var> = <b>projection</b> (<var>S</var>)</code></p>
+<p class="h5 fs fs-last"><code>solid.Shape: <var>R</var> = <b>projection</b> (<var>S</var>, <var>U</var>)</code></p>
+<p> </p>
+<p> <code><var>R</var> = projection (<var>S</var>, <var>U</var>)</code> projects the shape <var>S</var>
+ along the normal of the <code>geom.UCS</code> <var>U</var> onto its plane and
+ returns the area it covers as a 1-by-<em class="math">N</em> cell array of
+ <code>geom.Region</code> objects in <var>U</var>, one for each separate piece of
+ it, largest first.  This is the shadow the shape casts on the plane in
+ light falling along the normal: a bore seen along its axis is a hole in
+ the outline, and seen from the side it is not there.  A piece standing
+ in a hole of another is a piece of its own.  Where the plane lies along
+ its normal changes only the plane the regions lie in.  The empty shape
+ has no outline, and <var>R</var> is the empty <code>cell (1, 0)</code>.
+</p>
+<p> <code><var>R</var> = projection (<var>S</var>)</code> projects onto the <em class="math">xy</em> plane,
+ as seen from above, which is what OpenSCAD&rsquo;s <code>projection</code> does.
+</p>
+<p> The outline is drawn from the edges of <var>S</var> and the outlines of its
+ curved faces.  Straight edges are straight segments and a circle seen
+ square on is a circle; a circle seen at a slant is the ellipse it makes,
+ and the outline of a cylinder, a cone or a sphere is exact too.  That of
+ a torus or of a spline surface is the B-spline Open CASCADE fits to it.
+ <code>section</code> cuts a shape with a plane instead.
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example"> ## A plate with a bore, seen from above and from the front
+ S = subtract (solid.box (80, 40, 12), ...
+               translate (solid.cylinder (4, 12), [20, 20, 0]));
+ top = projection (S);
+ numel (top{1}.Holes)
+ &rArr; 1
+ front = projection (S, geom.UCS ([0, -1, 0], [0, 0, 0]));
+ numel (front{1}.Holes)
+ &rArr; 0
+</pre></td></tr></table>
+
+<p> <strong>See also: </strong>
+  <a href="solid.Shape.html#solid_Shape_section">solid.Shape.section</a>, 
+  <a href="geom.Region.html">geom.Region</a>, 
+  <a href="geom.UCS.html">geom.UCS</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#solid_Shape_hull"
+              aria-expanded="false" aria-controls="solid_Shape_hull">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>hull</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+The convex hull of shapes and points.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="solid_Shape_hull">
+            <div class="border-bottom py-2">
+<p class="h5 fs"><code>solid.Shape: <var>H</var> = <b>hull</b> (<var>A</var>, <var>B</var>, &hellip;)</code></p>
+<p class="h5 fs fs-last"><code>solid.Shape: <var>H</var> = <b>hull</b> (&hellip;, <code>'Tolerance'</code>, <var>TOL</var>)</code></p>
+<p> </p>
+<p> <code><var>H</var> = hull (<var>A</var>, <var>B</var>, &hellip;)</code> returns the smallest
+ convex solid that holds every shape and point given, the shape a sheet
+ shrunk round them takes.  Each argument is a <code>solid.Shape</code> or an
+ <em class="math">N</em>-by-3 matrix of points.  This is OpenSCAD&rsquo;s <code>hull</code> of
+ solids: a slot from two cylinders, a rounded block from eight spheres
+ at its corners, a tapered arm from the bosses at its ends.  Empty
+ shapes add nothing, and the hull of nothing is the empty shape.
+</p>
+<p> The hull has flat faces.  The surface of each shape is taken as the
+ points of a triangulation that strays no further than <var>TOL</var> from
+ it, 0.01 by default, so the hull lies inside the exact one by at most
+ <var>TOL</var>; where the exact hull is flat, as between boxes, it is exact
+ and its triangles meet as whole faces.  Open CASCADE has no exact hull
+ of curved faces.
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example"> ## A slot 30 long and 10 wide, 4 deep, cut through a plate
+ C = solid.cylinder (5, 4);
+ slot = hull (C, translate (C, [20, 0, 0]));
+ plate = subtract (translate (solid.box (50, 30, 4), [-15, -15, 0]), ...
+                   slot);
+</pre></td></tr></table>
+
+<p> <strong>See also: </strong>
+  <a href="geom.Region.html#geom_Region_hull">geom.Region.hull</a>, 
+  <a href="solid.polyhedron.html">solid.polyhedron</a>, 
+  <a href="solid.Shape.html#solid_Shape_union">solid.Shape.union</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#solid_Shape_resize"
+              aria-expanded="false" aria-controls="solid_Shape_resize">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>resize</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Scale a shape to a size.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="solid_Shape_resize">
+            <div class="border-bottom py-2">
+<p class="h5 fs"><code>solid.Shape: <var>S</var> = <b>resize</b> (<var>S</var>, <var>SZ</var>)</code></p>
+<p class="h5 fs fs-last"><code>solid.Shape: <var>S</var> = <b>resize</b> (<var>S</var>, <var>SZ</var>, <code>'Uniform'</code>, <var>TF</var>)</code></p>
+<p> </p>
+<p> <code><var>S</var> = resize (<var>S</var>, <var>SZ</var>)</code> scales the shape evenly so
+ that its bounding box is as large as it can be within the sizes
+ <code><var>SZ</var> = [<var>x</var>, <var>y</var>, <var>z</var>]</code> in millimetres; a size of
+ 0 leaves that direction free.  <code>resize (<var>S</var>, [30, 0, 0])</code>
+ makes the shape 30 long in <em class="math">x</em> and keeps its proportions.  The
+ corner of the box at the least <em class="math">x</em>, <em class="math">y</em> and <em class="math">z</em> stays
+ where it is, and every face keeps its type: a cylinder stays a
+ cylinder.
+</p>
+<p> With <code>'Uniform'</code> set to <code>false</code> each direction given is
+ scaled to its size on its own and a direction left at 0 keeps its
+ size, as OpenSCAD&rsquo;s <code>resize</code> does.  Flat faces stay planes, but a
+ curved face stretched so is no longer a cylinder, a cone or a sphere:
+ Open CASCADE carries it as the exact B-spline surface it becomes, so
+ <code>solid.Shape.faces</code> finds a stretched cylinder among the faces of
+ type <code>'bspline'</code>, not <code>'cylinder'</code>.
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example"> ## A sphere of diameter 10 stretched into an ellipsoid 40 by 20 by 10
+ E = resize (solid.sphere (5), [40, 20, 0], 'Uniform', false);
+</pre></td></tr></table>
+
+<p> <strong>See also: </strong>
+  <a href="solid.Shape.html#solid_Shape_scale">solid.Shape.scale</a>, 
+  <a href="solid.ellipsoid.html">solid.ellipsoid</a>, 
+  <a href="geom.Region.html#geom_Region_resize">geom.Region.resize</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#solid_Shape_copy"
+              aria-expanded="false" aria-controls="solid_Shape_copy">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>copy</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Copies of a shape, united.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="solid_Shape_copy">
+            <div class="border-bottom py-2">
+<p class="h5 fs fs-last"><code>solid.Shape: <var>C</var> = <b>copy</b> (<var>S</var>, <var>D</var>)</code></p>
+<p> </p>
+<p> <code><var>C</var> = copy (<var>S</var>, <var>D</var>)</code> places a copy of the shape
+ moved by each row of <var>D</var>, an <em class="math">N</em>-by-3 matrix of offsets in
+ millimetres, and returns them as one shape, united as
+ <code>solid.Shape.union</code> unites shapes.  The shape itself is among them
+ only where a row of <var>D</var> is zero.  Copies apart from one another are
+ kept side by side, separate solids of the one shape, with no boolean
+ to compute; only copies that overlap or touch are fused, so a hundred
+ pins standing apart cost little more than one.  This is OpenSCAD&rsquo;s
+ <code>for</code> loop of <code>translate</code>.
+</p>
+<p> <strong>See also: </strong>
+  <a href="solid.Shape.html#solid_Shape_rectarray">solid.Shape.rectarray</a>, 
+  <a href="solid.Shape.html#solid_Shape_polararray">solid.Shape.polararray</a>, 
+  <a href="geom.Region.html#geom_Region_copy">geom.Region.copy</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#solid_Shape_rectarray"
+              aria-expanded="false" aria-controls="solid_Shape_rectarray">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>rectarray</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Copies of a shape in rows, columns and layers, united.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="solid_Shape_rectarray">
+            <div class="border-bottom py-2">
+<p class="h5 fs fs-last"><code>solid.Shape: <var>C</var> = <b>rectarray</b> (<var>S</var>, <var>COUNT</var>, <var>SPACING</var>)</code></p>
+<p> </p>
+<p> <code><var>C</var> = rectarray (<var>S</var>, <var>COUNT</var>, <var>SPACING</var>)</code> places
+ <code><var>COUNT</var> = [<var>nx</var>, <var>ny</var>, <var>nz</var>]</code> copies of the shape
+ along the <em class="math">x</em>, <em class="math">y</em> and <em class="math">z</em> axes, <code><var>SPACING</var> =
+ [<var>dx</var>, <var>dy</var>, <var>dz</var>]</code> millimetres apart, the first where the
+ shape is; a negative spacing runs the other way.  It returns them as one
+ shape, as <code>solid.Shape.copy</code> does.  This is a grid of holes cut
+ into a plate in one subtraction, or of ribs, pins or bosses standing on
+ it.
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example"> ## A plate 70 by 50 with four rows of six holes of diameter 4
+ H = rectarray (translate (solid.cylinder (2, 5), [10, 10, 0]), ...
+                [6, 4, 1], [10, 10, 0]);
+ P = subtract (solid.box (70, 50, 5), H);
+</pre></td></tr></table>
+
+<p> <strong>See also: </strong>
+  <a href="solid.Shape.html#solid_Shape_copy">solid.Shape.copy</a>, 
+  <a href="solid.Shape.html#solid_Shape_polararray">solid.Shape.polararray</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#solid_Shape_polararray"
+              aria-expanded="false" aria-controls="solid_Shape_polararray">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>polararray</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Copies of a shape round an axis, united.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="solid_Shape_polararray">
+            <div class="border-bottom py-2">
+<p class="h5 fs"><code>solid.Shape: <var>C</var> = <b>polararray</b> (<var>S</var>, <var>N</var>, <var>ANGLE</var>)</code></p>
+<p class="h5 fs"><code>solid.Shape: <var>C</var> = <b>polararray</b> (<var>S</var>, <var>N</var>, <var>ANGLE</var>, <var>AXIS</var>)</code></p>
+<p class="h5 fs"><code>solid.Shape: <var>C</var> = <b>polararray</b> (<var>S</var>, <var>N</var>, <var>ANGLE</var>, <var>AXIS</var>, <var>P</var>)</code></p>
+<p class="h5 fs fs-last"><code>solid.Shape: <var>C</var> = <b>polararray</b> (&hellip;, <code>'Rotate'</code>, <var>TF</var>)</code></p>
+<p> </p>
+<p> <code><var>C</var> = polararray (<var>S</var>, <var>N</var>, <var>ANGLE</var>, <var>AXIS</var>,
+ <var>P</var>)</code> places <var>N</var> copies of the shape round the axis through the
+ point <var>P</var> in the direction <var>AXIS</var>, the <em class="math">z</em> axis through the
+ origin by default, the first where the shape is and the rest turned on
+ by the right-hand rule, the other way for a negative <var>ANGLE</var>.  A
+ whole turn, <var>ANGLE</var> of 360, spaces them evenly <code><var>ANGLE</var> /
+ <var>N</var></code> apart; a part of a turn puts one at each end, <code><var>ANGLE</var>
+ / (<var>N</var> - 1)</code> apart.  It returns them as one shape, as
+ <code>solid.Shape.copy</code> does.
+</p>
+<p> Each copy is turned as it goes round, as the holes of a bolt circle,
+ the teeth of a wheel or the blades of a fan are.  With
+ <code>'Rotate'</code> set to <code>false</code> each copy keeps the shape&rsquo;s own
+ direction, moved as the centre of its bounding box moves.
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example"> ## A flange of diameter 60 with six bolt holes of 6 on a circle of 40
+ H = polararray (translate (solid.cylinder (3, 8), [20, 0, 0]), 6, 360);
+ F = subtract (solid.cylinder (30, 8), solid.cylinder (10, 8), H);
+</pre></td></tr></table>
+
+<p> <strong>See also: </strong>
+  <a href="solid.Shape.html#solid_Shape_copy">solid.Shape.copy</a>, 
+  <a href="solid.Shape.html#solid_Shape_rectarray">solid.Shape.rectarray</a>, 
+  <a href="solid.Shape.html#solid_Shape_rotate">solid.Shape.rotate</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </body>
+</html>

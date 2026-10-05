@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Geometry, CAD Input/Output and Technical Drawing: geom.Polyline</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" integrity="sha512-1ycn6IcaQQ40/MKBW2W4Rhis/DbILU74C1vSrLJxCq57o941Ym01SwNsOMqvEBFlcgUa6xLiPY/NS5R+E6ztJQ==" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/css/bootstrap.min.css" integrity="sha384-KyZXEAg3QhqLMpG8r+8fhAXLRk2vvoC2f3B09zVXn8CA5QIVfZOJ3BCsw2P0p/We" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-U1DAWAznBHeqEIlVSCgzq+c9gqGAJn5c/t99JyeKa9xxaYpSvHU5awsuZVVFIhvj" crossorigin="anonymous"></script>
+    <script type="text/javascript" async
+      src="https://cdn.jsdelivr.net/npm/mathjax@2/MathJax.js?config=TeX-AMS_CHTML">
+    </script>
+    <script type="text/javascript">
+      window.addEventListener("load", () => {
+        for (let i of document.querySelectorAll(".collapse ul")) {
+          let tog = document.createElement("div");
+          tog.innerHTML = i.previousSibling.textContent;
+          tog.className = "toggle";
+          tog.onclick = () => tog.classList.toggle("show");
+          i.parentElement.removeChild(i.previousSibling);
+          i.parentElement.insertBefore(tog, i);
+        }
+      });
+      // Open the collapsible demo an "#example" link points to, then scroll to
+      // it.  getElementById (not querySelector) matches ids that contain a dot,
+      // e.g. "Class.method-example1".
+      function openHashTarget () {
+        if (! window.location.hash) { return; }
+        let el = document.getElementById (
+          decodeURIComponent (window.location.hash.slice (1)));
+        if (! el) { return; }
+        if (el.classList.contains ("collapse") &&
+            ! el.classList.contains ("show")) {
+          bootstrap.Collapse.getOrCreateInstance (el).show ();
+        }
+        el.scrollIntoView ();
+      }
+      window.addEventListener ("DOMContentLoaded", openHashTarget);
+      window.addEventListener ("hashchange", openHashTarget);
+      // When the collapsible named by the current URL fragment is collapsed,
+      // drop the fragment (replaceState: no scroll, no history entry).  Otherwise
+      // the fragment would still equal this id, so clicking the same #example
+      // link again fires no "hashchange" and the example would not re-expand.
+      document.addEventListener ("hide.bs.collapse", (e) => {
+        if (e.target.id && window.location.hash === "#" + e.target.id) {
+          history.replaceState (null, "",
+            window.location.pathname + window.location.search);
+        }
+      });
+      // Let the browser's find-in-page reach the text inside a collapsed
+      // panel.  The attribute "hidden=until-found" is what makes content
+      // searchable and revealable; the style block below clears the
+      // "display: none" that would otherwise stop the attribute meaning
+      // anything, a box that is not generated having nothing to reveal.  Set
+      // it only where it is understood, which "content-visibility" is no test
+      // for, Firefox having shipped the two apart.  Where it is not, the panel
+      // keeps the user agent's plain [hidden] and the page behaves as before.
+      window.addEventListener ("DOMContentLoaded", () => {
+        if (! ("onbeforematch" in document.body)) { return; }
+        document.documentElement.classList.add ("until-found");
+        let panels = document.querySelectorAll (
+          ".collapse:not(.show):not(.navbar-collapse)");
+        for (let el of panels) {
+          el.setAttribute ("hidden", "until-found");
+          // Fired on a find-in-page hit, before the browser drops the
+          // attribute and scrolls to it.  Bootstrap keeps a panel's state in
+          // its class list, so adding the class here opens the panel in the
+          // same frame and leaves the button shutting it correctly afterwards.
+          // Bootstrap's own show () would animate against that scroll, and the
+          // attribute once dropped, "display: none" would take the panel back
+          // part way through.
+          el.addEventListener ("beforematch", () => {
+            el.classList.add ("show");
+            for (let b of document.querySelectorAll ("[data-bs-target]")) {
+              if (b.getAttribute ("data-bs-target") === "#" + el.id) {
+                b.setAttribute ("aria-expanded", "true");
+              }
+            }
+          });
+        }
+        // Drop the attribute before Bootstrap measures the panel it is opening,
+        // which it does after firing this; a revealable one measures nothing.
+        document.addEventListener ("show.bs.collapse", (e) => {
+          e.target.removeAttribute ("hidden");
+        });
+        // Restore it once the panel is shut, rather than while it is shutting.
+        document.addEventListener ("hidden.bs.collapse", (e) => {
+          if (! e.target.classList.contains ("navbar-collapse")) {
+            e.target.setAttribute ("hidden", "until-found");
+          }
+        });
+      });
+    </script>
+    <style>
+    .fs {
+    margin-top: -0.15em;
+    margin-bottom: -0.15em;
+    }
+    .fs-last {
+    margin-bottom: calc(1rem - 0.15em);
+    }
+    p.description {
+    font-family: Consolas, "Courier New", monospace;
+    }
+    p.description code {
+    font-size: inherit;
+    }
+    h6:hover {
+      color: gray;
+    }
+    code {
+    font-family: Consolas, "Courier New", monospace;
+    border-radius: 0.3em;
+    white-space: nowrap;
+    color: gray;
+    }
+    code.description {
+    font-family: Consolas, "Courier New", monospace;
+    border-radius: 0.3em;
+    white-space: normal;
+    font-size:1.2em;
+    color: gray;
+    }
+    var {
+    font-family: Consolas, "Courier New", monospace;
+    border-radius: 0.3em;
+    font-style: normal;
+    font-weight: bold;
+    color: gray;
+    }
+    td {
+      vertical-align: top;
+    }
+    [id^="togList"],                        /* HIDE CHECKBOX */
+    [id^="togList"] ~ .list,                /* HIDE LIST */
+    [id^="togList"] + label  span + span,   /* HIDE "Collapse" */
+    [id^="togList"]:checked + label span{   /* HIDE "Expand" (IF CHECKED) */
+      display:none;
+    }
+    [id^="togList"]:checked + label span + span{
+      display:inline-block;                 /* SHOW "Collapse" (IF CHECKED) */
+    }
+    [id^="togList"]:checked ~ .list{
+      display:block;                        /* SHOW LIST (IF CHECKED) */
+    }
+    /* Bootstrap hides a collapsed panel with "display: none", which generates
+       no box, so the "content-visibility: hidden" the user agent gives
+       "hidden=until-found" could never apply and the text would stay beyond
+       find-in-page.  Clear that one declaration, and only where the script
+       above has found the attribute to be understood: an attribute selector
+       matches a value the browser does not understand, so an ungated rule
+       would leave every panel of an older browser standing open.  The
+       "!important" is required rather than decoration: the reboot carries
+       "[hidden] {display: none !important}", which the attribute itself brings
+       into play, and only another "!important" can outrank it. */
+    html.until-found .collapse[hidden="until-found"]:not(.show) {
+      display: block !important;
+    }
+    </style>
+  </head>
+  <body>
+    <div class="bg-dark">
+      <div class="container-xl">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+          <div class="container-fluid">
+            <a class="navbar-brand" href=index.html>
+              <img src="assets/drafting.png" alt="drafting" class="d-inline-block align-top" width="25" height="25">
+              Geometry, CAD Input/Output and Technical Drawing
+            </a>
+            <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+              <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+              <ul class="navbar-nav">
+                <li class="nav-item">
+                  <a class="nav-link" href="index.html#Polylines and regions">
+                    <i class="fas fa-list-alt"></i>
+                    Polylines and regions
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="https://gnu-octave.github.io/packages/">
+                  <img src="assets/octave-logo.svg" alt="GNU Octave logo" class="d-inline-block align-top" width="25" height="25">
+                    Octave Packages
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="https://www.octave.org">
+                    <i class="fas fa-home"></i>
+                    GNU Octave website
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </nav>
+      </div>
+    </div>
+    <div class="container-xl my-4">
+      <div class="row flex-nowrap" style="min-height:0">
+        <div class="col-md-2 bg-light" style="overflow-y: scroll; width: 250px;">
+          <div class="p-2" style="text-align: center;">
+            <h3>Categories &</h3>
+            <h4 style="color: blue">Functions List</h4>
+          </div>
+			<div class="row">
+				<input id="togList1" type="checkbox" checked>
+				<label for="togList1">
+					<span><h6>Polylines and regions</h6></span>
+					<span><h6>Polylines and regions</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="geom.Polyline.html" class="text-decoration-none font-monospace fw-bolder"><small>geom.Polyline</small></a></li>
+					<li><a href="geom.Spline.html" class="text-decoration-none font-monospace"><small>geom.Spline</small></a></li>
+					<li><a href="geom.Region.html" class="text-decoration-none font-monospace"><small>geom.Region</small></a></li>
+					<li><a href="geom.Path.html" class="text-decoration-none font-monospace"><small>geom.Path</small></a></li>
+					<li><a href="geom.UCS.html" class="text-decoration-none font-monospace"><small>geom.UCS</small></a></li>
+					<li><a href="geom.text.html" class="text-decoration-none font-monospace"><small>geom.text</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList2" type="checkbox">
+				<label for="togList2">
+					<span><h6>Geometry primitives</h6></span>
+					<span><h6>Geometry primitives</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="geom.signedarea.html" class="text-decoration-none font-monospace"><small>geom.signedarea</small></a></li>
+					<li><a href="geom.bbox.html" class="text-decoration-none font-monospace"><small>geom.bbox</small></a></li>
+					<li><a href="geom.centroid.html" class="text-decoration-none font-monospace"><small>geom.centroid</small></a></li>
+					<li><a href="geom.transform.html" class="text-decoration-none font-monospace"><small>geom.transform</small></a></li>
+					<li><a href="geom.isrectilinear.html" class="text-decoration-none font-monospace"><small>geom.isrectilinear</small></a></li>
+					<li><a href="geom.offset.html" class="text-decoration-none font-monospace"><small>geom.offset</small></a></li>
+					<li><a href="geom.largestrect.html" class="text-decoration-none font-monospace"><small>geom.largestrect</small></a></li>
+					<li><a href="geom.triangulate.html" class="text-decoration-none font-monospace"><small>geom.triangulate</small></a></li>
+					<li><a href="geom.hatchlines.html" class="text-decoration-none font-monospace"><small>geom.hatchlines</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList3" type="checkbox">
+				<label for="togList3">
+					<span><h6>Curve geometry</h6></span>
+					<span><h6>Curve geometry</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="geom.curvature.html" class="text-decoration-none font-monospace"><small>geom.curvature</small></a></li>
+					<li><a href="geom.curvesample.html" class="text-decoration-none font-monospace"><small>geom.curvesample</small></a></li>
+					<li><a href="geom.curveoffset.html" class="text-decoration-none font-monospace"><small>geom.curveoffset</small></a></li>
+					<li><a href="geom.selfintersects.html" class="text-decoration-none font-monospace"><small>geom.selfintersects</small></a></li>
+					<li><a href="geom.arclength.html" class="text-decoration-none font-monospace"><small>geom.arclength</small></a></li>
+					<li><a href="geom.resample.html" class="text-decoration-none font-monospace"><small>geom.resample</small></a></li>
+					<li><a href="geom.simplify.html" class="text-decoration-none font-monospace"><small>geom.simplify</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList4" type="checkbox">
+				<label for="togList4">
+					<span><h6>Construction geometry</h6></span>
+					<span><h6>Construction geometry</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="geom.intersectlines.html" class="text-decoration-none font-monospace"><small>geom.intersectlines</small></a></li>
+					<li><a href="geom.intersectcircle.html" class="text-decoration-none font-monospace"><small>geom.intersectcircle</small></a></li>
+					<li><a href="geom.intersectcircles.html" class="text-decoration-none font-monospace"><small>geom.intersectcircles</small></a></li>
+					<li><a href="geom.tangentpoints.html" class="text-decoration-none font-monospace"><small>geom.tangentpoints</small></a></li>
+					<li><a href="geom.fillet.html" class="text-decoration-none font-monospace"><small>geom.fillet</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList5" type="checkbox">
+				<label for="togList5">
+					<span><h6>DXF input and output</h6></span>
+					<span><h6>DXF input and output</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="geom.read.html" class="text-decoration-none font-monospace"><small>geom.read</small></a></li>
+					<li><a href="geom.write.html" class="text-decoration-none font-monospace"><small>geom.write</small></a></li>
+					<li><a href="draw.read.html" class="text-decoration-none font-monospace"><small>draw.read</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList6" type="checkbox">
+				<label for="togList6">
+					<span><h6>Meshes</h6></span>
+					<span><h6>Meshes</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="polymesh.Mesh.html" class="text-decoration-none font-monospace"><small>polymesh.Mesh</small></a></li>
+					<li><a href="polymesh.read.html" class="text-decoration-none font-monospace"><small>polymesh.read</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList7" type="checkbox">
+				<label for="togList7">
+					<span><h6>Sheet composition</h6></span>
+					<span><h6>Sheet composition</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="draw.titleblock.html" class="text-decoration-none font-monospace"><small>draw.titleblock</small></a></li>
+					<li><a href="draw.coordtable.html" class="text-decoration-none font-monospace"><small>draw.coordtable</small></a></li>
+					<li><a href="draw.symbol.html" class="text-decoration-none font-monospace"><small>draw.symbol</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList8" type="checkbox">
+				<label for="togList8">
+					<span><h6>Line types and colours</h6></span>
+					<span><h6>Line types and colours</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="draw.linetype.html" class="text-decoration-none font-monospace"><small>draw.linetype</small></a></li>
+					<li><a href="draw.colour.html" class="text-decoration-none font-monospace"><small>draw.colour</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList9" type="checkbox">
+				<label for="togList9">
+					<span><h6>Drawing model</h6></span>
+					<span><h6>Drawing model</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="draw.Drawing.html" class="text-decoration-none font-monospace"><small>draw.Drawing</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList10" type="checkbox">
+				<label for="togList10">
+					<span><h6>Solid modelling</h6></span>
+					<span><h6>Solid modelling</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="solid.Shape.html" class="text-decoration-none font-monospace"><small>solid.Shape</small></a></li>
+					<li><a href="solid.box.html" class="text-decoration-none font-monospace"><small>solid.box</small></a></li>
+					<li><a href="solid.wedge.html" class="text-decoration-none font-monospace"><small>solid.wedge</small></a></li>
+					<li><a href="solid.cylinder.html" class="text-decoration-none font-monospace"><small>solid.cylinder</small></a></li>
+					<li><a href="solid.cone.html" class="text-decoration-none font-monospace"><small>solid.cone</small></a></li>
+					<li><a href="solid.sphere.html" class="text-decoration-none font-monospace"><small>solid.sphere</small></a></li>
+					<li><a href="solid.ellipsoid.html" class="text-decoration-none font-monospace"><small>solid.ellipsoid</small></a></li>
+					<li><a href="solid.torus.html" class="text-decoration-none font-monospace"><small>solid.torus</small></a></li>
+					<li><a href="solid.polyhedron.html" class="text-decoration-none font-monospace"><small>solid.polyhedron</small></a></li>
+					<li><a href="solid.extrude.html" class="text-decoration-none font-monospace"><small>solid.extrude</small></a></li>
+					<li><a href="solid.revolve.html" class="text-decoration-none font-monospace"><small>solid.revolve</small></a></li>
+					<li><a href="solid.loft.html" class="text-decoration-none font-monospace"><small>solid.loft</small></a></li>
+					<li><a href="solid.sweep.html" class="text-decoration-none font-monospace"><small>solid.sweep</small></a></li>
+					<li><a href="solid.helix.html" class="text-decoration-none font-monospace"><small>solid.helix</small></a></li>
+					<li><a href="solid.read.html" class="text-decoration-none font-monospace"><small>solid.read</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList11" type="checkbox">
+				<label for="togList11">
+					<span><h6>Assemblies and viewing</h6></span>
+					<span><h6>Assemblies and viewing</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="model.Assembly.html" class="text-decoration-none font-monospace"><small>model.Assembly</small></a></li>
+					<li><a href="model.read.html" class="text-decoration-none font-monospace"><small>model.read</small></a></li>
+					<li><a href="model.Viewer.html" class="text-decoration-none font-monospace"><small>model.Viewer</small></a></li>
+				</ul>
+				</div>
+			</div>
+
+			  </div>
+			  <div class="col-md-10">
+          <div class="card rounded">
+            <div class="card-header card-header-mod">
+              <div class="row d-flex flex-wrap align-items-center">
+                <h3 class="d-inline-block mr-2">
+                Class&nbsp;Definition: <b><code>geom.Polyline</code></b>
+                </h3>
+              </div>
+            </div>
+            <div class="card-body">
+<p class="h5 description mb-3"><code>drafting: geom.Polyline</code></p>
+<p> A polyline of straight segments and circular arcs, lying in a plane.
+</p>
+<div class="ms-5">
+<p> A <code>geom.Polyline</code> is the package&rsquo;s one representation of an outline
+ that may carry arcs, the polyline of a DXF file.  Its vertices are rows
+ <code>[<var>x</var>, <var>y</var>, <var>bulge</var>]</code> in its own plane, and it is open or
+ closed.  It may cross itself: it is a line in a drawing.  An area to make
+ a solid from is a <code>geom.Region</code>, built from closed polylines.
+</p>
+<p> The bulge of a vertex turns the segment leaving it into a circular arc.
+ It is the tangent of a quarter of the arc&rsquo;s included angle: zero is a
+ straight segment, 1 a semicircle and 0.4142 a quarter circle.  The height
+ of the arc above the middle of its chord is the bulge times half the
+ chord.  A positive bulge is an arc running anticlockwise from the vertex
+ to the next, which puts it to the right of the direction of travel; a
+ negative one runs clockwise, to the left.  So a polyline from
+ <code>[0, 0]</code> to <code>[20, 0]</code> with a bulge of 1 dips <em>below</em> the
+ chord, to <em class="math">y = -10</em>.  Two vertices with a bulge of 1 each make a
+ whole circle.
+</p>
+<p> The vertices are coordinates in the polyline&rsquo;s <code>geom.UCS</code>, so the
+ same outline can be laid on any plane, as a CAD program&rsquo;s user coordinate
+ system lays a sketch on a face.  By default it is the world <em class="math">xy</em>
+ plane, and assigning another UCS moves the polyline onto it.
+</p>
+<p> A <code>geom.Polyline</code> is a value: every change makes a new one.
+</p>
+<p> <strong>See also: </strong>
+  <a href="geom.Region.html">geom.Region</a>, 
+  <a href="geom.UCS.html">geom.UCS</a>, 
+  <a href="draw.Drawing.polyline.html">draw.Drawing.polyline</a>
+</p>
+<p><strong>Source Code: </strong>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/0f84b98/inst/+geom/Polyline.m">geom.Polyline</a>
+</p>
+</div>
+        <p class="lead my-3">The <code>geom.Polyline</code> class contains the following properties:</p>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#geom_Polyline_Vertices"
+              aria-expanded="false" aria-controls="geom_Polyline_Vertices">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>Vertices</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Vertices and bulges
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="geom_Polyline_Vertices">
+            <div class="border-bottom py-2">
+<p> </p>
+<p> The vertices as an <em class="math">N</em>-by-3 matrix <code>[<var>x</var>, <var>y</var>,
+ <var>bulge</var>]</code>, in millimetres in the polyline&rsquo;s plane.
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#geom_Polyline_Closed"
+              aria-expanded="false" aria-controls="geom_Polyline_Closed">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>Closed</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Closed flag
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="geom_Polyline_Closed">
+            <div class="border-bottom py-2">
+<p> </p>
+<p> <code>true</code> when the last vertex is joined back to the first.
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#geom_Polyline_UCS"
+              aria-expanded="false" aria-controls="geom_Polyline_UCS">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>UCS</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Coordinate system of the vertices
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="geom_Polyline_UCS">
+            <div class="border-bottom py-2">
+<p> </p>
+<p> The <code>geom.UCS</code> the vertices are coordinates in, the world
+ <em class="math">xy</em> plane by default.  Assigning another moves the polyline onto
+ it, its shape unchanged in its own coordinates.
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <p class="lead my-3">The <code>geom.Polyline</code> class offers the following public methods:</p>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#geom_Polyline_Polyline"
+              aria-expanded="false" aria-controls="geom_Polyline_Polyline">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>geom.Polyline</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Make a polyline.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="geom_Polyline_Polyline">
+            <div class="border-bottom py-2">
+<p class="h5 fs"><code>geom.Polyline: <var>PL</var> = <b>geom.Polyline</b> (<var>P</var>)</code></p>
+<p class="h5 fs fs-last"><code>geom.Polyline: <var>PL</var> = <b>geom.Polyline</b> (<var>P</var>, <var>Name</var>, <var>Value</var>, &hellip;)</code></p>
+<p> </p>
+<p> <code><var>PL</var> = geom.Polyline (<var>P</var>)</code> makes an open polyline in the
+ world <em class="math">xy</em> plane through the vertices given as rows of <var>P</var>, in
+ millimetres.  <var>P</var> is an <em class="math">N</em>-by-3 matrix <code>[<var>x</var>,
+ <var>y</var>, <var>bulge</var>]</code>, or an <em class="math">N</em>-by-2 matrix of vertices joined by
+ straight segments, with at least two rows.
+</p>
+<p> Name/Value pairs:
+</p>
+<dl compact="compact">
+<dt> <code>'Closed'</code></dt>
+<dd> <code>true</code> to join the last vertex back to the first, <code>false</code> by
+ default.  A closed polyline must <strong>not</strong> repeat its first vertex at
+ the end; a repeat is accepted and dropped.  An open polyline has no
+ segment leaving its last vertex, so the bulge there must be zero.</dd>
+<dt> <code>'UCS'</code></dt>
+<dd> The <code>geom.UCS</code> the vertices are coordinates in, the world
+ <em class="math">xy</em> plane by default.</dd>
+</dl>
+
+<table><tr><td>&nbsp;</td><td><pre class="example"> ## A slot 40 between centres and 12 wide, as one closed polyline
+ PL = geom.Polyline ([0, -6, 0; 40, -6, 1; 40, 6, 0; 0, 6, 1], ...
+                     'Closed', true);
+</pre></td></tr></table>
+
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#geom_Polyline_fillet"
+              aria-expanded="false" aria-controls="geom_Polyline_fillet">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>fillet</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Round the corners of a polyline.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="geom_Polyline_fillet">
+            <div class="border-bottom py-2">
+<p class="h5 fs"><code>geom.Polyline: <var>PL</var> = <b>fillet</b> (<var>PL</var>, <var>RADIUS</var>)</code></p>
+<p class="h5 fs fs-last"><code>geom.Polyline: <var>PL</var> = <b>fillet</b> (<var>PL</var>, <var>RADIUS</var>, <var>IDX</var>)</code></p>
+<p> </p>
+<p> <code><var>PL</var> = fillet (<var>PL</var>, <var>RADIUS</var>)</code> rounds every corner
+ where two straight segments meet with an arc of radius <var>RADIUS</var>
+ millimetres, tangent to both: the corner vertex becomes the two points
+ where the arc meets the segments, joined by the arc.  Corners where an
+ arc meets a segment are left as they are, and so are the two ends of an
+ open polyline.
+</p>
+<p> <code><var>PL</var> = fillet (<var>PL</var>, <var>RADIUS</var>, <var>IDX</var>)</code> rounds
+ only the corners at the vertices indexed by <var>IDX</var>, each of which
+ must be a corner between two straight segments.
+</p>
+<p> A radius too large for a corner, whose arc would run past the end of a
+ segment or into the round of the next corner, is refused.
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example"> ## A plate 60 by 40 with corners of radius 5
+ PL = fillet (geom.Polyline ([0, 0; 60, 0; 60, 40; 0, 40], ...
+                             'Closed', true), 5);
+</pre></td></tr></table>
+
+<p> <strong>See also: </strong>
+  <a href="geom.Region.html#geom_Region_fillet">geom.Region.fillet</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#geom_Polyline_chamfer"
+              aria-expanded="false" aria-controls="geom_Polyline_chamfer">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>chamfer</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Cut the corners of a polyline.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="geom_Polyline_chamfer">
+            <div class="border-bottom py-2">
+<p class="h5 fs"><code>geom.Polyline: <var>PL</var> = <b>chamfer</b> (<var>PL</var>, <var>D</var>)</code></p>
+<p class="h5 fs"><code>geom.Polyline: <var>PL</var> = <b>chamfer</b> (<var>PL</var>, [<var>D1</var>, <var>D2</var>])</code></p>
+<p class="h5 fs"><code>geom.Polyline: <var>PL</var> = <b>chamfer</b> (&hellip;, <var>IDX</var>)</code></p>
+<p class="h5 fs fs-last"><code>geom.Polyline: <var>PL</var> = <b>chamfer</b> (&hellip;, <code>'Angle'</code>, <var>A</var>)</code></p>
+<p> </p>
+<p> <code><var>PL</var> = chamfer (<var>PL</var>, <var>D</var>)</code> cuts every corner where
+ two straight segments meet with a straight segment from <var>D</var>
+ millimetres back along the segment before the corner to <var>D</var> along
+ the segment after it.  Corners where an arc meets a segment are left as
+ they are, and so are the two ends of an open polyline.
+</p>
+<p> <code><var>PL</var> = chamfer (<var>PL</var>, [<var>D1</var>, <var>D2</var>])</code> cuts back
+ <var>D1</var> along the segment before each corner and <var>D2</var> along the
+ segment after it, before and after in the order of the vertices.
+</p>
+<p> <code><var>PL</var> = chamfer (<var>PL</var>, <var>D</var>, <code>'Angle'</code>, <var>A</var>)</code>
+ cuts back <var>D</var> along the segment before each corner, with the cut at
+ <var>A</var> degrees to that segment, so a square corner is cut <code><var>D</var>
+ x <var>A</var></code>, reaching <code><var>D</var> * tand (<var>A</var>)</code> along the segment
+ after it.
+</p>
+<p> <code><var>PL</var> = chamfer (&hellip;, <var>IDX</var>)</code> cuts only the corners at
+ the vertices indexed by <var>IDX</var>, each of which must be a corner
+ between two straight segments.
+</p>
+<p> A cut that would run past the end of a segment, or into the cut or round
+ of the next corner, or an angle at which the cut misses the segment
+ after the corner, is refused.
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example"> ## A plate 60 by 40 with its corners cut 5 by 45 degrees
+ PL = geom.Polyline ([0, 0; 60, 0; 60, 40; 0, 40], 'Closed', true);
+ PL = chamfer (PL, 5);
+</pre></td></tr></table>
+
+<p> <strong>See also: </strong>
+  <a href="geom.Polyline.html#geom_Polyline_fillet">geom.Polyline.fillet</a>, 
+  <a href="geom.Region.html#geom_Region_chamfer">geom.Region.chamfer</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#geom_Polyline_write"
+              aria-expanded="false" aria-controls="geom_Polyline_write">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>write</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Write a polyline to a DXF file.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="geom_Polyline_write">
+            <div class="border-bottom py-2">
+<p class="h5 fs"><code>geom.Polyline: <b>write</b> (<var>PL</var>, <var>FILE</var>)</code></p>
+<p class="h5 fs fs-last"><code>geom.Polyline: <b>write</b> (<var>PL</var>, <var>FILE</var>, <var>Name</var>, <var>Value</var>, &hellip;)</code></p>
+<p> </p>
+<p> <code>write (<var>PL</var>, <var>FILE</var>)</code> writes the polyline <var>PL</var> to
+ <var>FILE</var>, which must end in <code>.dxf</code>, as one <code>LWPOLYLINE</code> of
+ an ASCII DXF drawing.  The entity holds the polyline&rsquo;s plane as its
+ normal and elevation, and the polyline&rsquo;s <code>geom.UCS</code> goes with it
+ as extended data under the application <code>'DRAFTING'</code>, so
+ <code>geom.read</code> gives back the polyline that was written, frame and
+ all.
+</p>
+<p> Name/Value pairs:
+</p>
+<dl compact="compact">
+<dt> <code>'Layer'</code></dt>
+<dd> The layer, <code>'0'</code> by default.</dd>
+<dt> <code>'Linetype'</code></dt>
+<dd> One of the line types of <code>draw.linetype</code>, or any name the
+ receiving program holds; <code>'CONTINUOUS'</code> by default.</dd>
+<dt> <code>'Colour'</code></dt>
+<dd> An AutoCAD colour index from 1 to 256, 256 meaning the layer&rsquo;s colour,
+ which is the default.  True colour came only with R2004.</dd>
+<dt> <code>'Version'</code></dt>
+<dd> <code>'R2000'</code> (<code>AC1015</code>), the default, or <code>'R12'</code>
+ (<code>AC1009</code>) for a program that reads nothing later.  R12 holds
+ lines and arcs, which is what a polyline is made of.</dd>
+<dt> <code>'LTScale'</code></dt>
+<dd> The drawing&rsquo;s line-type scale, 1 by default, written in the header so
+ the dashes look the same wherever the file is opened.</dd>
+</dl>
+
+<p> The drawing units are millimetres.  Several geom objects go in one file
+ through <code>geom.write</code>.
+</p>
+<p> <strong>See also: </strong>
+  <a href="geom.read.html">geom.read</a>, 
+  <a href="geom.write.html">geom.write</a>, 
+  <a href="draw.Drawing.write.html">draw.Drawing.write</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </body>
+</html>

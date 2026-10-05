@@ -47,11 +47,63 @@
             window.location.pathname + window.location.search);
         }
       });
+      // Let the browser's find-in-page reach the text inside a collapsed
+      // panel.  The attribute "hidden=until-found" is what makes content
+      // searchable and revealable; the style block below clears the
+      // "display: none" that would otherwise stop the attribute meaning
+      // anything, a box that is not generated having nothing to reveal.  Set
+      // it only where it is understood, which "content-visibility" is no test
+      // for, Firefox having shipped the two apart.  Where it is not, the panel
+      // keeps the user agent's plain [hidden] and the page behaves as before.
+      window.addEventListener ("DOMContentLoaded", () => {
+        if (! ("onbeforematch" in document.body)) { return; }
+        document.documentElement.classList.add ("until-found");
+        let panels = document.querySelectorAll (
+          ".collapse:not(.show):not(.navbar-collapse)");
+        for (let el of panels) {
+          el.setAttribute ("hidden", "until-found");
+          // Fired on a find-in-page hit, before the browser drops the
+          // attribute and scrolls to it.  Bootstrap keeps a panel's state in
+          // its class list, so adding the class here opens the panel in the
+          // same frame and leaves the button shutting it correctly afterwards.
+          // Bootstrap's own show () would animate against that scroll, and the
+          // attribute once dropped, "display: none" would take the panel back
+          // part way through.
+          el.addEventListener ("beforematch", () => {
+            el.classList.add ("show");
+            for (let b of document.querySelectorAll ("[data-bs-target]")) {
+              if (b.getAttribute ("data-bs-target") === "#" + el.id) {
+                b.setAttribute ("aria-expanded", "true");
+              }
+            }
+          });
+        }
+        // Drop the attribute before Bootstrap measures the panel it is opening,
+        // which it does after firing this; a revealable one measures nothing.
+        document.addEventListener ("show.bs.collapse", (e) => {
+          e.target.removeAttribute ("hidden");
+        });
+        // Restore it once the panel is shut, rather than while it is shutting.
+        document.addEventListener ("hidden.bs.collapse", (e) => {
+          if (! e.target.classList.contains ("navbar-collapse")) {
+            e.target.setAttribute ("hidden", "until-found");
+          }
+        });
+      });
     </script>
     <style>
-    h5.fs {
+    .fs {
     margin-top: -0.15em;
     margin-bottom: -0.15em;
+    }
+    .fs-last {
+    margin-bottom: calc(1rem - 0.15em);
+    }
+    p.description {
+    font-family: Consolas, "Courier New", monospace;
+    }
+    p.description code {
+    font-size: inherit;
     }
     h6:hover {
       color: gray;
@@ -90,6 +142,19 @@
     }
     [id^="togList"]:checked ~ .list{
       display:block;                        /* SHOW LIST (IF CHECKED) */
+    }
+    /* Bootstrap hides a collapsed panel with "display: none", which generates
+       no box, so the "content-visibility: hidden" the user agent gives
+       "hidden=until-found" could never apply and the text would stay beyond
+       find-in-page.  Clear that one declaration, and only where the script
+       above has found the attribute to be understood: an attribute selector
+       matches a value the browser does not understand, so an ungated rule
+       would leave every panel of an older browser standing open.  The
+       "!important" is required rather than decoration: the reboot carries
+       "[hidden] {display: none !important}", which the attribute itself brings
+       into play, and only another "!important" can outrank it. */
+    html.until-found .collapse[hidden="until-found"]:not(.show) {
+      display: block !important;
     }
     </style>
   </head>
@@ -153,6 +218,7 @@
 					<li><a href="draw.Drawing.numentities.html" class="text-decoration-none font-monospace"><small>numentities</small></a></li>
 					<li><a href="draw.Drawing.isempty.html" class="text-decoration-none font-monospace"><small>isempty</small></a></li>
 					<li><a href="draw.Drawing.layers.html" class="text-decoration-none font-monospace"><small>layers</small></a></li>
+					<li><a href="draw.Drawing.layer.html" class="text-decoration-none font-monospace"><small>layer</small></a></li>
 					<li><a href="draw.Drawing.bbox.html" class="text-decoration-none font-monospace"><small>bbox</small></a></li>
 				</ul>
 				</div>
@@ -168,6 +234,9 @@
 					<li><a href="draw.Drawing.line.html" class="text-decoration-none font-monospace"><small>line</small></a></li>
 					<li><a href="draw.Drawing.point.html" class="text-decoration-none font-monospace"><small>point</small></a></li>
 					<li><a href="draw.Drawing.polyline.html" class="text-decoration-none font-monospace"><small>polyline</small></a></li>
+					<li><a href="draw.Drawing.spline.html" class="text-decoration-none font-monospace"><small>spline</small></a></li>
+					<li><a href="draw.Drawing.path.html" class="text-decoration-none font-monospace"><small>path</small></a></li>
+					<li><a href="draw.Drawing.region.html" class="text-decoration-none font-monospace"><small>region</small></a></li>
 					<li><a href="draw.Drawing.arc.html" class="text-decoration-none font-monospace"><small>arc</small></a></li>
 					<li><a href="draw.Drawing.circle.html" class="text-decoration-none font-monospace"><small>circle</small></a></li>
 					<li><a href="draw.Drawing.ellipse.html" class="text-decoration-none font-monospace"><small>ellipse</small></a></li>
@@ -188,6 +257,7 @@
 					<li><a href="draw.Drawing.diam.html" class="text-decoration-none font-monospace"><small>diam</small></a></li>
 					<li><a href="draw.Drawing.radius.html" class="text-decoration-none font-monospace"><small>radius</small></a></li>
 					<li><a href="draw.Drawing.angdim.html" class="text-decoration-none font-monospace"><small>angdim</small></a></li>
+					<li><a href="draw.Drawing.ordinate.html" class="text-decoration-none font-monospace"><small>ordinate</small></a></li>
 					<li><a href="draw.Drawing.centremark.html" class="text-decoration-none font-monospace"><small>centremark</small></a></li>
 					<li><a href="draw.Drawing.leader.html" class="text-decoration-none font-monospace"><small>leader</small></a></li>
 				</ul>
@@ -217,10 +287,10 @@
 				</label>
 				<div class="list">
 				<ul style="list-style-type: none; padding-left: 20px;">
-					<li><a href="draw.Drawing.entities.html" class="text-decoration-none font-monospace"><small>entities</small></a></li>
 					<li><a href="draw.Drawing.plot.html" class="text-decoration-none font-monospace"><small>plot</small></a></li>
 					<li><a href="draw.Drawing.print.html" class="text-decoration-none font-monospace fw-bolder"><small>print</small></a></li>
 					<li><a href="draw.Drawing.tikz.html" class="text-decoration-none font-monospace"><small>tikz</small></a></li>
+					<li><a href="draw.Drawing.write.html" class="text-decoration-none font-monospace"><small>write</small></a></li>
 				</ul>
 				</div>
 			</div>
@@ -244,31 +314,25 @@
                 </ol>
               </nav>
 
-<dl>
-<dt><code><h5 class="fs">draw.Drawing: <b>print</b> (<var>D</var>, <var>FILE</var>)</code></h5></dt>
-<dt><code><h5 class="fs">draw.Drawing: <b>print</b> (<var>D</var>, <var>FILE</var>, <var>NAME</var>, <var>VALUE</var>, &hellip;)</code></h5></dt>
-<dt><code><h5 class="fs">draw.Drawing: [<var>PAPER</var>, <var>SCALE</var>] = <b>print</b> (&hellip;)</code></h5></dt>
-</dl>
+<p class="h5 fs"><code>draw.Drawing: <b>print</b> (<var>D</var>, <var>FILE</var>)</code></p>
+<p class="h5 fs"><code>draw.Drawing: <b>print</b> (<var>D</var>, <var>FILE</var>, <var>NAME</var>, <var>VALUE</var>, &hellip;)</code></p>
+<p class="h5 fs fs-last"><code>draw.Drawing: [<var>PAPER</var>, <var>SCALE</var>] = <b>print</b> (&hellip;)</code></p>
 <p> Plot a drawing onto paper at a stated scale.
 </p>
 <div class="ms-5">
 <p> <code>draw.Drawing.print (<var>D</var>, <var>FILE</var>)</code> writes the
- <code>draw.Drawing</code>
- object <var>D</var> to <var>FILE</var> on an A4 landscape sheet, at the largest of
- the
- preferred scales that fits. The output format is taken from the extension
- of <var>FILE</var>: <code>.pdf</code>, <code>.eps</code> and <code>.svg</code> are vector,
- <code>.png</code>, <code>.jpg</code> and <code>.tif</code> are raster.
+ <code>draw.Drawing</code> object <var>D</var> to <var>FILE</var> on an A4 landscape
+ sheet, at the largest of the preferred scales that fits.  The output
+ format is taken from the extension of <var>FILE</var>: <code>.pdf</code>,
+ <code>.eps</code> and <code>.svg</code> are vector, <code>.png</code>, <code>.jpg</code> and
+ <code>.tif</code> are raster.
 </p>
-<p> <strong>The drawing arrives at its scale, not merely fitted to the page.</strong>
- A
- distance measured on the sheet, multiplied by the scale denominator, is
- the
- distance in the model. That is the difference between a plot and a
- picture,
- and it is what <code>print</code> on a figure cannot give: it fits the axes to
- the
- paper, so a millimetre on the page means nothing.
+<p> <strong>The drawing arrives at its scale, not merely fitted to the
+ page.</strong>  A distance measured on the sheet, multiplied by the scale
+ denominator, is the distance in the model.  That is the difference
+ between a plot and a picture, and it is what <code>print</code> on a figure
+ cannot give: it fits the axes to the paper, so a millimetre on the page
+ means nothing.
 </p>
 <a name="Name/Value-pairs"></a>
 <h3 class="subheading">Name/Value pairs</h3>
@@ -283,66 +347,63 @@
 <tr><td width="16%"><code>'Scale'</code></td><td width="16%">fitted</td><td width="68%">plot scale denominator: 50 means
  1:50.  The default picks the largest preferred scale the sheet holds</td></tr>
 <tr><td width="16%"><code>'Margin'</code></td><td width="16%">10</td><td width="68%">blank border kept around the drawing,
- in
- millimetres of paper</td></tr>
+ in millimetres of paper; 0 for none, as a sheet framed by
+ <code>draw.titleblock</code> wants, since its frame runs along the trimmed
+ edge of the paper</td></tr>
 <tr><td width="16%"><code>'Resolution'</code></td><td width="16%">600</td><td width="68%">dots per inch, for a raster
- format
- only; a vector format ignores it</td></tr>
+ format only; a vector format ignores it</td></tr>
 <tr><td width="16%"><code>'LineWidth'</code></td><td width="16%">0.35</td><td width="68%">pen width in millimetres of
- paper,
- from the ISO 128 set 0.25, 0.35, 0.5, 0.7</td></tr>
+ paper, from the ISO 128 set 0.25, 0.35, 0.5, 0.7, for every line with
+ no line weight of its own or of its layer</td></tr>
 </table>
-<p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/tree/main/inst/+draw/Drawing.m">draw.Drawing</a>
 </div>
 
+<p> A layer whose <code>plot</code> is false in <code>Layers</code> is left off the
+ paper, as is a layer that is not visible, but a layer not printed keeps
+ its place on the sheet: the trimmed edge <code>draw.titleblock</code> draws
+ on such a layer still places the sheet on the paper.
+</p>
 <p> <code>[<var>PAPER</var>, <var>SCALE</var>] = draw.Drawing.print (&hellip;)</code> returns
- the sheet
- size actually used, in millimetres, and the scale denominator, which is
- worth having when the scale was fitted rather than given.
+ the sheet size actually used, in millimetres, and the scale denominator,
+ which is worth having when the scale was fitted rather than given.
 </p>
 <a name="The-scale-is-chosen-from-the-preferred-series"></a>
 <h3 class="subheading">The scale is chosen from the preferred series</h3>
 
 <p> When <code>'Scale'</code> is not given, the denominator is the smallest of
  <code>1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000</code> that leaves
- the
- drawing inside the sheet&rsquo;s margins. Those are the scales ISO 5455 admits,
- so an automatically chosen scale is still one a reader expects to see in
- a
- title block, rather than the 1:37.4 that fitting exactly would give.
+ the drawing inside the sheet&rsquo;s margins.  Those are the scales ISO 5455
+ admits, so an automatically chosen scale is still one a reader expects
+ to see in a title block, rather than the 1:37.4 that fitting exactly
+ would give.
 </p>
 <p> An explicit <code>'Scale'</code> is never overridden.  If the drawing does not
  fit at it, that is an error rather than a silent reduction: a sheet at
- the
- wrong scale is worse than no sheet.
+ the wrong scale is worse than no sheet.
 </p>
 <a name="Text-is-a-model-dimension,-pens-are-a-paper-one"></a>
 <h3 class="subheading">Text is a model dimension, pens are a paper one</h3>
 
 <p> Each string is drawn at the height its entity carries, reduced by the
- scale,
- exactly as <code>draw.Drawing.tikz</code> does and as a CAD application does:
- lettering
- given as 125 mm in the model arrives 2.5 mm tall on a sheet at 1:50.
- Author
- it as the height wanted on paper times the scale denominator. The height
- is
- therefore part of the drawing and survives into the DXF, rather than
- being a
- property of one particular plot.
+ scale, exactly as <code>draw.Drawing.tikz</code> does and as a CAD application
+ does: lettering given as 125 mm in the model arrives 2.5 mm tall on a
+ sheet at 1:50.  Author it as the height wanted on paper times the scale
+ denominator.  The height is therefore part of the drawing and survives
+ into a file written from it, rather than being a property of one
+ particular plot.
 </p>
 <p> <code>'LineWidth'</code> is the opposite: a width on the paper, held there at
  every scale, because a 0.35 mm pen is 0.35 mm whatever the sheet shows.
 </p>
 <p> <strong>See also: </strong>
-draw.Drawing.plot, 
-draw.Drawing.tikz, 
+  <a href="draw.Drawing.plot.html">draw.Drawing.plot</a>, 
+  <a href="draw.Drawing.tikz.html">draw.Drawing.tikz</a>, 
   <a href="draw.titleblock.html">draw.titleblock</a>, 
-  <a href="dxf.write.html">dxf.write</a>
+  <a href="draw.Drawing.write.html">draw.Drawing.write</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/tree/main/inst/+draw/Drawing.m">draw.Drawing</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/0f84b98/inst/+draw/Drawing.m#L2467">draw.Drawing</a>
+</p>
 </div>
         <div class="card rounded my-4">
           <div class="card-header card-header-mod">
@@ -361,7 +422,8 @@ draw.Drawing.tikz,
             <div class="card-body">
                 <p>A plate plotted on A4 at a scale the sheet chooses.  What comes back is the sheet actually used and the scale it settled on, which is what a title block has to state.</p>
                 <pre style="overflow-x: auto; white-space: pre; padding: 0.6rem 0.8rem; margin: 0.3rem 0; border: 1px solid #cfe0e6; border-left: 4px solid #4a90a4; border-radius: 4px; background-color: #eef5f8;"> D = draw.Drawing ('plate');
- D = D.polyline ([0, 0; 200, 0; 200, 120; 0, 120], true);
+ D = D.polyline (geom.Polyline ([0, 0; 200, 0; 200, 120; 0, 120], ...
+                                'Closed', true));
  D = D.circle ([100, 60], 35);
  D = D.dim ([0, 0], [200, 0], -20, 'horizontal');
  fn = fullfile (tempdir (), 'plate.pdf');
@@ -393,10 +455,23 @@ scale = 1</pre>
           <div class="collapse show" id="draw_Drawing_print-example2">
             <div class="card-body">
                 <p>The same drawing on A5 needs a smaller scale, and the function picks the largest of the ISO 5455 series that still fits rather than an exact fit.</p>
-                <pre style="overflow-x: auto; white-space: pre; padding: 0.6rem 0.8rem; margin: 0.3rem 0; border: 1px solid #cfe0e6; border-left: 4px solid #4a90a4; border-radius: 4px; background-color: #eef5f8;"> D = draw.Drawing ().polyline ([0, 0; 200, 0; 200, 120; 0, 120], true);
+                <pre style="overflow-x: auto; white-space: pre; padding: 0.6rem 0.8rem; margin: 0.3rem 0; border: 1px solid #cfe0e6; border-left: 4px solid #4a90a4; border-radius: 4px; background-color: #eef5f8;"> PL = geom.Polyline ([0, 0; 200, 0; 200, 120; 0, 120], 'Closed', true);
+ D = draw.Drawing ().polyline (PL);
  fn = fullfile (tempdir (), 'plate5.pdf');
  [paper, scale] = print (D, fn, 'Paper', 'A5')</pre>
-                <pre style="overflow-x: auto; white-space: pre; padding: 0.6rem 0.8rem; margin: 0.3rem 0 0.8rem 0; border: 1px solid #e2e2e2; border-left: 4px solid #b7b7b7; border-radius: 4px; background-color: #fafafa;">paper =
+                <pre style="overflow-x: auto; white-space: pre; padding: 0.6rem 0.8rem; margin: 0.3rem 0 0.8rem 0; border: 1px solid #e2e2e2; border-left: 4px solid #b7b7b7; border-radius: 4px; background-color: #fafafa;">warning: print: given the current "paperposition" and "papersize" properties, the figure is too large and will be cropped to fit on the output page.
+warning: called from
+    __print_parse_opts__ at line 519 column 7
+    print at line 439 column 3
+    print at line 2848 column 9
+    __eval_demo__ at line 84 column 9
+    __demo_notebook__ at line 43 column 3
+    __build_demos__ at line 79 column 7
+    method_texi2html at line 87 column 5
+    classdef_texi2html at line 456 column 9
+    package_texi2html at line 344 column 11
+
+paper =
 
    210   148
 

@@ -1,0 +1,1351 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Geometry, CAD Input/Output and Technical Drawing: geom.Region</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" integrity="sha512-1ycn6IcaQQ40/MKBW2W4Rhis/DbILU74C1vSrLJxCq57o941Ym01SwNsOMqvEBFlcgUa6xLiPY/NS5R+E6ztJQ==" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/css/bootstrap.min.css" integrity="sha384-KyZXEAg3QhqLMpG8r+8fhAXLRk2vvoC2f3B09zVXn8CA5QIVfZOJ3BCsw2P0p/We" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-U1DAWAznBHeqEIlVSCgzq+c9gqGAJn5c/t99JyeKa9xxaYpSvHU5awsuZVVFIhvj" crossorigin="anonymous"></script>
+    <script type="text/javascript" async
+      src="https://cdn.jsdelivr.net/npm/mathjax@2/MathJax.js?config=TeX-AMS_CHTML">
+    </script>
+    <script type="text/javascript">
+      window.addEventListener("load", () => {
+        for (let i of document.querySelectorAll(".collapse ul")) {
+          let tog = document.createElement("div");
+          tog.innerHTML = i.previousSibling.textContent;
+          tog.className = "toggle";
+          tog.onclick = () => tog.classList.toggle("show");
+          i.parentElement.removeChild(i.previousSibling);
+          i.parentElement.insertBefore(tog, i);
+        }
+      });
+      // Open the collapsible demo an "#example" link points to, then scroll to
+      // it.  getElementById (not querySelector) matches ids that contain a dot,
+      // e.g. "Class.method-example1".
+      function openHashTarget () {
+        if (! window.location.hash) { return; }
+        let el = document.getElementById (
+          decodeURIComponent (window.location.hash.slice (1)));
+        if (! el) { return; }
+        if (el.classList.contains ("collapse") &&
+            ! el.classList.contains ("show")) {
+          bootstrap.Collapse.getOrCreateInstance (el).show ();
+        }
+        el.scrollIntoView ();
+      }
+      window.addEventListener ("DOMContentLoaded", openHashTarget);
+      window.addEventListener ("hashchange", openHashTarget);
+      // When the collapsible named by the current URL fragment is collapsed,
+      // drop the fragment (replaceState: no scroll, no history entry).  Otherwise
+      // the fragment would still equal this id, so clicking the same #example
+      // link again fires no "hashchange" and the example would not re-expand.
+      document.addEventListener ("hide.bs.collapse", (e) => {
+        if (e.target.id && window.location.hash === "#" + e.target.id) {
+          history.replaceState (null, "",
+            window.location.pathname + window.location.search);
+        }
+      });
+      // Let the browser's find-in-page reach the text inside a collapsed
+      // panel.  The attribute "hidden=until-found" is what makes content
+      // searchable and revealable; the style block below clears the
+      // "display: none" that would otherwise stop the attribute meaning
+      // anything, a box that is not generated having nothing to reveal.  Set
+      // it only where it is understood, which "content-visibility" is no test
+      // for, Firefox having shipped the two apart.  Where it is not, the panel
+      // keeps the user agent's plain [hidden] and the page behaves as before.
+      window.addEventListener ("DOMContentLoaded", () => {
+        if (! ("onbeforematch" in document.body)) { return; }
+        document.documentElement.classList.add ("until-found");
+        let panels = document.querySelectorAll (
+          ".collapse:not(.show):not(.navbar-collapse)");
+        for (let el of panels) {
+          el.setAttribute ("hidden", "until-found");
+          // Fired on a find-in-page hit, before the browser drops the
+          // attribute and scrolls to it.  Bootstrap keeps a panel's state in
+          // its class list, so adding the class here opens the panel in the
+          // same frame and leaves the button shutting it correctly afterwards.
+          // Bootstrap's own show () would animate against that scroll, and the
+          // attribute once dropped, "display: none" would take the panel back
+          // part way through.
+          el.addEventListener ("beforematch", () => {
+            el.classList.add ("show");
+            for (let b of document.querySelectorAll ("[data-bs-target]")) {
+              if (b.getAttribute ("data-bs-target") === "#" + el.id) {
+                b.setAttribute ("aria-expanded", "true");
+              }
+            }
+          });
+        }
+        // Drop the attribute before Bootstrap measures the panel it is opening,
+        // which it does after firing this; a revealable one measures nothing.
+        document.addEventListener ("show.bs.collapse", (e) => {
+          e.target.removeAttribute ("hidden");
+        });
+        // Restore it once the panel is shut, rather than while it is shutting.
+        document.addEventListener ("hidden.bs.collapse", (e) => {
+          if (! e.target.classList.contains ("navbar-collapse")) {
+            e.target.setAttribute ("hidden", "until-found");
+          }
+        });
+      });
+    </script>
+    <style>
+    .fs {
+    margin-top: -0.15em;
+    margin-bottom: -0.15em;
+    }
+    .fs-last {
+    margin-bottom: calc(1rem - 0.15em);
+    }
+    p.description {
+    font-family: Consolas, "Courier New", monospace;
+    }
+    p.description code {
+    font-size: inherit;
+    }
+    h6:hover {
+      color: gray;
+    }
+    code {
+    font-family: Consolas, "Courier New", monospace;
+    border-radius: 0.3em;
+    white-space: nowrap;
+    color: gray;
+    }
+    code.description {
+    font-family: Consolas, "Courier New", monospace;
+    border-radius: 0.3em;
+    white-space: normal;
+    font-size:1.2em;
+    color: gray;
+    }
+    var {
+    font-family: Consolas, "Courier New", monospace;
+    border-radius: 0.3em;
+    font-style: normal;
+    font-weight: bold;
+    color: gray;
+    }
+    td {
+      vertical-align: top;
+    }
+    [id^="togList"],                        /* HIDE CHECKBOX */
+    [id^="togList"] ~ .list,                /* HIDE LIST */
+    [id^="togList"] + label  span + span,   /* HIDE "Collapse" */
+    [id^="togList"]:checked + label span{   /* HIDE "Expand" (IF CHECKED) */
+      display:none;
+    }
+    [id^="togList"]:checked + label span + span{
+      display:inline-block;                 /* SHOW "Collapse" (IF CHECKED) */
+    }
+    [id^="togList"]:checked ~ .list{
+      display:block;                        /* SHOW LIST (IF CHECKED) */
+    }
+    /* Bootstrap hides a collapsed panel with "display: none", which generates
+       no box, so the "content-visibility: hidden" the user agent gives
+       "hidden=until-found" could never apply and the text would stay beyond
+       find-in-page.  Clear that one declaration, and only where the script
+       above has found the attribute to be understood: an attribute selector
+       matches a value the browser does not understand, so an ungated rule
+       would leave every panel of an older browser standing open.  The
+       "!important" is required rather than decoration: the reboot carries
+       "[hidden] {display: none !important}", which the attribute itself brings
+       into play, and only another "!important" can outrank it. */
+    html.until-found .collapse[hidden="until-found"]:not(.show) {
+      display: block !important;
+    }
+    </style>
+  </head>
+  <body>
+    <div class="bg-dark">
+      <div class="container-xl">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+          <div class="container-fluid">
+            <a class="navbar-brand" href=index.html>
+              <img src="assets/drafting.png" alt="drafting" class="d-inline-block align-top" width="25" height="25">
+              Geometry, CAD Input/Output and Technical Drawing
+            </a>
+            <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+              <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+              <ul class="navbar-nav">
+                <li class="nav-item">
+                  <a class="nav-link" href="index.html#Polylines and regions">
+                    <i class="fas fa-list-alt"></i>
+                    Polylines and regions
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="https://gnu-octave.github.io/packages/">
+                  <img src="assets/octave-logo.svg" alt="GNU Octave logo" class="d-inline-block align-top" width="25" height="25">
+                    Octave Packages
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="https://www.octave.org">
+                    <i class="fas fa-home"></i>
+                    GNU Octave website
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </nav>
+      </div>
+    </div>
+    <div class="container-xl my-4">
+      <div class="row flex-nowrap" style="min-height:0">
+        <div class="col-md-2 bg-light" style="overflow-y: scroll; width: 250px;">
+          <div class="p-2" style="text-align: center;">
+            <h3>Categories &</h3>
+            <h4 style="color: blue">Functions List</h4>
+          </div>
+			<div class="row">
+				<input id="togList1" type="checkbox" checked>
+				<label for="togList1">
+					<span><h6>Polylines and regions</h6></span>
+					<span><h6>Polylines and regions</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="geom.Polyline.html" class="text-decoration-none font-monospace"><small>geom.Polyline</small></a></li>
+					<li><a href="geom.Spline.html" class="text-decoration-none font-monospace"><small>geom.Spline</small></a></li>
+					<li><a href="geom.Region.html" class="text-decoration-none font-monospace fw-bolder"><small>geom.Region</small></a></li>
+					<li><a href="geom.Path.html" class="text-decoration-none font-monospace"><small>geom.Path</small></a></li>
+					<li><a href="geom.UCS.html" class="text-decoration-none font-monospace"><small>geom.UCS</small></a></li>
+					<li><a href="geom.text.html" class="text-decoration-none font-monospace"><small>geom.text</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList2" type="checkbox">
+				<label for="togList2">
+					<span><h6>Geometry primitives</h6></span>
+					<span><h6>Geometry primitives</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="geom.signedarea.html" class="text-decoration-none font-monospace"><small>geom.signedarea</small></a></li>
+					<li><a href="geom.bbox.html" class="text-decoration-none font-monospace"><small>geom.bbox</small></a></li>
+					<li><a href="geom.centroid.html" class="text-decoration-none font-monospace"><small>geom.centroid</small></a></li>
+					<li><a href="geom.transform.html" class="text-decoration-none font-monospace"><small>geom.transform</small></a></li>
+					<li><a href="geom.isrectilinear.html" class="text-decoration-none font-monospace"><small>geom.isrectilinear</small></a></li>
+					<li><a href="geom.offset.html" class="text-decoration-none font-monospace"><small>geom.offset</small></a></li>
+					<li><a href="geom.largestrect.html" class="text-decoration-none font-monospace"><small>geom.largestrect</small></a></li>
+					<li><a href="geom.triangulate.html" class="text-decoration-none font-monospace"><small>geom.triangulate</small></a></li>
+					<li><a href="geom.hatchlines.html" class="text-decoration-none font-monospace"><small>geom.hatchlines</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList3" type="checkbox">
+				<label for="togList3">
+					<span><h6>Curve geometry</h6></span>
+					<span><h6>Curve geometry</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="geom.curvature.html" class="text-decoration-none font-monospace"><small>geom.curvature</small></a></li>
+					<li><a href="geom.curvesample.html" class="text-decoration-none font-monospace"><small>geom.curvesample</small></a></li>
+					<li><a href="geom.curveoffset.html" class="text-decoration-none font-monospace"><small>geom.curveoffset</small></a></li>
+					<li><a href="geom.selfintersects.html" class="text-decoration-none font-monospace"><small>geom.selfintersects</small></a></li>
+					<li><a href="geom.arclength.html" class="text-decoration-none font-monospace"><small>geom.arclength</small></a></li>
+					<li><a href="geom.resample.html" class="text-decoration-none font-monospace"><small>geom.resample</small></a></li>
+					<li><a href="geom.simplify.html" class="text-decoration-none font-monospace"><small>geom.simplify</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList4" type="checkbox">
+				<label for="togList4">
+					<span><h6>Construction geometry</h6></span>
+					<span><h6>Construction geometry</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="geom.intersectlines.html" class="text-decoration-none font-monospace"><small>geom.intersectlines</small></a></li>
+					<li><a href="geom.intersectcircle.html" class="text-decoration-none font-monospace"><small>geom.intersectcircle</small></a></li>
+					<li><a href="geom.intersectcircles.html" class="text-decoration-none font-monospace"><small>geom.intersectcircles</small></a></li>
+					<li><a href="geom.tangentpoints.html" class="text-decoration-none font-monospace"><small>geom.tangentpoints</small></a></li>
+					<li><a href="geom.fillet.html" class="text-decoration-none font-monospace"><small>geom.fillet</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList5" type="checkbox">
+				<label for="togList5">
+					<span><h6>DXF input and output</h6></span>
+					<span><h6>DXF input and output</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="geom.read.html" class="text-decoration-none font-monospace"><small>geom.read</small></a></li>
+					<li><a href="geom.write.html" class="text-decoration-none font-monospace"><small>geom.write</small></a></li>
+					<li><a href="draw.read.html" class="text-decoration-none font-monospace"><small>draw.read</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList6" type="checkbox">
+				<label for="togList6">
+					<span><h6>Meshes</h6></span>
+					<span><h6>Meshes</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="polymesh.Mesh.html" class="text-decoration-none font-monospace"><small>polymesh.Mesh</small></a></li>
+					<li><a href="polymesh.read.html" class="text-decoration-none font-monospace"><small>polymesh.read</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList7" type="checkbox">
+				<label for="togList7">
+					<span><h6>Sheet composition</h6></span>
+					<span><h6>Sheet composition</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="draw.titleblock.html" class="text-decoration-none font-monospace"><small>draw.titleblock</small></a></li>
+					<li><a href="draw.coordtable.html" class="text-decoration-none font-monospace"><small>draw.coordtable</small></a></li>
+					<li><a href="draw.symbol.html" class="text-decoration-none font-monospace"><small>draw.symbol</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList8" type="checkbox">
+				<label for="togList8">
+					<span><h6>Line types and colours</h6></span>
+					<span><h6>Line types and colours</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="draw.linetype.html" class="text-decoration-none font-monospace"><small>draw.linetype</small></a></li>
+					<li><a href="draw.colour.html" class="text-decoration-none font-monospace"><small>draw.colour</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList9" type="checkbox">
+				<label for="togList9">
+					<span><h6>Drawing model</h6></span>
+					<span><h6>Drawing model</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="draw.Drawing.html" class="text-decoration-none font-monospace"><small>draw.Drawing</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList10" type="checkbox">
+				<label for="togList10">
+					<span><h6>Solid modelling</h6></span>
+					<span><h6>Solid modelling</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="solid.Shape.html" class="text-decoration-none font-monospace"><small>solid.Shape</small></a></li>
+					<li><a href="solid.box.html" class="text-decoration-none font-monospace"><small>solid.box</small></a></li>
+					<li><a href="solid.wedge.html" class="text-decoration-none font-monospace"><small>solid.wedge</small></a></li>
+					<li><a href="solid.cylinder.html" class="text-decoration-none font-monospace"><small>solid.cylinder</small></a></li>
+					<li><a href="solid.cone.html" class="text-decoration-none font-monospace"><small>solid.cone</small></a></li>
+					<li><a href="solid.sphere.html" class="text-decoration-none font-monospace"><small>solid.sphere</small></a></li>
+					<li><a href="solid.ellipsoid.html" class="text-decoration-none font-monospace"><small>solid.ellipsoid</small></a></li>
+					<li><a href="solid.torus.html" class="text-decoration-none font-monospace"><small>solid.torus</small></a></li>
+					<li><a href="solid.polyhedron.html" class="text-decoration-none font-monospace"><small>solid.polyhedron</small></a></li>
+					<li><a href="solid.extrude.html" class="text-decoration-none font-monospace"><small>solid.extrude</small></a></li>
+					<li><a href="solid.revolve.html" class="text-decoration-none font-monospace"><small>solid.revolve</small></a></li>
+					<li><a href="solid.loft.html" class="text-decoration-none font-monospace"><small>solid.loft</small></a></li>
+					<li><a href="solid.sweep.html" class="text-decoration-none font-monospace"><small>solid.sweep</small></a></li>
+					<li><a href="solid.helix.html" class="text-decoration-none font-monospace"><small>solid.helix</small></a></li>
+					<li><a href="solid.read.html" class="text-decoration-none font-monospace"><small>solid.read</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList11" type="checkbox">
+				<label for="togList11">
+					<span><h6>Assemblies and viewing</h6></span>
+					<span><h6>Assemblies and viewing</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="model.Assembly.html" class="text-decoration-none font-monospace"><small>model.Assembly</small></a></li>
+					<li><a href="model.read.html" class="text-decoration-none font-monospace"><small>model.read</small></a></li>
+					<li><a href="model.Viewer.html" class="text-decoration-none font-monospace"><small>model.Viewer</small></a></li>
+				</ul>
+				</div>
+			</div>
+
+			  </div>
+			  <div class="col-md-10">
+          <div class="card rounded">
+            <div class="card-header card-header-mod">
+              <div class="row d-flex flex-wrap align-items-center">
+                <h3 class="d-inline-block mr-2">
+                Class&nbsp;Definition: <b><code>geom.Region</code></b>
+                </h3>
+              </div>
+            </div>
+            <div class="card-body">
+<p class="h5 description mb-3"><code>drafting: geom.Region</code></p>
+<p> A closed area of a plane, an outline with holes in it.
+</p>
+<div class="ms-5">
+<p> A <code>geom.Region</code> is what a solid is made from:
+ <code>solid.extrude</code>, <code>solid.revolve</code>, <code>solid.sweep</code>,
+ <code>solid.loft</code> and <code>solid.helix</code> each take one.  It is the area
+ inside one closed loop, the outline, less the areas inside any number of
+ others, the holes.  Each loop is a closed <code>geom.Path</code> of straight
+ segments, arcs and splines, so a hole may have any shape: a circle, a
+ slot, a square or a smooth closed <code>geom.Spline</code>.  A hole goes right
+ through whatever is made from the region; a recess of limited depth is a
+ pocket, worked on the solid.
+</p>
+<p> A region is always valid: every outline closed, none crossing or touching
+ itself or enclosing no area, every hole in the plane of the outline and
+ strictly inside it, and no two holes overlapping or touching.  An island
+ inside a hole is not a region; union a second solid made from it.  Arcs
+ are followed to within 2 degrees, and splines as closely, when the loops
+ are checked against one another.
+</p>
+<p> The outline and holes may be drawn either way round.  The region stores
+ the outline anticlockwise and the holes clockwise, all in the
+ <code>geom.UCS</code> of the outline, which is the UCS of the region.
+ Assigning the region another UCS moves it there.
+</p>
+<p> A <code>geom.Region</code> is a value: every change makes a new one.
+</p>
+<p> <strong>See also: </strong>
+  <a href="geom.Path.html">geom.Path</a>, 
+  <a href="geom.Polyline.html">geom.Polyline</a>, 
+  <a href="geom.Spline.html">geom.Spline</a>, 
+  <a href="geom.UCS.html">geom.UCS</a>, 
+  <a href="solid.extrude.html">solid.extrude</a>
+</p>
+<p><strong>Source Code: </strong>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/0f84b98/inst/+geom/Region.m">geom.Region</a>
+</p>
+</div>
+        <p class="lead my-3">The <code>geom.Region</code> class contains the following properties:</p>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#geom_Region_Outline"
+              aria-expanded="false" aria-controls="geom_Region_Outline">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>Outline</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Outline of the region
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="geom_Region_Outline">
+            <div class="border-bottom py-2">
+<p> </p>
+<p> The outline, a closed <code>geom.Path</code> running anticlockwise in the
+ plane of its UCS, which is the plane of the region.
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#geom_Region_Holes"
+              aria-expanded="false" aria-controls="geom_Region_Holes">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>Holes</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Holes in the region
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="geom_Region_Holes">
+            <div class="border-bottom py-2">
+<p> </p>
+<p> The holes, a row cell array of closed <code>geom.Path</code> objects running
+ clockwise, in the UCS of the outline; empty when there are none.
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#geom_Region_UCS"
+              aria-expanded="false" aria-controls="geom_Region_UCS">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>UCS</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Coordinate system of the region
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="geom_Region_UCS">
+            <div class="border-bottom py-2">
+<p> </p>
+<p> The <code>geom.UCS</code> the outline and holes are coordinates in.
+ Assigning another moves the region onto it, its shape unchanged in its
+ own coordinates, so a region drawn in the <em class="math">xy</em> plane is laid on the
+ face of a part by assigning it the face&rsquo;s UCS.
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <p class="lead my-3">The <code>geom.Region</code> class offers the following public methods:</p>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#geom_Region_Region"
+              aria-expanded="false" aria-controls="geom_Region_Region">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>geom.Region</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Make a region.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="geom_Region_Region">
+            <div class="border-bottom py-2">
+<p class="h5 fs"><code>geom.Region: <var>R</var> = <b>geom.Region</b> (<var>OUTLINE</var>)</code></p>
+<p class="h5 fs fs-last"><code>geom.Region: <var>R</var> = <b>geom.Region</b> (<var>OUTLINE</var>, <var>HOLES</var>)</code></p>
+<p> </p>
+<p> <code><var>R</var> = geom.Region (<var>OUTLINE</var>)</code> makes the area inside
+ <var>OUTLINE</var>, a closed <code>geom.Polyline</code>, <code>geom.Path</code> or
+ <code>geom.Spline</code> lying in the plane of its UCS.
+</p>
+<p> <code><var>R</var> = geom.Region (<var>OUTLINE</var>, <var>HOLES</var>)</code> cuts out of
+ it the areas inside the closed polylines, paths and splines in the cell
+ array <var>HOLES</var>.  A hole given in another frame of the same plane is
+ carried into the frame of the outline.  The region keeps each as a
+ <code>geom.Path</code>.
+</p>
+<p> <var>OUTLINE</var> and each hole may also be given as the matrix of vertices
+ a <code>geom.Polyline</code> is made from, <code>[<var>x</var>, <var>y</var>,
+ <var>bulge</var>]</code> rows or <code>[<var>x</var>, <var>y</var>]</code> rows for straight
+ segments.  An outline given so lies in the <em class="math">xy</em> plane, and a hole
+ given so lies in the plane of the outline:
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example"> ## A plate 60 by 40 with a bore of diameter 20 and two square holes
+ R = geom.Region ([0, 0; 60, 0; 60, 40; 0, 40], ...
+                  {[20, 20, 1; 40, 20, 1], ...
+                   [4, 4; 10, 4; 10, 10; 4, 10], ...
+                   [50, 30; 56, 30; 56, 36; 50, 36]});
+</pre></td></tr></table>
+
+<p> A hole with a smooth outline is a closed spline:
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example"> H = geom.Spline ([20, 15; 35, 12; 40, 25; 28, 35; 18, 28], ...
+                  'Closed', true);
+ R = geom.Region ([0, 0; 80, 0; 80, 50; 0, 50], {H});
+</pre></td></tr></table>
+
+<p> An invalid region is refused with an error naming the outline or hole at
+ fault.
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#geom_Region_fillet"
+              aria-expanded="false" aria-controls="geom_Region_fillet">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>fillet</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Round the corners of a region.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="geom_Region_fillet">
+            <div class="border-bottom py-2">
+<p class="h5 fs fs-last"><code>geom.Region: <var>R</var> = <b>fillet</b> (<var>R</var>, <var>RADIUS</var>)</code></p>
+<p> </p>
+<p> <code><var>R</var> = fillet (<var>R</var>, <var>RADIUS</var>)</code> rounds every corner of
+ the outline and of every hole where two straight segments meet, with an
+ arc of radius <var>RADIUS</var> millimetres tangent to both, as
+ <code>geom.Path.fillet</code> does: the outline&rsquo;s corners and the inside
+ corners of its holes alike.  This is the rounded outline of a plate or a
+ pocket, drawn before it is extruded, which is simpler and more exact
+ than rounding the edges of the solid afterwards.  Corners next to an arc
+ or a spline are left as they are.  To round only some corners, round the
+ outline or a hole as a path and make the region again.
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example"> ## A plate 60 by 40 with corners of radius 5 and a slot with sharp
+ ## corners rounded to 1
+ R = geom.Region ([0, 0; 60, 0; 60, 40; 0, 40], ...
+                  {[20, 15; 40, 15; 40, 25; 20, 25]});
+ S = solid.extrude (fillet (R, 1), 6);
+</pre></td></tr></table>
+
+<p> <strong>See also: </strong>
+  <a href="geom.Path.html#geom_Path_fillet">geom.Path.fillet</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#geom_Region_chamfer"
+              aria-expanded="false" aria-controls="geom_Region_chamfer">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>chamfer</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Cut the corners of a region.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="geom_Region_chamfer">
+            <div class="border-bottom py-2">
+<p class="h5 fs"><code>geom.Region: <var>R</var> = <b>chamfer</b> (<var>R</var>, <var>D</var>)</code></p>
+<p class="h5 fs"><code>geom.Region: <var>R</var> = <b>chamfer</b> (<var>R</var>, [<var>D1</var>, <var>D2</var>])</code></p>
+<p class="h5 fs fs-last"><code>geom.Region: <var>R</var> = <b>chamfer</b> (<var>R</var>, <var>D</var>, <code>'Angle'</code>, <var>A</var>)</code></p>
+<p> </p>
+<p> <code><var>R</var> = chamfer (<var>R</var>, <var>D</var>)</code> cuts every corner of the
+ outline and of every hole where two straight segments meet, <var>D</var>
+ millimetres back along both segments, as <code>geom.Path.chamfer</code>
+ does.  Two distances or a distance and an angle are taken as there,
+ before and after each corner in the order the region stores its
+ vertices: anticlockwise round the outline, clockwise round the holes.
+ To cut only some corners, cut the outline or a hole as a path and make
+ the region again.
+</p>
+<p> <strong>See also: </strong>
+  <a href="geom.Path.html#geom_Path_chamfer">geom.Path.chamfer</a>, 
+  <a href="geom.Region.html#geom_Region_fillet">geom.Region.fillet</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#geom_Region_fit"
+              aria-expanded="false" aria-controls="geom_Region_fit">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>fit</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Fit lines, arcs and splines to a faceted region.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="geom_Region_fit">
+            <div class="border-bottom py-2">
+<p class="h5 fs"><code>geom.Region: <var>R</var> = <b>fit</b> (<var>R</var>)</code></p>
+<p class="h5 fs"><code>geom.Region: <var>R</var> = <b>fit</b> (<var>R</var>, <var>MODE</var>)</code></p>
+<p class="h5 fs fs-last"><code>geom.Region: <var>R</var> = <b>fit</b> (&hellip;, <var>Name</var>, <var>Value</var>, &hellip;)</code></p>
+<p> </p>
+<p> <code><var>R</var> = fit (<var>R</var>)</code> replaces the straight segments of the
+ outline and the holes of <var>R</var> with as few lines and circular arcs as
+ follow them within a tolerance, so that a region cut from a mesh, whose
+ round bore is a polygon of facets and whose edges zigzag with the noise
+ of a scan, becomes the outline it was drawn from: its edges straight,
+ its bore a circle, its fillets arcs.  Where two pieces meet without a
+ corner they meet tangentially.  Arcs and splines already in <var>R</var> are
+ kept, and the straight segments between them fitted.
+</p>
+<p> <var>MODE</var> chooses what the fit may use: <code>'lines'</code>, lines only;
+ <code>'arcs'</code>, lines and arcs, the default; or <code>'curves'</code>,
+ lines, arcs that turn at least 60 degrees, lines at least a fiftieth of
+ the region&rsquo;s size, and smooth cubic splines for the stretches between
+ them, the shape of a free-form part.
+</p>
+<p> Name/Value pairs:
+</p>
+<dl compact="compact">
+<dt> <code>'AbsTol'</code></dt>
+<dd> The furthest, in millimetres, the fit may stray from the segments it
+ replaces, and they from it.</dd>
+<dt> <code>'RelTol'</code></dt>
+<dd> The same as a fraction of the region&rsquo;s size, the diagonal of the box
+ around its outline.  Given alone, either tolerance holds alone; given
+ both, the stricter.  The default is a <code>'RelTol'</code> of 1e-3.  To
+ turn a faceted bore into a circle the tolerance must be larger than its
+ facets stray from the circle.</dd>
+<dt> <code>'Corner'</code></dt>
+<dd> The turn, in degrees, at which the outline has a corner, 20 by
+ default.  The turn is measured on a sliding window: between the mean
+ direction of the outline over a stretch behind a point and over a
+ stretch ahead of it, so that noise and a small fillet saved as a few
+ facets do not make corners of their own.  A corner is kept only where
+ the outline lies within the tolerance of the sharp corner its two
+ sides make, which then sits where the sides meet; a larger fillet is
+ fitted as an arc.</dd>
+<dt> <code>'Window'</code></dt>
+<dd> The length of each stretch, in millimetres, ten tolerances by default.</dd>
+</dl>
+
+<p> The fitted region is checked as any region is.  Should a fit make a loop
+ cross or touch another, as when two lie closer than the tolerance, the
+ region is fitted again at half the tolerance, up to four times, and
+ returned as it was when it never passes.
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example"> ## A slice of a scanned part, its bore a circle again
+ M = polymesh.read ('part.stl');
+ R = section (M, geom.UCS ([0, 0, 1], [0, 0, 5]));
+ R = fit (R{1}, 'arcs', 'AbsTol', 0.01);
+</pre></td></tr></table>
+
+<p> <strong>See also: </strong>
+  <a href="polymesh.Mesh.html#polymesh_Mesh_section">polymesh.Mesh.section</a>, 
+  <a href="geom.Region.html#geom_Region_fillet">geom.Region.fillet</a>, 
+  <a href="geom.Spline.html">geom.Spline</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#geom_Region_union"
+              aria-expanded="false" aria-controls="geom_Region_union">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>union</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+The area of any of several regions.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="geom_Region_union">
+            <div class="border-bottom py-2">
+<p class="h5 fs fs-last"><code>geom.Region: <var>R</var> = <b>union</b> (<var>R1</var>, <var>R2</var>, &hellip;)</code></p>
+<p> </p>
+<p> <code><var>R</var> = union (<var>R1</var>, <var>R2</var>, &hellip;)</code> returns the area
+ covered by any of the regions, as a 1-by-<em class="math">N</em> cell array of
+ <code>geom.Region</code> objects, one for each separate piece, largest first,
+ in the <code>geom.UCS</code> of <var>R1</var>.  Each argument is a region or a cell
+ array of them, such as another of these operations returns, so that they
+ chain.  Every region must lie in the plane of the first.  Where two meet
+ along an edge they become one, and the edges of the result are those of
+ the regions, arcs and splines exact.  This is OpenSCAD&rsquo;s <code>union</code> of
+ 2-D shapes, before the result is extruded or revolved.
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example"> ## A plate and a tab, as one outline
+ R = union (geom.Region ([0, 0; 60, 0; 60, 40; 0, 40]), ...
+            geom.Region ([50, 10; 80, 10; 80, 30; 50, 30]));
+ S = solid.extrude (R{1}, 5);
+</pre></td></tr></table>
+
+<p> Open CASCADE computes it, so the package must be built with it.
+</p>
+<p> <strong>See also: </strong>
+  <a href="geom.Region.html#geom_Region_subtract">geom.Region.subtract</a>, 
+  <a href="geom.Region.html#geom_Region_intersect">geom.Region.intersect</a>, 
+  <a href="geom.Region.html#geom_Region_offset">geom.Region.offset</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#geom_Region_subtract"
+              aria-expanded="false" aria-controls="geom_Region_subtract">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>subtract</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+The area of a region outside several others.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="geom_Region_subtract">
+            <div class="border-bottom py-2">
+<p class="h5 fs fs-last"><code>geom.Region: <var>R</var> = <b>subtract</b> (<var>R1</var>, <var>R2</var>, &hellip;)</code></p>
+<p> </p>
+<p> <code><var>R</var> = subtract (<var>R1</var>, <var>R2</var>, &hellip;)</code> returns the area
+ of <var>R1</var> that lies in none of the regions after it, as
+ <code>geom.Region.union</code> returns its result: a cell array of regions,
+ largest first, in the <code>geom.UCS</code> of <var>R1</var>, empty when nothing is
+ left.  This is OpenSCAD&rsquo;s <code>difference</code> of 2-D shapes.
+</p>
+<p> <strong>See also: </strong>
+  <a href="geom.Region.html#geom_Region_union">geom.Region.union</a>, 
+  <a href="geom.Region.html#geom_Region_intersect">geom.Region.intersect</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#geom_Region_intersect"
+              aria-expanded="false" aria-controls="geom_Region_intersect">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>intersect</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+The area common to several regions.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="geom_Region_intersect">
+            <div class="border-bottom py-2">
+<p class="h5 fs fs-last"><code>geom.Region: <var>R</var> = <b>intersect</b> (<var>R1</var>, <var>R2</var>, &hellip;)</code></p>
+<p> </p>
+<p> <code><var>R</var> = intersect (<var>R1</var>, <var>R2</var>, &hellip;)</code> returns the
+ area that lies in every one of the regions, as
+ <code>geom.Region.union</code> returns its result, empty when they share
+ none.  This is OpenSCAD&rsquo;s <code>intersection</code> of 2-D shapes.
+</p>
+<p> <strong>See also: </strong>
+  <a href="geom.Region.html#geom_Region_union">geom.Region.union</a>, 
+  <a href="geom.Region.html#geom_Region_subtract">geom.Region.subtract</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#geom_Region_offset"
+              aria-expanded="false" aria-controls="geom_Region_offset">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>offset</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Grow or shrink a region by a distance.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="geom_Region_offset">
+            <div class="border-bottom py-2">
+<p class="h5 fs"><code>geom.Region: <var>R</var> = <b>offset</b> (<var>R</var>, <var>D</var>)</code></p>
+<p class="h5 fs fs-last"><code>geom.Region: <var>R</var> = <b>offset</b> (<var>R</var>, <var>D</var>, <code>'Corners'</code>, <var>C</var>)</code></p>
+<p> </p>
+<p> <code><var>R</var> = offset (<var>R</var>, <var>D</var>)</code> returns the points of the
+ plane that lie within <var>D</var> millimetres of the region, for a
+ positive <var>D</var>, or the points of the region at least -<var>D</var>
+ inside its edges, for a negative one: the outline moves out by <var>D</var>
+ and the holes close in by it, or the other way.  The corners that come
+ out of the move are round by default, arcs of radius <var>D</var>, as
+ OpenSCAD&rsquo;s <code>offset (r = <var>D</var>)</code> makes them.  Shrinking can split a
+ region into pieces or leave nothing, so the result is a cell array of
+ regions as <code>geom.Region.union</code> returns it.
+</p>
+<p> With <code>'Corners'</code> set to <code>'sharp'</code> the edges are carried on
+ to meet, as <code>offset (delta = <var>D</var>)</code> makes them, and with
+ <code>'chamfer'</code> each such corner between straight edges is cut off
+ square to the corner, <var>D</var> from where it was, as
+ <code>offset (delta = <var>D</var>, chamfer = true)</code> does.
+</p>
+<p> The edges of the result are those of the region moved, straight edges
+ straight and arcs exact; a spline&rsquo;s offset is a spline that Open CASCADE
+ fits to it, to about a part in ten million.  It computes the offset, so
+ the package must be built with it.
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example"> ## A band 2 wide round a flange, G{1}; G{2} is the band 2 wide
+ ## inside its bore, which grows into it too
+ F = geom.Region ([0, 0; 60, 0; 60, 40; 0, 40], ...
+                  {[30, 20, 1; 40, 20, 1]});
+ G = subtract (offset (F, 2), F);
+</pre></td></tr></table>
+
+<p> <strong>See also: </strong>
+  <a href="geom.Region.html#geom_Region_union">geom.Region.union</a>, 
+  <a href="geom.Region.html#geom_Region_fillet">geom.Region.fillet</a>, 
+  <a href="geom.offset.html">geom.offset</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#geom_Region_hull"
+              aria-expanded="false" aria-controls="geom_Region_hull">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>hull</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+The convex hull of regions and points.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="geom_Region_hull">
+            <div class="border-bottom py-2">
+<p class="h5 fs fs-last"><code>geom.Region: <var>R</var> = <b>hull</b> (<var>R1</var>, <var>R2</var>, &hellip;)</code></p>
+<p> </p>
+<p> <code><var>R</var> = hull (<var>R1</var>, <var>R2</var>, &hellip;)</code> returns the
+ smallest convex region that holds every region and point given, the
+ shape a band stretched round them takes, as a <code>geom.Region</code> in the
+ <code>geom.UCS</code> of <var>R1</var>.  Each argument after the first is a
+ region, a cell array of regions, such as <code>geom.Region.union</code>
+ returns, or an <em class="math">N</em>-by-2 matrix of points in the coordinates of that
+ UCS.  Every region must lie in the plane of the first; only outlines
+ count, since a hole cannot reach the hull.
+</p>
+<p> The hull is exact where the regions are made of lines and arcs: where
+ it passes from one to the next its edge is a straight line truly
+ tangent to the arcs it leaves and meets, and where an arc reaches
+ furthest the hull follows the arc.  This is OpenSCAD&rsquo;s <code>hull</code> of
+ 2-D shapes, which there are polygons of facets: the outline of a lever
+ from the circles at its ends, of a bracket from its bosses, or of a
+ plate rounded from four circles.  A spline is taken as points along
+ it, the curve turning a tenth of a degree from one to the next.
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example"> ## A lever: bosses of radius 10 and 5, 40 apart, and its bores
+ C = @(x, r) geom.Region ([x - r, 0, 1; x + r, 0, 1]);
+ L = hull (C (0, 10), C (40, 5));
+ L = subtract (L, C (0, 5), C (40, 2.5));
+</pre></td></tr></table>
+
+<p> It is computed without Open CASCADE.
+</p>
+<p> <strong>See also: </strong>
+  <a href="geom.Region.html#geom_Region_union">geom.Region.union</a>, 
+  <a href="geom.Region.html#geom_Region_offset">geom.Region.offset</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#geom_Region_resize"
+              aria-expanded="false" aria-controls="geom_Region_resize">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>resize</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Scale a region to a size.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="geom_Region_resize">
+            <div class="border-bottom py-2">
+<p class="h5 fs"><code>geom.Region: <var>R</var> = <b>resize</b> (<var>R</var>, <var>SZ</var>)</code></p>
+<p class="h5 fs fs-last"><code>geom.Region: <var>R</var> = <b>resize</b> (<var>R</var>, <var>SZ</var>, <code>'Uniform'</code>, <var>TF</var>)</code></p>
+<p> </p>
+<p> <code><var>R</var> = resize (<var>R</var>, <var>SZ</var>)</code> scales the region evenly so
+ that the box round it is as large as it can be within the sizes
+ <code><var>SZ</var> = [<var>x</var>, <var>y</var>]</code>, in millimetres along the axes of
+ its UCS; a size of 0 leaves that direction free.  <code>resize (<var>R</var>,
+ [30, 0])</code> makes the region 30 wide and keeps its proportions.  The
+ corner of the box at the least <em class="math">x</em> and <em class="math">y</em> stays where it is,
+ and arcs stay arcs.
+</p>
+<p> With <code>'Uniform'</code> set to <code>false</code> each direction given is
+ scaled to its size on its own and a direction left at 0 keeps its
+ size, as OpenSCAD&rsquo;s <code>resize</code> does.  An arc stretched so becomes
+ part of an ellipse, kept exactly as a rational <code>geom.Spline</code>.
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example"> ## A disc of diameter 10 stretched into an ellipse 40 by 20
+ E = resize (geom.Region ([-5, 0, 1; 5, 0, 1]), [40, 20], ...
+             'Uniform', false);
+</pre></td></tr></table>
+
+<p> <strong>See also: </strong>
+  <a href="geom.Region.html#geom_Region_mirror">geom.Region.mirror</a>, 
+  <a href="solid.Shape.html#solid_Shape_resize">solid.Shape.resize</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#geom_Region_mirror"
+              aria-expanded="false" aria-controls="geom_Region_mirror">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>mirror</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Reflect a region in a line of its plane.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="geom_Region_mirror">
+            <div class="border-bottom py-2">
+<p class="h5 fs"><code>geom.Region: <var>R</var> = <b>mirror</b> (<var>R</var>, <var>N</var>)</code></p>
+<p class="h5 fs fs-last"><code>geom.Region: <var>R</var> = <b>mirror</b> (<var>R</var>, <var>N</var>, <var>P</var>)</code></p>
+<p> </p>
+<p> <code><var>R</var> = mirror (<var>R</var>, <var>N</var>, <var>P</var>)</code> reflects the region
+ in the line through the point <var>P</var>, the origin of its UCS by default,
+ square to the nonzero direction <var>N</var>, both 2-element vectors in its
+ UCS.  <code>mirror (<var>R</var>, [1, 0])</code> reflects in the <em class="math">y</em> axis.
+ Only the reflection is returned; <code>union (<var>R</var>, mirror (<var>R</var>,
+ &hellip;))</code> keeps both, as a profile drawn for one side of a symmetric
+ part is made whole.
+</p>
+<p> <strong>See also: </strong>
+  <a href="geom.Region.html#geom_Region_union">geom.Region.union</a>, 
+  <a href="solid.Shape.html#solid_Shape_mirror">solid.Shape.mirror</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#geom_Region_copy"
+              aria-expanded="false" aria-controls="geom_Region_copy">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>copy</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Copies of a region, united.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="geom_Region_copy">
+            <div class="border-bottom py-2">
+<p class="h5 fs fs-last"><code>geom.Region: <var>C</var> = <b>copy</b> (<var>R</var>, <var>D</var>)</code></p>
+<p> </p>
+<p> <code><var>C</var> = copy (<var>R</var>, <var>D</var>)</code> places a copy of the region
+ moved by each row of <var>D</var>, an <em class="math">N</em>-by-2 matrix of offsets in its
+ UCS, and returns their union as <code>geom.Region.union</code> returns it, a
+ cell array of regions, largest first.  The region itself is among them
+ only where a row of <var>D</var> is zero.  Copies that overlap become one
+ region.
+</p>
+<p> Open CASCADE unites the copies, so the package must be built with it.
+</p>
+<p> <strong>See also: </strong>
+  <a href="geom.Region.html#geom_Region_rectarray">geom.Region.rectarray</a>, 
+  <a href="geom.Region.html#geom_Region_polararray">geom.Region.polararray</a>, 
+  <a href="solid.Shape.html#solid_Shape_copy">solid.Shape.copy</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#geom_Region_rectarray"
+              aria-expanded="false" aria-controls="geom_Region_rectarray">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>rectarray</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Copies of a region in rows and columns, united.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="geom_Region_rectarray">
+            <div class="border-bottom py-2">
+<p class="h5 fs fs-last"><code>geom.Region: <var>C</var> = <b>rectarray</b> (<var>R</var>, <var>COUNT</var>, <var>SPACING</var>)</code></p>
+<p> </p>
+<p> <code><var>C</var> = rectarray (<var>R</var>, <var>COUNT</var>, <var>SPACING</var>)</code> places
+ <code><var>COUNT</var> = [<var>nx</var>, <var>ny</var>]</code> copies of the region along the
+ <em class="math">x</em> and <em class="math">y</em> axes of its UCS, <code><var>SPACING</var> =
+ [<var>dx</var>, <var>dy</var>]</code> millimetres apart, the first where the region
+ is; a negative spacing runs the other way.  It returns their union as
+ <code>geom.Region.copy</code> does.  This is a grid of holes or slots, drawn
+ once and subtracted from a plate in one step.
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example"> ## A plate with four rows of six holes of diameter 4, 10 apart
+ H = rectarray (geom.Region ([8, 10, 1; 12, 10, 1]), [6, 4], [10, 10]);
+ P = subtract (geom.Region ([0, 0; 70, 0; 70, 50; 0, 50]), H);
+</pre></td></tr></table>
+
+<p> <strong>See also: </strong>
+  <a href="geom.Region.html#geom_Region_copy">geom.Region.copy</a>, 
+  <a href="geom.Region.html#geom_Region_polararray">geom.Region.polararray</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#geom_Region_polararray"
+              aria-expanded="false" aria-controls="geom_Region_polararray">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>polararray</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Copies of a region round a point, united.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="geom_Region_polararray">
+            <div class="border-bottom py-2">
+<p class="h5 fs"><code>geom.Region: <var>C</var> = <b>polararray</b> (<var>R</var>, <var>N</var>, <var>ANGLE</var>)</code></p>
+<p class="h5 fs"><code>geom.Region: <var>C</var> = <b>polararray</b> (<var>R</var>, <var>N</var>, <var>ANGLE</var>, <var>P</var>)</code></p>
+<p class="h5 fs fs-last"><code>geom.Region: <var>C</var> = <b>polararray</b> (&hellip;, <code>'Rotate'</code>, <var>TF</var>)</code></p>
+<p> </p>
+<p> <code><var>C</var> = polararray (<var>R</var>, <var>N</var>, <var>ANGLE</var>, <var>P</var>)</code>
+ places <var>N</var> copies of the region round the point <var>P</var> of its
+ plane, the origin of its UCS by default, the first where the region is
+ and the rest turned on anticlockwise, clockwise for a negative
+ <var>ANGLE</var>.  A whole turn, <var>ANGLE</var> of 360, spaces them evenly
+ <code><var>ANGLE</var> / <var>N</var></code> apart; a part of a turn puts one at each
+ end, <code><var>ANGLE</var> / (<var>N</var> - 1)</code> apart.  It returns their union as
+ <code>geom.Region.copy</code> does.
+</p>
+<p> Each copy is turned as it goes round, as the holes of a bolt circle or
+ the spokes of a wheel are.  With <code>'Rotate'</code> set to <code>false</code>
+ each copy keeps the region&rsquo;s own direction, moved as the centre of the
+ box round it moves.
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example"> ## A flange of diameter 60 with a bore of 20 and six bolt holes of 6
+ ## on a circle of 40
+ H = polararray (geom.Region ([17, 0, 1; 23, 0, 1]), 6, 360);
+ F = subtract (geom.Region ([-30, 0, 1; 30, 0, 1], ...
+                           {[-10, 0, 1; 10, 0, 1]}), H);
+</pre></td></tr></table>
+
+<p> <strong>See also: </strong>
+  <a href="geom.Region.html#geom_Region_copy">geom.Region.copy</a>, 
+  <a href="geom.Region.html#geom_Region_rectarray">geom.Region.rectarray</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#geom_Region_write"
+              aria-expanded="false" aria-controls="geom_Region_write">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>write</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Write a region to a DXF file.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="geom_Region_write">
+            <div class="border-bottom py-2">
+<p class="h5 fs"><code>geom.Region: <b>write</b> (<var>R</var>, <var>FILE</var>)</code></p>
+<p class="h5 fs fs-last"><code>geom.Region: <b>write</b> (<var>R</var>, <var>FILE</var>, <var>Name</var>, <var>Value</var>, &hellip;)</code></p>
+<p> </p>
+<p> <code>write (<var>R</var>, <var>FILE</var>)</code> writes the region <var>R</var> to
+ <var>FILE</var>, which must end in <code>.dxf</code>, as its loops in an ASCII DXF
+ drawing, the outline first and then the holes, bound by a group: a
+ loop of straight segments and arcs is one closed <code>LWPOLYLINE</code> on
+ the region&rsquo;s plane, a loop with a spline in it its pieces.  The
+ group&rsquo;s extended data, under the application <code>'DRAFTING'</code>,
+ names the class and holds the region&rsquo;s <code>geom.UCS</code>, so
+ <code>geom.read</code> gives back the region that was written, its holes and
+ frame included.
+</p>
+<p> Name/Value pairs:
+</p>
+<dl compact="compact">
+<dt> <code>'Layer'</code></dt>
+<dd> The layer, <code>'0'</code> by default.</dd>
+<dt> <code>'Linetype'</code></dt>
+<dd> One of the line types of <code>draw.linetype</code>, or any name the
+ receiving program holds; <code>'CONTINUOUS'</code> by default.</dd>
+<dt> <code>'Colour'</code></dt>
+<dd> An AutoCAD colour index from 1 to 256, 256 meaning the layer&rsquo;s colour,
+ which is the default.  True colour came only with R2004.</dd>
+<dt> <code>'Fill'</code></dt>
+<dd> <code>true</code> adds a solid <code>HATCH</code> over the region, written with its
+ group, so it reads back as part of the region rather than as a second
+ one; <code>false</code> by default.</dd>
+<dt> <code>'Version'</code></dt>
+<dd> <code>'R2000'</code> (<code>AC1015</code>), the default, or <code>'R12'</code>
+ (<code>AC1009</code>) for a program that reads nothing later.  R12 has no
+ groups and no <code>HATCH</code>, so a region is an error there.</dd>
+<dt> <code>'LTScale'</code></dt>
+<dd> The drawing&rsquo;s line-type scale, 1 by default, written in the header so
+ the dashes look the same wherever the file is opened.</dd>
+</dl>
+
+<p> The drawing units are millimetres.  Several geom objects go in one file
+ through <code>geom.write</code>.
+</p>
+<p> <strong>See also: </strong>
+  <a href="geom.read.html">geom.read</a>, 
+  <a href="geom.write.html">geom.write</a>, 
+  <a href="draw.Drawing.write.html">draw.Drawing.write</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#geom_Region_nest"
+              aria-expanded="false" aria-controls="geom_Region_nest">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>nest</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Make regions from closed loops, each hole in the loop around it.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="geom_Region_nest">
+            <div class="border-bottom py-2">
+<p class="h5 fs fs-last"><code>geom.Region: <var>R</var> = <b>geom.Region.nest</b> (<var>LOOPS</var>)</code></p>
+<p> </p>
+<p> <code><var>R</var> = geom.Region.nest (<var>LOOPS</var>)</code> takes the closed
+ <code>geom.Path</code>, <code>geom.Polyline</code> and <code>geom.Spline</code> objects
+ in the cell array <var>LOOPS</var>, in any order, and returns the regions
+ they bound as a row cell array, largest first, or <code>cell (1, 0)</code>
+ when <var>LOOPS</var> is empty.  This is how the outlines of a drawing, an
+ outline and the bores and slots drawn inside it, become regions to make
+ solids from.
+</p>
+<p> Loops nest only with loops in the same plane.  In a plane, a loop that
+ no other loop encloses is the outline of a region, and a loop inside it
+ is a hole in that region.  A loop inside a hole is an island: it is the
+ outline of a region of its own, with any loops inside it as its holes,
+ and so on inwards, since a region is one outline and its holes.  Each
+ region is in the UCS of the first loop of its plane in <var>LOOPS</var>, and,
+ as every region does, runs its outline anticlockwise and its holes
+ clockwise.
+</p>
+<p> A loop given in world coordinates need not lie in the plane of its UCS;
+ it must lie in a plane.  Loops that cross or touch, themselves or each
+ other, make no regions and are refused, as is a loop enclosing no area.
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example"> ## A plate with a bore, and a disc lying in the bore
+ R = geom.Region.nest ({geom.Polyline ([20, 20, 1; 40, 20, 1], ...
+                                        'Closed', true), ...
+                       geom.Polyline ([0, 0; 60, 0; 60, 40; 0, 40], ...
+                                      'Closed', true), ...
+                       geom.Polyline ([25, 20, 1; 35, 20, 1], ...
+                                      'Closed', true)});
+</pre></td></tr></table>
+
+<p> <strong>See also: </strong>
+  <a href="geom.Path.html#geom_Path_chain">geom.Path.chain</a>, 
+  <a href="geom.Region.html">geom.Region</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </body>
+</html>

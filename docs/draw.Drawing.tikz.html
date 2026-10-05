@@ -47,11 +47,63 @@
             window.location.pathname + window.location.search);
         }
       });
+      // Let the browser's find-in-page reach the text inside a collapsed
+      // panel.  The attribute "hidden=until-found" is what makes content
+      // searchable and revealable; the style block below clears the
+      // "display: none" that would otherwise stop the attribute meaning
+      // anything, a box that is not generated having nothing to reveal.  Set
+      // it only where it is understood, which "content-visibility" is no test
+      // for, Firefox having shipped the two apart.  Where it is not, the panel
+      // keeps the user agent's plain [hidden] and the page behaves as before.
+      window.addEventListener ("DOMContentLoaded", () => {
+        if (! ("onbeforematch" in document.body)) { return; }
+        document.documentElement.classList.add ("until-found");
+        let panels = document.querySelectorAll (
+          ".collapse:not(.show):not(.navbar-collapse)");
+        for (let el of panels) {
+          el.setAttribute ("hidden", "until-found");
+          // Fired on a find-in-page hit, before the browser drops the
+          // attribute and scrolls to it.  Bootstrap keeps a panel's state in
+          // its class list, so adding the class here opens the panel in the
+          // same frame and leaves the button shutting it correctly afterwards.
+          // Bootstrap's own show () would animate against that scroll, and the
+          // attribute once dropped, "display: none" would take the panel back
+          // part way through.
+          el.addEventListener ("beforematch", () => {
+            el.classList.add ("show");
+            for (let b of document.querySelectorAll ("[data-bs-target]")) {
+              if (b.getAttribute ("data-bs-target") === "#" + el.id) {
+                b.setAttribute ("aria-expanded", "true");
+              }
+            }
+          });
+        }
+        // Drop the attribute before Bootstrap measures the panel it is opening,
+        // which it does after firing this; a revealable one measures nothing.
+        document.addEventListener ("show.bs.collapse", (e) => {
+          e.target.removeAttribute ("hidden");
+        });
+        // Restore it once the panel is shut, rather than while it is shutting.
+        document.addEventListener ("hidden.bs.collapse", (e) => {
+          if (! e.target.classList.contains ("navbar-collapse")) {
+            e.target.setAttribute ("hidden", "until-found");
+          }
+        });
+      });
     </script>
     <style>
-    h5.fs {
+    .fs {
     margin-top: -0.15em;
     margin-bottom: -0.15em;
+    }
+    .fs-last {
+    margin-bottom: calc(1rem - 0.15em);
+    }
+    p.description {
+    font-family: Consolas, "Courier New", monospace;
+    }
+    p.description code {
+    font-size: inherit;
     }
     h6:hover {
       color: gray;
@@ -90,6 +142,19 @@
     }
     [id^="togList"]:checked ~ .list{
       display:block;                        /* SHOW LIST (IF CHECKED) */
+    }
+    /* Bootstrap hides a collapsed panel with "display: none", which generates
+       no box, so the "content-visibility: hidden" the user agent gives
+       "hidden=until-found" could never apply and the text would stay beyond
+       find-in-page.  Clear that one declaration, and only where the script
+       above has found the attribute to be understood: an attribute selector
+       matches a value the browser does not understand, so an ungated rule
+       would leave every panel of an older browser standing open.  The
+       "!important" is required rather than decoration: the reboot carries
+       "[hidden] {display: none !important}", which the attribute itself brings
+       into play, and only another "!important" can outrank it. */
+    html.until-found .collapse[hidden="until-found"]:not(.show) {
+      display: block !important;
     }
     </style>
   </head>
@@ -153,6 +218,7 @@
 					<li><a href="draw.Drawing.numentities.html" class="text-decoration-none font-monospace"><small>numentities</small></a></li>
 					<li><a href="draw.Drawing.isempty.html" class="text-decoration-none font-monospace"><small>isempty</small></a></li>
 					<li><a href="draw.Drawing.layers.html" class="text-decoration-none font-monospace"><small>layers</small></a></li>
+					<li><a href="draw.Drawing.layer.html" class="text-decoration-none font-monospace"><small>layer</small></a></li>
 					<li><a href="draw.Drawing.bbox.html" class="text-decoration-none font-monospace"><small>bbox</small></a></li>
 				</ul>
 				</div>
@@ -168,6 +234,9 @@
 					<li><a href="draw.Drawing.line.html" class="text-decoration-none font-monospace"><small>line</small></a></li>
 					<li><a href="draw.Drawing.point.html" class="text-decoration-none font-monospace"><small>point</small></a></li>
 					<li><a href="draw.Drawing.polyline.html" class="text-decoration-none font-monospace"><small>polyline</small></a></li>
+					<li><a href="draw.Drawing.spline.html" class="text-decoration-none font-monospace"><small>spline</small></a></li>
+					<li><a href="draw.Drawing.path.html" class="text-decoration-none font-monospace"><small>path</small></a></li>
+					<li><a href="draw.Drawing.region.html" class="text-decoration-none font-monospace"><small>region</small></a></li>
 					<li><a href="draw.Drawing.arc.html" class="text-decoration-none font-monospace"><small>arc</small></a></li>
 					<li><a href="draw.Drawing.circle.html" class="text-decoration-none font-monospace"><small>circle</small></a></li>
 					<li><a href="draw.Drawing.ellipse.html" class="text-decoration-none font-monospace"><small>ellipse</small></a></li>
@@ -188,6 +257,7 @@
 					<li><a href="draw.Drawing.diam.html" class="text-decoration-none font-monospace"><small>diam</small></a></li>
 					<li><a href="draw.Drawing.radius.html" class="text-decoration-none font-monospace"><small>radius</small></a></li>
 					<li><a href="draw.Drawing.angdim.html" class="text-decoration-none font-monospace"><small>angdim</small></a></li>
+					<li><a href="draw.Drawing.ordinate.html" class="text-decoration-none font-monospace"><small>ordinate</small></a></li>
 					<li><a href="draw.Drawing.centremark.html" class="text-decoration-none font-monospace"><small>centremark</small></a></li>
 					<li><a href="draw.Drawing.leader.html" class="text-decoration-none font-monospace"><small>leader</small></a></li>
 				</ul>
@@ -217,10 +287,10 @@
 				</label>
 				<div class="list">
 				<ul style="list-style-type: none; padding-left: 20px;">
-					<li><a href="draw.Drawing.entities.html" class="text-decoration-none font-monospace"><small>entities</small></a></li>
 					<li><a href="draw.Drawing.plot.html" class="text-decoration-none font-monospace"><small>plot</small></a></li>
 					<li><a href="draw.Drawing.print.html" class="text-decoration-none font-monospace"><small>print</small></a></li>
 					<li><a href="draw.Drawing.tikz.html" class="text-decoration-none font-monospace fw-bolder"><small>tikz</small></a></li>
+					<li><a href="draw.Drawing.write.html" class="text-decoration-none font-monospace"><small>write</small></a></li>
 				</ul>
 				</div>
 			</div>
@@ -244,84 +314,66 @@
                 </ol>
               </nav>
 
-<dl>
-<dt><code><h5 class="fs">draw.Drawing: <var>S</var> = <b>tikz</b> (<var>D</var>)</code></h5></dt>
-<dt><code><h5 class="fs">draw.Drawing: <var>S</var> = <b>tikz</b> (<var>D</var>, <var>NAME</var>, <var>VALUE</var>, &hellip;)</code></h5></dt>
-</dl>
+<p class="h5 fs"><code>draw.Drawing: <var>S</var> = <b>tikz</b> (<var>D</var>)</code></p>
+<p class="h5 fs fs-last"><code>draw.Drawing: <var>S</var> = <b>tikz</b> (<var>D</var>, <var>NAME</var>, <var>VALUE</var>, &hellip;)</code></p>
 <p> Render a drawing as a TikZ picture for inclusion in the LaTeX report.
 </p>
 <div class="ms-5">
 <p> <code><var>S</var> = tikz (<var>D</var>)</code> returns the TikZ code for the
- <code>draw.Drawing</code> object <var>D</var> as a character array, one line per row
- of
- the drawing, ready to be written to a <code>.tex</code> file and pulled into a
- document with <code>\input</code>.
+ <code>draw.Drawing</code> object <var>D</var> as one character vector, its lines
+ separated by newlines, ready to be written to a <code>.tex</code> file and
+ pulled into a document with <code>\input</code>.
 </p>
 <p> The picture is emitted at a stated plot scale, so it arrives on the page
- at
- the size a drawing is meant to be read at rather than at whatever size
- fits.
- Model coordinates are written unchanged, in millimetres, and the scale is
- carried by the <code>x</code> and <code>y</code> unit vectors of the
- <code>tikzpicture</code>: a wall at <math>x = 1600</math> appears in the output as
+ at the size a drawing is meant to be read at rather than at whatever
+ size fits.  Model coordinates are written unchanged, in millimetres, and
+ the scale is carried by the <code>x</code> and <code>y</code> unit vectors of the
+ <code>tikzpicture</code>: a wall at <em class="math">x = 1600</em> appears in the output as
  <code>1600</code> whatever the scale, which is what makes the generated source
  readable against the drawing it came from.
 </p>
 <p> Radii, text sizes and dimension ornament cannot follow that convention,
  since they must come out at a fixed size on paper regardless of scale.
  Those are emitted in absolute millimetres and points, already divided by
- the
- scale.
+ the scale.
 </p>
 <a name="Options"></a>
 <h3 class="subheading">Options</h3>
 
 <div class="table-responsive">
 <table class="table table-striped table-bordered table-sm">
-<tr><td width="16%"><code>'Scale'</code></td><td width="84%">Plot scale denominator: <math>50</math> means
- <math>1:50</math>, which is a common scale for a general-arrangement plan and
- the
- default.  A drawing at <math>1:1</math> wants <math>1</math>.</td></tr>
+<tr><td width="16%"><code>'Scale'</code></td><td width="84%">Plot scale denominator: <em class="math">50</em> means
+ <em class="math">1:50</em>, which is a common scale for a general-arrangement plan and
+ the default.  A drawing at <em class="math">1:1</em> wants <em class="math">1</em>.</td></tr>
 <tr><td width="16%"><code>'File'</code></td><td width="84%">Also write the result to this file.  The code
- is
- returned either way.</td></tr>
+ is returned either way.</td></tr>
 <tr><td width="16%"><code>'Styles'</code></td><td width="84%">Emit a <code>\tikzset</code> block defining one
- empty
- style per layer, so that the document can restyle a layer by redefining
- it.
- True by default; set it false when the styles are already defined and
- redefining them would undo that.</td></tr>
+ empty style per layer, so that the document can restyle a layer by
+ redefining it.  True by default; set it false when the styles are
+ already defined and redefining them would undo that.</td></tr>
 <tr><td width="16%"><code>'LTScale'</code></td><td width="84%">Multiplies line-type dash lengths.  Patterns
  are model lengths times this factor, exactly as in
- <code>draw.Drawing.plot</code> and as
- CAD&rsquo;s own <code>LTSCALE</code> works.  Defaults to the drawing scale, which
- cancels the reduction so dashes reach the page at their nominal size &mdash;
- a
- centre line reads as a centre line whether the view is at 1:1 or 1:50 &mdash;
- while leaving the factor visible and adjustable.</td></tr>
+ <code>draw.Drawing.plot</code> and as CAD&rsquo;s own <code>LTSCALE</code> works.
+ Defaults to the drawing scale, which cancels the reduction so dashes
+ reach the page at their nominal size, and a centre line reads as a
+ centre line whether the view is at 1:1 or 1:50, while leaving the factor
+ visible and adjustable.</td></tr>
 </table>
-<p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/tree/main/inst/+draw/Drawing.m">draw.Drawing</a>
 </div>
 
 <a name="Dimensions"></a>
 <h3 class="subheading">Dimensions</h3>
 
-<p> Dimensions are rendered here rather than reused from
- <code>draw.Drawing.entities</code>, which is the point of storing them
- semantically.  A
- TikZ node anchors itself, so the label is positioned by naming the side
- it
- should sit on and letting TikZ measure the text &mdash; where the DXF path
- has
- to estimate the width of a string from its character count.  The same
- drawing therefore gets properly centred labels on the report figure and
- approximately centred ones in the CAD file, from one model and without a
- flag anywhere.
+<p> Dimensions are rendered here from what they measure, which is the point
+ of storing them semantically.  A TikZ node anchors itself, so the label
+ is positioned by naming the side it should sit on and letting TikZ
+ measure the text, where a figure or a CAD file has to estimate the width
+ of a string from its character count.  The same drawing therefore gets
+ properly centred labels on the report figure, from one model and without
+ a flag anywhere.
 </p>
-<p> Labels are unidirectional, matching <code>draw.Drawing.entities</code>, and
- ticks are the
- 45-degree architectural obliques.
+<p> Labels are unidirectional, as <code>draw.Drawing.plot</code> draws them, and
+ ticks are the 45-degree architectural obliques.
 </p>
 <a name="What-the-document-needs"></a>
 <h3 class="subheading">What the document needs</h3>
@@ -331,17 +383,18 @@
  library beyond TikZ itself.
 </p>
 <p> Text is written through as UTF-8 and LaTeX&rsquo;s special characters are
- escaped.  Greek text needs a Unicode-aware engine &mdash; <code>xelatex</code> or
- <code>lualatex</code> &mdash; or <code>babel</code> configured for Greek; that is a
- property
- of the document, not of this output.
+ escaped.  Greek text needs a Unicode-aware engine, <code>xelatex</code> or
+ <code>lualatex</code>, or <code>babel</code> configured for Greek; that is a
+ property of the document, not of this output.
 </p>
 <p> <strong>See also: </strong>
   <a href="draw.Drawing.html">draw.Drawing</a>, 
-draw.Drawing.entities
+  <a href="draw.Drawing.plot.html">draw.Drawing.plot</a>, 
+  <a href="draw.Drawing.write.html">draw.Drawing.write</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/tree/main/inst/+draw/Drawing.m">draw.Drawing</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/0f84b98/inst/+draw/Drawing.m#L2687">draw.Drawing</a>
+</p>
 </div>
         <div class="card rounded my-4">
           <div class="card-header card-header-mod">
@@ -361,7 +414,8 @@ draw.Drawing.entities
                 <p>The LaTeX backend, for a drawing that belongs in a report rather than in a CAD program.  Each layer becomes a TikZ scope with a style of its own, so the document can restyle a layer by redefining it.</p>
                 <pre style="overflow-x: auto; white-space: pre; padding: 0.6rem 0.8rem; margin: 0.3rem 0; border: 1px solid #cfe0e6; border-left: 4px solid #4a90a4; border-radius: 4px; background-color: #eef5f8;"> D = draw.Drawing ('bracket');
  D.Layer = 'BODY';
- D = D.polyline ([0, 0; 40, 0; 40, 25; 0, 25], true).circle ([20, 12.5], 6);
+ D = D.polyline (geom.Polyline ([0, 0; 40, 0; 40, 25; 0, 25], ...
+                                'Closed', true)).circle ([20, 12.5], 6);
  D.Layer = 'AXES';
  D.Linetype = 'CENTER';
  D.Colour = 'red';

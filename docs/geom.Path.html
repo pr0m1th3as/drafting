@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Geometry, CAD Input/Output and Technical Drawing: geom.Path</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" integrity="sha512-1ycn6IcaQQ40/MKBW2W4Rhis/DbILU74C1vSrLJxCq57o941Ym01SwNsOMqvEBFlcgUa6xLiPY/NS5R+E6ztJQ==" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/css/bootstrap.min.css" integrity="sha384-KyZXEAg3QhqLMpG8r+8fhAXLRk2vvoC2f3B09zVXn8CA5QIVfZOJ3BCsw2P0p/We" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-U1DAWAznBHeqEIlVSCgzq+c9gqGAJn5c/t99JyeKa9xxaYpSvHU5awsuZVVFIhvj" crossorigin="anonymous"></script>
+    <script type="text/javascript" async
+      src="https://cdn.jsdelivr.net/npm/mathjax@2/MathJax.js?config=TeX-AMS_CHTML">
+    </script>
+    <script type="text/javascript">
+      window.addEventListener("load", () => {
+        for (let i of document.querySelectorAll(".collapse ul")) {
+          let tog = document.createElement("div");
+          tog.innerHTML = i.previousSibling.textContent;
+          tog.className = "toggle";
+          tog.onclick = () => tog.classList.toggle("show");
+          i.parentElement.removeChild(i.previousSibling);
+          i.parentElement.insertBefore(tog, i);
+        }
+      });
+      // Open the collapsible demo an "#example" link points to, then scroll to
+      // it.  getElementById (not querySelector) matches ids that contain a dot,
+      // e.g. "Class.method-example1".
+      function openHashTarget () {
+        if (! window.location.hash) { return; }
+        let el = document.getElementById (
+          decodeURIComponent (window.location.hash.slice (1)));
+        if (! el) { return; }
+        if (el.classList.contains ("collapse") &&
+            ! el.classList.contains ("show")) {
+          bootstrap.Collapse.getOrCreateInstance (el).show ();
+        }
+        el.scrollIntoView ();
+      }
+      window.addEventListener ("DOMContentLoaded", openHashTarget);
+      window.addEventListener ("hashchange", openHashTarget);
+      // When the collapsible named by the current URL fragment is collapsed,
+      // drop the fragment (replaceState: no scroll, no history entry).  Otherwise
+      // the fragment would still equal this id, so clicking the same #example
+      // link again fires no "hashchange" and the example would not re-expand.
+      document.addEventListener ("hide.bs.collapse", (e) => {
+        if (e.target.id && window.location.hash === "#" + e.target.id) {
+          history.replaceState (null, "",
+            window.location.pathname + window.location.search);
+        }
+      });
+      // Let the browser's find-in-page reach the text inside a collapsed
+      // panel.  The attribute "hidden=until-found" is what makes content
+      // searchable and revealable; the style block below clears the
+      // "display: none" that would otherwise stop the attribute meaning
+      // anything, a box that is not generated having nothing to reveal.  Set
+      // it only where it is understood, which "content-visibility" is no test
+      // for, Firefox having shipped the two apart.  Where it is not, the panel
+      // keeps the user agent's plain [hidden] and the page behaves as before.
+      window.addEventListener ("DOMContentLoaded", () => {
+        if (! ("onbeforematch" in document.body)) { return; }
+        document.documentElement.classList.add ("until-found");
+        let panels = document.querySelectorAll (
+          ".collapse:not(.show):not(.navbar-collapse)");
+        for (let el of panels) {
+          el.setAttribute ("hidden", "until-found");
+          // Fired on a find-in-page hit, before the browser drops the
+          // attribute and scrolls to it.  Bootstrap keeps a panel's state in
+          // its class list, so adding the class here opens the panel in the
+          // same frame and leaves the button shutting it correctly afterwards.
+          // Bootstrap's own show () would animate against that scroll, and the
+          // attribute once dropped, "display: none" would take the panel back
+          // part way through.
+          el.addEventListener ("beforematch", () => {
+            el.classList.add ("show");
+            for (let b of document.querySelectorAll ("[data-bs-target]")) {
+              if (b.getAttribute ("data-bs-target") === "#" + el.id) {
+                b.setAttribute ("aria-expanded", "true");
+              }
+            }
+          });
+        }
+        // Drop the attribute before Bootstrap measures the panel it is opening,
+        // which it does after firing this; a revealable one measures nothing.
+        document.addEventListener ("show.bs.collapse", (e) => {
+          e.target.removeAttribute ("hidden");
+        });
+        // Restore it once the panel is shut, rather than while it is shutting.
+        document.addEventListener ("hidden.bs.collapse", (e) => {
+          if (! e.target.classList.contains ("navbar-collapse")) {
+            e.target.setAttribute ("hidden", "until-found");
+          }
+        });
+      });
+    </script>
+    <style>
+    .fs {
+    margin-top: -0.15em;
+    margin-bottom: -0.15em;
+    }
+    .fs-last {
+    margin-bottom: calc(1rem - 0.15em);
+    }
+    p.description {
+    font-family: Consolas, "Courier New", monospace;
+    }
+    p.description code {
+    font-size: inherit;
+    }
+    h6:hover {
+      color: gray;
+    }
+    code {
+    font-family: Consolas, "Courier New", monospace;
+    border-radius: 0.3em;
+    white-space: nowrap;
+    color: gray;
+    }
+    code.description {
+    font-family: Consolas, "Courier New", monospace;
+    border-radius: 0.3em;
+    white-space: normal;
+    font-size:1.2em;
+    color: gray;
+    }
+    var {
+    font-family: Consolas, "Courier New", monospace;
+    border-radius: 0.3em;
+    font-style: normal;
+    font-weight: bold;
+    color: gray;
+    }
+    td {
+      vertical-align: top;
+    }
+    [id^="togList"],                        /* HIDE CHECKBOX */
+    [id^="togList"] ~ .list,                /* HIDE LIST */
+    [id^="togList"] + label  span + span,   /* HIDE "Collapse" */
+    [id^="togList"]:checked + label span{   /* HIDE "Expand" (IF CHECKED) */
+      display:none;
+    }
+    [id^="togList"]:checked + label span + span{
+      display:inline-block;                 /* SHOW "Collapse" (IF CHECKED) */
+    }
+    [id^="togList"]:checked ~ .list{
+      display:block;                        /* SHOW LIST (IF CHECKED) */
+    }
+    /* Bootstrap hides a collapsed panel with "display: none", which generates
+       no box, so the "content-visibility: hidden" the user agent gives
+       "hidden=until-found" could never apply and the text would stay beyond
+       find-in-page.  Clear that one declaration, and only where the script
+       above has found the attribute to be understood: an attribute selector
+       matches a value the browser does not understand, so an ungated rule
+       would leave every panel of an older browser standing open.  The
+       "!important" is required rather than decoration: the reboot carries
+       "[hidden] {display: none !important}", which the attribute itself brings
+       into play, and only another "!important" can outrank it. */
+    html.until-found .collapse[hidden="until-found"]:not(.show) {
+      display: block !important;
+    }
+    </style>
+  </head>
+  <body>
+    <div class="bg-dark">
+      <div class="container-xl">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+          <div class="container-fluid">
+            <a class="navbar-brand" href=index.html>
+              <img src="assets/drafting.png" alt="drafting" class="d-inline-block align-top" width="25" height="25">
+              Geometry, CAD Input/Output and Technical Drawing
+            </a>
+            <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+              <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+              <ul class="navbar-nav">
+                <li class="nav-item">
+                  <a class="nav-link" href="index.html#Polylines and regions">
+                    <i class="fas fa-list-alt"></i>
+                    Polylines and regions
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="https://gnu-octave.github.io/packages/">
+                  <img src="assets/octave-logo.svg" alt="GNU Octave logo" class="d-inline-block align-top" width="25" height="25">
+                    Octave Packages
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="https://www.octave.org">
+                    <i class="fas fa-home"></i>
+                    GNU Octave website
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </nav>
+      </div>
+    </div>
+    <div class="container-xl my-4">
+      <div class="row flex-nowrap" style="min-height:0">
+        <div class="col-md-2 bg-light" style="overflow-y: scroll; width: 250px;">
+          <div class="p-2" style="text-align: center;">
+            <h3>Categories &</h3>
+            <h4 style="color: blue">Functions List</h4>
+          </div>
+			<div class="row">
+				<input id="togList1" type="checkbox" checked>
+				<label for="togList1">
+					<span><h6>Polylines and regions</h6></span>
+					<span><h6>Polylines and regions</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="geom.Polyline.html" class="text-decoration-none font-monospace"><small>geom.Polyline</small></a></li>
+					<li><a href="geom.Spline.html" class="text-decoration-none font-monospace"><small>geom.Spline</small></a></li>
+					<li><a href="geom.Region.html" class="text-decoration-none font-monospace"><small>geom.Region</small></a></li>
+					<li><a href="geom.Path.html" class="text-decoration-none font-monospace fw-bolder"><small>geom.Path</small></a></li>
+					<li><a href="geom.UCS.html" class="text-decoration-none font-monospace"><small>geom.UCS</small></a></li>
+					<li><a href="geom.text.html" class="text-decoration-none font-monospace"><small>geom.text</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList2" type="checkbox">
+				<label for="togList2">
+					<span><h6>Geometry primitives</h6></span>
+					<span><h6>Geometry primitives</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="geom.signedarea.html" class="text-decoration-none font-monospace"><small>geom.signedarea</small></a></li>
+					<li><a href="geom.bbox.html" class="text-decoration-none font-monospace"><small>geom.bbox</small></a></li>
+					<li><a href="geom.centroid.html" class="text-decoration-none font-monospace"><small>geom.centroid</small></a></li>
+					<li><a href="geom.transform.html" class="text-decoration-none font-monospace"><small>geom.transform</small></a></li>
+					<li><a href="geom.isrectilinear.html" class="text-decoration-none font-monospace"><small>geom.isrectilinear</small></a></li>
+					<li><a href="geom.offset.html" class="text-decoration-none font-monospace"><small>geom.offset</small></a></li>
+					<li><a href="geom.largestrect.html" class="text-decoration-none font-monospace"><small>geom.largestrect</small></a></li>
+					<li><a href="geom.triangulate.html" class="text-decoration-none font-monospace"><small>geom.triangulate</small></a></li>
+					<li><a href="geom.hatchlines.html" class="text-decoration-none font-monospace"><small>geom.hatchlines</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList3" type="checkbox">
+				<label for="togList3">
+					<span><h6>Curve geometry</h6></span>
+					<span><h6>Curve geometry</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="geom.curvature.html" class="text-decoration-none font-monospace"><small>geom.curvature</small></a></li>
+					<li><a href="geom.curvesample.html" class="text-decoration-none font-monospace"><small>geom.curvesample</small></a></li>
+					<li><a href="geom.curveoffset.html" class="text-decoration-none font-monospace"><small>geom.curveoffset</small></a></li>
+					<li><a href="geom.selfintersects.html" class="text-decoration-none font-monospace"><small>geom.selfintersects</small></a></li>
+					<li><a href="geom.arclength.html" class="text-decoration-none font-monospace"><small>geom.arclength</small></a></li>
+					<li><a href="geom.resample.html" class="text-decoration-none font-monospace"><small>geom.resample</small></a></li>
+					<li><a href="geom.simplify.html" class="text-decoration-none font-monospace"><small>geom.simplify</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList4" type="checkbox">
+				<label for="togList4">
+					<span><h6>Construction geometry</h6></span>
+					<span><h6>Construction geometry</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="geom.intersectlines.html" class="text-decoration-none font-monospace"><small>geom.intersectlines</small></a></li>
+					<li><a href="geom.intersectcircle.html" class="text-decoration-none font-monospace"><small>geom.intersectcircle</small></a></li>
+					<li><a href="geom.intersectcircles.html" class="text-decoration-none font-monospace"><small>geom.intersectcircles</small></a></li>
+					<li><a href="geom.tangentpoints.html" class="text-decoration-none font-monospace"><small>geom.tangentpoints</small></a></li>
+					<li><a href="geom.fillet.html" class="text-decoration-none font-monospace"><small>geom.fillet</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList5" type="checkbox">
+				<label for="togList5">
+					<span><h6>DXF input and output</h6></span>
+					<span><h6>DXF input and output</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="geom.read.html" class="text-decoration-none font-monospace"><small>geom.read</small></a></li>
+					<li><a href="geom.write.html" class="text-decoration-none font-monospace"><small>geom.write</small></a></li>
+					<li><a href="draw.read.html" class="text-decoration-none font-monospace"><small>draw.read</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList6" type="checkbox">
+				<label for="togList6">
+					<span><h6>Meshes</h6></span>
+					<span><h6>Meshes</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="polymesh.Mesh.html" class="text-decoration-none font-monospace"><small>polymesh.Mesh</small></a></li>
+					<li><a href="polymesh.read.html" class="text-decoration-none font-monospace"><small>polymesh.read</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList7" type="checkbox">
+				<label for="togList7">
+					<span><h6>Sheet composition</h6></span>
+					<span><h6>Sheet composition</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="draw.titleblock.html" class="text-decoration-none font-monospace"><small>draw.titleblock</small></a></li>
+					<li><a href="draw.coordtable.html" class="text-decoration-none font-monospace"><small>draw.coordtable</small></a></li>
+					<li><a href="draw.symbol.html" class="text-decoration-none font-monospace"><small>draw.symbol</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList8" type="checkbox">
+				<label for="togList8">
+					<span><h6>Line types and colours</h6></span>
+					<span><h6>Line types and colours</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="draw.linetype.html" class="text-decoration-none font-monospace"><small>draw.linetype</small></a></li>
+					<li><a href="draw.colour.html" class="text-decoration-none font-monospace"><small>draw.colour</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList9" type="checkbox">
+				<label for="togList9">
+					<span><h6>Drawing model</h6></span>
+					<span><h6>Drawing model</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="draw.Drawing.html" class="text-decoration-none font-monospace"><small>draw.Drawing</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList10" type="checkbox">
+				<label for="togList10">
+					<span><h6>Solid modelling</h6></span>
+					<span><h6>Solid modelling</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="solid.Shape.html" class="text-decoration-none font-monospace"><small>solid.Shape</small></a></li>
+					<li><a href="solid.box.html" class="text-decoration-none font-monospace"><small>solid.box</small></a></li>
+					<li><a href="solid.wedge.html" class="text-decoration-none font-monospace"><small>solid.wedge</small></a></li>
+					<li><a href="solid.cylinder.html" class="text-decoration-none font-monospace"><small>solid.cylinder</small></a></li>
+					<li><a href="solid.cone.html" class="text-decoration-none font-monospace"><small>solid.cone</small></a></li>
+					<li><a href="solid.sphere.html" class="text-decoration-none font-monospace"><small>solid.sphere</small></a></li>
+					<li><a href="solid.ellipsoid.html" class="text-decoration-none font-monospace"><small>solid.ellipsoid</small></a></li>
+					<li><a href="solid.torus.html" class="text-decoration-none font-monospace"><small>solid.torus</small></a></li>
+					<li><a href="solid.polyhedron.html" class="text-decoration-none font-monospace"><small>solid.polyhedron</small></a></li>
+					<li><a href="solid.extrude.html" class="text-decoration-none font-monospace"><small>solid.extrude</small></a></li>
+					<li><a href="solid.revolve.html" class="text-decoration-none font-monospace"><small>solid.revolve</small></a></li>
+					<li><a href="solid.loft.html" class="text-decoration-none font-monospace"><small>solid.loft</small></a></li>
+					<li><a href="solid.sweep.html" class="text-decoration-none font-monospace"><small>solid.sweep</small></a></li>
+					<li><a href="solid.helix.html" class="text-decoration-none font-monospace"><small>solid.helix</small></a></li>
+					<li><a href="solid.read.html" class="text-decoration-none font-monospace"><small>solid.read</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList11" type="checkbox">
+				<label for="togList11">
+					<span><h6>Assemblies and viewing</h6></span>
+					<span><h6>Assemblies and viewing</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="model.Assembly.html" class="text-decoration-none font-monospace"><small>model.Assembly</small></a></li>
+					<li><a href="model.read.html" class="text-decoration-none font-monospace"><small>model.read</small></a></li>
+					<li><a href="model.Viewer.html" class="text-decoration-none font-monospace"><small>model.Viewer</small></a></li>
+				</ul>
+				</div>
+			</div>
+
+			  </div>
+			  <div class="col-md-10">
+          <div class="card rounded">
+            <div class="card-header card-header-mod">
+              <div class="row d-flex flex-wrap align-items-center">
+                <h3 class="d-inline-block mr-2">
+                Class&nbsp;Definition: <b><code>geom.Path</code></b>
+                </h3>
+              </div>
+            </div>
+            <div class="card-body">
+<p class="h5 description mb-3"><code>drafting: geom.Path</code></p>
+<p> A path of straight segments, circular arcs and splines in three
+ dimensions.
+</p>
+<div class="ms-5">
+<p> A <code>geom.Path</code> is the route a section is swept along by
+ <code>solid.sweep</code>: a pipe run, a bent bar or the centre line of a frame.
+ It is open or closed and, unlike a <code>geom.Polyline</code>, need not lie in
+ one plane.
+</p>
+<p> The vertices are coordinates in the path&rsquo;s <code>geom.UCS</code>, the world
+ coordinate system by default, so the same path can be laid anywhere, as a
+ polyline is laid on a plane.  Assigning another UCS moves the path, its
+ shape unchanged in its own coordinates.
+</p>
+<p> An arc is kept by the point half way along it, which fixes its plane and
+ its radius; a bulge, as a polyline keeps, would leave the plane of an arc
+ undecided in three dimensions.  Arcs come from rounding corners with
+ <code>geom.Path.fillet</code>, from a polyline&rsquo;s bulges, or from three points
+ with <code>geom.Path.arc</code>.  A <code>geom.Spline</code> makes one smooth segment
+ of its own.  Pieces are put end to end with <code>geom.Path.join</code>.
+</p>
+<p> A <code>geom.Path</code> is a value: every change makes a new one.
+</p>
+<p> <strong>See also: </strong>
+  <a href="solid.sweep.html">solid.sweep</a>, 
+  <a href="geom.Spline.html">geom.Spline</a>, 
+  <a href="geom.Polyline.html">geom.Polyline</a>, 
+  <a href="geom.Region.html">geom.Region</a>, 
+  <a href="geom.UCS.html">geom.UCS</a>
+</p>
+<p><strong>Source Code: </strong>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/0f84b98/inst/+geom/Path.m">geom.Path</a>
+</p>
+</div>
+        <p class="lead my-3">The <code>geom.Path</code> class contains the following properties:</p>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#geom_Path_Vertices"
+              aria-expanded="false" aria-controls="geom_Path_Vertices">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>Vertices</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Vertices
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="geom_Path_Vertices">
+            <div class="border-bottom py-2">
+<p> </p>
+<p> The vertices as an <em class="math">M</em>-by-3 matrix <code>[<var>x</var>, <var>y</var>,
+ <var>z</var>]</code>, in millimetres in the path&rsquo;s UCS.
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#geom_Path_Midpoints"
+              aria-expanded="false" aria-controls="geom_Path_Midpoints">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>Midpoints</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Midpoints of the arcs
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="geom_Path_Midpoints">
+            <div class="border-bottom py-2">
+<p> </p>
+<p> An <em class="math">M</em>-by-3 matrix whose row <em class="math">i</em> is the point half way along
+ the arc leaving vertex <em class="math">i</em>, or <code>NaN</code> where the segment leaving
+ it is straight or where no segment leaves it, at the end of an open
+ path.  The points are in the path&rsquo;s UCS.
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#geom_Path_Splines"
+              aria-expanded="false" aria-controls="geom_Path_Splines">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>Splines</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Splines of the path
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="geom_Path_Splines">
+            <div class="border-bottom py-2">
+<p> </p>
+<p> An <em class="math">M</em>-by-1 cell whose element <em class="math">i</em> is the <code>geom.Spline</code>
+ of the segment leaving vertex <em class="math">i</em>, its points in the path&rsquo;s
+ coordinates, or empty where that segment is a straight segment or an
+ arc.
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#geom_Path_Closed"
+              aria-expanded="false" aria-controls="geom_Path_Closed">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>Closed</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Closed flag
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="geom_Path_Closed">
+            <div class="border-bottom py-2">
+<p> </p>
+<p> <code>true</code> when the last vertex is joined back to the first.
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#geom_Path_UCS"
+              aria-expanded="false" aria-controls="geom_Path_UCS">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>UCS</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Coordinate system of the vertices
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="geom_Path_UCS">
+            <div class="border-bottom py-2">
+<p> </p>
+<p> The <code>geom.UCS</code> the vertices are coordinates in, the world
+ coordinate system by default.  Assigning another moves the path onto
+ it, its shape unchanged in its own coordinates.
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <p class="lead my-3">The <code>geom.Path</code> class offers the following public methods:</p>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#geom_Path_Path"
+              aria-expanded="false" aria-controls="geom_Path_Path">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>geom.Path</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Make a path.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="geom_Path_Path">
+            <div class="border-bottom py-2">
+<p class="h5 fs"><code>geom.Path: <var>P</var> = <b>geom.Path</b> (<var>V</var>)</code></p>
+<p class="h5 fs"><code>geom.Path: <var>P</var> = <b>geom.Path</b> (<var>V</var>, <var>Name</var>, <var>Value</var>, &hellip;)</code></p>
+<p class="h5 fs"><code>geom.Path: <var>P</var> = <b>geom.Path</b> (<var>PL</var>)</code></p>
+<p class="h5 fs fs-last"><code>geom.Path: <var>P</var> = <b>geom.Path</b> (<var>SP</var>)</code></p>
+<p> </p>
+<p> <code><var>P</var> = geom.Path (<var>V</var>)</code> makes an open path of straight
+ segments through the points given as rows of <var>V</var>, an <em class="math">M</em>-by-3
+ matrix in millimetres, or an <em class="math">M</em>-by-2 matrix of points in the plane
+ of the UCS, with at least two rows.
+</p>
+<p> Name/Value pairs:
+</p>
+<dl compact="compact">
+<dt> <code>'Closed'</code></dt>
+<dd> <code>true</code> to join the last point back to the first, <code>false</code> by
+ default.  A closed path must <strong>not</strong> repeat its first point at the
+ end; a repeat is accepted and dropped.</dd>
+<dt> <code>'UCS'</code></dt>
+<dd> The <code>geom.UCS</code> the points are coordinates in, the world coordinate
+ system by default.</dd>
+</dl>
+
+<p> <code><var>P</var> = geom.Path (<var>PL</var>)</code> makes the path of the
+ <code>geom.Polyline</code> <var>PL</var>, in its UCS, open or closed as <var>PL</var>
+ is, with its arcs kept exact.
+</p>
+<p> <code><var>P</var> = geom.Path (<var>SP</var>)</code> makes the path of one segment
+ along the <code>geom.Spline</code> <var>SP</var>, in its UCS.  A closed spline
+ makes a closed path of one vertex, its first point, the spline running
+ from it round and back.
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example"> ## The centre line of a tube bent twice, with bends of radius 15
+ P = geom.Path ([0, 0, 0; 0, 0, 100; 80, 0, 100; 80, 60, 100]);
+ P = fillet (P, 15);
+</pre></td></tr></table>
+
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#geom_Path_fillet"
+              aria-expanded="false" aria-controls="geom_Path_fillet">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>fillet</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Round the corners of a path.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="geom_Path_fillet">
+            <div class="border-bottom py-2">
+<p class="h5 fs"><code>geom.Path: <var>P</var> = <b>fillet</b> (<var>P</var>, <var>RADIUS</var>)</code></p>
+<p class="h5 fs fs-last"><code>geom.Path: <var>P</var> = <b>fillet</b> (<var>P</var>, <var>RADIUS</var>, <var>IDX</var>)</code></p>
+<p> </p>
+<p> <code><var>P</var> = fillet (<var>P</var>, <var>RADIUS</var>)</code> rounds every corner
+ where two straight segments meet with an arc of radius <var>RADIUS</var>
+ millimetres, tangent to both and in their plane, as a tube is bent: the
+ corner vertex becomes the two points where the arc meets the segments,
+ joined by the arc.  Corners where an arc or a spline meets a segment are
+ left as they are, and so are the two ends of an open path.
+</p>
+<p> <code><var>P</var> = fillet (<var>P</var>, <var>RADIUS</var>, <var>IDX</var>)</code> rounds only
+ the corners at the vertices indexed by <var>IDX</var>, each of which must be
+ a corner between two straight segments.
+</p>
+<p> A radius too large for a corner, whose arc would run past the end of a
+ segment or into the round of the next corner, is refused.  Rounds that
+ use up a segment between them meet, and the segment is dropped.
+</p>
+<p> <strong>See also: </strong>
+  <a href="geom.Polyline.html#geom_Polyline_fillet">geom.Polyline.fillet</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#geom_Path_chamfer"
+              aria-expanded="false" aria-controls="geom_Path_chamfer">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>chamfer</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Cut the corners of a path.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="geom_Path_chamfer">
+            <div class="border-bottom py-2">
+<p class="h5 fs"><code>geom.Path: <var>P</var> = <b>chamfer</b> (<var>P</var>, <var>D</var>)</code></p>
+<p class="h5 fs"><code>geom.Path: <var>P</var> = <b>chamfer</b> (<var>P</var>, [<var>D1</var>, <var>D2</var>])</code></p>
+<p class="h5 fs"><code>geom.Path: <var>P</var> = <b>chamfer</b> (&hellip;, <var>IDX</var>)</code></p>
+<p class="h5 fs fs-last"><code>geom.Path: <var>P</var> = <b>chamfer</b> (&hellip;, <code>'Angle'</code>, <var>A</var>)</code></p>
+<p> </p>
+<p> <code><var>P</var> = chamfer (<var>P</var>, <var>D</var>)</code> cuts every corner where two
+ straight segments meet with a straight segment from <var>D</var> millimetres
+ back along the segment before the corner to <var>D</var> along the segment
+ after it.  Corners where an arc or a spline meets a segment are left as
+ they are, and so are the two ends of an open path.
+</p>
+<p> <code><var>P</var> = chamfer (<var>P</var>, [<var>D1</var>, <var>D2</var>])</code> cuts back
+ <var>D1</var> along the segment before each corner and <var>D2</var> along the
+ segment after it, before and after in the order of the vertices.
+</p>
+<p> <code><var>P</var> = chamfer (<var>P</var>, <var>D</var>, <code>'Angle'</code>, <var>A</var>)</code>
+ cuts back <var>D</var> along the segment before each corner, with the cut at
+ <var>A</var> degrees to that segment.
+</p>
+<p> <code><var>P</var> = chamfer (&hellip;, <var>IDX</var>)</code> cuts only the corners at
+ the vertices indexed by <var>IDX</var>, each of which must be a corner
+ between two straight segments.
+</p>
+<p> A cut that would run past the end of a segment, or into the cut or round
+ of the next corner, or an angle at which the cut misses the segment
+ after the corner, is refused.
+</p>
+<p> <strong>See also: </strong>
+  <a href="geom.Path.html#geom_Path_fillet">geom.Path.fillet</a>, 
+  <a href="geom.Polyline.html#geom_Polyline_chamfer">geom.Polyline.chamfer</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#geom_Path_join"
+              aria-expanded="false" aria-controls="geom_Path_join">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>join</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Put paths and splines end to end.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="geom_Path_join">
+            <div class="border-bottom py-2">
+<p class="h5 fs"><code>geom.Path: <var>P</var> = <b>join</b> (<var>P1</var>, <var>P2</var>, &hellip;)</code></p>
+<p class="h5 fs fs-last"><code>geom.Path: <var>P</var> = <b>join</b> (&hellip;, <code>'Tangent'</code>, <var>TF</var>)</code></p>
+<p> </p>
+<p> <code><var>P</var> = join (<var>P1</var>, <var>P2</var>, &hellip;)</code> returns the path
+ that runs along <var>P1</var>, then <var>P2</var>, and so on, each a
+ <code>geom.Path</code> or a <code>geom.Spline</code>.  Each path must be open and
+ begin where the piece before it ends.  The pieces need not meet
+ smoothly: where they meet at an angle, the path has a corner.  When the
+ last piece ends where the first begins, the path is closed.  The path
+ is in the UCS of <var>P1</var>, the others&rsquo; points carried into it.
+</p>
+<p> Where a free end of a spline drawn through points meets a straight
+ segment, an arc or a spline end with a direction of its own, the spline
+ takes that direction, so the path runs on smoothly there.  A spline made
+ from control points is kept as it is.  With
+ <code>'Tangent'</code> set to <code>false</code>, free ends stay free and the
+ path may have a corner there.
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example"> ## A hairpin: up, over the top by a half circle, and down
+ P = join (geom.Path ([0, 0, 0; 0, 0, 50]), ...
+           geom.Path.arc ([0, 0, 50], [10, 0, 60], [20, 0, 50]), ...
+           geom.Path ([20, 0, 50; 20, 0, 0]));
+</pre></td></tr></table>
+
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#geom_Path_length"
+              aria-expanded="false" aria-controls="geom_Path_length">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>length</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+The length of a path.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="geom_Path_length">
+            <div class="border-bottom py-2">
+<p class="h5 fs fs-last"><code>geom.Path: <var>L</var> = <b>length</b> (<var>P</var>)</code></p>
+<p> </p>
+<p> <code><var>L</var> = length (<var>P</var>)</code> returns the length of the path
+ <var>P</var> in millimetres along its arcs and splines, including the
+ segment that closes a closed path.
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#geom_Path_write"
+              aria-expanded="false" aria-controls="geom_Path_write">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>write</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Write a path to a DXF file.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="geom_Path_write">
+            <div class="border-bottom py-2">
+<p class="h5 fs"><code>geom.Path: <b>write</b> (<var>P</var>, <var>FILE</var>)</code></p>
+<p class="h5 fs fs-last"><code>geom.Path: <b>write</b> (<var>P</var>, <var>FILE</var>, <var>Name</var>, <var>Value</var>, &hellip;)</code></p>
+<p> </p>
+<p> <code>write (<var>P</var>, <var>FILE</var>)</code> writes the path <var>P</var> to
+ <var>FILE</var>, which must end in <code>.dxf</code>, as its pieces in an ASCII
+ DXF drawing: a <code>LINE</code> for each straight segment, an <code>ARC</code> on
+ its own plane for each arc and a <code>SPLINE</code> for each spline, in
+ world coordinates, bound by a group.  The group&rsquo;s extended data, under
+ the application <code>'DRAFTING'</code>, names the class and holds the
+ path&rsquo;s <code>geom.UCS</code>, so <code>geom.read</code> gives back the path that
+ was written, closed or not, in its frame.  A program that does not
+ know the package sees the pieces, which is what a path is.
+</p>
+<p> Name/Value pairs:
+</p>
+<dl compact="compact">
+<dt> <code>'Layer'</code></dt>
+<dd> The layer, <code>'0'</code> by default.</dd>
+<dt> <code>'Linetype'</code></dt>
+<dd> One of the line types of <code>draw.linetype</code>, or any name the
+ receiving program holds; <code>'CONTINUOUS'</code> by default.</dd>
+<dt> <code>'Colour'</code></dt>
+<dd> An AutoCAD colour index from 1 to 256, 256 meaning the layer&rsquo;s colour,
+ which is the default.  True colour came only with R2004.</dd>
+<dt> <code>'Version'</code></dt>
+<dd> <code>'R2000'</code> (<code>AC1015</code>), the default, or <code>'R12'</code>
+ (<code>AC1009</code>) for a program that reads nothing later.  R12 has no
+ groups and holds only lines and arcs, so a path is an error there.</dd>
+<dt> <code>'LTScale'</code></dt>
+<dd> The drawing&rsquo;s line-type scale, 1 by default, written in the header so
+ the dashes look the same wherever the file is opened.</dd>
+</dl>
+
+<p> The drawing units are millimetres.  Several geom objects go in one file
+ through <code>geom.write</code>.
+</p>
+<p> <strong>See also: </strong>
+  <a href="geom.read.html">geom.read</a>, 
+  <a href="geom.write.html">geom.write</a>, 
+  <a href="draw.Drawing.write.html">draw.Drawing.write</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#geom_Path_arc"
+              aria-expanded="false" aria-controls="geom_Path_arc">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>arc</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+A path along a circular arc through three points.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="geom_Path_arc">
+            <div class="border-bottom py-2">
+<p class="h5 fs fs-last"><code>geom.Path: <var>P</var> = <b>geom.Path.arc</b> (<var>P1</var>, <var>PM</var>, <var>P2</var>)</code></p>
+<p> </p>
+<p> <code><var>P</var> = geom.Path.arc (<var>P1</var>, <var>PM</var>, <var>P2</var>)</code> returns
+ the open path along the circular arc that starts at <var>P1</var>, passes
+ through <var>PM</var> and ends at <var>P2</var>.  <var>PM</var> may be any point on the
+ arc between its ends.  Each point is a 3-element vector in world
+ coordinates, and the three must not lie on one line.  The path is in
+ the world coordinate system, and assigning it a UCS moves it there.
+</p>
+<p> <strong>See also: </strong>
+  <a href="geom.Path.html#geom_Path_join">geom.Path.join</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#geom_Path_chain"
+              aria-expanded="false" aria-controls="geom_Path_chain">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>chain</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Join pieces that meet end to end into paths.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="geom_Path_chain">
+            <div class="border-bottom py-2">
+<p class="h5 fs fs-last"><code>geom.Path: <var>C</var> = <b>geom.Path.chain</b> (<var>PIECES</var>)</code></p>
+<p> </p>
+<p> <code><var>C</var> = geom.Path.chain (<var>PIECES</var>)</code> joins the
+ <code>geom.Polyline</code>, <code>geom.Spline</code> and <code>geom.Path</code> objects
+ in the cell array <var>PIECES</var> wherever an end of one meets an end of
+ another, and returns the paths they make as a row cell array, one for
+ each run of pieces, or <code>cell (1, 0)</code> when <var>PIECES</var> is empty.
+ This is how the lines, arcs and splines of a drawing, given in any
+ order and any direction, become the outlines they draw.
+</p>
+<p> Two ends meet when they lie within 1e-4 millimetres of each other.  The
+ pieces are turned round as the run needs, and the two ends of every
+ joint are moved to the point half way between them, so that the path
+ passes through one vertex there.  Nothing else is changed: arcs stay
+ exact arcs, splines stay the splines they were, and where pieces meet
+ at an angle the path has a corner.  A run whose last end meets its
+ first is closed, and a piece that is closed already comes back as a
+ closed path of its own.
+</p>
+<p> Where an end meets more than one other end, the run stops there, and
+ each branch is a path of its own: the pieces do not say which way the
+ outline goes on.  The paths come in the order of the first piece of
+ each in <var>PIECES</var>.
+</p>
+<p> The paths are in the world coordinate system, unless every piece has
+ the same UCS, in which case they are in that one.
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example"> ## A slot drawn as two lines and two half circles, in no order
+ C = geom.Path.chain ({geom.Polyline ([0, 0; 20, 0]), ...
+                      geom.Polyline ([0, 10, 1; 0, 0, 0]), ...
+                      geom.Polyline ([0, 10; 20, 10]), ...
+                      geom.Polyline ([20, 0, 1; 20, 10, 0])});
+</pre></td></tr></table>
+
+<p> <strong>See also: </strong>
+  <a href="geom.Path.html#geom_Path_join">geom.Path.join</a>, 
+  <a href="geom.Region.html#geom_Region_nest">geom.Region.nest</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </body>
+</html>

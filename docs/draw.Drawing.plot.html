@@ -47,11 +47,63 @@
             window.location.pathname + window.location.search);
         }
       });
+      // Let the browser's find-in-page reach the text inside a collapsed
+      // panel.  The attribute "hidden=until-found" is what makes content
+      // searchable and revealable; the style block below clears the
+      // "display: none" that would otherwise stop the attribute meaning
+      // anything, a box that is not generated having nothing to reveal.  Set
+      // it only where it is understood, which "content-visibility" is no test
+      // for, Firefox having shipped the two apart.  Where it is not, the panel
+      // keeps the user agent's plain [hidden] and the page behaves as before.
+      window.addEventListener ("DOMContentLoaded", () => {
+        if (! ("onbeforematch" in document.body)) { return; }
+        document.documentElement.classList.add ("until-found");
+        let panels = document.querySelectorAll (
+          ".collapse:not(.show):not(.navbar-collapse)");
+        for (let el of panels) {
+          el.setAttribute ("hidden", "until-found");
+          // Fired on a find-in-page hit, before the browser drops the
+          // attribute and scrolls to it.  Bootstrap keeps a panel's state in
+          // its class list, so adding the class here opens the panel in the
+          // same frame and leaves the button shutting it correctly afterwards.
+          // Bootstrap's own show () would animate against that scroll, and the
+          // attribute once dropped, "display: none" would take the panel back
+          // part way through.
+          el.addEventListener ("beforematch", () => {
+            el.classList.add ("show");
+            for (let b of document.querySelectorAll ("[data-bs-target]")) {
+              if (b.getAttribute ("data-bs-target") === "#" + el.id) {
+                b.setAttribute ("aria-expanded", "true");
+              }
+            }
+          });
+        }
+        // Drop the attribute before Bootstrap measures the panel it is opening,
+        // which it does after firing this; a revealable one measures nothing.
+        document.addEventListener ("show.bs.collapse", (e) => {
+          e.target.removeAttribute ("hidden");
+        });
+        // Restore it once the panel is shut, rather than while it is shutting.
+        document.addEventListener ("hidden.bs.collapse", (e) => {
+          if (! e.target.classList.contains ("navbar-collapse")) {
+            e.target.setAttribute ("hidden", "until-found");
+          }
+        });
+      });
     </script>
     <style>
-    h5.fs {
+    .fs {
     margin-top: -0.15em;
     margin-bottom: -0.15em;
+    }
+    .fs-last {
+    margin-bottom: calc(1rem - 0.15em);
+    }
+    p.description {
+    font-family: Consolas, "Courier New", monospace;
+    }
+    p.description code {
+    font-size: inherit;
     }
     h6:hover {
       color: gray;
@@ -90,6 +142,19 @@
     }
     [id^="togList"]:checked ~ .list{
       display:block;                        /* SHOW LIST (IF CHECKED) */
+    }
+    /* Bootstrap hides a collapsed panel with "display: none", which generates
+       no box, so the "content-visibility: hidden" the user agent gives
+       "hidden=until-found" could never apply and the text would stay beyond
+       find-in-page.  Clear that one declaration, and only where the script
+       above has found the attribute to be understood: an attribute selector
+       matches a value the browser does not understand, so an ungated rule
+       would leave every panel of an older browser standing open.  The
+       "!important" is required rather than decoration: the reboot carries
+       "[hidden] {display: none !important}", which the attribute itself brings
+       into play, and only another "!important" can outrank it. */
+    html.until-found .collapse[hidden="until-found"]:not(.show) {
+      display: block !important;
     }
     </style>
   </head>
@@ -153,6 +218,7 @@
 					<li><a href="draw.Drawing.numentities.html" class="text-decoration-none font-monospace"><small>numentities</small></a></li>
 					<li><a href="draw.Drawing.isempty.html" class="text-decoration-none font-monospace"><small>isempty</small></a></li>
 					<li><a href="draw.Drawing.layers.html" class="text-decoration-none font-monospace"><small>layers</small></a></li>
+					<li><a href="draw.Drawing.layer.html" class="text-decoration-none font-monospace"><small>layer</small></a></li>
 					<li><a href="draw.Drawing.bbox.html" class="text-decoration-none font-monospace"><small>bbox</small></a></li>
 				</ul>
 				</div>
@@ -168,6 +234,9 @@
 					<li><a href="draw.Drawing.line.html" class="text-decoration-none font-monospace"><small>line</small></a></li>
 					<li><a href="draw.Drawing.point.html" class="text-decoration-none font-monospace"><small>point</small></a></li>
 					<li><a href="draw.Drawing.polyline.html" class="text-decoration-none font-monospace"><small>polyline</small></a></li>
+					<li><a href="draw.Drawing.spline.html" class="text-decoration-none font-monospace"><small>spline</small></a></li>
+					<li><a href="draw.Drawing.path.html" class="text-decoration-none font-monospace"><small>path</small></a></li>
+					<li><a href="draw.Drawing.region.html" class="text-decoration-none font-monospace"><small>region</small></a></li>
 					<li><a href="draw.Drawing.arc.html" class="text-decoration-none font-monospace"><small>arc</small></a></li>
 					<li><a href="draw.Drawing.circle.html" class="text-decoration-none font-monospace"><small>circle</small></a></li>
 					<li><a href="draw.Drawing.ellipse.html" class="text-decoration-none font-monospace"><small>ellipse</small></a></li>
@@ -188,6 +257,7 @@
 					<li><a href="draw.Drawing.diam.html" class="text-decoration-none font-monospace"><small>diam</small></a></li>
 					<li><a href="draw.Drawing.radius.html" class="text-decoration-none font-monospace"><small>radius</small></a></li>
 					<li><a href="draw.Drawing.angdim.html" class="text-decoration-none font-monospace"><small>angdim</small></a></li>
+					<li><a href="draw.Drawing.ordinate.html" class="text-decoration-none font-monospace"><small>ordinate</small></a></li>
 					<li><a href="draw.Drawing.centremark.html" class="text-decoration-none font-monospace"><small>centremark</small></a></li>
 					<li><a href="draw.Drawing.leader.html" class="text-decoration-none font-monospace"><small>leader</small></a></li>
 				</ul>
@@ -217,10 +287,10 @@
 				</label>
 				<div class="list">
 				<ul style="list-style-type: none; padding-left: 20px;">
-					<li><a href="draw.Drawing.entities.html" class="text-decoration-none font-monospace"><small>entities</small></a></li>
 					<li><a href="draw.Drawing.plot.html" class="text-decoration-none font-monospace fw-bolder"><small>plot</small></a></li>
 					<li><a href="draw.Drawing.print.html" class="text-decoration-none font-monospace"><small>print</small></a></li>
 					<li><a href="draw.Drawing.tikz.html" class="text-decoration-none font-monospace"><small>tikz</small></a></li>
+					<li><a href="draw.Drawing.write.html" class="text-decoration-none font-monospace"><small>write</small></a></li>
 				</ul>
 				</div>
 			</div>
@@ -244,12 +314,10 @@
                 </ol>
               </nav>
 
-<dl>
-<dt><code><h5 class="fs">draw.Drawing: <b>plot</b> (<var>D</var>)</code></h5></dt>
-<dt><code><h5 class="fs">draw.Drawing: <b>plot</b> (<var>HAX</var>, <var>D</var>)</code></h5></dt>
-<dt><code><h5 class="fs">draw.Drawing: <b>plot</b> (&hellip;, <var>Name</var>, <var>Value</var>)</code></h5></dt>
-<dt><code><h5 class="fs">draw.Drawing: <var>H</var> = <b>plot</b> (&hellip;)</code></h5></dt>
-</dl>
+<p class="h5 fs"><code>draw.Drawing: <b>plot</b> (<var>D</var>)</code></p>
+<p class="h5 fs"><code>draw.Drawing: <b>plot</b> (<var>HAX</var>, <var>D</var>)</code></p>
+<p class="h5 fs"><code>draw.Drawing: <b>plot</b> (&hellip;, <var>Name</var>, <var>Value</var>)</code></p>
+<p class="h5 fs fs-last"><code>draw.Drawing: <var>H</var> = <b>plot</b> (&hellip;)</code></p>
 <p> Draw a <code>draw.Drawing</code> into a figure, to look at it.
 </p>
 <div class="ms-5">
@@ -275,7 +343,9 @@
 <table class="table table-striped table-bordered table-sm">
 <thead class="table-primary"><tr><th width="16%">Name</th><th width="14%">Default</th><th width="70%">Meaning</th></tr></thead>
 <tr><td width="16%"><code>'Axes'</code></td><td width="14%"><code>gca</code></td><td width="70%">axes to draw into</td></tr>
-<tr><td width="16%"><code>'LineWidth'</code></td><td width="14%">0.5</td><td width="70%">width of every line, in points</td></tr>
+<tr><td width="16%"><code>'LineWidth'</code></td><td width="14%">0.5</td><td width="70%">width in points of every line
+ with no line weight of its own or of its layer, which is drawn at that
+ weight</td></tr>
 <tr><td width="16%"><code>'FontSize'</code></td><td width="14%">8</td><td width="70%">size of text, in points</td></tr>
 <tr><td width="16%"><code>'Layers'</code></td><td width="14%">all</td><td width="70%">cell array of layer names to draw</td></tr>
 <tr><td width="16%"><code>'Arc'</code></td><td width="14%">64</td><td width="70%">segments per full turn when sampling
@@ -295,11 +365,9 @@
  given, each string is sized from its own entity height instead of from
  <code>'FontSize'</code></td></tr>
 <tr><td width="16%"><code>'DimScale'</code></td><td width="14%">1</td><td width="70%">multiplies the dimension ornament,
- which is a model dimension: a drawing meant for <math>1:50</math> wants 50
- here, as it does in <code>entities</code></td></tr>
+ which is a model dimension: a drawing meant for <em class="math">1:50</em> wants 50
+ here</td></tr>
 </table>
-<p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/tree/main/inst/+draw/Drawing.m">draw.Drawing</a>
 </div>
 
 <a name="Why-the-axes-do-not-fit-tight"></a>
@@ -315,21 +383,14 @@
  two
  spans.
 </p>
-<a name="What-you-see-is-what-gets-written"></a>
-<h3 class="subheading">What you see is what gets written</h3>
+<a name="What-is-drawn"></a>
+<h3 class="subheading">What is drawn</h3>
 
-<p> The drawing is lowered through <code>draw.Drawing.entities</code> &mdash; the same
- conversion
- the DXF backend uses &mdash; and the result of that is what is plotted. A
- figure
- therefore shows the entities the file will contain, not a more flattering
- rendering of them.  In particular a hatch appears as its boundary alone,
- because that is what the file will carry; the second output of
- <code>draw.Drawing.entities</code> says so explicitly.
-</p>
-<p> The alternative, rendering from the drawing model directly, would let the
- screen show something the recipient never receives.  For a package whose
- output is meant to be manufactured, that is the wrong way round.
+<p> Every entity is drawn as the lines, arcs and text it consists of: a
+ dimension as its extension lines, ticks and label, a spline, path or
+ region along its curves, a hatch as its loops and its fill lines, clear
+ of its holes, or as its loops alone with <code>'Hatch'</code> set to
+ <code>'boundary'</code>.  <code>draw.Drawing.tikz</code> draws the same.
 </p>
 <a name="Line-types-are-drawn-properly,-not-approximated"></a>
 <h3 class="subheading">Line types are drawn properly, not approximated</h3>
@@ -368,7 +429,7 @@
  out at the height the model gives it. Pass <code>'FontScale'</code>, in points
  per model unit, and each string is sized from its own entity height
  instead:
- at a plot scale of <math>1:S</math> that factor is <code>72 / (25.4 *
+ at a plot scale of <em class="math">1:S</em> that factor is <code>72 / (25.4 *
  <var>S</var>)</code>,
  which is what <code>draw.Drawing.print</code> supplies. For a rendering where
  text is to
@@ -376,12 +437,13 @@
 </p>
 <p> <strong>See also: </strong>
   <a href="draw.Drawing.html">draw.Drawing</a>, 
-draw.Drawing.entities, 
-draw.Drawing.tikz, 
-  <a href="dxf.write.html">dxf.write</a>
+  <a href="draw.Drawing.tikz.html">draw.Drawing.tikz</a>, 
+  <a href="draw.Drawing.print.html">draw.Drawing.print</a>, 
+  <a href="draw.Drawing.write.html">draw.Drawing.write</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/tree/main/inst/+draw/Drawing.m">draw.Drawing</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/0f84b98/inst/+draw/Drawing.m#L2204">draw.Drawing</a>
+</p>
 </div>
         <div class="card rounded my-4">
           <div class="card-header card-header-mod">
@@ -401,7 +463,8 @@ draw.Drawing.tikz,
                 <p><code>plot</code> renders a drawing at equal aspect, honouring layer, line type and colour.  It plots what <code>entities</code> produces, which is what the file backends write, so a figure shows what the recipient will get.</p>
                 <pre style="overflow-x: auto; white-space: pre; padding: 0.6rem 0.8rem; margin: 0.3rem 0; border: 1px solid #cfe0e6; border-left: 4px solid #4a90a4; border-radius: 4px; background-color: #eef5f8;"> D = draw.Drawing ('plate');
  D.Layer = 'OUTLINE';
- D = D.polyline ([0, 0; 80, 0; 80, 50; 0, 50], true);
+ D = D.polyline (geom.Polyline ([0, 0; 80, 0; 80, 50; 0, 50], ...
+                                'Closed', true));
  D = D.circle ([20, 25], 8).circle ([60, 25], 8);
  D.Layer = 'AXES';
  D.Linetype = 'CENTER';

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <title>Geometry, CAD Input/Output and Technical Drawing: draw.Drawing.entities</title>
+    <title>Geometry, CAD Input/Output and Technical Drawing: draw.Drawing.layer</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" integrity="sha512-1ycn6IcaQQ40/MKBW2W4Rhis/DbILU74C1vSrLJxCq57o941Ym01SwNsOMqvEBFlcgUa6xLiPY/NS5R+E6ztJQ==" crossorigin="anonymous" referrerpolicy="no-referrer">
@@ -47,11 +47,63 @@
             window.location.pathname + window.location.search);
         }
       });
+      // Let the browser's find-in-page reach the text inside a collapsed
+      // panel.  The attribute "hidden=until-found" is what makes content
+      // searchable and revealable; the style block below clears the
+      // "display: none" that would otherwise stop the attribute meaning
+      // anything, a box that is not generated having nothing to reveal.  Set
+      // it only where it is understood, which "content-visibility" is no test
+      // for, Firefox having shipped the two apart.  Where it is not, the panel
+      // keeps the user agent's plain [hidden] and the page behaves as before.
+      window.addEventListener ("DOMContentLoaded", () => {
+        if (! ("onbeforematch" in document.body)) { return; }
+        document.documentElement.classList.add ("until-found");
+        let panels = document.querySelectorAll (
+          ".collapse:not(.show):not(.navbar-collapse)");
+        for (let el of panels) {
+          el.setAttribute ("hidden", "until-found");
+          // Fired on a find-in-page hit, before the browser drops the
+          // attribute and scrolls to it.  Bootstrap keeps a panel's state in
+          // its class list, so adding the class here opens the panel in the
+          // same frame and leaves the button shutting it correctly afterwards.
+          // Bootstrap's own show () would animate against that scroll, and the
+          // attribute once dropped, "display: none" would take the panel back
+          // part way through.
+          el.addEventListener ("beforematch", () => {
+            el.classList.add ("show");
+            for (let b of document.querySelectorAll ("[data-bs-target]")) {
+              if (b.getAttribute ("data-bs-target") === "#" + el.id) {
+                b.setAttribute ("aria-expanded", "true");
+              }
+            }
+          });
+        }
+        // Drop the attribute before Bootstrap measures the panel it is opening,
+        // which it does after firing this; a revealable one measures nothing.
+        document.addEventListener ("show.bs.collapse", (e) => {
+          e.target.removeAttribute ("hidden");
+        });
+        // Restore it once the panel is shut, rather than while it is shutting.
+        document.addEventListener ("hidden.bs.collapse", (e) => {
+          if (! e.target.classList.contains ("navbar-collapse")) {
+            e.target.setAttribute ("hidden", "until-found");
+          }
+        });
+      });
     </script>
     <style>
-    h5.fs {
+    .fs {
     margin-top: -0.15em;
     margin-bottom: -0.15em;
+    }
+    .fs-last {
+    margin-bottom: calc(1rem - 0.15em);
+    }
+    p.description {
+    font-family: Consolas, "Courier New", monospace;
+    }
+    p.description code {
+    font-size: inherit;
     }
     h6:hover {
       color: gray;
@@ -90,6 +142,19 @@
     }
     [id^="togList"]:checked ~ .list{
       display:block;                        /* SHOW LIST (IF CHECKED) */
+    }
+    /* Bootstrap hides a collapsed panel with "display: none", which generates
+       no box, so the "content-visibility: hidden" the user agent gives
+       "hidden=until-found" could never apply and the text would stay beyond
+       find-in-page.  Clear that one declaration, and only where the script
+       above has found the attribute to be understood: an attribute selector
+       matches a value the browser does not understand, so an ungated rule
+       would leave every panel of an older browser standing open.  The
+       "!important" is required rather than decoration: the reboot carries
+       "[hidden] {display: none !important}", which the attribute itself brings
+       into play, and only another "!important" can outrank it. */
+    html.until-found .collapse[hidden="until-found"]:not(.show) {
+      display: block !important;
     }
     </style>
   </head>
@@ -142,7 +207,7 @@
 				<a href="draw.Drawing.html" class="text-decoration-none"><h6>&#8962;&nbsp;draw.Drawing</h6></a>
 			</div>
 			<div class="row">
-				<input id="togList1" type="checkbox">
+				<input id="togList1" type="checkbox" checked>
 				<label for="togList1">
 					<span><h6>The drawing object</h6></span>
 					<span><h6>The drawing object</h6></span>
@@ -153,6 +218,7 @@
 					<li><a href="draw.Drawing.numentities.html" class="text-decoration-none font-monospace"><small>numentities</small></a></li>
 					<li><a href="draw.Drawing.isempty.html" class="text-decoration-none font-monospace"><small>isempty</small></a></li>
 					<li><a href="draw.Drawing.layers.html" class="text-decoration-none font-monospace"><small>layers</small></a></li>
+					<li><a href="draw.Drawing.layer.html" class="text-decoration-none font-monospace fw-bolder"><small>layer</small></a></li>
 					<li><a href="draw.Drawing.bbox.html" class="text-decoration-none font-monospace"><small>bbox</small></a></li>
 				</ul>
 				</div>
@@ -168,6 +234,9 @@
 					<li><a href="draw.Drawing.line.html" class="text-decoration-none font-monospace"><small>line</small></a></li>
 					<li><a href="draw.Drawing.point.html" class="text-decoration-none font-monospace"><small>point</small></a></li>
 					<li><a href="draw.Drawing.polyline.html" class="text-decoration-none font-monospace"><small>polyline</small></a></li>
+					<li><a href="draw.Drawing.spline.html" class="text-decoration-none font-monospace"><small>spline</small></a></li>
+					<li><a href="draw.Drawing.path.html" class="text-decoration-none font-monospace"><small>path</small></a></li>
+					<li><a href="draw.Drawing.region.html" class="text-decoration-none font-monospace"><small>region</small></a></li>
 					<li><a href="draw.Drawing.arc.html" class="text-decoration-none font-monospace"><small>arc</small></a></li>
 					<li><a href="draw.Drawing.circle.html" class="text-decoration-none font-monospace"><small>circle</small></a></li>
 					<li><a href="draw.Drawing.ellipse.html" class="text-decoration-none font-monospace"><small>ellipse</small></a></li>
@@ -188,6 +257,7 @@
 					<li><a href="draw.Drawing.diam.html" class="text-decoration-none font-monospace"><small>diam</small></a></li>
 					<li><a href="draw.Drawing.radius.html" class="text-decoration-none font-monospace"><small>radius</small></a></li>
 					<li><a href="draw.Drawing.angdim.html" class="text-decoration-none font-monospace"><small>angdim</small></a></li>
+					<li><a href="draw.Drawing.ordinate.html" class="text-decoration-none font-monospace"><small>ordinate</small></a></li>
 					<li><a href="draw.Drawing.centremark.html" class="text-decoration-none font-monospace"><small>centremark</small></a></li>
 					<li><a href="draw.Drawing.leader.html" class="text-decoration-none font-monospace"><small>leader</small></a></li>
 				</ul>
@@ -210,17 +280,17 @@
 				</div>
 			</div>
 			<div class="row">
-				<input id="togList5" type="checkbox" checked>
+				<input id="togList5" type="checkbox">
 				<label for="togList5">
 					<span><h6>Output</h6></span>
 					<span><h6>Output</h6></span>
 				</label>
 				<div class="list">
 				<ul style="list-style-type: none; padding-left: 20px;">
-					<li><a href="draw.Drawing.entities.html" class="text-decoration-none font-monospace fw-bolder"><small>entities</small></a></li>
 					<li><a href="draw.Drawing.plot.html" class="text-decoration-none font-monospace"><small>plot</small></a></li>
 					<li><a href="draw.Drawing.print.html" class="text-decoration-none font-monospace"><small>print</small></a></li>
 					<li><a href="draw.Drawing.tikz.html" class="text-decoration-none font-monospace"><small>tikz</small></a></li>
+					<li><a href="draw.Drawing.write.html" class="text-decoration-none font-monospace"><small>write</small></a></li>
 				</ul>
 				</div>
 			</div>
@@ -231,7 +301,7 @@
             <div class="card-header card-header-mod">
               <div class="row d-flex flex-wrap align-items-center">
                 <h3 class="d-inline-block mr-2">
-                Method&nbsp;Reference: <b><code>draw.Drawing.entities</code></b>
+                Method&nbsp;Reference: <b><code>draw.Drawing.layer</code></b>
                 </h3>
               </div>
             </div>
@@ -240,174 +310,60 @@
                 <ol class="breadcrumb">
                   <li class="breadcrumb-item"><a href="index.html">drafting</a></li>
                   <li class="breadcrumb-item"><a href="draw.Drawing.html">draw.Drawing</a></li>
-                  <li class="breadcrumb-item active" aria-current="page">entities</li>
+                  <li class="breadcrumb-item active" aria-current="page">layer</li>
                 </ol>
               </nav>
 
-<dl>
-<dt><code><h5 class="fs">draw.Drawing: <var>E</var> = <b>entities</b> (<var>D</var>)</code></h5></dt>
-<dt><code><h5 class="fs">draw.Drawing: <var>E</var> = <b>entities</b> (<var>D</var>, <var>NAME</var>, <var>VALUE</var>, &hellip;)</code></h5></dt>
-<dt><code><h5 class="fs">draw.Drawing: [<var>E</var>, <var>LOST</var>] = <b>entities</b> (&hellip;)</code></h5></dt>
-<dt><code><h5 class="fs">draw.Drawing: [<var>E</var>, <var>LOST</var>, <var>BLOCKS</var>] = <b>entities</b> (&hellip;)</code></h5></dt>
-</dl>
-<p> Lower a drawing to the flat entity struct array that <code>dxf.write</code>
- takes.
+<p class="h5 fs"><code>draw.Drawing: <var>D</var> = <b>layer</b> (<var>D</var>, <var>NAME</var>)</code></p>
+<p class="h5 fs fs-last"><code>draw.Drawing: <var>D</var> = <b>layer</b> (<var>D</var>, <var>NAME</var>, <var>Name</var>, <var>Value</var>, &hellip;)</code></p>
+<p> Define a layer, or set its properties.
 </p>
 <div class="ms-5">
-<p> <code><var>E</var> = entities (<var>D</var>)</code> converts the <code>draw.Drawing</code>
- object <var>D</var> into the entity vocabulary of the DXF layer: <code>LINE</code>,
- <code>POLYLINE</code>, <code>ARC</code>, <code>CIRCLE</code> and <code>TEXT</code>, each on the
- layer it was drawn on.  The result is written with
- <code>dxf.write (<var>FILE</var>, <var>E</var>)</code>.
+<p> <code><var>D</var> = layer (<var>D</var>, <var>NAME</var>)</code> adds the layer <var>NAME</var>
+ to <code>Layers</code>, with colour 7, line type CONTINUOUS, the output&rsquo;s own
+ pen, visible and printed; a layer already there is left as it is.
+ Name/Value pairs set its properties, and on a layer already there they
+ change only those given:
 </p>
-<p> This is the adapter between the two representations and the only place
- that
- knows both.  <code>dxf</code> deals in a file format and knows nothing of
- dimensions or hatches; <code>draw</code> models the drawing and knows nothing
- of
- group codes.
-</p>
-<a name="Dimensions-are-exploded-here"></a>
-<h3 class="subheading">Dimensions are exploded here</h3>
+<dl compact="compact">
+<dt> <code>'Colour'</code></dt>
+<dd> An AutoCAD colour index from 1 to 255, or a colour name accepted by
+ <code>draw.colour</code>.</dd>
+<dt> <code>'Linetype'</code></dt>
+<dd> A line type name: one of <code>draw.linetype</code>, or any a CAD program
+ holds.</dd>
+<dt> <code>'LineWeight'</code></dt>
+<dd> The width in millimetres of paper, or empty for the output&rsquo;s own pen.</dd>
+<dt> <code>'Visible'</code></dt>
+<dd> False keeps the layer and its entities but draws none of them.</dd>
+<dt> <code>'Plot'</code></dt>
+<dd> False draws the layer on screen and leaves it off paper, for
+ construction lines and the edge of a sheet.</dd>
+</dl>
 
-<p> A <code>'dim'</code> entity carries only geometry &mdash; two points, an offset and
- a
- direction.  It becomes six entities: two extension lines, the dimension
- line, two oblique ticks and the text.  Nothing associative is emitted: a
- true <code>DIMENSION</code> needs a <code>*D</code> block and a <code>DIMSTYLE</code>
- record,
- and plots identically.
+<p> An entity drawn <code>'byLayer'</code>, as entities are unless told
+ otherwise, takes its colour, line type and line weight from its layer,
+ so making a layer current is the one step that sets them all:
 </p>
-<p> Ticks are the 45-degree architectural obliques rather than arrowheads.
- R12
- draws a filled arrowhead only as a <code>SOLID</code>, and at drawing scale the
- tick is the conventional mark in any case.
-</p>
-<p> The text is placed <strong>horizontally whatever the dimension measures</strong>
- &mdash; unidirectional dimensioning, which ISO 129 permits and which keeps
- every
- label on the sheet readable from one side of it.
-</p>
-<p> The label always clears the dimension line, on the far side from the
- geometry being measured.  A dimension across the sheet carries its label
- above or below the line; one up the sheet carries it to the left or
- right,
- since a horizontal label beside a vertical dimension has to clear the
- line
- by its <em>width</em>.  Which side is which follows the sign of the offset.
-</p>
-<p> Without a label a dimension is annotated with the distance it measures,
- computed at the moment of conversion, so a dimension cannot fall out of
- step
- with the geometry it spans.
-</p>
-<a name="Ornament-size"></a>
-<h3 class="subheading">Ornament size</h3>
+<table><tr><td>&nbsp;</td><td><pre class="example"> D = draw.Drawing ('bracket');
+ D = D.layer ('OUTLINE', 'LineWeight', 0.5);
+ D = D.layer ('HIDDEN', 'Linetype', 'HIDDEN', 'LineWeight', 0.25);
+ D.Layer = 'OUTLINE';
+ D = D.circle ([0, 0], 20);
+ D.Layer = 'HIDDEN';
+ D = D.circle ([0, 0], 12);
+</pre></td></tr></table>
 
-<p> Dimension ornament &mdash; tick length, text height, the gap between a
- measured
- point and the start of its extension line &mdash; is in millimetres of
- <em>model space</em>, so its size on the sheet depends on the plot scale.
- Pass <code>'DimScale'</code> to set it: a drawing to be plotted at <math>1:50</math>
- wants <code>'DimScale', 50</code>, which makes a nominally <math>2.5</math> mm text
- <math>125</math> mm in the model and therefore <math>2.5</math> mm on paper.  The
- default is <math>1</math>.
-</p>
-<a name="What-the-DXF-vocabulary-cannot-carry"></a>
-<h3 class="subheading">What the DXF vocabulary cannot carry</h3>
-
-<p> One thing in the model has no R12 equivalent, and it is not dropped
- silently: a <code>'hatch'</code> becomes its boundary as a closed polyline, so
- the
- region is outlined but not filled, R12 having no <code>HATCH</code> entity.
-</p>
-<p> Text rotation used to be the second such case and no longer is.
- <code>dxf.write</code> emits group code 50, so a rotated <code>'text'</code> arrives
- in
- the CAD file at the angle it was drawn at.
-</p>
-<p> <code>[<var>E</var>, <var>LOST</var>] = entities (&hellip;)</code> returns the losses as
- a struct array with fields <code>index</code>, <code>type</code> and <code>reason</code>,
- naming the entity of <var>D</var> that lost something.  Ask for <var>LOST</var> and
- nothing is printed; omit it and each distinct reason is warned about
- once,
- because a conversion that quietly discards part of a drawing is the one
- failure mode a CAD file will not show you.
-</p>
 <p> <strong>See also: </strong>
-  <a href="dxf.write.html">dxf.write</a>, 
-  <a href="draw.Drawing.html">draw.Drawing</a>
+  <a href="draw.Drawing.html#draw_Drawing_Layers">draw.Drawing.Layers</a>, 
+  <a href="draw.Drawing.html#draw_Drawing_Layer">draw.Drawing.Layer</a>, 
+  <a href="draw.linetype.html">draw.linetype</a>, 
+  <a href="draw.colour.html">draw.colour</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/tree/main/inst/+draw/Drawing.m">draw.Drawing</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/0f84b98/inst/+draw/Drawing.m#L786">draw.Drawing</a>
+</p>
 </div>
-        <div class="card rounded my-4">
-          <div class="card-header card-header-mod">
-            <div class="row d-flex flex-wrap align-items-center">
-              <div class="col-sm-3 col-md-5 mb-2 mb-sm-0">
-                <button class="btn btn-link fs-4 fw-normal d-inline-block mr-2 p-0 text-reset text-decoration-none"
-                  type="button" data-bs-toggle="collapse"
-                  data-bs-target="#draw_Drawing_entities-example1" aria-expanded="true"
-                  aria-controls="draw_Drawing_entities-example1">
-                Example: 1
-                </button>
-              </div>
-            </div>
-          </div>
-          <div class="collapse show" id="draw_Drawing_entities-example1">
-            <div class="card-body">
-                <p><code>entities</code> lowers a drawing to the primitives a file can hold.  It is what every backend goes through, so what it returns is what the recipient gets.  The second output names anything that could not survive.</p>
-                <pre style="overflow-x: auto; white-space: pre; padding: 0.6rem 0.8rem; margin: 0.3rem 0; border: 1px solid #cfe0e6; border-left: 4px solid #4a90a4; border-radius: 4px; background-color: #eef5f8;"> D = draw.Drawing ().circle ([0, 0], 10).dim ([0, 0], [40, 0], -15);
- D = D.hatch ([0, -40; 40, -40; 40, -55; 0, -55]);
- [E, LOST] = entities (D);
- printf ('%d drawing entities -&gt; %d file entities\n', ...
-         numentities (D), numel (E));</pre>
-                <pre style="overflow-x: auto; white-space: pre; padding: 0.6rem 0.8rem; margin: 0.3rem 0 0.8rem 0; border: 1px solid #e2e2e2; border-left: 4px solid #b7b7b7; border-radius: 4px; background-color: #fafafa;">3 drawing entities -&gt; 18 file entities</pre>
-                <pre style="overflow-x: auto; white-space: pre; padding: 0.6rem 0.8rem; margin: 0.3rem 0; border: 1px solid #cfe0e6; border-left: 4px solid #4a90a4; border-radius: 4px; background-color: #eef5f8;"> unique ({E.type})</pre>
-                <pre style="overflow-x: auto; white-space: pre; padding: 0.6rem 0.8rem; margin: 0.3rem 0 0.8rem 0; border: 1px solid #e2e2e2; border-left: 4px solid #b7b7b7; border-radius: 4px; background-color: #fafafa;">ans =
-{
-  [1,1] = CIRCLE
-  [1,2] = DIMENSION
-  [1,3] = LINE
-  [1,4] = POLYLINE
-}</pre>
-                <p>A dimension arrives already exploded into the lines and text that draw it</p>
-                <pre style="overflow-x: auto; white-space: pre; padding: 0.6rem 0.8rem; margin: 0.3rem 0; border: 1px solid #cfe0e6; border-left: 4px solid #4a90a4; border-radius: 4px; background-color: #eef5f8;"> sum (strcmp ({E.type}, 'LINE'))</pre>
-                <pre style="overflow-x: auto; white-space: pre; padding: 0.6rem 0.8rem; margin: 0.3rem 0 0.8rem 0; border: 1px solid #e2e2e2; border-left: 4px solid #b7b7b7; border-radius: 4px; background-color: #fafafa;">ans = 15</pre>
-
-            </div>
-          </div>
-        </div>
-
-        <div class="card rounded my-4">
-          <div class="card-header card-header-mod">
-            <div class="row d-flex flex-wrap align-items-center">
-              <div class="col-sm-3 col-md-5 mb-2 mb-sm-0">
-                <button class="btn btn-link fs-4 fw-normal d-inline-block mr-2 p-0 text-reset text-decoration-none"
-                  type="button" data-bs-toggle="collapse"
-                  data-bs-target="#draw_Drawing_entities-example2" aria-expanded="true"
-                  aria-controls="draw_Drawing_entities-example2">
-                Example: 2
-                </button>
-              </div>
-            </div>
-          </div>
-          <div class="collapse show" id="draw_Drawing_entities-example2">
-            <div class="card-body">
-                <p>A hatch reaches the file as its boundary and the fill lines, because R12 has no hatch entity.  Ask for the boundary alone and the fill is dropped, which is then reported in LOST.</p>
-                <pre style="overflow-x: auto; white-space: pre; padding: 0.6rem 0.8rem; margin: 0.3rem 0; border: 1px solid #cfe0e6; border-left: 4px solid #4a90a4; border-radius: 4px; background-color: #eef5f8;"> D = draw.Drawing ().hatch ([0, 0; 40, 0; 40, 25; 0, 25]);
- numel (entities (D))</pre>
-                <pre style="overflow-x: auto; white-space: pre; padding: 0.6rem 0.8rem; margin: 0.3rem 0 0.8rem 0; border: 1px solid #e2e2e2; border-left: 4px solid #b7b7b7; border-radius: 4px; background-color: #fafafa;">ans = 20</pre>
-                <pre style="overflow-x: auto; white-space: pre; padding: 0.6rem 0.8rem; margin: 0.3rem 0; border: 1px solid #cfe0e6; border-left: 4px solid #4a90a4; border-radius: 4px; background-color: #eef5f8;"> [E, LOST] = entities (D, 'hatch', 'boundary');
- numel (E)</pre>
-                <pre style="overflow-x: auto; white-space: pre; padding: 0.6rem 0.8rem; margin: 0.3rem 0 0.8rem 0; border: 1px solid #e2e2e2; border-left: 4px solid #b7b7b7; border-radius: 4px; background-color: #fafafa;">ans = 1</pre>
-                <pre style="overflow-x: auto; white-space: pre; padding: 0.6rem 0.8rem; margin: 0.3rem 0; border: 1px solid #cfe0e6; border-left: 4px solid #4a90a4; border-radius: 4px; background-color: #eef5f8;"> LOST(1).reason</pre>
-                <pre style="overflow-x: auto; white-space: pre; padding: 0.6rem 0.8rem; margin: 0.3rem 0 0.8rem 0; border: 1px solid #e2e2e2; border-left: 4px solid #b7b7b7; border-radius: 4px; background-color: #fafafa;">ans = fill dropped: R12 has no HATCH, boundary emitted</pre>
-
-            </div>
-          </div>
-        </div>
-
 
             </div>
           </div>

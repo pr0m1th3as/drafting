@@ -47,11 +47,63 @@
             window.location.pathname + window.location.search);
         }
       });
+      // Let the browser's find-in-page reach the text inside a collapsed
+      // panel.  The attribute "hidden=until-found" is what makes content
+      // searchable and revealable; the style block below clears the
+      // "display: none" that would otherwise stop the attribute meaning
+      // anything, a box that is not generated having nothing to reveal.  Set
+      // it only where it is understood, which "content-visibility" is no test
+      // for, Firefox having shipped the two apart.  Where it is not, the panel
+      // keeps the user agent's plain [hidden] and the page behaves as before.
+      window.addEventListener ("DOMContentLoaded", () => {
+        if (! ("onbeforematch" in document.body)) { return; }
+        document.documentElement.classList.add ("until-found");
+        let panels = document.querySelectorAll (
+          ".collapse:not(.show):not(.navbar-collapse)");
+        for (let el of panels) {
+          el.setAttribute ("hidden", "until-found");
+          // Fired on a find-in-page hit, before the browser drops the
+          // attribute and scrolls to it.  Bootstrap keeps a panel's state in
+          // its class list, so adding the class here opens the panel in the
+          // same frame and leaves the button shutting it correctly afterwards.
+          // Bootstrap's own show () would animate against that scroll, and the
+          // attribute once dropped, "display: none" would take the panel back
+          // part way through.
+          el.addEventListener ("beforematch", () => {
+            el.classList.add ("show");
+            for (let b of document.querySelectorAll ("[data-bs-target]")) {
+              if (b.getAttribute ("data-bs-target") === "#" + el.id) {
+                b.setAttribute ("aria-expanded", "true");
+              }
+            }
+          });
+        }
+        // Drop the attribute before Bootstrap measures the panel it is opening,
+        // which it does after firing this; a revealable one measures nothing.
+        document.addEventListener ("show.bs.collapse", (e) => {
+          e.target.removeAttribute ("hidden");
+        });
+        // Restore it once the panel is shut, rather than while it is shutting.
+        document.addEventListener ("hidden.bs.collapse", (e) => {
+          if (! e.target.classList.contains ("navbar-collapse")) {
+            e.target.setAttribute ("hidden", "until-found");
+          }
+        });
+      });
     </script>
     <style>
-    h5.fs {
+    .fs {
     margin-top: -0.15em;
     margin-bottom: -0.15em;
+    }
+    .fs-last {
+    margin-bottom: calc(1rem - 0.15em);
+    }
+    p.description {
+    font-family: Consolas, "Courier New", monospace;
+    }
+    p.description code {
+    font-size: inherit;
     }
     h6:hover {
       color: gray;
@@ -90,6 +142,19 @@
     }
     [id^="togList"]:checked ~ .list{
       display:block;                        /* SHOW LIST (IF CHECKED) */
+    }
+    /* Bootstrap hides a collapsed panel with "display: none", which generates
+       no box, so the "content-visibility: hidden" the user agent gives
+       "hidden=until-found" could never apply and the text would stay beyond
+       find-in-page.  Clear that one declaration, and only where the script
+       above has found the attribute to be understood: an attribute selector
+       matches a value the browser does not understand, so an ungated rule
+       would leave every panel of an older browser standing open.  The
+       "!important" is required rather than decoration: the reboot carries
+       "[hidden] {display: none !important}", which the attribute itself brings
+       into play, and only another "!important" can outrank it. */
+    html.until-found .collapse[hidden="until-found"]:not(.show) {
+      display: block !important;
     }
     </style>
   </head>
@@ -153,6 +218,7 @@
 					<li><a href="draw.Drawing.numentities.html" class="text-decoration-none font-monospace"><small>numentities</small></a></li>
 					<li><a href="draw.Drawing.isempty.html" class="text-decoration-none font-monospace"><small>isempty</small></a></li>
 					<li><a href="draw.Drawing.layers.html" class="text-decoration-none font-monospace"><small>layers</small></a></li>
+					<li><a href="draw.Drawing.layer.html" class="text-decoration-none font-monospace"><small>layer</small></a></li>
 					<li><a href="draw.Drawing.bbox.html" class="text-decoration-none font-monospace"><small>bbox</small></a></li>
 				</ul>
 				</div>
@@ -168,6 +234,9 @@
 					<li><a href="draw.Drawing.line.html" class="text-decoration-none font-monospace"><small>line</small></a></li>
 					<li><a href="draw.Drawing.point.html" class="text-decoration-none font-monospace"><small>point</small></a></li>
 					<li><a href="draw.Drawing.polyline.html" class="text-decoration-none font-monospace"><small>polyline</small></a></li>
+					<li><a href="draw.Drawing.spline.html" class="text-decoration-none font-monospace"><small>spline</small></a></li>
+					<li><a href="draw.Drawing.path.html" class="text-decoration-none font-monospace"><small>path</small></a></li>
+					<li><a href="draw.Drawing.region.html" class="text-decoration-none font-monospace"><small>region</small></a></li>
 					<li><a href="draw.Drawing.arc.html" class="text-decoration-none font-monospace"><small>arc</small></a></li>
 					<li><a href="draw.Drawing.circle.html" class="text-decoration-none font-monospace"><small>circle</small></a></li>
 					<li><a href="draw.Drawing.ellipse.html" class="text-decoration-none font-monospace"><small>ellipse</small></a></li>
@@ -188,6 +257,7 @@
 					<li><a href="draw.Drawing.diam.html" class="text-decoration-none font-monospace"><small>diam</small></a></li>
 					<li><a href="draw.Drawing.radius.html" class="text-decoration-none font-monospace"><small>radius</small></a></li>
 					<li><a href="draw.Drawing.angdim.html" class="text-decoration-none font-monospace"><small>angdim</small></a></li>
+					<li><a href="draw.Drawing.ordinate.html" class="text-decoration-none font-monospace"><small>ordinate</small></a></li>
 					<li><a href="draw.Drawing.centremark.html" class="text-decoration-none font-monospace"><small>centremark</small></a></li>
 					<li><a href="draw.Drawing.leader.html" class="text-decoration-none font-monospace"><small>leader</small></a></li>
 				</ul>
@@ -217,10 +287,10 @@
 				</label>
 				<div class="list">
 				<ul style="list-style-type: none; padding-left: 20px;">
-					<li><a href="draw.Drawing.entities.html" class="text-decoration-none font-monospace"><small>entities</small></a></li>
 					<li><a href="draw.Drawing.plot.html" class="text-decoration-none font-monospace"><small>plot</small></a></li>
 					<li><a href="draw.Drawing.print.html" class="text-decoration-none font-monospace"><small>print</small></a></li>
 					<li><a href="draw.Drawing.tikz.html" class="text-decoration-none font-monospace"><small>tikz</small></a></li>
+					<li><a href="draw.Drawing.write.html" class="text-decoration-none font-monospace"><small>write</small></a></li>
 				</ul>
 				</div>
 			</div>
@@ -244,17 +314,24 @@
                 </ol>
               </nav>
 
-<dl>
-<dt><code><h5 class="fs">draw.Drawing: <var>D</var> = <b>expand</b> (<var>D</var>)</code></h5></dt>
-</dl>
+<p class="h5 fs fs-last"><code>draw.Drawing: <var>D</var> = <b>expand</b> (<var>D</var>)</code></p>
 <p> Replace every insert with the geometry it refers to.
 </p>
 <div class="ms-5">
 <p> The result holds no blocks and no inserts, only the entities they stood
  for, each transformed to where its reference put it.  This is what a
- backend with no block of its own needs, and what <code>draw.Drawing.plot</code>
- and
- <code>draw.Drawing.tikz</code> do before rendering.
+ backend with no block of its own needs, and what
+ <code>draw.Drawing.plot</code> and <code>draw.Drawing.tikz</code> do before
+ rendering.
+</p>
+<p> Every entity keeps the look the insert gave it, as CAD programs draw a
+ block.  An entity of the block on layer <code>'0'</code> goes on the layer of
+ the insert, so a symbol drawn on <code>'0'</code> takes the layer it is
+ placed on; a colour, line type or line weight <code>'byBlock'</code> becomes
+ the insert&rsquo;s.  An entity on any other layer stays there, and one drawn
+ <code>'byLayer'</code> keeps following its layer.  Through nested blocks the
+ rule applies at every level, so an entity on <code>'0'</code> inside a block
+ on <code>'0'</code> ends on the layer of the outermost insert.
 </p>
 <p> Blocks may contain inserts of other blocks and are expanded through.  A
  block keeps its own definitions and inherits the enclosing drawing&rsquo;s only
@@ -267,12 +344,13 @@
  caller can meet by accident.
 </p>
 <p> <strong>See also: </strong>
-block, 
-insert, 
-draw.Drawing.entities
+  <a href="draw.Drawing.block.html">block</a>, 
+  <a href="draw.Drawing.insert.html">insert</a>, 
+  <a href="draw.Drawing.plot.html">draw.Drawing.plot</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/tree/main/inst/+draw/Drawing.m">draw.Drawing</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/0f84b98/inst/+draw/Drawing.m#L2031">draw.Drawing</a>
+</p>
 </div>
 
             </div>

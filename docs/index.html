@@ -47,11 +47,63 @@
             window.location.pathname + window.location.search);
         }
       });
+      // Let the browser's find-in-page reach the text inside a collapsed
+      // panel.  The attribute "hidden=until-found" is what makes content
+      // searchable and revealable; the style block below clears the
+      // "display: none" that would otherwise stop the attribute meaning
+      // anything, a box that is not generated having nothing to reveal.  Set
+      // it only where it is understood, which "content-visibility" is no test
+      // for, Firefox having shipped the two apart.  Where it is not, the panel
+      // keeps the user agent's plain [hidden] and the page behaves as before.
+      window.addEventListener ("DOMContentLoaded", () => {
+        if (! ("onbeforematch" in document.body)) { return; }
+        document.documentElement.classList.add ("until-found");
+        let panels = document.querySelectorAll (
+          ".collapse:not(.show):not(.navbar-collapse)");
+        for (let el of panels) {
+          el.setAttribute ("hidden", "until-found");
+          // Fired on a find-in-page hit, before the browser drops the
+          // attribute and scrolls to it.  Bootstrap keeps a panel's state in
+          // its class list, so adding the class here opens the panel in the
+          // same frame and leaves the button shutting it correctly afterwards.
+          // Bootstrap's own show () would animate against that scroll, and the
+          // attribute once dropped, "display: none" would take the panel back
+          // part way through.
+          el.addEventListener ("beforematch", () => {
+            el.classList.add ("show");
+            for (let b of document.querySelectorAll ("[data-bs-target]")) {
+              if (b.getAttribute ("data-bs-target") === "#" + el.id) {
+                b.setAttribute ("aria-expanded", "true");
+              }
+            }
+          });
+        }
+        // Drop the attribute before Bootstrap measures the panel it is opening,
+        // which it does after firing this; a revealable one measures nothing.
+        document.addEventListener ("show.bs.collapse", (e) => {
+          e.target.removeAttribute ("hidden");
+        });
+        // Restore it once the panel is shut, rather than while it is shutting.
+        document.addEventListener ("hidden.bs.collapse", (e) => {
+          if (! e.target.classList.contains ("navbar-collapse")) {
+            e.target.setAttribute ("hidden", "until-found");
+          }
+        });
+      });
     </script>
     <style>
-    h5.fs {
+    .fs {
     margin-top: -0.15em;
     margin-bottom: -0.15em;
+    }
+    .fs-last {
+    margin-bottom: calc(1rem - 0.15em);
+    }
+    p.description {
+    font-family: Consolas, "Courier New", monospace;
+    }
+    p.description code {
+    font-size: inherit;
     }
     h6:hover {
       color: gray;
@@ -90,6 +142,19 @@
     }
     [id^="togList"]:checked ~ .list{
       display:block;                        /* SHOW LIST (IF CHECKED) */
+    }
+    /* Bootstrap hides a collapsed panel with "display: none", which generates
+       no box, so the "content-visibility: hidden" the user agent gives
+       "hidden=until-found" could never apply and the text would stay beyond
+       find-in-page.  Clear that one declaration, and only where the script
+       above has found the attribute to be understood: an attribute selector
+       matches a value the browser does not understand, so an ungated rule
+       would leave every panel of an older browser standing open.  The
+       "!important" is required rather than decoration: the reboot carries
+       "[hidden] {display: none !important}", which the attribute itself brings
+       into play, and only another "!important" can outrank it. */
+    html.until-found .collapse[hidden="until-found"]:not(.show) {
+      display: block !important;
     }
     </style>
   </head>
@@ -134,9 +199,9 @@
             </div>
             <div class="col-sm-9 col-md-10">
               <h3 class="d-inline-block mr-2">drafting</h3>
-              <b>0.1.0&nbsp;2026-08-18</b>
+              <b>0.2.0&nbsp;2026-10-05</b>
               <p class="indent">
-                Planar geometry primitives, ASCII DXF reading and writing,  and a format-agnostic technical drawing model with DXF and TikZ backends.  Provides the drafting layer for engineering design packages.
+                Planar geometry, technical drawing and solid modelling:  polylines, splines, paths and regions with booleans, offsets and hulls;  a technical drawing model plotted, printed to scale, set in TikZ and  written to DXF; DXF read and written from R12 to R2018; triangle meshes  in STL, OBJ, PLY and 3MF; and, when built with Open CASCADE, exact solids  with holes, fillets, sections and projections, assemblies in STEP and  3MF, and a viewer.  Provides the drafting layer for engineering design  packages.
               </p>
             </div>
           </div>
@@ -144,17 +209,76 @@
         <div class="card-body">
            <p>Select Category:
              <select name="cat" onchange="location = this.options[this.selectedIndex].value;">
+             <option value="#Polylines and regions">Polylines and regions</option>
              <option value="#Geometry primitives">Geometry primitives</option>
              <option value="#Curve geometry">Curve geometry</option>
              <option value="#Construction geometry">Construction geometry</option>
              <option value="#DXF input and output">DXF input and output</option>
-             <option value="#STL output">STL output</option>
+             <option value="#Meshes">Meshes</option>
              <option value="#Sheet composition">Sheet composition</option>
              <option value="#Line types and colours">Line types and colours</option>
              <option value="#Drawing model">Drawing model</option>
+             <option value="#Solid modelling">Solid modelling</option>
+             <option value="#Assemblies and viewing">Assemblies and viewing</option>
              </select>
            <p>
 
+           <h3 class="category">
+             <a name="Polylines and regions">Polylines and regions</a>
+           </h3>
+           <table class="table table-striped">
+             <tbody>
+               <tr>
+                 <td>
+                   <b><code>
+                   <a href="geom.Polyline.html">geom.Polyline</a>
+                   </code></b>
+                 </td>
+                 <td>A polyline of straight segments and circular arcs, lying in a plane.</td>
+               </tr>
+               <tr>
+                 <td>
+                   <b><code>
+                   <a href="geom.Spline.html">geom.Spline</a>
+                   </code></b>
+                 </td>
+                 <td>A smooth curve: a NURBS, drawn through points or given by its control points.</td>
+               </tr>
+               <tr>
+                 <td>
+                   <b><code>
+                   <a href="geom.Region.html">geom.Region</a>
+                   </code></b>
+                 </td>
+                 <td>A closed area of a plane, an outline with holes in it.</td>
+               </tr>
+               <tr>
+                 <td>
+                   <b><code>
+                   <a href="geom.Path.html">geom.Path</a>
+                   </code></b>
+                 </td>
+                 <td>A path of straight segments, circular arcs and splines in three dimensions.</td>
+               </tr>
+               <tr>
+                 <td>
+                   <b><code>
+                   <a href="geom.UCS.html">geom.UCS</a>
+                   </code></b>
+                 </td>
+                 <td>A user coordinate system: an origin, an x axis and a normal, defining a plane
+with coordinates of its own.</td>
+               </tr>
+               <tr>
+                 <td>
+                   <b><code>
+                   <a href="geom.text.html">geom.text</a>
+                   </code></b>
+                 </td>
+                 <td>The outlines of text, as regions.</td>
+               </tr>
+             </tbody>
+           </table>
            <h3 class="category">
              <a name="Geometry primitives">Geometry primitives</a>
            </h3>
@@ -352,33 +476,49 @@
                <tr>
                  <td>
                    <b><code>
-                   <a href="dxf.read.html">dxf.read</a>
+                   <a href="geom.read.html">geom.read</a>
                    </code></b>
                  </td>
-                 <td>Read geometry from an ASCII DXF file.</td>
+                 <td>Read geom objects from an ASCII DXF file.</td>
                </tr>
                <tr>
                  <td>
                    <b><code>
-                   <a href="dxf.write.html">dxf.write</a>
+                   <a href="geom.write.html">geom.write</a>
                    </code></b>
                  </td>
-                 <td>Write drawing entities to an ASCII DXF file.</td>
+                 <td>Write several geom objects to one DXF file.</td>
+               </tr>
+               <tr>
+                 <td>
+                   <b><code>
+                   <a href="draw.read.html">draw.read</a>
+                   </code></b>
+                 </td>
+                 <td>Read a drawing from an ASCII DXF file.</td>
                </tr>
              </tbody>
            </table>
            <h3 class="category">
-             <a name="STL output">STL output</a>
+             <a name="Meshes">Meshes</a>
            </h3>
            <table class="table table-striped">
              <tbody>
                <tr>
                  <td>
                    <b><code>
-                   <a href="stl.write.html">stl.write</a>
+                   <a href="polymesh.Mesh.html">polymesh.Mesh</a>
                    </code></b>
                  </td>
-                 <td>Write a section stack to a binary STL file.</td>
+                 <td>A triangle mesh in millimetres.</td>
+               </tr>
+               <tr>
+                 <td>
+                   <b><code>
+                   <a href="polymesh.read.html">polymesh.read</a>
+                   </code></b>
+                 </td>
+                 <td>Read a triangle mesh from an STL, OBJ, PLY or 3MF file.</td>
                </tr>
              </tbody>
            </table>
@@ -449,13 +589,164 @@
                  </td>
                  <td>A two-dimensional drawing in model space.</td>
                </tr>
+             </tbody>
+           </table>
+           <h3 class="category">
+             <a name="Solid modelling">Solid modelling</a>
+           </h3>
+           <table class="table table-striped">
+             <tbody>
                <tr>
                  <td>
                    <b><code>
-                   <a href="draw.fromentities.html">draw.fromentities</a>
+                   <a href="solid.Shape.html">solid.Shape</a>
                    </code></b>
                  </td>
-                 <td>Build a drawing from an entity list, as read from a file.</td>
+                 <td>A solid in millimetres, modelled through Open CASCADE.</td>
+               </tr>
+               <tr>
+                 <td>
+                   <b><code>
+                   <a href="solid.box.html">solid.box</a>
+                   </code></b>
+                 </td>
+                 <td>A rectangular block.</td>
+               </tr>
+               <tr>
+                 <td>
+                   <b><code>
+                   <a href="solid.wedge.html">solid.wedge</a>
+                   </code></b>
+                 </td>
+                 <td>A wedge: a block whose top is smaller than its base.</td>
+               </tr>
+               <tr>
+                 <td>
+                   <b><code>
+                   <a href="solid.cylinder.html">solid.cylinder</a>
+                   </code></b>
+                 </td>
+                 <td>A right circular cylinder.</td>
+               </tr>
+               <tr>
+                 <td>
+                   <b><code>
+                   <a href="solid.cone.html">solid.cone</a>
+                   </code></b>
+                 </td>
+                 <td>A right circular cone or truncated cone.</td>
+               </tr>
+               <tr>
+                 <td>
+                   <b><code>
+                   <a href="solid.sphere.html">solid.sphere</a>
+                   </code></b>
+                 </td>
+                 <td>A sphere.</td>
+               </tr>
+               <tr>
+                 <td>
+                   <b><code>
+                   <a href="solid.ellipsoid.html">solid.ellipsoid</a>
+                   </code></b>
+                 </td>
+                 <td>An ellipsoid.</td>
+               </tr>
+               <tr>
+                 <td>
+                   <b><code>
+                   <a href="solid.torus.html">solid.torus</a>
+                   </code></b>
+                 </td>
+                 <td>A torus, the solid of a ring.</td>
+               </tr>
+               <tr>
+                 <td>
+                   <b><code>
+                   <a href="solid.polyhedron.html">solid.polyhedron</a>
+                   </code></b>
+                 </td>
+                 <td>A solid bounded by a closed triangle mesh.</td>
+               </tr>
+               <tr>
+                 <td>
+                   <b><code>
+                   <a href="solid.extrude.html">solid.extrude</a>
+                   </code></b>
+                 </td>
+                 <td>A solid extruded from a region.</td>
+               </tr>
+               <tr>
+                 <td>
+                   <b><code>
+                   <a href="solid.revolve.html">solid.revolve</a>
+                   </code></b>
+                 </td>
+                 <td>A solid of revolution, turned from a region about its own axis.</td>
+               </tr>
+               <tr>
+                 <td>
+                   <b><code>
+                   <a href="solid.loft.html">solid.loft</a>
+                   </code></b>
+                 </td>
+                 <td>A solid passing through regions.</td>
+               </tr>
+               <tr>
+                 <td>
+                   <b><code>
+                   <a href="solid.sweep.html">solid.sweep</a>
+                   </code></b>
+                 </td>
+                 <td>A solid swept by a region along a path.</td>
+               </tr>
+               <tr>
+                 <td>
+                   <b><code>
+                   <a href="solid.helix.html">solid.helix</a>
+                   </code></b>
+                 </td>
+                 <td>A coil, swept by a region turning about its own axis as it rises.</td>
+               </tr>
+               <tr>
+                 <td>
+                   <b><code>
+                   <a href="solid.read.html">solid.read</a>
+                   </code></b>
+                 </td>
+                 <td>Read a solid from a STEP file.</td>
+               </tr>
+             </tbody>
+           </table>
+           <h3 class="category">
+             <a name="Assemblies and viewing">Assemblies and viewing</a>
+           </h3>
+           <table class="table table-striped">
+             <tbody>
+               <tr>
+                 <td>
+                   <b><code>
+                   <a href="model.Assembly.html">model.Assembly</a>
+                   </code></b>
+                 </td>
+                 <td>Named parts placed together.</td>
+               </tr>
+               <tr>
+                 <td>
+                   <b><code>
+                   <a href="model.read.html">model.read</a>
+                   </code></b>
+                 </td>
+                 <td>Read an assembly from a STEP or 3MF file.</td>
+               </tr>
+               <tr>
+                 <td>
+                   <b><code>
+                   <a href="model.Viewer.html">model.Viewer</a>
+                   </code></b>
+                 </td>
+                 <td>A window showing a solid or a triangle mesh, in which edges, faces and
+coordinate systems can be picked.</td>
                </tr>
              </tbody>
            </table>
