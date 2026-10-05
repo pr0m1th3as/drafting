@@ -275,7 +275,10 @@ function [img, n] = capture (ctx, views, n)
     n += 1;
     f = sprintf ("%s-%d.png", ctx.base, n);
     if (ctx.build)
-      print (h(k), fullfile (ctx.imgdir, f), '-dpng', '-S900,700');
+      ## At 200 dots per inch, twice the size it is shown at: a line weight is
+      ## in points, and only a resolution turns points into pixels
+      set (h(k), 'paperunits', 'inches', 'paperposition', [0, 0, 9, 7]);
+      print (h(k), fullfile (ctx.imgdir, f), '-dpng', '-r200');
     endif
     img{end+1} = f;
     close (h(k));

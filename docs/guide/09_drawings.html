@@ -72,9 +72,9 @@
         </div>
         <main class="col-md-9 col-lg-10">
 <h1>Technical drawings</h1>
-<p>A <a href="../draw.Drawing.html"><code>draw.Drawing</code></a> holds a technical drawing as data: geometry, text, hatches and dimensions on named layers, each with a line type and a colour. The same drawing is plotted, printed to scale, set in LaTeX and written to DXF.</p>
-<h2>The pen</h2>
-<p>A drawing draws the way a CAD program does, with a current pen. <code>Layer</code>, <code>Linetype</code> and <code>Colour</code> are set first, and every entity appended after takes them; nothing appended before changes. <a href="../draw.linetype.html"><code>draw.linetype</code></a> lists the line types and <a href="../draw.colour.html"><code>draw.colour</code></a> turns a colour name into the AutoCAD colour index a DXF file stores.</p>
+<p>A <a href="../draw.Drawing.html"><code>draw.Drawing</code></a> holds a technical drawing as data: geometry, text, hatches and dimensions on named layers, each layer with a colour, a line type and a line weight. The same drawing is plotted, printed to scale, set in LaTeX and written to DXF.</p>
+<h2>Layers and the pen</h2>
+<p>A drawing draws the way a CAD program does, with a current pen: <code>Layer</code>, <code>Linetype</code>, <code>Colour</code> and <code>LineWeight</code> are set first, and every entity appended after takes them. The last three are <code>'byLayer'</code> unless set, so an entity takes them from its layer, and <code>layer</code> gives each layer its properties. <a href="../draw.linetype.html"><code>draw.linetype</code></a> lists the line types and <a href="../draw.colour.html"><code>draw.colour</code></a> turns a colour name into the AutoCAD colour index a DXF file stores.</p>
 <pre class="code-in"><code>draw.linetype ()
 draw.colour ('red')</code></pre>
 <pre class="code-out"><code>ans =
@@ -89,27 +89,37 @@ draw.colour ('red')</code></pre>
 }
 
 ans = 1</code></pre>
+<p>The layers of a plate drawing, with the line weights of ISO 128: thick outlines, thin hidden lines, centre lines and dimensions.</p>
+<pre class="code-in"><code>D = draw.Drawing ('bracket');
+D = D.layer ('OUTLINE', 'LineWeight', 0.5);
+D = D.layer ('HIDDEN', 'Linetype', 'HIDDEN', 'LineWeight', 0.25);
+D = D.layer ('CENTRE', 'Linetype', 'CENTER', 'Colour', 'red', ...
+             'LineWeight', 0.25);
+D = D.layer ('DIMENSIONS', 'LineWeight', 0.25);
+layers (D)</code></pre>
+<pre class="code-out"><code>ans =
+{
+  [1,1] = 0
+  [1,2] = CENTRE
+  [1,3] = DIMENSIONS
+  [1,4] = HIDDEN
+  [1,5] = OUTLINE
+}</code></pre>
 <h2>Geometry</h2>
 <p>A mounting plate: its outline a polyline with rounded corners, a bore and two smaller holes as circles, all on the layer <code>OUTLINE</code>. Each append returns the new drawing, so appends chain.</p>
-<pre class="code-in"><code>D = draw.Drawing ('bracket');
-D.Layer = 'OUTLINE';
+<pre class="code-in"><code>D.Layer = 'OUTLINE';
 D = D.polyline (fillet (geom.Polyline ([0, 0; 100, 0; 100, 60; 0, 60], ...
                                        'Closed', true), 6));
 D = D.circle ([35, 30], 10);
 D = D.circle ([75, 15], 4).circle ([75, 45], 4);</code></pre>
-<p>Centre lines go on a layer of their own, in the CENTER line type and in red. <code>centremark</code> with no centre marks every circle and arc already in the drawing. A step machined on the underside, hidden from above, is a line in the HIDDEN line type; setting the colour back to <code>'byLayer'</code> lets the layer decide it, as a CAD drawing normally does.</p>
+<p>Centre lines go on their own layer, which draws them red and in the CENTER line type. <code>centremark</code> with no centre marks every circle and arc already in the drawing. A step machined on the underside, hidden from above, is a line on the layer <code>HIDDEN</code>. Changing the layer is all it takes.</p>
 <pre class="code-in"><code>D.Layer = 'CENTRE';
-D.Linetype = 'CENTER';
-D.Colour = 'red';
 D = D.centremark ();
 D.Layer = 'HIDDEN';
-D.Linetype = 'HIDDEN';
-D.Colour = 'byLayer';
 D = D.line ([0, 10], [100, 10]);</code></pre>
 <h2>Dimensions</h2>
 <p>A dimension is stored by what it measures, not by the number on it, so it measures again whenever the drawing is drawn. <code>dim</code> measures between two points, <code>'horizontal'</code>, <code>'vertical'</code> or, by default, along the line joining them; the sign of the offset picks the side. <code>diam</code> dimensions a circle across and <code>radius</code> an arc. A label replaces the measured figure, and the codes of <a href="../draw.symbol.html"><code>draw.symbol</code></a> put a diameter or degree sign in it. <code>leader</code> points a note at a feature.</p>
 <pre class="code-in"><code>D.Layer = 'DIMENSIONS';
-D.Linetype = 'CONTINUOUS';
 D = D.dim ([0, 0], [100, 0], -12, 'horizontal');
 D = D.dim ([100, 0], [100, 60], -12, 'vertical');
 D = D.diam ([35, 30], 10);
@@ -120,7 +130,7 @@ D
 plot (D);</code></pre>
 <pre class="code-out"><code>D =
 
-  draw.Drawing 'bracket' with 14 entities on 4 layers
+  draw.Drawing 'bracket' with 14 entities on 5 layers
     line        1
     polyline    1
     circle      3
@@ -225,13 +235,13 @@ printf ("%s\n", L{1:5});</code></pre>
 % Drawing: bracket
 % Plot scale 1:1. Coordinates are model millimetres.
 \tikzset{
-  drCENTRE/.style={}, % layer 'CENTRE'</code></pre>
+  drCENTRE/.style={red, dash pattern=on 1.25mm off 0.25mm on 0.25mm off 0.25mm, line width=0.25mm}, % layer 'CENTRE'</code></pre>
 <p><code>write</code> saves the drawing as a DXF file for a CAD program, every entity on its layer with its line type and colour, and <a href="../draw.read.html"><code>draw.read</code></a> reads one back. Dimensions come back as dimensions, measuring again. Centre marks and leaders, which DXF has no entity for, come back as the lines and text they are drawn with, which is why the count grows. How each entity is written and read is set out in <a href="dxf.html">DXF and the classes</a>.</p>
 <pre class="code-in"><code>write (sheet, 'sheet.dxf');
 E = draw.read ('sheet.dxf')</code></pre>
 <pre class="code-out"><code>E =
 
-  draw.Drawing 'imported' with 60 entities on 6 layers
+  draw.Drawing 'imported' with 60 entities on 9 layers
     line        20
     polyline    6
     circle      3

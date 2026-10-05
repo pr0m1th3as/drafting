@@ -267,10 +267,9 @@ and splines are read in world coordinates.</p>
 
 <h2 id="drawings">Drawings</h2>
 
-<p><code>write (D, FILE)</code> writes a <code>draw.Drawing</code> with every
-entity on its own layer, line type and colour, the layers and line types
-declared in the file's tables with the dash pattern of every line type the
-package defines. Each entity is written as itself:</p>
+<p><code>write (D, FILE)</code> writes a <code>draw.Drawing</code> with its
+layer table and every entity on its layer. Each entity is written as
+itself:</p>
 
 <table class="guide">
   <tr><th>Entity in the drawing</th><th>Written as</th></tr>
@@ -282,7 +281,8 @@ package defines. Each entity is written as itself:</p>
   <tr><td>hatch</td><td><code>HATCH</code> over its region, the holes left
   clear, with its pattern, angle and spacing</td></tr>
   <tr><td>dimension</td><td><code>DIMENSION</code>, its picture in an
-  anonymous block, so a CAD program measures it again</td></tr>
+  anonymous block, so a CAD program measures it again; the picture on layer
+  <code>0</code> and by block, so the dimension's own layer governs it</td></tr>
   <tr><td>centre mark, leader</td><td>The lines and text they are drawn
   with</td></tr>
   <tr><td>block and insert</td><td>The block once, placed by
@@ -291,6 +291,30 @@ package defines. Each entity is written as itself:</p>
 
 <p>A drawing writes no frames, since everything in it lies in <i>z</i> =
 0: its path and region groups carry only their class name.</p>
+
+<h3>Layers</h3>
+
+<p>A drawing keeps a layer table, as a DXF file does, and the two map one to
+one:</p>
+
+<table class="guide">
+  <tr><th>In <code>D.Layers</code></th><th>In the file</th></tr>
+  <tr><td><code>colour</code></td><td>The layer's colour, group 62</td></tr>
+  <tr><td><code>linetype</code></td><td>The layer's line type, group 6,
+  declared in the <code>LTYPE</code> table</td></tr>
+  <tr><td><code>lineweight</code></td><td>Group 370, the nearest of the
+  weights DXF allows; none in R12</td></tr>
+  <tr><td><code>visible</code> false</td><td>The colour negated, the layer
+  switched off; a frozen layer reads as not visible too</td></tr>
+  <tr><td><code>plot</code> false</td><td>Group 290 set to 0, the layer not
+  printed</td></tr>
+</table>
+
+<p>An entity drawn <code>'byLayer'</code>, as entities are unless told
+otherwise, is written by layer: no line type, colour or weight of its own,
+so a CAD program that changes a layer changes everything on it. An entity
+with a colour, line type or weight of its own is written with it. Read back,
+the table returns whole and by-layer entities stay by layer.</p>
 
 <table class="guide">
   <tr><th>Option</th><th>Value</th></tr>
@@ -311,8 +335,8 @@ package defines. Each entity is written as itself:</p>
 </table>
 
 <p><code>draw.read</code> gives the drawing back as a
-<code>draw.Drawing</code> named <code>'imported'</code>, each entity on its
-own layer, line type and colour. Dimensions return as dimensions, rebuilt
+<code>draw.Drawing</code> named <code>'imported'</code>, with the file's
+layer table and each entity on its layer. Dimensions return as dimensions, rebuilt
 from their definition points as the method that would have made them, so
 they measure the geometry again rather than repeating a number. Blocks
 return with their inserts, nested blocks included, hatches over their

@@ -18,20 +18,32 @@
 ## # Technical drawings
 ##
 ## A `draw.Drawing` holds a technical drawing as data: geometry, text,
-## hatches and dimensions on named layers, each with a line type and a
-## colour. The same drawing is plotted, printed to scale, set in LaTeX and
-## written to DXF.
+## hatches and dimensions on named layers, each layer with a colour, a line
+## type and a line weight. The same drawing is plotted, printed to scale, set
+## in LaTeX and written to DXF.
 ##
-## ## The pen
+## ## Layers and the pen
 ##
-## A drawing draws the way a CAD program does, with a current pen. `Layer`,
-## `Linetype` and `Colour` are set first, and every entity appended after
-## takes them; nothing appended before changes. `draw.linetype` lists the
-## line types and `draw.colour` turns a colour name into the AutoCAD colour
-## index a DXF file stores.
+## A drawing draws the way a CAD program does, with a current pen: `Layer`,
+## `Linetype`, `Colour` and `LineWeight` are set first, and every entity
+## appended after takes them. The last three are `'byLayer'` unless set, so
+## an entity takes them from its layer, and `layer` gives each layer its
+## properties. `draw.linetype` lists the line types and `draw.colour` turns a
+## colour name into the AutoCAD colour index a DXF file stores.
 
 draw.linetype ()
 draw.colour ('red')
+
+## The layers of a plate drawing, with the line weights of ISO 128: thick
+## outlines, thin hidden lines, centre lines and dimensions.
+
+D = draw.Drawing ('bracket');
+D = D.layer ('OUTLINE', 'LineWeight', 0.5);
+D = D.layer ('HIDDEN', 'Linetype', 'HIDDEN', 'LineWeight', 0.25);
+D = D.layer ('CENTRE', 'Linetype', 'CENTER', 'Colour', 'red', ...
+             'LineWeight', 0.25);
+D = D.layer ('DIMENSIONS', 'LineWeight', 0.25);
+layers (D)
 
 ## ## Geometry
 ##
@@ -39,26 +51,20 @@ draw.colour ('red')
 ## two smaller holes as circles, all on the layer `OUTLINE`. Each append
 ## returns the new drawing, so appends chain.
 
-D = draw.Drawing ('bracket');
 D.Layer = 'OUTLINE';
 D = D.polyline (fillet (geom.Polyline ([0, 0; 100, 0; 100, 60; 0, 60], ...
                                        'Closed', true), 6));
 D = D.circle ([35, 30], 10);
 D = D.circle ([75, 15], 4).circle ([75, 45], 4);
 
-## Centre lines go on a layer of their own, in the CENTER line type and in
-## red. `centremark` with no centre marks every circle and arc already in the
-## drawing. A step machined on the underside, hidden from above, is a line in
-## the HIDDEN line type; setting the colour back to `'byLayer'` lets the
-## layer decide it, as a CAD drawing normally does.
+## Centre lines go on their own layer, which draws them red and in the
+## CENTER line type. `centremark` with no centre marks every circle and arc
+## already in the drawing. A step machined on the underside, hidden from
+## above, is a line on the layer `HIDDEN`. Changing the layer is all it takes.
 
 D.Layer = 'CENTRE';
-D.Linetype = 'CENTER';
-D.Colour = 'red';
 D = D.centremark ();
 D.Layer = 'HIDDEN';
-D.Linetype = 'HIDDEN';
-D.Colour = 'byLayer';
 D = D.line ([0, 10], [100, 10]);
 
 ## ## Dimensions
@@ -72,7 +78,6 @@ D = D.line ([0, 10], [100, 10]);
 ## `leader` points a note at a feature.
 
 D.Layer = 'DIMENSIONS';
-D.Linetype = 'CONTINUOUS';
 D = D.dim ([0, 0], [100, 0], -12, 'horizontal');
 D = D.dim ([100, 0], [100, 60], -12, 'vertical');
 D = D.diam ([35, 30], 10);
