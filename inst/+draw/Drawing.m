@@ -41,20 +41,28 @@ classdef Drawing
   ## @end group
   ## @end example
   ##
-  ## New entities take the layer, line type and colour that are current when
-  ## they are appended, exactly as a CAD application draws on its current layer
-  ## with its current pen.  Set @code{Layer}, @code{Linetype} or
-  ## @code{Colour} first and then draw; no append method takes any of the
-  ## three as an argument.  Each governs what follows it and never what came
-  ## before.
+  ## New entities take the layer, line type, colour and line weight that are
+  ## current when they are appended, exactly as a CAD application draws on its
+  ## current layer with its current pen.  Set @code{Layer}, @code{Linetype},
+  ## @code{Colour} or @code{LineWeight} first and then draw; no append method
+  ## takes any of them as an argument.  Each governs what follows it and never
+  ## what came before.
+  ##
+  ## The drawing keeps a layer table, @code{Layers}, as a CAD drawing does:
+  ## each layer has a colour, a line type, a line weight, and whether it is
+  ## visible and printed.  Line type, colour and line weight are
+  ## @qcode{'byLayer'} unless set otherwise, so an entity takes them from its
+  ## layer, and with the layers defined by @code{layer}, choosing the current
+  ## layer is the one step that sets the pen.  Every output resolves them the
+  ## same way, and a DXF file carries the table itself.
   ##
   ## Properties rather than arguments is what lets a caller state a drawing
   ## convention once and then draw against it, which is how a draughtsman works
   ## and how CAD is built.  It is also why a dimension's exploded parts inherit
-  ## all three: the rule has no exceptions.
+  ## the pen: the rule has no exceptions.
   ##
-  ## Dimensions are stored @strong{semantically} --- the two measured points, a
-  ## perpendicular offset and a direction --- and are turned into lines,
+  ## Dimensions are stored @strong{semantically}, as the two measured points, a
+  ## perpendicular offset and a direction, and are turned into lines,
   ## arrowheads and text by whichever backend renders them.  Nothing about how a
   ## dimension looks is decided here, which is what keeps a dimension truthful
   ## when the geometry it measures moves.
@@ -106,14 +114,17 @@ classdef Drawing
     ##
     ## The line type that entities are drawn with as they are appended, named
     ## as a character vector: one of CONTINUOUS, HIDDEN, CENTER, PHANTOM,
-    ## DASHED, DASHDOT or DOT.  It defaults to @qcode{'CONTINUOUS'}.
+    ## DASHED, DASHDOT or DOT, or any name a CAD program holds.  It defaults
+    ## to @qcode{'byLayer'}, which takes the line type of the entity's layer
+    ## from @code{Layers}; @qcode{'byBlock'} takes that of the insert placing
+    ## the entity when it is part of a block.
     ##
     ## It governs what is appended after it is set, never what came before.
     ## The dash lengths themselves are model dimensions scaled by each
     ## backend's line-type scale, not a property of the drawing.
     ##
     ## @end deftp
-    Linetype = 'CONTINUOUS';
+    Linetype = 'byLayer';
 
     ## -*- texinfo -*-
     ## @deftp {draw.Drawing} {property} Colour
@@ -122,14 +133,70 @@ classdef Drawing
     ##
     ## The colour that entities are drawn in as they are appended, as an
     ## AutoCAD colour index from 0 to 256 or as a colour name accepted by
-    ## @code{draw.colour}.  It defaults to 256, which is @qcode{'byLayer'} ---
-    ## the entity takes whatever colour its layer carries, which is how a CAD
-    ## drawing is normally organised.
+    ## @code{draw.colour}.  It defaults to 256, which is @qcode{'byLayer'}:
+    ## the entity takes the colour of its layer from @code{Layers}, which is
+    ## how a CAD drawing is normally organised.  0 is @qcode{'byBlock'}, the
+    ## colour of the insert placing the entity when it is part of a block.
     ##
     ## It governs what is appended after it is set, never what came before.
     ##
     ## @end deftp
     Colour = 256;
+
+    ## -*- texinfo -*-
+    ## @deftp {draw.Drawing} {property} LineWeight
+    ##
+    ## The current line weight
+    ##
+    ## The width entities are drawn with as they are appended, in millimetres
+    ## of paper, or @qcode{'byLayer'}, the default, to take the weight of the
+    ## entity's layer from @code{Layers}, or @qcode{'byBlock'}, to take that of
+    ## the insert placing the entity when it is part of a block.  A weight is
+    ## a width on paper and holds at every scale, as the pens of ISO 128 do.
+    ##
+    ## It governs what is appended after it is set, never what came before.
+    ##
+    ## @end deftp
+    LineWeight = 'byLayer';
+
+  endproperties
+
+  properties (SetAccess = private)
+
+    ## -*- texinfo -*-
+    ## @deftp {draw.Drawing} {property} Layers
+    ##
+    ## The layer table
+    ##
+    ## A struct array with one element for each layer of the drawing and the
+    ## fields @code{name}, @code{colour}, @code{linetype}, @code{lineweight},
+    ## @code{visible} and @code{plot}.  An entity drawn @qcode{'byLayer'} takes
+    ## its colour, line type or line weight from its layer here.
+    ##
+    ## @table @code
+    ## @item colour
+    ## An AutoCAD colour index from 1 to 255.
+    ## @item linetype
+    ## A line type name.
+    ## @item lineweight
+    ## The width in millimetres of paper, or empty for the output's own pen.
+    ## @item visible
+    ## False keeps the layer and what is on it, writes them to a file, and
+    ## draws none of it.
+    ## @item plot
+    ## False draws the layer on screen and leaves it off paper.
+    ## @end table
+    ##
+    ## Layer @qcode{'0'} is always there, and so is every layer an entity is
+    ## on: making a layer current adds it, with colour 7, line type
+    ## CONTINUOUS, the output's own pen, visible and printed.  Names are
+    ## compared without regard to case, as CAD programs compare them.
+    ## @code{layer} sets the properties of a layer.
+    ##
+    ## @end deftp
+    Layers = struct ('name', {'0'}, 'colour', {7}, 'linetype', ...
+                     {'CONTINUOUS'}, 'lineweight', {[]}, 'visible', {true}, ...
+                     'plot', {true});
 
   endproperties
 
@@ -148,7 +215,8 @@ classdef Drawing
     ## the layers in use.  'shape' holds the geom object of a spline, path,
     ## region or hatch, in world coordinates in the xy plane facing +z.
     Entities = struct ('type', {}, 'layer', {}, 'linetype', {}, ...
-                       'colour', {}, 'pts', {}, 'closed', {}, ...
+                       'colour', {}, 'lineweight', {}, 'pts', {}, ...
+                       'closed', {}, ...
                        'radius', {}, 'angles', {}, 'angle', {}, 'text', {}, ...
                        'height', {}, 'offset', {}, 'direction', {}, ...
                        'pattern', {}, 'spacing', {}, 'block', {}, ...
@@ -177,6 +245,9 @@ classdef Drawing
                        " vector."));
       endif
       this.Layer = LAYER;
+      if (! any (strcmpi (LAYER, {this.Layers.name})))
+        this.Layers(end+1) = newlayer (LAYER);
+      endif
 
     endfunction
 
@@ -186,7 +257,22 @@ classdef Drawing
         error (strcat ("draw.Drawing: LINETYPE must be a non-empty", ...
                        " character vector."));
       endif
-      this.Linetype = LT;
+      this.Linetype = byname (LT);
+
+    endfunction
+
+    function this = set.LineWeight (this, LW)
+
+      if (ischar (LW) && isrow (LW)
+          && any (strcmpi (LW, {'byLayer', 'byBlock'})))
+        this.LineWeight = byname (LW);
+      elseif (isnumeric (LW) && isreal (LW) && isscalar (LW)
+              && isfinite (LW) && LW >= 0)
+        this.LineWeight = double (LW);
+      else
+        error (strcat ("draw.Drawing: LINEWEIGHT must be 'byLayer',", ...
+                       " 'byBlock' or a width in millimetres."));
+      endif
 
     endfunction
 
@@ -271,6 +357,13 @@ classdef Drawing
     ## @code{'DimScale', 50}.  Ticks are 45-degree obliques and the text is
     ## horizontal whatever the dimension measures.
     ##
+    ## Nothing on a layer that is not visible is lowered.  Every record takes
+    ## its colour, line type and line weight from its layer where it is drawn
+    ## @qcode{'byLayer'}, and the defaults where it is drawn
+    ## @qcode{'byBlock'} outside a block, unless @qcode{'Layers'} is
+    ## @qcode{'keep'}, which leaves them as they are for a backend that
+    ## styles layers itself.
+    ##
     ## @code{[@var{E}, @var{LOST}] = entities (@dots{})} returns what was drawn
     ## otherwise than it is held, with fields @code{index}, @code{type} and
     ## @code{reason}; omit @var{LOST} and each distinct reason is warned about
@@ -298,6 +391,7 @@ classdef Drawing
       chordTol = 0.01;
       bulgeMode = 'keep';
       dimMode = 'associative';
+      layerMode = 'resolve';
       for ii = 1:2:numel (varargin)
         name = varargin{ii};
         if (! ischar (name) || ! isrow (name))
@@ -350,6 +444,14 @@ classdef Drawing
                              " 'reference'."));
             endif
             blockMode = lower (blockMode);
+          case 'layers'
+            layerMode = varargin{ii+1};
+            if (! ischar (layerMode) || ! isrow (layerMode)
+                || ! any (strcmpi (layerMode, {'resolve', 'keep'})))
+              error (strcat ("draw.Drawing.entities: Layers must be", ...
+                             " 'resolve' or 'keep'."));
+            endif
+            layerMode = lower (layerMode);
           case 'hatch'
             hatchMode = varargin{ii+1};
             if (! ischar (hatchMode) || ! isrow (hatchMode)
@@ -557,6 +659,7 @@ classdef Drawing
         endswitch
 
       endfor
+      E = resolvelayers (E, D.Layers, strcmp (layerMode, 'resolve'));
 
       ## Warn only when the caller has not asked to be told properly.
       if (nargout < 2 && ! isempty (LOST))
@@ -710,20 +813,132 @@ classdef Drawing
     ## -*- texinfo -*-
     ## @deftypefn {draw.Drawing} {@var{L} =} layers (@var{D})
     ##
-    ## Return the layers the drawing actually uses, as a sorted cellstr.
+    ## Return the names of the layers of the drawing, as a sorted cellstr.
     ##
-    ## The current layer appears only if something was drawn on it, so this
-    ## reports the layers a backend has to declare, not the layers that were
-    ## selected along the way.
+    ## These are the layers of @code{Layers}: @qcode{'0'}, every layer an
+    ## entity is on, and every layer made current or given properties with
+    ## @code{layer}, whether or not anything was drawn on it yet.
     ##
     ## @end deftypefn
     function L = layers (this)
 
-      if (isempty (this.Entities))
-        L = {};
-        return;
+      L = sort ({this.Layers.name});
+
+    endfunction
+
+    ## -*- texinfo -*-
+    ## @deftypefn  {draw.Drawing} {@var{D} =} layer (@var{D}, @var{NAME})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} layer (@var{D}, @var{NAME}, @var{Name}, @var{Value}, @dots{})
+    ##
+    ## Define a layer, or set its properties.
+    ##
+    ## @code{@var{D} = layer (@var{D}, @var{NAME})} adds the layer @var{NAME}
+    ## to @code{Layers}, with colour 7, line type CONTINUOUS, the output's own
+    ## pen, visible and printed; a layer already there is left as it is.
+    ## Name/Value pairs set its properties, and on a layer already there they
+    ## change only those given:
+    ##
+    ## @table @asis
+    ## @item @qcode{'Colour'}
+    ## An AutoCAD colour index from 1 to 255, or a colour name accepted by
+    ## @code{draw.colour}.
+    ## @item @qcode{'Linetype'}
+    ## A line type name: one of @code{draw.linetype}, or any a CAD program
+    ## holds.
+    ## @item @qcode{'LineWeight'}
+    ## The width in millimetres of paper, or empty for the output's own pen.
+    ## @item @qcode{'Visible'}
+    ## False keeps the layer and its entities but draws none of them.
+    ## @item @qcode{'Plot'}
+    ## False draws the layer on screen and leaves it off paper, for
+    ## construction lines and the edge of a sheet.
+    ## @end table
+    ##
+    ## An entity drawn @qcode{'byLayer'}, as entities are unless told
+    ## otherwise, takes its colour, line type and line weight from its layer,
+    ## so making a layer current is the one step that sets them all:
+    ##
+    ## @example
+    ## @group
+    ## D = draw.Drawing ('bracket');
+    ## D = D.layer ('OUTLINE', 'LineWeight', 0.5);
+    ## D = D.layer ('HIDDEN', 'Linetype', 'HIDDEN', 'LineWeight', 0.25);
+    ## D.Layer = 'OUTLINE';
+    ## D = D.circle ([0, 0], 20);
+    ## D.Layer = 'HIDDEN';
+    ## D = D.circle ([0, 0], 12);
+    ## @end group
+    ## @end example
+    ##
+    ## @seealso{draw.Drawing.Layers, draw.Drawing.Layer, draw.linetype,
+    ## draw.colour}
+    ## @end deftypefn
+    function this = layer (this, NAME, varargin)
+
+      if (nargin < 2)
+        error ("draw.Drawing.layer: invalid number of input arguments.");
       endif
-      L = unique ({this.Entities.layer});
+      if (! ischar (NAME) || ! isrow (NAME) || isempty (NAME))
+        error (strcat ("draw.Drawing.layer: NAME must be a non-empty", ...
+                       " character vector."));
+      endif
+      if (mod (numel (varargin), 2) != 0)
+        error (strcat ("draw.Drawing.layer: Name/Value arguments must come", ...
+                       " in pairs."));
+      endif
+      k = find (strcmpi (NAME, {this.Layers.name}), 1);
+      if (isempty (k))
+        L = newlayer (NAME);
+      else
+        L = this.Layers(k);
+      endif
+      for ii = 1:2:numel (varargin)
+        name = varargin{ii};
+        v = varargin{ii+1};
+        if (! ischar (name) || ! isrow (name))
+          error ("draw.Drawing.layer: unknown parameter.");
+        endif
+        switch (lower (name))
+          case 'colour'
+            if (ischar (v))
+              v = draw.colour (v);
+            endif
+            if (! isnumeric (v) || ! isreal (v) || ! isscalar (v)
+                || v != fix (v) || v < 1 || v > 255)
+              error (strcat ("draw.Drawing.layer: Colour must be a name or", ...
+                             " an integer index from 1 to 255."));
+            endif
+            L.colour = double (v);
+          case 'linetype'
+            if (! ischar (v) || ! isrow (v) || isempty (v)
+                || any (strcmpi (v, {'byLayer', 'byBlock'})))
+              error (strcat ("draw.Drawing.layer: Linetype must be the", ...
+                             " name of a line type."));
+            endif
+            L.linetype = v;
+          case 'lineweight'
+            if (! (isempty (v) && isnumeric (v))
+                && ! (isnumeric (v) && isreal (v) && isscalar (v)
+                      && isfinite (v) && v >= 0))
+              error (strcat ("draw.Drawing.layer: LineWeight must be a", ...
+                             " width in millimetres, or empty."));
+            endif
+            L.lineweight = double (v);
+          case {'visible', 'plot'}
+            if (! (islogical (v) || isnumeric (v)) || ! isscalar (v)
+                || ! any (v == [0, 1]))
+              error ("draw.Drawing.layer: %s must be true or false.", name);
+            endif
+            L.(lower (name)) = logical (v);
+          otherwise
+            error ("draw.Drawing.layer: unknown parameter.");
+        endswitch
+      endfor
+      if (isempty (k))
+        this.Layers(end+1) = L;
+      else
+        this.Layers(k) = L;
+      endif
 
     endfunction
 
@@ -812,7 +1027,7 @@ classdef Drawing
         error ("draw.Drawing.line: P1 and P2 must not be the same point.");
       endif
 
-      e = makeentity ('line', this.Layer, this.Linetype, this.Colour);
+      e = makeentity ('line', pen (this));
       e.pts = [P1; P2];
       this.Entities(end+1) = e;
 
@@ -842,7 +1057,7 @@ classdef Drawing
         error ("draw.Drawing.point: P %s", errmsg);
       endif
 
-      e = makeentity ('point', this.Layer, this.Linetype, this.Colour);
+      e = makeentity ('point', pen (this));
       e.pts = P(:)';
       this.Entities(end+1) = e;
 
@@ -895,7 +1110,7 @@ classdef Drawing
       V = PL.Vertices;
       W = U.Origin(1:2) + V(:,1) * U.XAxis(1:2) + V(:,2) * U.YAxis(1:2);
       b = V(:,3)' * sign (U.Normal(3));
-      e = makeentity ('polyline', this.Layer, this.Linetype, this.Colour);
+      e = makeentity ('polyline', pen (this));
       e.pts = W;
       e.closed = PL.Closed;
       if (any (b != 0))
@@ -941,7 +1156,7 @@ classdef Drawing
         error ("draw.Drawing.spline: SP %s", errmsg);
       endif
 
-      e = makeentity ('spline', this.Layer, this.Linetype, this.Colour);
+      e = makeentity ('spline', pen (this));
       e.closed = SP.Closed;
       e.shape = SP;
       this.Entities(end+1) = e;
@@ -985,7 +1200,7 @@ classdef Drawing
         error ("draw.Drawing.path: P %s", errmsg);
       endif
 
-      e = makeentity ('path', this.Layer, this.Linetype, this.Colour);
+      e = makeentity ('path', pen (this));
       e.closed = P.Closed;
       e.shape = P;
       this.Entities(end+1) = e;
@@ -1032,7 +1247,7 @@ classdef Drawing
         error ("draw.Drawing.region: R %s", errmsg);
       endif
 
-      e = makeentity ('region', this.Layer, this.Linetype, this.Colour);
+      e = makeentity ('region', pen (this));
       e.closed = true;
       e.shape = R;
       this.Entities(end+1) = e;
@@ -1073,7 +1288,7 @@ classdef Drawing
                        " scalar angles in degrees."));
       endif
 
-      e = makeentity ('arc', this.Layer, this.Linetype, this.Colour);
+      e = makeentity ('arc', pen (this));
       e.pts = double (C);
       e.radius = double (R);
       e.angles = double ([A1, A2]);
@@ -1101,7 +1316,7 @@ classdef Drawing
         error ("draw.Drawing.circle: R %s", errmsg);
       endif
 
-      e = makeentity ('circle', this.Layer, this.Linetype, this.Colour);
+      e = makeentity ('circle', pen (this));
       e.pts = double (C);
       e.radius = double (R);
       this.Entities(end+1) = e;
@@ -1145,7 +1360,7 @@ classdef Drawing
         error ("draw.Drawing.ellipse: ROT must be a real finite scalar.");
       endif
 
-      e = makeentity ('ellipse', this.Layer, this.Linetype, this.Colour);
+      e = makeentity ('ellipse', pen (this));
       e.pts = C(:)';
       e.radius = [A, B];
       e.angle = ROT;
@@ -1191,7 +1406,7 @@ classdef Drawing
         error ("draw.Drawing.text: ROT must be a real finite scalar.");
       endif
 
-      e = makeentity ('text', this.Layer, this.Linetype, this.Colour);
+      e = makeentity ('text', pen (this));
       e.pts = double (P);
       e.text = S;
       e.height = double (H);
@@ -1268,7 +1483,7 @@ classdef Drawing
         error ("draw.Drawing.hatch: R %s", errmsg);
       endif
 
-      e = makeentity ('hatch', this.Layer, this.Linetype, this.Colour);
+      e = makeentity ('hatch', pen (this));
       e.closed = true;
       e.pattern = PATTERN;
       e.angle = double (ANGLE);
@@ -1363,7 +1578,7 @@ classdef Drawing
                        " points differing in y."));
       endif
 
-      e = makeentity ('dim', this.Layer, this.Linetype, this.Colour);
+      e = makeentity ('dim', pen (this));
       e.pts = [P1; P2];
       e.offset = double (OFFSET);
       e.direction = DIRECTION;
@@ -1472,7 +1687,7 @@ classdef Drawing
                        " the vertex."));
       endif
 
-      e = makeentity ('angdim', this.Layer, this.Linetype, this.Colour);
+      e = makeentity ('angdim', pen (this));
       e.pts = [V(:)'; P1(:)'; P2(:)'];
       e.radius = RAD;
       e.text = LABEL;
@@ -1563,7 +1778,7 @@ classdef Drawing
                        " differ from P in x."));
       endif
 
-      e = makeentity ('ordinate', this.Layer, this.Linetype, this.Colour);
+      e = makeentity ('ordinate', pen (this));
       e.pts = [O; P; L];
       e.direction = AXIS;
       e.text = LABEL;
@@ -1619,7 +1834,7 @@ classdef Drawing
         error ("draw.Drawing.centremark: R %s", errmsg);
       endif
 
-      e = makeentity ('centremark', this.Layer, this.Linetype, this.Colour);
+      e = makeentity ('centremark', pen (this));
       e.pts = C(:)';
       e.radius = R;
       this.Entities(end+1) = e;
@@ -1657,7 +1872,7 @@ classdef Drawing
         error ("draw.Drawing.leader: TEXT must be a character vector.");
       endif
 
-      e = makeentity ('leader', this.Layer, this.Linetype, this.Colour);
+      e = makeentity ('leader', pen (this));
       e.pts = P;
       e.text = TEXT;
       this.Entities(end+1) = e;
@@ -1835,6 +2050,18 @@ classdef Drawing
     ## keeping the layer, line type and colour it was drawn with.  Any number of
     ## drawings may be given.
     ##
+    ## The layers of every drawing come with it.  A layer several drawings
+    ## have keeps the properties of the first that has it, as a CAD program
+    ## keeps its own layers when another drawing is brought in, so a sheet
+    ## built on a title block draws its parts in the sheet's layers.
+    ##
+    ## The blocks every drawing defines come with it, so an insert still finds
+    ## its block.  A block defined in several drawings must be defined the same
+    ## in each, with the same entities and the same blocks inside it: a block
+    ## is geometry, and one definition silently drawn in place of another would
+    ## draw the wrong part, so a different definition under the same name is an
+    ## error naming the block.
+    ##
     ## The result takes its name and its current layer, line type and colour
     ## from the first drawing.  Those are the state a caller would carry on
     ## drawing with, and the first drawing is the one being added to.
@@ -1856,6 +2083,18 @@ classdef Drawing
         for ii = 1:numel (other.Entities)
           this.Entities(end+1) = other.Entities(ii);
         endfor
+        this.Layers = foldlayers (this.Layers, other.Layers);
+        for bb = 1:numel (other.Blocks)
+          name = other.Blocks(bb).name;
+          j = find (strcmpi (name, {this.Blocks.name}), 1);
+          if (isempty (j))
+            this.Blocks(end+1) = other.Blocks(bb);
+          elseif (! sameblock (this.Blocks(j).drawing,
+                               other.Blocks(bb).drawing))
+            error (strcat ("draw.Drawing.merge: argument %d defines the", ...
+                           " block '%s' differently."), k, name);
+          endif
+        endfor
       endfor
 
     endfunction
@@ -1870,8 +2109,13 @@ classdef Drawing
     ## adds no entity.
     ##
     ## Redefining a name replaces the definition, and every insert of it takes
-    ## the new geometry --- which is the point of a block, and the reason a
+    ## the new geometry, which is the point of a block, and the reason a
     ## drawing that repeats a feature two dozen times should use one.
+    ##
+    ## A drawing has one layer table, which its blocks share, as in a DXF
+    ## file.  The layers of @var{B} the drawing lacks are added to it; a layer
+    ## it has already keeps its own properties.  Draw a symbol on layer
+    ## @qcode{'0'} to have it take the layer of each insert placing it.
     ##
     ## @seealso{insert, merge, transform}
     ## @end deftypefn
@@ -1894,6 +2138,7 @@ classdef Drawing
       endif
       this.Blocks(k).name = NAME;
       this.Blocks(k).drawing = B;
+      this.Layers = foldlayers (this.Layers, B.Layers);
 
     endfunction
 
@@ -1946,7 +2191,7 @@ classdef Drawing
                        " finite scalar."));
       endif
 
-      e = makeentity ('insert', this.Layer, this.Linetype, this.Colour);
+      e = makeentity ('insert', pen (this));
       e.pts = POS(:)';
       e.block = NAME;
       e.angle = ROT;
@@ -1962,9 +2207,18 @@ classdef Drawing
     ##
     ## The result holds no blocks and no inserts, only the entities they stood
     ## for, each transformed to where its reference put it.  This is what a
-    ## backend with no block of its own needs, and what @code{draw.Drawing.plot}
-    ## and
-    ## @code{draw.Drawing.tikz} do before rendering.
+    ## backend with no block of its own needs, and what
+    ## @code{draw.Drawing.plot} and @code{draw.Drawing.tikz} do before
+    ## rendering.
+    ##
+    ## Every entity keeps the look the insert gave it, as CAD programs draw a
+    ## block.  An entity of the block on layer @qcode{'0'} goes on the layer of
+    ## the insert, so a symbol drawn on @qcode{'0'} takes the layer it is
+    ## placed on; a colour, line type or line weight @qcode{'byBlock'} becomes
+    ## the insert's.  An entity on any other layer stays there, and one drawn
+    ## @qcode{'byLayer'} keeps following its layer.  Through nested blocks the
+    ## rule applies at every level, so an entity on @qcode{'0'} inside a block
+    ## on @qcode{'0'} ends on the layer of the outermost insert.
     ##
     ## Blocks may contain inserts of other blocks and are expanded through.  A
     ## block keeps its own definitions and inherits the enclosing drawing's only
@@ -2019,9 +2273,10 @@ classdef Drawing
         endif
         sub = sub.transform ('translate', e.pts);
         for jj = 1:numel (sub.Entities)
-          out.Entities(end+1) = sub.Entities(jj);
+          out.Entities(end+1) = fromblock (sub.Entities(jj), e);
         endfor
       endfor
+      out.Blocks = this.Blocks([]);
       this = out;
 
     endfunction
@@ -2066,7 +2321,9 @@ classdef Drawing
     ## @multitable @columnfractions 0.16 0.14 0.70
     ## @headitem Name @tab Default @tab Meaning
     ## @item @qcode{'Axes'} @tab @code{gca} @tab axes to draw into
-    ## @item @qcode{'LineWidth'} @tab 0.5 @tab width of every line, in points
+    ## @item @qcode{'LineWidth'} @tab 0.5 @tab width in points of every line
+    ## with no line weight of its own or of its layer, which is drawn at that
+    ## weight
     ## @item @qcode{'FontSize'} @tab 8 @tab size of text, in points
     ## @item @qcode{'Layers'} @tab all @tab cell array of layer names to draw
     ## @item @qcode{'Arc'} @tab 64 @tab segments per full turn when sampling
@@ -2258,6 +2515,11 @@ classdef Drawing
         for ii = 1:numel (E)
           e = E(ii);
           col = draw.colour (e.colour);
+          ## A weight of its own or its layer's, in millimetres of paper
+          po = opt;
+          if (! isempty (e.lineweight))
+            po.LineWidth = e.lineweight * 72 / 25.4;
+          endif
 
           switch (e.type)
             case {'LINE', 'POLYLINE', 'LWPOLYLINE'}
@@ -2265,7 +2527,7 @@ classdef Drawing
               if (e.closed)
                 P = [P; P(1,:)];
               endif
-              H = [H; polydraw(ax, P, e.linetype, col, opt)];
+              H = [H; polydraw(ax, P, e.linetype, col, po)];
 
             case {'CIRCLE', 'ARC'}
               if (strcmp (e.type, 'CIRCLE'))
@@ -2280,7 +2542,7 @@ classdef Drawing
               endif
               P = [e.pts(1) + e.radius * cosd(a)', ...
                    e.pts(2) + e.radius * sind(a)'];
-              H = [H; polydraw(ax, P, e.linetype, col, opt)];
+              H = [H; polydraw(ax, P, e.linetype, col, po)];
 
             case 'TEXT'
               ## With a FontScale the entity's own height decides the size,
@@ -2390,8 +2652,14 @@ classdef Drawing
     ## @item @qcode{'Resolution'} @tab 600 @tab dots per inch, for a raster
     ## format only; a vector format ignores it
     ## @item @qcode{'LineWidth'} @tab 0.35 @tab pen width in millimetres of
-    ## paper, from the ISO 128 set 0.25, 0.35, 0.5, 0.7
+    ## paper, from the ISO 128 set 0.25, 0.35, 0.5, 0.7, for every line with
+    ## no line weight of its own or of its layer
     ## @end multitable
+    ##
+    ## A layer whose @code{plot} is false in @code{Layers} is left off the
+    ## paper, as is a layer that is not visible, but a layer not printed keeps
+    ## its place on the sheet: the trimmed edge @code{draw.titleblock} draws
+    ## on such a layer still places the sheet on the paper.
     ##
     ## @code{[@var{PAPER}, @var{SCALE}] = draw.Drawing.print (@dots{})} returns
     ## the sheet size actually used, in millimetres, and the scale denominator,
@@ -2483,6 +2751,18 @@ classdef Drawing
       if (isempty (D) || D.numentities () == 0)
         error ("draw.Drawing.print: D is empty, so there is nothing to plot.");
       endif
+
+      ## Paper carries the layers that are printed and nothing else; the rest
+      ## keep their place on the sheet, as the trimmed edge of a title block
+      ## places it, but leave no ink
+      D = expand (D);
+      P = D;
+      printed = upper ({D.Layers([D.Layers.plot]).name});
+      P.Entities = D.Entities(ismember (upper ({D.Entities.layer}), printed));
+      if (P.numentities () == 0)
+        error (strcat ("draw.Drawing.print: D has nothing on a layer that", ...
+                       " is printed."));
+      endif
       usable = PAPER - 2 * opt.Margin;
       if (any (usable <= 0))
         error ("draw.Drawing.print: Margin leaves no room on the sheet.");
@@ -2535,8 +2815,16 @@ classdef Drawing
                          span(1) / SCALE, span(2) / SCALE, usable(1), ...
                          usable(2));
         endif
-        xlim (ax, xlim (ax));
-        ylim (ax, ylim (ax));
+        xl = xlim (ax);
+        yl = ylim (ax);
+        if (P.numentities () < D.numentities ())
+          cla (ax);
+          plot (P, 'Axes', ax, 'Margin', 0, ...
+                     'FontScale', 72 / (25.4 * SCALE), ...
+                     'LineWidth', opt.LineWidth * 72 / 25.4);
+        endif
+        xlim (ax, xl);
+        ylim (ax, yl);
         axis (ax, 'off');
 
         ## Place the drawing centred on the sheet, at scale.  The printed
@@ -2717,7 +3005,9 @@ classdef Drawing
       ## type.
       ## That is not hypothetical: this one did, when the dimensioning entities
       ## arrived and only this backend still rendered from the drawing model.
-      E = entities (D, 'bulges', 'flatten', 'dimensions', 'explode');
+      ## What an entity takes from its layer is left to the layer's style
+      E = entities (D, 'bulges', 'flatten', 'dimensions', 'explode', ...
+                    'layers', 'keep');
 
       if (isempty (E))
         L = {};
@@ -2735,8 +3025,15 @@ classdef Drawing
       if (styles && ! isempty (L))
         out{end+1} = '\tikzset{';
         for ii = 1:numel (L)
-          out{end+1} = sprintf ('  %s/.style={}, %% layer ''%s''', ...
-                                  sty{ii}, L{ii});
+          k = find (strcmpi (L{ii}, {D.Layers.name}), 1);
+          c = D.Layers(k).colour;
+          if (c == 7)
+            c = 256;
+          endif
+          o = optparts (c, D.Layers(k).linetype, D.Layers(k).lineweight, ...
+                        ltscale, scale);
+          out{end+1} = sprintf ('  %s/.style={%s}, %% layer ''%s''', ...
+                                  sty{ii}, strjoin (o, ', '), L{ii});
         endfor
         out{end+1} = '}';
       endif
@@ -2784,10 +3081,14 @@ classdef Drawing
     ##
     ## @code{write (@var{D}, @var{FILE})} writes the drawing @var{D} to
     ## @var{FILE}, which must end in @file{.dxf}, as an AutoCAD R2000
-    ## (@code{AC1015}) ASCII DXF drawing in millimetres, every entity on its
-    ## own layer with its line type and colour, the layers and line types
-    ## declared in the file's tables with the dash pattern of every line type
-    ## the package defines.
+    ## (@code{AC1015}) ASCII DXF drawing in millimetres.  The layer table is
+    ## written whole: every layer of @code{Layers} with its colour, line type
+    ## and line weight, switched off where it is not visible and marked not
+    ## to print where it is not printed.  Every entity is written on its layer,
+    ## by layer where it takes its properties from it, so a CAD program that
+    ## changes a layer changes everything on it.  Line types are declared with
+    ## the dash pattern of every line type the package defines.  A line weight
+    ## is written as the nearest of the weights DXF allows; R12 holds none.
     ##
     ## Each entity is written as itself: a line, point, arc, circle, ellipse,
     ## text, spline, insert and polyline, its bulges kept, as the DXF entity of
@@ -2796,10 +3097,12 @@ classdef Drawing
     ## angle and spacing; a path as its pieces and a region as its loops, each
     ## bound by a group that names the class, so @code{draw.read} gives them
     ## back as a path and a region.  A dimension is a @code{DIMENSION} whose
-    ## picture is an anonymous block, so a CAD program measures it again; a
-    ## centre mark and a leader are written as the lines and text they are
-    ## drawn with.  The blocks the drawing defines are written once each and
-    ## placed by @code{INSERT}.
+    ## picture is an anonymous block, so a CAD program measures it again; the
+    ## picture is on layer @qcode{'0'} and by block, as CAD programs draw it, so
+    ## the dimension's own layer and properties govern it.  A centre mark and a
+    ## leader are written as the lines and text they are drawn with.  The
+    ## blocks the drawing defines are written once each and placed by
+    ## @code{INSERT}.
     ##
     ## Name/Value pairs:
     ##
@@ -2844,14 +3147,180 @@ classdef Drawing
 
 endclassdef
 
+## Whether the drawings A and B define the same block: the same entities and
+## the same blocks inside, whatever their names and current pens
+function TF = sameblock (A, B)
+
+  TF = alike (A.Entities, B.Entities) && alike (A.Blocks, B.Blocks);
+
+endfunction
+
+## Whether A and B hold the same values.  Objects are compared by their
+## public properties, since isequal does not compare classdef objects, and
+## NaN equals NaN, as a path marks its straight segments with it.
+function TF = alike (a, b)
+
+  TF = strcmp (class (a), class (b)) && isequal (size (a), size (b));
+  if (! TF)
+    return;
+  endif
+  if (isa (a, 'draw.Drawing'))
+    for k = 1:numel (a)
+      if (! sameblock (a(k), b(k)))
+        TF = false;
+        return;
+      endif
+    endfor
+  elseif (isobject (a))
+    p = properties (a);
+    for k = 1:numel (a)
+      for j = 1:numel (p)
+        if (! alike (a(k).(p{j}), b(k).(p{j})))
+          TF = false;
+          return;
+        endif
+      endfor
+    endfor
+  elseif (isstruct (a))
+    f = fieldnames (a);
+    if (! isequal (sort (f), sort (fieldnames (b))))
+      TF = false;
+      return;
+    endif
+    for k = 1:numel (a)
+      for j = 1:numel (f)
+        if (! alike (a(k).(f{j}), b(k).(f{j})))
+          TF = false;
+          return;
+        endif
+      endfor
+    endfor
+  elseif (iscell (a))
+    for k = 1:numel (a)
+      if (! alike (a{k}, b{k}))
+        TF = false;
+        return;
+      endif
+    endfor
+  else
+    TF = isequaln (a, b);
+  endif
+
+endfunction
+
+## The current pen of the drawing D, as an entity carries it
+function p = pen (D)
+
+  p = struct ('layer', D.Layer, 'linetype', D.Linetype, 'colour', D.Colour, ...
+              'lineweight', D.LineWeight);
+
+endfunction
+
+## The layer table A with the layers of B it lacks; a layer in both keeps
+## its properties in A
+function A = foldlayers (A, B)
+
+  for k = 1:numel (B)
+    if (! any (strcmpi (B(k).name, {A.name})))
+      A(end+1) = B(k);
+    endif
+  endfor
+
+endfunction
+
+## The entity S of a block as the insert E places it: on E's layer when S is
+## on layer 0, and with E's colour, line type or line weight where S has
+## 'byBlock'
+function S = fromblock (S, E)
+
+  if (strcmp (S.layer, '0'))
+    S.layer = E.layer;
+  endif
+  if (S.colour == 0)
+    S.colour = E.colour;
+  endif
+  if (strcmp (S.linetype, 'byBlock'))
+    S.linetype = E.linetype;
+  endif
+  if (ischar (S.lineweight) && strcmp (S.lineweight, 'byBlock'))
+    S.lineweight = E.lineweight;
+  endif
+
+endfunction
+
+## The lowered records E without those on a layer of the table T that is not
+## visible, and with RESOLVE, each 'byLayer' colour, line type and line
+## weight taken from its layer and each 'byBlock' one at its default, since
+## nothing places these records
+function E = resolvelayers (E, T, resolve)
+
+  names = {T.name};
+  keep = true (1, numel (E));
+  for k = 1:numel (E)
+    j = find (strcmpi (E(k).layer, names), 1);
+    if (isempty (j))
+      L = newlayer (E(k).layer);
+    else
+      L = T(j);
+    endif
+    if (! L.visible)
+      keep(k) = false;
+      continue;
+    endif
+    if (! resolve)
+      continue;
+    endif
+    if (E(k).colour == 256)
+      E(k).colour = L.colour;
+    elseif (E(k).colour == 0)
+      E(k).colour = 7;
+    endif
+    if (strcmp (E(k).linetype, 'byLayer'))
+      E(k).linetype = L.linetype;
+    elseif (strcmp (E(k).linetype, 'byBlock'))
+      E(k).linetype = 'CONTINUOUS';
+    endif
+    if (ischar (E(k).lineweight))
+      if (strcmp (E(k).lineweight, 'byLayer'))
+        E(k).lineweight = L.lineweight;
+      else
+        E(k).lineweight = [];
+      endif
+    endif
+  endfor
+  E = E(keep);
+
+endfunction
+
+## A layer of the table with the default properties
+function L = newlayer (NAME)
+
+  L = struct ('name', NAME, 'colour', 7, 'linetype', 'CONTINUOUS', ...
+              'lineweight', [], 'visible', true, 'plot', true);
+
+endfunction
+
+## 'byLayer' and 'byBlock' spelled one way whatever the case given; any
+## other name as given
+function S = byname (S)
+
+  if (strcmpi (S, 'byLayer'))
+    S = 'byLayer';
+  elseif (strcmpi (S, 'byBlock'))
+    S = 'byBlock';
+  endif
+
+endfunction
+
 ## Build an entity record with every field present and the type-specific ones
 ## empty.  Every append method starts here, which is what keeps the field set
 ## and its order identical across the whole array -- a struct array will not
 ## grow otherwise, and a backend would have to test for each field.
-function e = makeentity (type, layer, linetype, colour)
+function e = makeentity (type, p)
 
-  e = struct ('type', type, 'layer', layer, 'linetype', linetype, ...
-              'colour', colour, 'pts', [], 'closed', false, ...
+  e = struct ('type', type, 'layer', p.layer, 'linetype', p.linetype, ...
+              'colour', p.colour, 'lineweight', p.lineweight, 'pts', [], ...
+              'closed', false, ...
               'radius', [], 'angles', [], 'angle', [], 'text', '', ...
               'height', [], 'offset', [], 'direction', '', 'pattern', '', ...
               'spacing', [], 'block', '', 'scale', [], 'bulge', [], ...
@@ -2878,7 +3347,7 @@ function e = dimcircle (this, kind, C, R, ANG, LABEL)
     error ("draw.Drawing.%s: LABEL must be a character vector.", kind);
   endif
 
-  e = makeentity (kind, this.Layer, this.Linetype, this.Colour);
+  e = makeentity (kind, pen (this));
   e.pts = C(:)';
   e.radius = R;
   e.angle = ANG;
@@ -3075,10 +3544,10 @@ endfunction
 ## held by a draw.Drawing of its own
 function E = partsentities (parts)
 
-  E = repmat (makeentity ('line', '0', 'CONTINUOUS', 256), 1, 0);
+  E = repmat (makeentity ('line', pen (draw.Drawing ())), 1, 0);
   for k = 1:numel (parts)
     p = parts(k);
-    e = makeentity (lower (p.type), p.layer, p.linetype, p.colour);
+    e = makeentity (lower (p.type), p);
     e.pts = p.pts;
     switch (p.type)
       case 'POLYLINE'
@@ -3480,7 +3949,7 @@ endfunction
 function E = emptyentity ()
 
   E = struct ('type', {}, 'layer', {}, 'linetype', {}, 'colour', {}, ...
-              'pts', {}, 'closed', {}, ...
+              'lineweight', {}, 'pts', {}, 'closed', {}, ...
               'radius', {}, 'angles', {}, 'text', {}, 'height', {}, ...
               'rotation', {}, 'bulge', {}, 'block', {});
 
@@ -3495,8 +3964,9 @@ endfunction
 function s = mkent (type, e, pts)
 
   s = struct ('type', type, 'layer', e.layer, ...
-              'linetype', optfield (e, 'linetype', 'CONTINUOUS'), ...
+              'linetype', optfield (e, 'linetype', 'byLayer'), ...
               'colour', optfield (e, 'colour', 256), ...
+              'lineweight', optfield (e, 'lineweight', 'byLayer'), ...
               'pts', pts, 'closed', false, ...
               'radius', [], 'angles', [], 'text', '', 'height', [], ...
               'rotation', 0, 'bulge', [], 'block', '');
@@ -3883,25 +4353,40 @@ function sty = stylenames (L)
 
 endfunction
 
-## Line type and colour as a TikZ option list, empty when both are default.
+## The colour, line type and line weight an entity states itself, as a TikZ
+## option list, empty when it takes them all from its layer
+function o = dopts (e, ltscale, scale)
+
+  parts = optparts (optfield (e, 'colour', 256), ...
+                    optfield (e, 'linetype', 'byLayer'), ...
+                    optfield (e, 'lineweight', 'byLayer'), ltscale, scale);
+  if (isempty (parts))
+    o = '';
+  else
+    o = ['[', strjoin(parts, ', '), ']'];
+  endif
+
+endfunction
+
+## Colour C, line type LT and line weight LW as TikZ options, none for what
+## is by layer, by block or the default.
 ##
 ## Dash lengths are emitted at their nominal size on the page, not divided by
 ## the drawing scale.  A line type is a paper-space property: a centre line
 ## should read as a centre line whether the view is at 1:1 or 1:50, and scaling
-## the pattern down with the geometry would make it vanish.
-function o = dopts (e, ltscale, scale)
+## the pattern down with the geometry would make it vanish.  A line weight is
+## a width on paper for the same reason.
+function parts = optparts (c, lt, lw, ltscale, scale)
 
   parts = {};
 
   colours = {'', 'red', 'yellow', 'green', 'cyan', 'blue', 'magenta', ...
              'black', 'gray'};
-  c = optfield (e, 'colour', 256);
   if (c >= 1 && c <= 8)
     parts{end+1} = colours{c + 1};
   endif
 
-  lt = optfield (e, 'linetype', 'CONTINUOUS');
-  if (! strcmpi (lt, 'CONTINUOUS'))
+  if (! any (strcmpi (lt, {'CONTINUOUS', 'byLayer', 'byBlock'})))
     try
       pat = draw.linetype (lt) * ltscale / scale;
     catch
@@ -3920,10 +4405,8 @@ function o = dopts (e, ltscale, scale)
     endif
   endif
 
-  if (isempty (parts))
-    o = '';
-  else
-    o = ['[', strjoin(parts, ', '), ']'];
+  if (isnumeric (lw) && ! isempty (lw))
+    parts{end+1} = sprintf ('line width=%smm', fmt (lw));
   endif
 
 endfunction

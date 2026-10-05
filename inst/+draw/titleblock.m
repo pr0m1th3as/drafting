@@ -33,7 +33,7 @@
 ##
 ## The ISO A series from A4 to A0, by name, in landscape.  Every one is in
 ## millimetres, and the border is inset 10 mm from the trimmed edge except at
-## the left, where it is inset 20 mm to leave a filing margin --- which is what
+## the left, where it is inset 20 mm to leave a filing margin, which is what
 ## ISO 5457 asks for and what a drawing loses if it is punched without.
 ##
 ## @subheading Fields
@@ -49,9 +49,24 @@
 ##
 ## @subheading Layers
 ##
-## Everything is placed on layer @qcode{'FRAME'}, so a caller can turn the
-## border off, restyle it, or drop it before sending the geometry to a machine
-## that has no use for it.
+## The sheet is drawn on three layers of its own, defined with the line
+## weights of ISO 5457 and ISO 128, so it prints correctly as it is:
+##
+## @table @asis
+## @item @qcode{'FRAME'}
+## The border and the outline of the title block, 0.7 mm, the weight ISO
+## 5457 asks of a border.
+## @item @qcode{'TITLE'}
+## The rules and the text inside the title block, 0.25 mm.
+## @item @qcode{'SHEET'}
+## The trimmed edge of the paper, shown on screen and not printed, since on
+## paper it is the edge itself.
+## @end table
+##
+## Merged first, as a sheet is built, the frame keeps these definitions: a
+## layer several drawings have keeps the properties of the first.  Change
+## them afterwards with @code{draw.Drawing.layer}, or drop the three layers
+## before sending the geometry to a machine that has no use for them.
 ##
 ## @seealso{draw.Drawing, draw.coordtable, merge}
 ## @end deftypefn
@@ -93,10 +108,14 @@ function D = titleblock (varargin)
   H = T{k,3};
 
   D = draw.Drawing (sprintf ('%s sheet', T{k,1}));
-  D.Layer = 'FRAME';
+  D = D.layer ('SHEET', 'Plot', false);
+  D = D.layer ('FRAME', 'LineWeight', 0.7);
+  D = D.layer ('TITLE', 'LineWeight', 0.25);
 
   ## Trimmed edge, then the border inset for filing
+  D.Layer = 'SHEET';
   D = D.polyline (geom.Polyline ([0, 0; W, 0; W, H; 0, H], 'Closed', true));
+  D.Layer = 'FRAME';
   PL = geom.Polyline ([20, 10; W - 10, 10; W - 10, H - 10; 20, H - 10], ...
                       'Closed', true);
   D = D.polyline (PL);
@@ -110,6 +129,7 @@ function D = titleblock (varargin)
                       'Closed', true);
   D = D.polyline (PL);
 
+  D.Layer = 'TITLE';
   rows_ = [0, 14, 28, 42];
   for r = rows_(2:end)
     D = D.line ([x0, y0 + r], [x0 + bw, y0 + r]);
@@ -142,8 +162,8 @@ endfunction
 
 %!demo
 %! ## A sheet frame with its title block, ready to merge with the drawing it
-%! ## frames.  Everything sits on layer FRAME, so it can be dropped before the
-%! ## geometry goes to a machine that has no use for it.
+%! ## frames.  The border is drawn at 0.7 mm, the title block's rules at
+%! ## 0.25 mm, and the trimmed edge only on screen.
 %!
 %! draw.titleblock ()
 %!
@@ -184,9 +204,18 @@ endfunction
 %! [~, W, H] = bbox (draw.titleblock ('A0'));
 %! assert_equal (W > H, true);
 
-%!test  # everything sits on the frame layer, so it can be dropped
+%!test  # the sheet is drawn on three layers of its own
 %! D = draw.titleblock ('A4', struct ('title', 'BRACKET'));
-%! assert_equal (D.layers (), {'FRAME'});
+%! assert_equal (D.layers (), {'0', 'FRAME', 'SHEET', 'TITLE'});
+
+%!test  # the border is drawn at 0.7 mm and the rules at 0.25 mm
+%! D = draw.titleblock ('A4');
+%! k = strcmp ({D.Layers.name}, 'FRAME') | strcmp ({D.Layers.name}, 'TITLE');
+%! assert_equal ([D.Layers(k).lineweight], [0.7, 0.25]);
+
+%!test  # the trimmed edge is not printed
+%! D = draw.titleblock ('A4');
+%! assert_equal (D.Layers(strcmp ({D.Layers.name}, 'SHEET')).plot, false);
 
 %!test  # a field given is written, with its caption
 %! D = draw.titleblock ('A4', struct ('drawing', 'ABC-123'));

@@ -410,12 +410,25 @@ encodetext (const string& s)
   return out;
 }
 
-// Layer, line type and colour, which every entity carries
+// Layer, line type, colour and line weight, which every entity carries; the
+// weight as DXF codes it, -1 by layer, -2 by block, or hundredths of a
+// millimetre
 struct Attr
 {
   string layer = "0";
   string ltype = "CONTINUOUS";
   int colour = 256;
+  int lw = -1;
+};
+
+// What the layer table says of a layer; the weight -3 is the default pen
+struct LayRec
+{
+  int colour = 7;
+  string ltype = "CONTINUOUS";
+  int lw = -3;
+  bool visible = true;
+  bool plot = true;
 };
 
 // One record to emit.  Handles and owners are given when the file is laid
@@ -553,6 +566,7 @@ public:
   vector<Group> groups;
   vector<string> layers;
   vector<string> ltypes;
+  map<string, LayRec> lprops;
   int ndim = 0;
 
   Writer (const WOpts& o) : opt (o) { uselayer ("0"); }
@@ -563,6 +577,20 @@ public:
       if (lower (l) == lower (s))
         return;
     layers.push_back (s);
+  }
+
+  // A layer of the drawing's table, declared whether or not anything is on it
+  void deflayer (const string& s, const LayRec& r)
+  {
+    uselayer (s);
+    lprops[upper (s)] = r;
+    useltype (r.ltype);
+  }
+
+  LayRec layerof (const string& s) const
+  {
+    auto it = lprops.find (upper (s));
+    return it == lprops.end () ? LayRec () : it->second;
   }
 
   void useltype (const string& s)
@@ -1153,10 +1181,12 @@ emititem (ostringstream& s, const Item& it, bool r12, const string& owner,
     put (s, 100, "AcDbEntity");
   }
   put (s, 8, it.a.layer);
-  if (upper (it.a.ltype) != "CONTINUOUS")
+  if (upper (it.a.ltype) != "BYLAYER")
     put (s, 6, it.a.ltype);
   if (it.a.colour != 256)
     puti (s, 62, it.a.colour);
+  if (! r12 && it.a.lw != -1)
+    puti (s, 370, it.a.lw);
   for (const auto& t : it.data)
     put (s, t.first, t.second);
   for (const auto& t : it.xdata)
@@ -1165,7 +1195,7 @@ emititem (ostringstream& s, const Item& it, bool r12, const string& owner,
   {
     put (s, 0, f.type);
     put (s, 8, f.a.layer);
-    if (upper (f.a.ltype) != "CONTINUOUS")
+    if (upper (f.a.ltype) != "BYLAYER")
       put (s, 6, f.a.ltype);
     if (f.a.colour != 256)
       puti (s, 62, f.a.colour);
@@ -1203,11 +1233,13 @@ Writer::emitr12 (ostringstream& s)
   puti (s, 70, layers.size ());
   for (const auto& l : layers)
   {
+    LayRec r = layerof (l);
     put (s, 0, "LAYER");
     put (s, 2, l);
     puti (s, 70, 0);
-    puti (s, 62, 7);
-    put (s, 6, "CONTINUOUS");
+    // A layer switched off is written with its colour negated
+    puti (s, 62, r.visible ? r.colour : -r.colour);
+    put (s, 6, r.ltype);
   }
   put (s, 0, "ENDTAB");
   put (s, 0, "TABLE");
@@ -1385,11 +1417,14 @@ Writer::emitr2000 (ostringstream& s)
   for (size_t k = 0; k < layers.size (); k++)
   {
     record ("LAYER", rLayer[k], tLayer, "AcDbLayerTableRecord");
+    LayRec r = layerof (layers[k]);
     put (s, 2, layers[k]);
     puti (s, 70, 0);
-    puti (s, 62, 7);
-    put (s, 6, "Continuous");
-    puti (s, 370, -3);
+    puti (s, 62, r.visible ? r.colour : -r.colour);
+    put (s, 6, upper (r.ltype) == "CONTINUOUS" ? "Continuous" : r.ltype);
+    if (! r.plot)
+      puti (s, 290, 0);
+    puti (s, 370, r.lw);
     put (s, 390, oHolder);
   }
   put (s, 0, "ENDTAB");
@@ -2059,6 +2094,29 @@ mapnum (const octave_map& m, const char *f, octave_idx_type i, double dflt)
   return x.isempty () ? dflt : x(0);
 }
 
+// A line weight as DXF codes it: 'byLayer' -1, 'byBlock' -2, a width in
+// millimetres in hundredths, rounded to the nearest DXF allows
+static int
+lwcode (const octave_value& v)
+{
+  if (v.is_string ())
+  {
+    string u = upper (v.string_value ());
+    return u == "BYBLOCK" ? -2 : -1;
+  }
+  if (v.isempty ())
+    return -1;
+  static const int std[] = {0, 5, 9, 13, 15, 18, 20, 25, 30, 35, 40, 50, 53,
+                            60, 70, 80, 90, 100, 106, 120, 140, 158, 200,
+                            211};
+  int want = static_cast<int> (std::lround (v.double_value () * 100));
+  int best = std[0];
+  for (int x : std)
+    if (std::abs (x - want) < std::abs (best - want))
+      best = x;
+  return best;
+}
+
 // The entities of a drawing; INBLOCK leaves paths and regions ungrouped,
 // since a group holds entities of the model alone
 static void
@@ -2072,8 +2130,12 @@ drawingitems (Writer& w, vector<Item>& dest, const octave_value& D,
     string type = mapstr (E, "type", i);
     Attr a;
     a.layer = mapstr (E, "layer", i, "0");
-    a.ltype = mapstr (E, "linetype", i, "CONTINUOUS");
+    a.ltype = mapstr (E, "linetype", i, "byLayer");
+    string u = upper (a.ltype);
+    if (u == "BYLAYER" || u == "BYBLOCK")
+      a.ltype = u;
     a.colour = static_cast<int> (mapnum (E, "colour", i, 256));
+    a.lw = lwcode (E.contents ("lineweight")(i));
     Matrix P = mapmat (E, "pts", i);
     auto pt = [&] (int r) { return v3 (P(r,0), P(r,1), 0); };
     octave_value shape;
@@ -2177,6 +2239,21 @@ drawingitems (Writer& w, vector<Item>& dest, const octave_value& D,
         }
         vector<Item> pic;
         drawingitems (w, pic, B, true);
+        // The picture on layer 0 and by block, as CAD programs draw it, so
+        // the DIMENSION's own layer and properties govern it
+        for (auto& it : pic)
+        {
+          it.a.layer = "0";
+          it.a.ltype = "BYBLOCK";
+          it.a.colour = 0;
+          it.a.lw = -2;
+          for (auto& f : it.follow)
+          {
+            f.a.layer = "0";
+            f.a.ltype = "BYBLOCK";
+            f.a.colour = 0;
+          }
+        }
         string name = "*D" + to_string (++w.ndim);
         Writer::Block blk;
         blk.name = name;
@@ -2400,6 +2477,19 @@ cmdwrite (const octave_value_list& args)
     octave_value D = objs(0);
     if (w.expand)
       D = call ("expand", ovl (D));
+    // Every layer of the drawing's table, in the table's order
+    octave_map L = prop (D, "Layers").map_value ();
+    for (octave_idx_type k = 0; k < L.numel (); k++)
+    {
+      LayRec r;
+      r.colour = L.contents ("colour")(k).int_value ();
+      r.ltype = L.contents ("linetype")(k).string_value ();
+      octave_value lw = L.contents ("lineweight")(k);
+      r.lw = lw.isempty () ? -3 : lwcode (lw);
+      r.visible = L.contents ("visible")(k).bool_value ();
+      r.plot = L.contents ("plot")(k).bool_value ();
+      wr.deflayer (L.contents ("name")(k).string_value (), r);
+    }
     drawingitems (wr, wr.model, D, false);
     // Expanded, the blocks are in place of their inserts and nothing
     // refers to them
@@ -2455,6 +2545,7 @@ struct Rec
   string layer = "0";
   string ltype = "BYLAYER";
   int colour = 256;
+  int lw = -1;
   bool paper = false;
 
   bool has (int c) const
@@ -2623,14 +2714,17 @@ public:
     vector<Tag> xdata;
   };
   vector<Grp> groups;
-  // The colour and line type of each layer the table defines, by the name
-  // in upper case, as layer names are compared
+  // The layer table, in the order of the file
   struct Lay
   {
+    string name;
     int colour = 7;
     string ltype = "CONTINUOUS";
+    int lw = -3;
+    bool visible = true;
+    bool plot = true;
   };
-  map<string, Lay> layers;
+  vector<Lay> layers;
 
   void load (const string& f);
   string decode (const string& s) const;
@@ -2749,6 +2843,8 @@ Reader::records (size_t a, size_t b) const
         r.ltype = trim (v);
       else if (c == 62)
         r.colour = atoi (v.c_str ());
+      else if (c == 370)
+        r.lw = atoi (v.c_str ());
       else if (c == 67)
         r.paper = atoi (v.c_str ()) == 1;
       r.tags.push_back (Tag (c, v));
@@ -2852,14 +2948,22 @@ Reader::load (const string& f)
         if (r.type == "LAYER" && ! trim (r.str (2)).empty ())
         {
           Lay l;
-          // A negative colour is a layer switched off, in its colour
-          int c = abs (static_cast<int> (r.num (62, 7)));
+          l.name = trim (r.str (2));
+          // A negative colour is a layer switched off, in its colour; a
+          // frozen layer is not drawn either
+          int c = static_cast<int> (r.num (62, 7));
+          l.visible = c >= 0 && ! (static_cast<int> (r.num (70)) & 1);
+          c = abs (c);
           if (c >= 1 && c <= 255)
             l.colour = c;
           string lt = trim (r.str (6));
           if (! lt.empty ())
-            l.ltype = lt;
-          layers[upper (trim (r.str (2)))] = l;
+            l.ltype = upper (lt) == "CONTINUOUS" ? "CONTINUOUS" : lt;
+          if (r.has (290))
+            l.plot = r.num (290) != 0;
+          if (r.has (370))
+            l.lw = static_cast<int> (r.num (370));
+          layers.push_back (l);
         }
     }
     else if (name == "BLOCKS")
@@ -4109,13 +4213,28 @@ raisedim (const octave_value& D, const Rec& r, double sc, const string& txt)
   }
 }
 
+// A line type as the pen of a drawing names it
 static string
-drawltype (const string& s)
+penltype (const string& s)
 {
-  string u = upper (s);
-  if (u.empty () || u == "BYLAYER" || u == "BYBLOCK" || u == "CONTINUOUS")
-    return "CONTINUOUS";
-  return s;
+  string u = upper (trim (s));
+  if (u.empty () || u == "BYLAYER")
+    return "byLayer";
+  if (u == "BYBLOCK")
+    return "byBlock";
+  return trim (s);
+}
+
+// A line weight as DXF codes it, as the pen of a drawing takes it: by
+// layer, by block, or millimetres; the default pen is taken by layer
+static octave_value
+penlw (int code)
+{
+  if (code == -2)
+    return octave_value ("byBlock");
+  if (code < 0)
+    return octave_value ("byLayer");
+  return octave_value (code / 100.0);
 }
 
 class Replay
@@ -4127,8 +4246,9 @@ public:
                     const set<string>& defined, const GroupHit *gh)
   {
     m_layer = "0";
-    m_ltype = "CONTINUOUS";
+    m_ltype = "byLayer";
     m_colour = 256;
+    m_lw = -1;
     for (size_t k = 0; k < recs.size (); k++)
     {
       const Rec& r = recs[k];
@@ -4186,8 +4306,9 @@ public:
     // Leave the drawing on its defaults rather than on whatever the last
     // entity happened to carry
     D = setprop (D, "Layer", octave_value ("0"));
-    D = setprop (D, "Linetype", octave_value ("CONTINUOUS"));
+    D = setprop (D, "Linetype", octave_value ("byLayer"));
     D = setprop (D, "Colour", octave_value (256.0));
+    D = setprop (D, "LineWeight", octave_value ("byLayer"));
     return D;
   }
 
@@ -4195,30 +4316,23 @@ private:
   const Reader& m_rd;
   Skips& m_sk;
   string m_layer, m_ltype;
-  int m_colour;
+  int m_colour, m_lw;
 
   // Layer, line type and colour are properties of the drawing at the moment
   // an entity is appended: set them, then draw, as a draughtsman does
   octave_value attrs (octave_value D, const Rec& r)
   {
     string layer = r.layer.empty () ? "0" : r.layer;
-    string lt = r.ltype;
+    string lt = penltype (r.ltype);
     int c = abs (r.colour);
     if (c > 256)
       c = 256;
-
-    // What the entity takes from its layer, the layer's own colour and line
-    // type, since a drawing has no layer table to defer to
-    auto lay = m_rd.layers.find (upper (layer));
-    if (lay != m_rd.layers.end ())
+    int lw = r.lw == -3 ? -1 : r.lw;
+    if (lw != m_lw)
     {
-      string u = upper (trim (lt));
-      if (u.empty () || u == "BYLAYER")
-        lt = lay->second.ltype;
-      if (c == 256)
-        c = lay->second.colour;
+      D = setprop (D, "LineWeight", penlw (lw));
+      m_lw = lw;
     }
-    lt = drawltype (lt);
     if (layer != m_layer)
     {
       D = setprop (D, "Layer", octave_value (layer));
@@ -4455,6 +4569,12 @@ cmdreaddraw (const octave_value_list& args, octave_value_list& out)
   }
 
   octave_value D = call ("draw.Drawing", ovl ("imported"));
+  for (const auto& l : rd.layers)
+    D = call ("layer", ovl (D, l.name, "Colour", static_cast<double> (l.colour),
+                            "Linetype", l.ltype, "LineWeight",
+                            l.lw < 0 ? octave_value (Matrix ())
+                                     : octave_value (l.lw / 100.0),
+                            "Visible", l.visible, "Plot", l.plot));
   set<string> defined;
   for (size_t k : keep)
   {

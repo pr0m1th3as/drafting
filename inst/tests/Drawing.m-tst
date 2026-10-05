@@ -23,13 +23,14 @@
 %! assert_equal (D.Layer, '0');
 %! assert_equal (D.numentities (), 0);
 %! assert_equal (isempty (D), true);
-%! assert_equal (D.layers (), {});
+%! assert_equal (D.layers (), {'0'});
 %!test  # the constructor names the drawing
 %! assert_equal (draw.Drawing ('plan').Name, 'plan');
 %!test  # the entity record carries every field from the outset
 %! D = draw.Drawing ();
 %! assert_equal (fieldnames (D.Entities), {'type'; 'layer'; 'linetype'; ...
-%!               'colour'; 'pts'; 'closed'; 'radius'; 'angles'; 'angle'; ...
+%!               'colour'; 'lineweight'; 'pts'; 'closed'; 'radius'; ...
+%!               'angles'; 'angle'; ...
 %!               'text'; 'height'; 'offset'; 'direction'; 'pattern'; ...
 %!               'spacing'; 'block'; 'scale'; 'bulge'; 'shape'});
 %!error<draw.Drawing: NAME must be a non-empty character vector.> ...
@@ -300,17 +301,17 @@
 %!error<draw.Drawing.dim: LABEL must be a character vector.> ...
 %! draw.Drawing ().dim ([0, 0], [1, 1], 5, 'aligned', 42)
 
-%!test  # layers reports what was drawn on, sorted, without duplicates
+%!test  # layers lists the table, sorted, without duplicates
 %! D = draw.Drawing ();
 %! D.Layer = 'walls';
 %! D = D.line ([0, 0], [1, 0]);
 %! D.Layer = 'inner';
 %! D = D.line ([0, 1], [1, 1]).line ([0, 2], [1, 2]);
-%! assert_equal (D.layers (), {'inner', 'walls'});
-%!test  # selecting a layer without drawing on it does not declare it
+%! assert_equal (D.layers (), {'0', 'inner', 'walls'});
+%!test  # making a layer current adds it to the table
 %! D = draw.Drawing ().line ([0, 0], [1, 1]);
 %! D.Layer = 'never-used';
-%! assert_equal (D.layers (), {'0'});
+%! assert_equal (D.layers (), {'0', 'never-used'});
 
 %!test  # numentities counts every type alike
 %! D = draw.Drawing ().line ([0, 0], [1, 1]).circle ([0, 0], 1);
@@ -369,14 +370,14 @@
 %! D = D.arc ([0, 0], 1, 0, 90).circle ([0, 0], 2).text ([0, 0], 'A');
 %! D = D.hatch (geom.Region ([0, 0; 1, 0; 1, 1])).dim ([0, 0], [1, 0], 5);
 %! assert_equal (numel (D.Entities), 7);
-%! assert_equal (numel (fieldnames (D.Entities)), 19);
+%! assert_equal (numel (fieldnames (D.Entities)), 20);
 %! assert_equal ({D.Entities.type}, {'line', 'polyline', 'arc', 'circle', ...
 %!                                   'text', 'hatch', 'dim'});
 
-%!test  # line type and colour default to continuous and byLayer
+%!test  # line type, colour and line weight default to byLayer
 %! D = draw.Drawing ();
-%! assert_equal (D.Linetype, 'CONTINUOUS');
-%! assert_equal (D.Colour, 256);
+%! assert_equal ({D.Linetype, D.Colour, D.LineWeight}, ...
+%!               {'byLayer', 256, 'byLayer'});
 
 %!test  # new entities take the current line type and colour
 %! D = draw.Drawing ();
@@ -390,7 +391,7 @@
 %! D = draw.Drawing ().line ([0, 0], [1, 0]);
 %! D.Linetype = 'HIDDEN';
 %! D = D.line ([0, 1], [1, 1]);
-%! assert_equal (D.Entities(1).linetype, 'CONTINUOUS');
+%! assert_equal (D.Entities(1).linetype, 'byLayer');
 %! assert_equal (D.Entities(2).linetype, 'HIDDEN');
 
 %!test  # a colour may be given by name or by index
@@ -406,6 +407,239 @@
 %! D = draw.Drawing (); D.Colour = 300;
 %!error<draw.colour: 'puce' is not a named colour> ...
 %! D = draw.Drawing (); D.Colour = 'puce';
+
+%!test  # byLayer and byBlock are spelled one way whatever the case given
+%! D = draw.Drawing ();
+%! D.Linetype = 'BYBLOCK';
+%! D.LineWeight = 'BYLAYER';
+%! assert_equal ({D.Linetype, D.LineWeight}, {'byBlock', 'byLayer'});
+
+%!test  # a line weight is a width in millimetres
+%! D = draw.Drawing ();
+%! D.LineWeight = 0.35;
+%! D = D.line ([0, 0], [1, 0]);
+%! assert_equal (D.Entities(1).lineweight, 0.35);
+
+%!error<draw.Drawing: LINEWEIGHT must be 'byLayer', 'byBlock' or a width in millimetres.> ...
+%! D = draw.Drawing (); D.LineWeight = -1;
+%!error<draw.Drawing: LINEWEIGHT must be 'byLayer', 'byBlock' or a width in millimetres.> ...
+%! D = draw.Drawing (); D.LineWeight = 'thick';
+
+%!test  # a new drawing's table holds layer 0, at the defaults
+%! L = draw.Drawing ().Layers;
+%! assert_equal ({L.name, L.colour, L.linetype, L.lineweight, L.visible, ...
+%!                L.plot}, {'0', 7, 'CONTINUOUS', [], true, true});
+
+%!test  # making a layer current adds it with the defaults
+%! D = draw.Drawing ();
+%! D.Layer = 'WALLS';
+%! assert_equal (D.Layers(2), struct ('name', 'WALLS', 'colour', 7, ...
+%!               'linetype', 'CONTINUOUS', 'lineweight', [], ...
+%!               'visible', true, 'plot', true));
+
+%!test  # a layer is one layer whatever the case of its name
+%! D = draw.Drawing ();
+%! D.Layer = 'Walls';
+%! D.Layer = 'WALLS';
+%! assert_equal (numel (D.Layers), 2);
+
+%!test  # layer defines a layer with the properties given
+%! D = draw.Drawing ().layer ('HIDDEN', 'Linetype', 'HIDDEN', ...
+%!                            'Colour', 'yellow', 'LineWeight', 0.25);
+%! L = D.Layers(2);
+%! assert_equal ({L.name, L.colour, L.linetype, L.lineweight}, ...
+%!               {'HIDDEN', 2, 'HIDDEN', 0.25});
+
+%!test  # layer changes only the properties given
+%! D = draw.Drawing ().layer ('A', 'Colour', 1, 'LineWeight', 0.5);
+%! D = D.layer ('a', 'Colour', 3);
+%! assert_equal ({D.Layers(2).colour, D.Layers(2).lineweight}, {3, 0.5});
+
+%!test  # a layer may be hidden or left off paper
+%! D = draw.Drawing ().layer ('C', 'Visible', false, 'Plot', false);
+%! assert_equal ({D.Layers(2).visible, D.Layers(2).plot}, {false, false});
+
+%!error<draw.Drawing.layer: invalid number of input arguments.> ...
+%! layer (draw.Drawing ())
+%!error<draw.Drawing.layer: NAME must be a non-empty character vector.> ...
+%! layer (draw.Drawing (), '')
+%!error<draw.Drawing.layer: Name/Value arguments must come in pairs.> ...
+%! layer (draw.Drawing (), 'A', 'Colour')
+%!error<draw.Drawing.layer: unknown parameter.> ...
+%! layer (draw.Drawing (), 'A', 'Width', 1)
+%!error<draw.Drawing.layer: unknown parameter.> ...
+%! layer (draw.Drawing (), 'A', 3, 1)
+%!error<draw.Drawing.layer: Colour must be a name or an integer index from 1 to 255.> ...
+%! layer (draw.Drawing (), 'A', 'Colour', 256)
+%!error<draw.Drawing.layer: Linetype must be the name of a line type.> ...
+%! layer (draw.Drawing (), 'A', 'Linetype', 'byLayer')
+%!error<draw.Drawing.layer: LineWeight must be a width in millimetres, or empty.> ...
+%! layer (draw.Drawing (), 'A', 'LineWeight', -0.5)
+%!error<draw.Drawing.layer: Visible must be true or false.> ...
+%! layer (draw.Drawing (), 'A', 'Visible', 2)
+
+%!test  # merge keeps the first drawing's properties for a layer both have
+%! A = draw.Drawing ().layer ('X', 'Colour', 1);
+%! B = draw.Drawing ().layer ('X', 'Colour', 5).layer ('Y', 'Colour', 3);
+%! M = A.merge (B);
+%! assert_equal ([M.Layers.colour], [7, 1, 3]);
+
+%!test  # a block brings its layers, and the drawing's own win
+%! B = draw.Drawing ().layer ('X', 'Colour', 5).layer ('Y', 'Colour', 3);
+%! D = draw.Drawing ().layer ('X', 'Colour', 1).block ('b', B);
+%! assert_equal ([D.Layers.colour], [7, 1, 3]);
+
+## A drawing placing, on layer HIDDEN in colour 4, a block of two lines: one
+## on layer 0 by block, one on layer KEEP by layer
+%!function D = placed ()
+%!  S = draw.Drawing ();
+%!  S.Colour = 'byBlock';
+%!  S.Linetype = 'byBlock';
+%!  S.LineWeight = 'byBlock';
+%!  S = S.line ([0, 0], [1, 0]);
+%!  S.Colour = 'byLayer';
+%!  S.Linetype = 'byLayer';
+%!  S.LineWeight = 'byLayer';
+%!  S.Layer = 'KEEP';
+%!  S = S.line ([0, 1], [1, 1]);
+%!  D = draw.Drawing ().block ('sym', S);
+%!  D.Layer = 'HIDDEN';
+%!  D.Colour = 4;
+%!  D.Linetype = 'DASHED';
+%!  D.LineWeight = 0.5;
+%!  D = D.insert ('sym', [10, 0]);
+%!endfunction
+
+%!test  # expanded, an entity on layer 0 goes on the insert's layer
+%! X = expand (placed ());
+%! assert_equal ({X.Entities.layer}, {'HIDDEN', 'KEEP'});
+
+%!test  # expanded, what is by block takes the insert's properties
+%! e = expand (placed ()).Entities(1);
+%! assert_equal ({e.colour, e.linetype, e.lineweight}, {4, 'DASHED', 0.5});
+
+%!test  # expanded, what is by layer on another layer stays so
+%! e = expand (placed ()).Entities(2);
+%! assert_equal ({e.colour, e.linetype, e.lineweight}, ...
+%!               {256, 'byLayer', 'byLayer'});
+
+%!test  # through nested blocks, layer 0 resolves to the outermost insert's
+%! S = draw.Drawing ().line ([0, 0], [1, 0]);
+%! M = draw.Drawing ().block ('inner', S).insert ('inner', [0, 0]);
+%! D = draw.Drawing ().block ('mid', M);
+%! D.Layer = 'OUTER';
+%! D = D.insert ('mid', [5, 5]);
+%! assert_equal (expand (D).Entities.layer, 'OUTER');
+
+%!test  # expanded, a drawing holds no blocks
+%! assert_equal (isempty (expand (placed ()).Blocks), true);
+
+%!test  # lowered, nothing on a hidden layer is drawn
+%! D = draw.Drawing ().layer ('C', 'Visible', false);
+%! D = D.line ([0, 0], [1, 0]);
+%! D.Layer = 'C';
+%! D = D.line ([0, 1], [1, 1]);
+%! assert_equal (numel (entities (D)), 1);
+
+%!test  # lowered, what is by layer takes the layer's properties
+%! D = draw.Drawing ().layer ('H', 'Linetype', 'HIDDEN', 'Colour', 2, ...
+%!                            'LineWeight', 0.25);
+%! D.Layer = 'H';
+%! E = entities (D.line ([0, 0], [1, 0]));
+%! assert_equal ({E.linetype, E.colour, E.lineweight}, {'HIDDEN', 2, 0.25});
+
+%!test  # lowered, what is by block outside a block takes the defaults
+%! D = draw.Drawing ();
+%! D.Colour = 'byBlock';
+%! D.Linetype = 'byBlock';
+%! D.LineWeight = 'byBlock';
+%! E = entities (D.line ([0, 0], [1, 0]));
+%! assert_equal ({E.linetype, E.colour, E.lineweight}, {'CONTINUOUS', 7, []});
+
+%!test  # with Layers keep, what is by layer is left so
+%! D = draw.Drawing ().layer ('H', 'Colour', 2);
+%! D.Layer = 'H';
+%! E = entities (D.line ([0, 0], [1, 0]), 'layers', 'keep');
+%! assert_equal ({E.linetype, E.colour}, {'byLayer', 256});
+
+%!error<draw.Drawing.entities: Layers must be 'resolve' or 'keep'.> ...
+%! entities (draw.Drawing (), 'layers', 'all')
+
+%!test  # plot draws a line at its layer's weight
+%! f = figure ('visible', 'off');
+%! unwind_protect
+%!   D = draw.Drawing ().layer ('T', 'LineWeight', 0.5);
+%!   D.Layer = 'T';
+%!   H = plot (D.line ([0, 0], [1, 0]), 'Axes', axes ('parent', f));
+%!   assert_equal (get (H, 'linewidth'), 0.5 * 72 / 25.4, 1e-12);
+%! unwind_protect_cleanup
+%!   close (f);
+%! end_unwind_protect
+
+%!error<draw.Drawing.print: D has nothing on a layer that is printed.> ...
+%! D = draw.Drawing ().layer ('C', 'Plot', false);
+%! D.Layer = 'C';
+%! print (D.line ([0, 0], [1, 0]), 'x.pdf');
+
+%!test  # tikz gives each layer's properties to its style
+%! D = draw.Drawing ().layer ('H', 'Linetype', 'HIDDEN', 'Colour', 2, ...
+%!                            'LineWeight', 0.25);
+%! D.Layer = 'H';
+%! S = tikz (D.line ([0, 0], [10, 0]), 'Scale', 1);
+%! p = 'drH1?/\.style=\{yellow, dash pattern=[^}]*, line width=0\.25mm\}';
+%! assert_equal (! isempty (regexp (S, p, 'once')), true);
+
+%!test  # tikz writes inline only what an entity states itself
+%! D = draw.Drawing ();
+%! D.LineWeight = 0.5;
+%! S = tikz (D.line ([0, 0], [10, 0]), 'Scale', 1);
+%! assert_equal (! isempty (strfind (S, '\draw[line width=0.5mm]')), true);
+
+%!test  # the layer table is written to DXF and read back
+%! fn = [tempname(), '.dxf'];
+%! unwind_protect
+%!   D = draw.Drawing ().layer ('H', 'Linetype', 'HIDDEN', 'Colour', 2, ...
+%!                              'LineWeight', 0.25, 'Plot', false);
+%!   D = D.layer ('OFF', 'Visible', false);
+%!   D.Layer = 'H';
+%!   write (D.line ([0, 0], [1, 0]), fn);
+%!   R = draw.read (fn);
+%!   L = R.Layers;
+%!   assert_equal ({L.name}, {'0', 'H', 'OFF'});
+%!   assert_equal ({L(2).colour, L(2).linetype, L(2).lineweight, ...
+%!                  L(2).plot, L(3).visible}, ...
+%!                 {2, 'HIDDEN', 0.25, false, false});
+%! unwind_protect_cleanup
+%!   unlink (fn);
+%! end_unwind_protect
+
+%!test  # a line weight is written as the nearest DXF allows
+%! fn = [tempname(), '.dxf'];
+%! unwind_protect
+%!   D = draw.Drawing ();
+%!   D.LineWeight = 0.33;
+%!   write (D.line ([0, 0], [1, 0]), fn);
+%!   R = draw.read (fn);
+%!   assert_equal (R.Entities.lineweight, 0.35);
+%! unwind_protect_cleanup
+%!   unlink (fn);
+%! end_unwind_protect
+
+%!test  # a dimension's picture is on layer 0 and by block, as CAD has it
+%! fn = [tempname(), '.dxf'];
+%! unwind_protect
+%!   D = draw.Drawing ();
+%!   D.Layer = 'DIM';
+%!   write (D.dim ([0, 0], [10, 0], -5, 'horizontal'), fn);
+%!   t = fileread (fn);
+%!   t = t(strfind (t, "BLOCKS")(1):end);
+%!   b = t(strfind (t, "\n*D1\n")(1):end);
+%!   b = b(1:strfind (b, "ENDBLK")(1));
+%!   assert_equal (isempty (regexp (b, "\n  8\n(?!0\n)", 'once')), true);
+%!   assert_equal (isempty (regexp (b, "\n 62\n *0\n", 'once')), false);
+%! unwind_protect_cleanup
+%!   unlink (fn);
+%! end_unwind_protect
 
 %!test  # translation moves every entity and changes nothing else
 %! D = draw.Drawing ().circle ([10, 0], 5).line ([0, 0], [20, 0]);
@@ -512,7 +746,7 @@
 %! assert_equal ({M.Entities.layer}, {'ONE', 'TWO'});
 %! assert_equal (M.Entities(2).linetype, 'HIDDEN');
 %! assert_equal (M.Entities(2).colour, 1);
-%! assert_equal (M.layers (), {'ONE', 'TWO'});
+%! assert_equal (M.layers (), {'0', 'ONE', 'TWO'});
 
 %!test  # the result keeps the first drawing's name and current state
 %! A = draw.Drawing ('sheet');
@@ -538,6 +772,24 @@
 %! assert_equal (numentities (sheet), 8);
 %! [B, W] = bbox (sheet);
 %! assert_equal (W, 70, 1e-9);
+
+%!test  # merge carries the blocks of every drawing
+%! B = draw.Drawing ().circle ([0, 0], 3);
+%! part = draw.Drawing ().block ('bolt', B).insert ('bolt', [10, 0]);
+%! M = draw.Drawing ('sheet').merge (part);
+%! assert_equal ({M.Blocks.name}, {'bolt'});
+%! assert_equal (numentities (expand (M)), 1);
+
+%!test  # a block defined the same in two drawings is kept once
+%! R = geom.Region ([0, 0; 6, 0; 6, 6]);
+%! A = draw.Drawing ().block ('tab', draw.Drawing ().region (R));
+%! B = draw.Drawing ().block ('tab', draw.Drawing ('other').region (R));
+%! assert_equal (numel (A.merge (B).Blocks), 1);
+
+%!error<draw.Drawing.merge: argument 1 defines the block 'TAB' differently.> ...
+%! A = draw.Drawing ().block ('tab', draw.Drawing ().circle ([0, 0], 3));
+%! B = draw.Drawing ().block ('TAB', draw.Drawing ().circle ([0, 0], 4));
+%! A.merge (B);
 
 %!error<draw.Drawing.transform: invalid number of input arguments.> ...
 %! draw.Drawing ().transform ()
@@ -1311,15 +1563,15 @@
 %! E = entities (draw.Drawing ().line ([0, 0], [1, 1]), ...
 %!     'dimensions', 'explode');
 %! assert_equal (fieldnames (E), {'type'; 'layer'; 'linetype'; 'colour'; ...
-%!               'pts'; 'closed'; 'radius'; 'angles'; 'text'; 'height'; ...
-%!               'rotation'; 'bulge'; 'block'});
+%!               'lineweight'; 'pts'; 'closed'; 'radius'; 'angles'; ...
+%!               'text'; 'height'; 'rotation'; 'bulge'; 'block'});
 
 %!test  # an empty drawing lowers to an empty entity array
 %! E = entities (draw.Drawing (), 'dimensions', 'explode');
 %! assert_equal (isempty (E), true);
 %! assert_equal (fieldnames (E), {'type'; 'layer'; 'linetype'; 'colour'; ...
-%!               'pts'; 'closed'; 'radius'; 'angles'; 'text'; 'height'; ...
-%!               'rotation'; 'bulge'; 'block'});
+%!               'lineweight'; 'pts'; 'closed'; 'radius'; 'angles'; ...
+%!               'text'; 'height'; 'rotation'; 'bulge'; 'block'});
 
 %!test  # an arc keeps its radius and both angles
 %! E = entities (draw.Drawing ().arc ([1, 2], 3, 30, 120), ...
@@ -1578,10 +1830,9 @@
 %! assert_equal (all (strcmp ({E.linetype}, 'HIDDEN')), true);
 %! assert_equal (all ([E.colour] == 5), true);
 
-%!test  # the defaults survive translation untouched
+%!test  # the defaults resolve to the layer's when lowered
 %! E = entities (draw.Drawing ().circle ([0, 0], 5), 'dimensions', 'explode');
-%! assert_equal (E(1).linetype, 'CONTINUOUS');
-%! assert_equal (E(1).colour, 256);
+%! assert_equal ({E(1).linetype, E(1).colour}, {'CONTINUOUS', 7});
 
 
 %!test  # the picture is opened and closed, and carries the drawing name
@@ -2072,6 +2323,32 @@
 %!   D = draw.Drawing ().polyline (PL);
 %!   print (D, fn, 'Paper', 'A4', 'Orientation', 'portrait');
 %!   assert_equal (__mediabox__ (fn), [210, 297], 1);
+%! unwind_protect_cleanup
+%!   unlink (fn);
+%! end_unwind_protect
+
+%!test  # print leaves a layer that is not printed off paper
+%! fn = [tempname(), '.png'];
+%! unwind_protect
+%!   D = draw.Drawing ().circle ([0, 0], 20).layer ('C', 'Plot', false);
+%!   D.Layer = 'C';
+%!   D = D.polyline (geom.Polyline ([-50, -50; 50, -50; 50, 50; -50, 50], ...
+%!                                  'Closed', true));
+%!   print (D, fn, 'Scale', 1, 'Resolution', 150);
+%!   [w, h] = __inkmm__ (fn, 150);
+%!   assert_equal ([w, h], [40, 40], 1);
+%! unwind_protect_cleanup
+%!   unlink (fn);
+%! end_unwind_protect
+
+%!test  # and a layer not printed keeps its place on the sheet
+%! fn = [tempname(), '.pdf'];
+%! unwind_protect
+%!   D = draw.Drawing ().circle ([0, 0], 20).layer ('C', 'Plot', false);
+%!   D.Layer = 'C';
+%!   D = D.line ([0, 0], [5000, 0]);
+%!   [~, S] = print (D, fn);
+%!   assert_equal (S > 1, true);
 %! unwind_protect_cleanup
 %!   unlink (fn);
 %! end_unwind_protect

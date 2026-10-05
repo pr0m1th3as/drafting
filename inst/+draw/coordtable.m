@@ -55,6 +55,10 @@
 ## is a micron in millimetres, which is finer than anything this package's own
 ## output is accurate to and about right for an inspection table.
 ##
+## The table is drawn on a layer of its own, @qcode{'TABLE'}, defined with
+## the narrow 0.25 mm line of ISO 128, so it can be restyled, moved or
+## dropped as one.
+##
 ## @seealso{draw.titleblock, draw.Drawing, geom.resample}
 ## @end deftypefn
 
@@ -112,6 +116,7 @@ function D = coordtable (P, ORIGIN, varargin)
   W = sum (colw);
 
   D = draw.Drawing ('coordinate table');
+  D = D.layer ('TABLE', 'LineWeight', 0.25);
   D.Layer = 'TABLE';
 
   ## Frame, one rule per row, one per column boundary
@@ -202,7 +207,12 @@ endfunction
 
 %!test  # the table sits on its own layer, so it can be moved or dropped
 %! D = draw.coordtable ([0, 0], [0, 0]);
-%! assert_equal (D.layers (), {'TABLE'});
+%! assert_equal (D.layers (), {'0', 'TABLE'});
+
+%!test  # the table is drawn with the narrow line
+%! D = draw.coordtable ([0, 0], [0, 0]);
+%! assert_equal (D.Layers(strcmp ({D.Layers.name}, 'TABLE')).lineweight, ...
+%!               0.25);
 
 %!test  # it grows downward from the origin given
 %! D = draw.coordtable ([0, 0; 1, 1], [100, 200]);

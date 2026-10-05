@@ -1,19 +1,34 @@
 %!demo
-%! ## Layer, line type and colour are properties, not arguments: they apply to
-%! ## what is appended after they are set and never to what came before.  That
-%! ## is how a draughtsman works, and how CAD is built.
+%! ## The current layer is where entities go as they are appended.  A layer
+%! ## carries a colour, a line type and a line weight, and an entity takes
+%! ## them from its layer unless told otherwise, so with the layers defined,
+%! ## changing the current layer is the one step that changes the pen.
 %!
 %! D = draw.Drawing ('shaft');
+%! D = D.layer ('BODY', 'LineWeight', 0.5);
+%! D = D.layer ('HIDDEN', 'Linetype', 'HIDDEN', 'LineWeight', 0.25);
+%! D = D.layer ('AXES', 'Linetype', 'CENTER', 'Colour', 'red', ...
+%!              'LineWeight', 0.25);
+%!
 %! D.Layer = 'BODY';
 %! D = D.polyline (geom.Polyline ([0, -15; 70, -15; 70, 15; 0, 15], ...
 %!                                'Closed', true));
 %! D.Layer = 'HIDDEN';
-%! D.Linetype = 'HIDDEN';
 %! D = D.line ([25, -15], [25, 15]).line ([50, -15], [50, 15]);
 %! D.Layer = 'AXES';
-%! D.Linetype = 'CENTER';
-%! D.Colour = 'red';
 %! D = D.line ([-6, 0], [76, 0]);
 %! D.layers ()
 %! plot (D);
-%! title ('three layers, each with its own line type');
+%! title ('three layers, each with its own line type and weight');
+%!
+%! ## `layer` also changes a layer already there, and everything drawn on it
+%! ## follows: the axes turn blue without touching a single entity.  A layer
+%! ## that is not plotted is drawn on screen and left off paper.
+%!
+%! D = D.layer ('AXES', 'Colour', 'blue');
+%! D = D.layer ('NOTES', 'Plot', false);
+%! D.Layer = 'NOTES';
+%! D = D.text ([0, 22], 'check the bore spacing', 3.5);
+%! figure ();
+%! plot (D);
+%! title ('the axes restyled, and a note that will not print');

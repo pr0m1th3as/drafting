@@ -24,10 +24,12 @@
 ## as a @code{draw.Drawing} named @qcode{'imported'}, which can then be
 ## transformed, merged into a sheet, dimensioned further and written out
 ## again.  Each entity is appended on its own layer, line type and colour,
-## and the drawing is left on its defaults afterwards.  An entity that takes
-## its colour or line type from its layer is given those of the layer, as
-## the file's layer table defines them, since a drawing has no layer table
-## of its own: a dashed yellow layer's lines come back dashed and yellow.
+## and the drawing is left on its defaults afterwards.  The file's layer
+## table comes with it into @code{Layers}: each layer's colour, line type,
+## line weight, whether it is switched off or frozen, which both read as not
+## visible, and whether it is printed.  An entity that takes its colour, line
+## type or line weight from its layer keeps doing so, so the drawing looks as
+## it did and a layer changed later changes everything on it.
 ##
 ## Geometry returns as itself: lines, points, arcs, circles, ellipses,
 ## polylines with their bulges, splines, text, and inserts of the blocks the
@@ -104,7 +106,8 @@ endfunction
 %!   assert_equal ({R.Entities.layer, R.Entities.linetype}, ...
 %!                 {'AXES', 'CENTER'});
 %!   assert_equal (R.Entities.colour, 1);
-%!   assert_equal ({R.Layer, R.Linetype, R.Colour}, {'0', 'CONTINUOUS', 256});
+%!   assert_equal ({R.Layer, R.Linetype, R.Colour, R.LineWeight}, ...
+%!                 {'0', 'byLayer', 256, 'byLayer'});
 %! unwind_protect_cleanup
 %!   unlink (tmpf);
 %! end_unwind_protect
@@ -342,26 +345,40 @@ endfunction
 %!  end_unwind_protect
 %!endfunction
 
-%!test  # an entity takes its colour and line type from its layer
+%!test  # the layer table comes back with the drawing
 %! D = readlayers (tmpf, "0\nLINE\n8\nHIDDEN\n10\n0\n20\n0\n11\n10\n21\n0\n");
-%! assert_equal ({D.Entities.linetype, D.Entities.colour}, {'DASHED', 2});
+%! L = D.Layers(strcmp ({D.Layers.name}, 'HIDDEN'));
+%! assert_equal ({L.colour, L.linetype, L.visible}, {2, 'DASHED', true});
+
+%!test  # an entity drawn by layer stays by layer
+%! D = readlayers (tmpf, "0\nLINE\n8\nHIDDEN\n10\n0\n20\n0\n11\n10\n21\n0\n");
+%! assert_equal ({D.Entities.linetype, D.Entities.colour}, {'byLayer', 256});
+
+%!test  # and is drawn in its layer's colour and line type
+%! D = readlayers (tmpf, "0\nLINE\n8\nHIDDEN\n10\n0\n20\n0\n11\n10\n21\n0\n");
+%! E = entities (D);
+%! assert_equal ({E.linetype, E.colour}, {'DASHED', 2});
 
 %!test  # a layer is found whatever the case of its name
 %! D = readlayers (tmpf, "0\nLINE\n8\nhidden\n10\n0\n20\n0\n11\n10\n21\n0\n");
-%! assert_equal ({D.Entities.linetype, D.Entities.colour}, {'DASHED', 2});
+%! E = entities (D);
+%! assert_equal ({E.linetype, E.colour}, {'DASHED', 2});
 
 %!test  # an entity's own colour and line type are kept
 %! D = readlayers (tmpf, ["0\nLINE\n8\nHIDDEN\n6\nCONTINUOUS\n62\n5\n" ...
 %!                        "10\n0\n20\n0\n11\n10\n21\n0\n"]);
 %! assert_equal ({D.Entities.linetype, D.Entities.colour}, {'CONTINUOUS', 5});
 
-%!test  # a layer switched off still lends its colour
+%!test  # a layer switched off is kept, and nothing on it is drawn
 %! D = readlayers (tmpf, "0\nLINE\n8\nOFF\n10\n0\n20\n0\n11\n10\n21\n0\n");
-%! assert_equal ({D.Entities.linetype, D.Entities.colour}, {'CENTER', 1});
+%! L = D.Layers(strcmp ({D.Layers.name}, 'OFF'));
+%! assert_equal ({L.colour, L.visible, numentities(D)}, {1, false, 1});
+%! assert_equal (isempty (entities (D)), true);
 
-%!test  # a layer the table does not define lends nothing
+%!test  # a layer the table does not define is added with the defaults
 %! D = readlayers (tmpf, "0\nLINE\n8\nOTHER\n10\n0\n20\n0\n11\n10\n21\n0\n");
-%! assert_equal ({D.Entities.linetype, D.Entities.colour}, {'CONTINUOUS', 256});
+%! E = entities (D);
+%! assert_equal ({E.linetype, E.colour}, {'CONTINUOUS', 7});
 
 %!warning<draw.read: skipped 1 LWPOLYLINE width.> ...
 %! D = readlayers (tmpf, ["0\nLWPOLYLINE\n8\n0\n90\n2\n70\n0\n43\n0.5\n" ...
