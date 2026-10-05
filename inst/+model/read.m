@@ -56,8 +56,8 @@ function A = read (FILE)
     error ("model.read: FILE must be a non-empty character vector.");
   endif
   [~, base, ext] = fileparts (FILE);
-  if (! any (strcmpi (ext, {'.step', '.stp', '.3mf'})))
-    error ("model.read: FILE must end in .step, .stp or .3mf.");
+  if (! any (strcmpi (ext, {'.step', '.3mf'})))
+    error ("model.read: FILE must end in .step or .3mf.");
   endif
   if (! isfile (FILE))
     error ("model.read: cannot find file '%s'.", FILE);
@@ -217,6 +217,7 @@ endfunction
 
 %!error<model.read: invalid number of input arguments.> model.read ()
 %!error<model.read: FILE must be a non-empty character vector.> model.read (1)
-%!error<model.read: FILE must end in .step, .stp or .3mf.> model.read ('a.stl')
+%!error<model.read: FILE must end in .step or .3mf.> model.read ('a.stl')
+%!error<model.read: FILE must end in .step or .3mf.> model.read ('a.stp')
 %!error<model.read: cannot find file 'no_such_part_7e1a.step'.> ...
 %! model.read ('no_such_part_7e1a.step')

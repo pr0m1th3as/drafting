@@ -95,8 +95,17 @@ classdef Region
 
     function disp (this)
 
-      printf ("  geom.Region: an outline of %d segments, %d holes\n", ...
-              rows (this.Outline.Vertices), numel (this.Holes));
+      sn = rows (this.Outline.Vertices);
+      sw = 'segment';
+      if (sn > 1)
+        sw = 'segments';
+      endif
+      hn = numel (this.Holes);
+      hw = 'hole';
+      if (hn > 1)
+        hw = 'holes';
+      endif
+      printf ("  geom.Region: an outline of %d %s, %d %s\n", sn, sw, hn, hw);
 
     endfunction
 

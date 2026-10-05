@@ -120,10 +120,23 @@ classdef Path
       else
         c = "open";
       endif
-      printf ("  geom.Path: %s, %d segments, %d arcs, %d splines\n", c, ...
-              rows (this.Vertices) - ! this.Closed, ...
-              nnz (! isnan (this.Midpoints(:,1))), ...
-              nnz (! cellfun (@isempty, this.Splines)));
+      sn = rows (this.Vertices) - ! this.Closed;
+      sw = 'segment';
+      if (sn > 1)
+        sw = 'segments';
+      endif
+      an = nnz (! isnan (this.Midpoints(:,1)));
+      aw = 'arc';
+      if (an > 1)
+        aw = 'arcs';
+      endif
+      pn = nnz (! cellfun (@isempty, this.Splines));
+      pw = 'spline';
+      if (pn > 1)
+        pw = 'splines';
+      endif
+      printf ("  geom.Path: %s, %d %s, %d %s, %d %s\n", c, sn, sw, an, aw, ...
+              pn, pw);
 
     endfunction
 

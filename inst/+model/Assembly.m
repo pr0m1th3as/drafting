@@ -89,8 +89,13 @@ classdef Assembly
 
     function disp (this)
 
-      printf ("  model.Assembly '%s': %d parts, %d placed\n", this.Name, ...
-              numparts (this), numinstances (this));
+      pn = numparts (this);
+      pw = 'part';
+      if (pn > 1)
+        pw = 'parts';
+      endif
+      printf ("  model.Assembly '%s': %d %s, %d placed\n", this.Name, pn, ...
+              pw, numinstances (this));
 
     endfunction
 
@@ -350,10 +355,10 @@ classdef Assembly
     ##
     ## @code{write (@var{A}, @var{FILE})} writes the assembly in the format
     ## the extension of @var{FILE} names, in either case.  A STEP file,
-    ## @file{.step} or @file{.stp}, keeps its structure: each part once, with
-    ## its name and colours, placed by its placements, which carry their
-    ## names, and each sub-assembly the same way, so that a CAD program opens
-    ## the product as it was built; it cannot hold a mesh part.  A 3MF file,
+    ## @file{.step}, keeps its structure: each part once, with its name and
+    ## colours, placed by its placements, which carry their names, and each
+    ## sub-assembly the same way, so that a CAD program opens the product as
+    ## it was built; it cannot hold a mesh part.  A 3MF file,
     ## the archive slicers take, keeps the same structure, each part a mesh
     ## written once and placed as a component, in its colours.  An STL, OBJ
     ## or PLY file holds @code{tessellate (@var{A})}.
@@ -762,6 +767,38 @@ endfunction
 %!   unlink (f);
 %! end_unwind_protect
 
+%!testif ; exist ('__occt__') == 3  # write: .STEP in capitals is STEP
+%! f = [tempname(), '.STEP'];
+%! unwind_protect
+%!   write (pinring (), f);
+%!   t = fileread (f);
+%!   assert_equal (strncmp (t, 'ISO-10303-21;', 13), true);
+%!   assert_equal (numel (strfind (t, "PRODUCT('pin'")), 1);
+%! unwind_protect_cleanup
+%!   unlink (f);
+%! end_unwind_protect
+
+%!testif ; exist ('__occt__') == 3  # write: .3MF in capitals is 3MF
+%! f = [tempname(), '.3MF'];
+%! unwind_protect
+%!   write (pinring (), f);
+%!   A = model.read (f);
+%!   assert_equal ([numparts(A), numinstances(A)], [2, 4]);
+%! unwind_protect_cleanup
+%!   unlink (f);
+%! end_unwind_protect
+
+%!testif ; exist ('__occt__') == 3  # write: .Stl in mixed case is STL
+%! f = [tempname(), '.Stl'];
+%! unwind_protect
+%!   write (pinring (), f, 'Tolerance', 0.05);
+%!   M = polymesh.read (f);
+%!   V = 60 * 60 * 4 + 3 * volume (solid.cylinder (2, 12));
+%!   assert_equal (volume (M), V, -1e-2);
+%! unwind_protect_cleanup
+%!   unlink (f);
+%! end_unwind_protect
+
 ## A tetrahedron as a mesh, its triangles turned outwards
 %!function M = tetrapart ()
 %!  M = polymesh.Mesh ([0, 0, 0; 1, 0, 0; 0, 1, 0; 0, 0, 1], ...
@@ -824,8 +861,14 @@ endfunction
 %! write (model.Assembly (), 1)
 %!error<model.Assembly.write: Tolerance applies to meshes only.> ...
 %! write (model.Assembly (), 'a.step', 'Tolerance', 0.1)
-%!error<model.Assembly.write: FILE must end in .step, .stp, .3mf, .stl, .obj or .ply.> ...
+%!error<model.Assembly.write: Tolerance applies to meshes only.> ...
+%! write (model.Assembly (), 'a.STEP', 'Tolerance', 0.1)
+%!error<model.Assembly.write: FILE must end in .step, .3mf, .stl, .obj or .ply.> ...
 %! write (model.Assembly (), 'a.dxf')
+%!error<model.Assembly.write: FILE must end in .step, .3mf, .stl, .obj or .ply.> ...
+%! write (model.Assembly (), 'a.stp')
+%!error<model.Assembly.write: FILE must end in .step, .3mf, .stl, .obj or .ply.> ...
+%! write (model.Assembly (), 'a.STP')
 %!error<model.Assembly.write: unknown parameter.> ...
 %! write (model.Assembly (), 'a.3mf', 'Angle', 0.1)
 %!error<model.Assembly.write: TOL must be a positive and finite real scalar.> ...

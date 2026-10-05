@@ -4,6 +4,7 @@ Polylines and regions
  geom.Spline
  geom.Region
  geom.Path
+ geom.UCS
  geom.text
 Geometry primitives
  geom.signedarea
@@ -61,7 +62,6 @@ Solid modelling
  solid.sweep
  solid.helix
  solid.read
- solid.write
 Assemblies and viewing
  model.Assembly
  model.read

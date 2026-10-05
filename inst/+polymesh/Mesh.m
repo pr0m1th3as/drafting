@@ -118,8 +118,17 @@ classdef Mesh
       if (! isempty (this.FaceColour))
         c = [c, ", face colours"];
       endif
-      printf ("  polymesh.Mesh: %d vertices, %d triangles%s\n", ...
-              rows (this.Vertices), rows (this.Faces), c);
+      vn = rows (this.Vertices);
+      vw = 'vertex';
+      if (vn > 1)
+        vw = 'vertices';
+      endif
+      tn = rows (this.Faces);
+      tw = 'triangle';
+      if (tn > 1)
+        tw = 'triangles';
+      endif
+      printf ("  polymesh.Mesh: %d %s, %d %s%s\n", vn, vw, tn, tw, c);
 
     endfunction
 

@@ -121,8 +121,23 @@ classdef Shape
         if (! isempty (this.Colour))
           c = ", coloured";
         endif
-        printf ("  solid.Shape: %d solid(s), %d faces, %d edges%s\n", ...
-                numsolids (this), numfaces (this), numedges (this), c);
+        sn = numsolids (this);
+        sw = 'solid';
+        if (sn > 1)
+          sw = 'solids';
+        endif
+        fn = numfaces (this);
+        fw = 'face';
+        if (fn > 1)
+          fw = 'faces';
+        endif
+        en = numedges (this);
+        ew = 'edge';
+        if (en > 1)
+          ew = 'edges';
+        endif
+        printf ("  solid.Shape: %d %s, %d %s, %d %s%s\n", sn, sw, fn, fw, ...
+                en, ew, c);
       endif
 
     endfunction
@@ -402,7 +417,7 @@ classdef Shape
     ## named by the extension of @var{FILE}, in either case:
     ##
     ## @table @asis
-    ## @item @file{.step}, @file{.stp}
+    ## @item @file{.step}
     ## STEP (ISO 10303-21, application protocol 214), in millimetres.  The
     ## exact geometry is kept, so this is the file to send to a CAD program or
     ## to another manufacturer.  The part is named after the base name of
@@ -450,11 +465,11 @@ classdef Shape
         opt.(name) = varargin{k+1};
       endfor
       [folder, base, ext] = fileparts (FILE);
-      isstep = any (strcmpi (ext, {'.step', '.stp'}));
+      isstep = strcmpi (ext, '.step');
       if (! isstep
           && ! any (strcmpi (ext, {'.stl', '.obj', '.ply', '.3mf'})))
-        error (strcat ("solid.Shape.write: FILE must end in .step, .stp,", ...
-                       " .stl, .obj, .ply or .3mf."));
+        error (strcat ("solid.Shape.write: FILE must end in .step, .stl,", ...
+                       " .obj, .ply or .3mf."));
       endif
       if (isstep && ! isempty (opt.Tolerance))
         error ("solid.Shape.write: Tolerance applies to meshes only.");
@@ -2777,7 +2792,7 @@ endfunction
 %! end_unwind_protect
 
 %!testif ; exist ('__occt__') == 3  # the product is named after the file
-%! f = [tempname(), '.stp'];
+%! f = [tempname(), '.step'];
 %! [~, base] = fileparts (f);
 %! unwind_protect
 %!   write (solid.box (1, 2, 3), f);
@@ -2892,8 +2907,10 @@ endfunction
 %! write (solid.Shape (), 'a.stl', 'Tolerance')
 %!error<solid.Shape.write: unknown parameter.> ...
 %! write (solid.Shape (), 'a.stl', 'Angle', 5)
-%!error<solid.Shape.write: FILE must end in .step, .stp, .stl, .obj, .ply or .3mf.> ...
+%!error<solid.Shape.write: FILE must end in .step, .stl, .obj, .ply or .3mf.> ...
 %! write (solid.Shape (), 'a.dxf')
+%!error<solid.Shape.write: FILE must end in .step, .stl, .obj, .ply or .3mf.> ...
+%! write (solid.Shape (), 'a.stp')
 %!error<solid.Shape.write: Tolerance applies to meshes only.> ...
 %! write (solid.Shape (), 'a.step', 'Tolerance', 0.1)
 %!error<solid.Shape.write: Tolerance must be a positive and finite real scalar.> ...

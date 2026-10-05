@@ -29,9 +29,9 @@
 ##
 ## STEP (ISO 10303-21) is the format every mechanical CAD program exchanges
 ## solids in, and it keeps their exact geometry: a hole read from it is a true
-## cylinder, as it was modelled.  A STEP file must end in @file{.step} or
-## @file{.stp}, in either case, and open with the keyword
-## @qcode{ISO-10303-21;}, which may follow white space and comments.
+## cylinder, as it was modelled.  A STEP file must end in @file{.step}, in
+## either case, and open with the keyword @qcode{ISO-10303-21;}, which may
+## follow white space and comments.
 ##
 ## @code{model.read} reads the same file as a @code{model.Assembly}, its
 ## parts named and placed as the file has them.  A triangle mesh, from an
@@ -51,8 +51,8 @@ function S = read (FILE)
     error ("solid.read: FILE must be a non-empty character vector.");
   endif
   [~, ~, ext] = fileparts (FILE);
-  if (! any (strcmpi (ext, {'.step', '.stp'})))
-    error ("solid.read: FILE must end in .step or .stp.");
+  if (! strcmpi (ext, '.step'))
+    error ("solid.read: FILE must end in .step.");
   endif
   if (! isfile (FILE))
     error ("solid.read: cannot find file '%s'.", FILE);
@@ -117,7 +117,7 @@ endfunction
 %! end_unwind_protect
 
 %!testif ; exist ('__occt__') == 3  # the extension in upper case
-%! f = [tempname(), '.STP'];
+%! f = [tempname(), '.STEP'];
 %! unwind_protect
 %!   write (solid.sphere (5), f);
 %!   assert_equal (volume (solid.read (f)), 4 / 3 * pi * 125, 1e-9);
@@ -180,8 +180,9 @@ endfunction
 %!error<solid.read: invalid number of input arguments.> solid.read ()
 %!error<solid.read: FILE must be a non-empty character vector.> solid.read ('')
 %!error<solid.read: FILE must be a non-empty character vector.> solid.read (1)
-%!error<solid.read: FILE must end in .step or .stp.> solid.read ('part.stl')
-%!error<solid.read: FILE must end in .step or .stp.> solid.read ('part')
+%!error<solid.read: FILE must end in .step.> solid.read ('part.stl')
+%!error<solid.read: FILE must end in .step.> solid.read ('part')
+%!error<solid.read: FILE must end in .step.> solid.read ('part.stp')
 %!error<solid.read: cannot find file 'no_such_part_9f2c.step'.> ...
 %! solid.read ('no_such_part_9f2c.step')
 %!error<solid.read: FILE is not a readable STEP file.>

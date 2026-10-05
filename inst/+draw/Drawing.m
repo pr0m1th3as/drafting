@@ -206,16 +206,29 @@ classdef Drawing
 
     function disp (this)
 
-      printf ("  draw.Drawing '%s' with %d entities on %d layers\n", ...
-              this.Name, numel (this.Entities), numel (layers (this)));
+      en = numel (this.Entities);
+      ew = 'entity';
+      if (en > 1)
+        ew = 'entities';
+      endif
+      ln = numel (layers (this));
+      lw = 'layer';
+      if (ln > 1)
+        lw = 'layers';
+      endif
+      printf ("  draw.Drawing '%s' with %d %s on %d %s\n", this.Name, ...
+              en, ew, ln, lw);
       if (! isempty (this.Entities))
         types = {this.Entities.type};
-        known = {'line', 'polyline', 'spline', 'path', 'region', 'arc', ...
-                 'circle', 'text', 'hatch', 'dim'};
-        for ii = 1:numel (known)
-          n = sum (strcmp (types, known{ii}));
+        known = {'line', 'point', 'polyline', 'spline', 'path', 'region', ...
+                 'arc', 'circle', 'ellipse', 'text', 'hatch', 'insert', ...
+                 'dim', 'diam', 'radius', 'angdim', 'ordinate', ...
+                 'centremark', 'leader'};
+        kinds = [known, setdiff(unique (types(:)'), known)];
+        for ii = 1:numel (kinds)
+          n = sum (strcmp (types, kinds{ii}));
           if (n > 0)
-            printf ("    %-9s %d\n", known{ii}, n);
+            printf ("    %-11s %d\n", kinds{ii}, n);
           endif
         endfor
       endif
