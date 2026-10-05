@@ -1,99 +1,89 @@
-Summary of important user-visible changes for drafting 0.1.0:
+Summary of important user-visible changes for drafting 0.2.0:
 -------------------------------------------------------------------
 
- ** Initial release.  Thirty-one public functions across four namespaces plus
-    the `draw.Drawing` class, 814 built-in self-tests and 67 `%!demo`
-    blocks.  All geometry is in millimetres.
+ This release makes the package an alternative to OpenSCAD written in Octave:
+ exact solids through Open CASCADE, meshes, assemblies and a viewer, built on
+ new geometry classes.  Drawings gain a layer table, and DXF is read and
+ written by compiled code.  It breaks code written for 0.1.0; see below.
 
- ** `+geom` -- planar geometry, knowing nothing of file formats or drawings.
-    Primitives: signed area, bounding box, centroid, affine transform,
-    rectilinear test, rectilinear polygon offset, largest inscribed rectangle,
-    triangulation, and hatch fill lines clipped to a boundary by the even-odd
-    rule.  Curve geometry: curvature, sampling, offsetting,
-    self-intersection and arc length.  Construction geometry: line and circle
-    intersections, tangent points from a point, and fillets, which return
-    exactly the arguments `draw.Drawing.arc` takes.  Polylines can be
-    resampled or simplified; `geom.simplify` is Douglas-Peucker and moves no
-    point further than its tolerance, while `geom.resample` cuts corners by
-    construction, so a polygon whose vertices matter wants the former.
+ ** New geometry classes, each lying in a coordinate system of its own,
+    `geom.UCS`: `geom.Polyline`, `geom.Spline`, `geom.Path` and
+    `geom.Region`.  Regions combine, offset, fillet, chamfer, hull, resize,
+    mirror and repeat, with arcs kept exact; `geom.text` gives letters as
+    regions.
 
- ** `+dxf` -- AutoCAD R12 (AC1009) ASCII DXF, read and write, covering LINE,
-    POLYLINE, LWPOLYLINE, CIRCLE, ARC, TEXT, POINT, INSERT and DIMENSION,
-    with layers, line types, colours and a BLOCKS section, all of which read
-    back as well as write.  R12 has no LWPOLYLINE, so an entity of that type
-    is written as a POLYLINE with its geometry, layer and closed flag
-    preserved.  `dxf.write` states `$LTSCALE` in the header, so a
-    written file's dash lengths no longer depend on the recipient's setting.
+ ** `solid.Shape`, exact solids: seven primitives; solids made from regions
+    by `solid.extrude`, `revolve`, `loft`, `sweep` and `helix`; booleans,
+    transforms, hulls and arrays; holes, pockets, fillets, chamfers and
+    shells on edges and faces chosen by `edges` and `faces`; `section` and
+    `projection`, which give regions.  STEP is read and written, and STL,
+    OBJ, PLY and 3MF written.
 
- ** `+stl` -- binary STL from a *section stack*: a struct array of profile,
-    z-range and holes, rather than a single extrusion, which expresses a
-    stepped or eccentric shaft without leaving the planar model.  Each section
-    is written as its own closed shell, so one section is a closed manifold
-    and a stack of several is not -- slicers union it, a tool demanding a
-    single closed surface will not.
+ ** `polymesh.Mesh` and `polymesh.read`: STL, OBJ, PLY and 3MF with their
+    colours, cut into regions by `section` and fitted back to lines and
+    arcs by `geom.Region.fit`; `solid.polyhedron` takes a closed mesh into
+    booleans.
 
- ** `+draw` -- `draw.Drawing`, a value class carrying lines, polylines with
-    per-vertex bulges, arcs, circles, ellipses, text, points, hatches, blocks
-    and inserts on named layers, with line types and colours.  Dimensions are
-    stored semantically and carry no text of their own by default, so they
-    stay truthful when the geometry changes: linear (`dim`), diameter, radius
-    and angular, plus centre marks and leaders.  `transform` places a drawing
-    and `merge` assembles several into a sheet; `draw.titleblock` frames it
-    and `draw.coordtable` tabulates a profile that cannot be dimensioned.
+ ** `model.Assembly` and `model.read`: named parts placed in coordinate
+    systems, and sub-assemblies, written to STEP and 3MF with their
+    structure, names and colours.
 
- ** The drawing symbols -- diameter, degree and plus-minus -- are stored as
-    the codes AutoCAD has always used, so a DXF file carries them verbatim and
-    only the other backends translate: `tikz` renders them with no package
-    beyond a bare document, and `plot` substitutes characters a figure font
-    holds.  `draw.symbol` converts between the two.
+ ** `model.Viewer`, and `show` on a solid, a mesh or an assembly: Open
+    CASCADE's own window, where edges, faces, points and coordinate systems
+    are picked with the mouse.  It turns about the centre of the view, or a
+    point double-clicked.
 
- ** One lowering, three backends.  `entities` converts a drawing into a flat
-    entity list, and `plot`, `tikz` and `dxf.write` all consume that list
-    rather than walking the drawing themselves, so no backend can silently
-    fail to know an entity type.  The three that take a drawing --- `plot`,
-    `print` and `tikz` --- are methods, so they dispatch as `plot (D)` and
-    leave the core functions of those names alone.  Line-type dash lengths
-    follow one rule everywhere -- model units times a scale factor, as CAD's
-    LTSCALE works -- and each backend defaults that factor to suit its medium.
+ ** DXF is read and written by compiled code: R2000 by default, R12 for
+    lines and arcs, and any ASCII file from R12 to R2018 read.  `geom.read`
+    and `geom.write` exchange geom objects with their coordinate systems, and
+    `'Type'` builds a region or a path from loose lines and arcs.
+    `draw.read` returns dimensions, blocks, hatches and the layer table.
 
- ** `draw.Drawing.plot` renders a drawing into a figure at equal aspect ratio,
-    drawing all seven line types as themselves rather than mapping them onto
-    the four styles a figure offers.  It keeps a margin between the geometry
-    and the axes, and widens to hold text that would otherwise be cut at an
-    edge.  It is a method rather than a namespace function, so `plot (D)` and
-    `plot (hax, D)` both reach it while core `plot` is left alone.
+ ** `draw.Drawing` keeps a layer table, set with the new method `layer`:
+    colour, line type, the new line weight, visibility and printing.  An
+    entity takes them from its layer unless set otherwise, and `plot`,
+    `print`, `tikz` and DXF all honour them.  Blocks take the layer and
+    properties of the insert placing them, as in CAD.
 
- ** `draw.Drawing.print` plots a drawing onto paper at a stated scale, so a
-    distance measured on the sheet times the scale denominator is the
-    model.  The sheet is named (`A0` to `A5`, either orientation) or given in
-    millimetres, and without a `Scale` the largest of the ISO 5455 preferred
-    denominators that fits is chosen and returned.  Resolution is settable for
-    a raster format; `.pdf`, `.eps` and `.svg` are vector and ignore it.  Pen
-    width is a paper dimension and text is a model one, reduced by the scale,
-    which is the convention `tikz` and CAD both follow.
+ ** `draw.Drawing` gains `spline`, `path`, `region` and `ordinate`.
+    `draw.titleblock` prints to ISO 5457, and `print` takes `'Margin', 0`
+    to print such a sheet at 1:1.
 
- ** A DXF file reads back as a drawing, not as a heap of lines.
-    `draw.fromentities` is the inverse of `entities`: it raises an entity list
-    and its block definitions into a `draw.Drawing`, so a file can be
-    transformed, merged, dimensioned further and written out again.  A
-    dimension returns as a dimension and measures its geometry again rather
-    than repeating the number it was written with.  What was lowered on the
-    way out does not return: a hatch comes back as its boundary and fill
-    lines, an ellipse as the polyline it was sampled to, because R12 records
-    no memory of either having been anything else.  Whatever cannot be raised
-    is reported through a second output rather than dropped.
+ ** The guide at https://pr0m1th3as.github.io/drafting/guide/ sets out how
+    the package fits together and how it meets DXF, with twelve tutorials.
 
- ** Dimensions are written as true `DIMENSION` entities, with the drawn
-    picture in an anonymous block and a `DIMSTYLE` record naming the
-    conventions, so a CAD application receives a dimension it can edit and
-    re-measure instead of six loose lines stating a number.  All four families
-    go: linear, angular, diameter and radius.  `entities` takes a
-    `'dimensions'` pair to get the old exploded form back.
+ ** Open CASCADE 7.8 or later is needed at build time for solids, and X11
+    for the viewer.  Without them the package installs and works as before,
+    and the functions that need them say so.
 
- ** `draw.Drawing.point` appends a single point, which is what a `POINT`
-    entity in a file becomes on the way in.
+ ** Bug fixes:
+    - An angular dimension was written to DXF with its points out of place,
+      so another program showed a different angle.
+    - An arc, circle or polyline facing down the z axis was read mirrored.
+    - `print` measured the figure rather than the drawing: a drawing that
+      fits could be refused, text printed up to 1.5% small, and a raster
+      sheet came back cropped.
+    - `merge` dropped the blocks of every drawing after the first.
+    - A drawing's display listed ten kinds of entity only, and read
+      "1 layers".
 
- ** What R12 cannot carry is recorded, not hidden.  A hatch is generated as
-    explicit fill lines, so nothing is lost and the recipient sees the section
-    hatched; an ellipse is sampled to a closed polyline, and that *is* reported
-    as a loss by the second output of `entities`.
+
+Backwards incompatible improvements:
+
+ ** The `dxf` namespace and `draw.fromentities` are removed: read with
+    `geom.read` and `draw.read`, write with the `write` method of the object,
+    or `geom.write` for several geom objects.
+
+ ** `stl.write` is removed: write a solid or a mesh with its `write` method.
+
+ ** DXF is written as R2000; `'Version', 'R12'` writes R12 for lines and
+    arcs.
+
+ ** `draw.Drawing.polyline` takes a `geom.Polyline`, and `hatch` a
+    `geom.Region`, in place of vertex matrices.
+
+ ** `draw.Drawing.Linetype` defaults to `'byLayer'`, and `layers` lists every
+    layer of the drawing's table.  `draw.titleblock` draws on the layers
+    `FRAME`, `TITLE` and `SHEET`.
+
+ ** `draw.Drawing.entities` is hidden, and `expand` leaves no blocks.
