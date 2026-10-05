@@ -210,6 +210,13 @@ plot (sheet, 'FontScale', 2.5);</code></pre>
    297   210
 
 scale = 1</code></pre>
+<p>A sheet framed by <a href="../draw.titleblock.html"><code>draw.titleblock</code></a> runs to the trimmed edge of the paper, so it is printed with no margin. It then comes out at 1:1 on its own A4 sheet, the scale its title block states.</p>
+<pre class="code-in"><code>[paper, scale] = print (sheet, 'sheet.pdf', 'Margin', 0)</code></pre>
+<pre class="code-out"><code>paper =
+
+   297   210
+
+scale = 1</code></pre>
 <p><code>tikz</code> returns the drawing as TikZ code, for a LaTeX report, at a stated scale. Its first lines:</p>
 <pre class="code-in"><code>t = tikz (D, 'Scale', 1);
 L = strsplit (t, "\n");

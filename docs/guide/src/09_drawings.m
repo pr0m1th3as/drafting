@@ -175,6 +175,12 @@ plot (sheet, 'FontScale', 2.5);
 
 [paper, scale] = print (D, 'bracket.pdf')
 
+## A sheet framed by `draw.titleblock` runs to the trimmed edge of the
+## paper, so it is printed with no margin. It then comes out at 1:1 on its
+## own A4 sheet, the scale its title block states.
+
+[paper, scale] = print (sheet, 'sheet.pdf', 'Margin', 0)
+
 ## `tikz` returns the drawing as TikZ code, for a LaTeX report, at a stated
 ## scale. Its first lines:
 
