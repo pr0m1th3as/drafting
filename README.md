@@ -1,20 +1,32 @@
 # drafting
 
-Planar geometry, CAD input and output, and a technical drawing model for GNU
-Octave.
+Planar geometry, technical drawing and solid modelling for GNU Octave.
 
-The package provides the drafting layer an engineering design package needs:
-compute geometry, build a drawing from it, and emit that drawing as a DXF file a
-CAD program or a CNC machine will accept, as a solid for a slicer, as LaTeX for
-a report, or as a figure on screen. Solids proper, built, combined and
-exchanged as STEP, come through Open CASCADE when the package is built with it.
+The package is the drafting layer an engineering design package builds on,
+and an alternative to OpenSCAD written in Octave itself: compute geometry,
+model a part, draw it, and send it to a CAD program as DXF or STEP, to a
+slicer as STL or 3MF, to a report as LaTeX, or to the screen. Solids come
+through [Open CASCADE](https://dev.opencascade.org/) when the package is built
+with it. All geometry is in millimetres.
 
-Forty-six public functions across five namespaces plus the `draw.Drawing`,
-`geom.Polyline`, `geom.Spline`, `geom.Region`, `geom.Path`, `geom.UCS`,
-`polymesh.Mesh`, `solid.Shape`, `model.Assembly` and `model.Viewer` classes,
-1976 built-in self-tests and 58 `%!demo` blocks, nearly all of which end in a
-`plot` call, so the documentation shows what a function does rather than only
-describing it.
+## What it does
+
+- **Outlines and curves:** polylines with arcs, splines, paths in 3-D, and
+  regions with holes, which combine, offset, round, hull, mirror and repeat as
+  OpenSCAD's 2-D shapes do, their arcs kept exact; text as outlines.
+- **Solids:** primitives, and extrusions, revolutions, lofts, sweeps and
+  helices of regions; booleans; holes, pockets, fillets, chamfers and shells
+  on edges and faces chosen by what they are; sections and projections that
+  are regions again; STEP in and out.
+- **Meshes:** STL, OBJ, PLY and 3MF read and written with their colours, cut
+  into regions and fitted back to lines and arcs, and taken into booleans.
+- **Assemblies:** named parts placed together, written to STEP and 3MF with
+  their structure.
+- **Technical drawings:** a drawing model with a layer table of colours, line
+  types and line weights, dimensions, hatches, blocks and an ISO title block;
+  plotted, printed to scale, set in TikZ and written to DXF.
+- **A viewer:** Open CASCADE's own window, to turn a part, pick its edges and
+  faces, and pick a coordinate system with the mouse.
 
 ## Layout
 
@@ -24,245 +36,81 @@ inst/+polymesh  STL, OBJ, PLY and 3MF meshes read, written and cut
 inst/+draw      the drawing model, its backends, and drawings as DXF
 inst/+solid     solids through Open CASCADE, STEP, and meshes for a slicer
 inst/+model     assemblies of solids and meshes, and the viewer
-inst/tests      classdef .m-tst suites
 src             compiled code: meshes, DXF, and the interface to Open CASCADE
 ```
 
-`+geom` is the middle layer, and the other namespaces build on it. Solids take
-and give `+geom` objects: a solid is made from regions and paths, and a section
-or a projection of it is a set of regions again. Meshes give them: a cut
-through a mesh is regions. Assemblies hold solids and meshes, each placed by a
-`geom.UCS`. A drawing takes `+geom` objects and nothing else that is geometry.
-`+geom` depends on none of them, so a solid never depends on the drawing model,
-and the drawing model never depends on Open CASCADE.
+`+geom` is the middle layer and depends on none of the others: solids are made
+from its regions and cut back into them, meshes are cut into them, and
+drawings are made of them. How each class becomes another is set out in the
+guide's [Package layout](https://pr0m1th3as.github.io/drafting/guide/layout.html).
 
-`+geom` covers primitives (signed area, bounding box, centroid, affine
-transform, offset, largest inscribed rectangle, triangulation), curve geometry
-(curvature, sampling, offsetting, self-intersection, arc length) and
-construction geometry (line and circle intersections, tangent points, fillets).
-Polylines can be resampled or simplified.
+## DXF
 
-Outlines and curves are value classes. A `geom.Polyline` is a DXF polyline, open
-or closed: vertices `[x, y, bulge]` in a plane of its own, an origin, an x axis
-and a normal, the xy plane unless told otherwise, so a sketch can be laid on any
-face. A `geom.Spline` is a NURBS curve, drawn through points or given by its
-control points, knots and weights, open or closed, an exact ellipse among them.
-A `geom.Region` is a closed area, one outline with holes of any shape in it,
-straight segments, arcs and splines, checked to be valid; it is what a solid is
-made from. A `geom.Path` is a route in 3-D of straight segments, arcs and
-splines, along which a region is swept; its corners are rounded into bends with
-`fillet`. Regions combine with `union`, `subtract` and `intersect` and grow or
-shrink with `offset`, round, sharp or chamfered at the corners: OpenSCAD's 2-D
-operations, with arcs exact, computed by Open CASCADE. `hull` wraps regions and
-points as OpenSCAD's `hull` does, its lines truly tangent to the arcs, so two
-circles make a lever and four a rounded plate. `geom.text` gives the outlines of
-text in any installed font as regions, to extrude, engrave or emboss. A region
-is resized, evenly or stretched, mirrored in a line, and copied, in rows and
-columns or round a point, the copies united. Functions take the classes; only
-their constructors take plain matrices.
+DXF is read and written by compiled code that needs nothing but Octave: R2000
+by default, R12 on request, and any ASCII file from R12 to R2018 read. A geom
+object keeps its coordinate system in the file, and a drawing its layer
+table, dimensions, hatches and blocks. What each class becomes in a file and
+back is set out in the guide's
+[DXF and the classes](https://pr0m1th3as.github.io/drafting/guide/dxf.html).
 
-`draw.Drawing` is a value class carrying lines, polylines with per-vertex
-bulges, arcs, circles, ellipses, splines, paths and regions, text, hatches over
-regions, blocks and inserts, and a full set of dimension entities (linear,
-diameter, radius, angular and ordinate, plus centre marks and leaders) on named
-layers with line types and colours. Drawings compose: `transform` places one,
-`merge` assembles several into a sheet, and `draw.titleblock` frames it.
+## Tutorials
 
-## Three outputs and DXF in both directions
+The [guide](https://pr0m1th3as.github.io/drafting/guide/) has twelve tutorials
+that build parts and drawings step by step. Every output and every picture on
+them is made by the code above it.
 
-A drawing goes to the screen, into a report or to a CAD program:
+1. [A first part](https://pr0m1th3as.github.io/drafting/guide/01_first_part.html):
+   a mounting plate from outline to STEP and STL.
+2. [Outlines: polylines, splines, paths and regions](https://pr0m1th3as.github.io/drafting/guide/02_outlines.html):
+   the four classes every shape is drawn with.
+3. [Working with regions](https://pr0m1th3as.github.io/drafting/guide/03_regions.html):
+   booleans, offsets, fillets, hulls, arrays and text.
+4. [Coordinate systems](https://pr0m1th3as.github.io/drafting/guide/04_coordinate_systems.html):
+   planes of their own, and features on the faces of a part.
+5. [Solids from regions](https://pr0m1th3as.github.io/drafting/guide/05_solids_from_regions.html):
+   extrude, revolve, loft, sweep and coil.
+6. [Primitives, booleans and transforms](https://pr0m1th3as.github.io/drafting/guide/06_primitives_and_booleans.html):
+   solids built the way OpenSCAD builds them, in colour.
+7. [Features: holes, pockets, fillets, chamfers and shells](https://pr0m1th3as.github.io/drafting/guide/07_features.html):
+   a bearing block finished as a machinist would finish it.
+8. [Sections and projections](https://pr0m1th3as.github.io/drafting/guide/08_sections_and_projections.html):
+   cuts and outlines of a solid, built from and drawn.
+9. [Technical drawings](https://pr0m1th3as.github.io/drafting/guide/09_drawings.html):
+   layers, dimensions, hatches, blocks, a sheet, and paper, LaTeX and DXF.
+10. [Meshes](https://pr0m1th3as.github.io/drafting/guide/10_meshes.html):
+    reading, writing, cutting and fitting meshes, and meshes in booleans.
+11. [Assemblies](https://pr0m1th3as.github.io/drafting/guide/11_assemblies.html):
+    parts placed together, saved to STEP and 3MF.
+12. [For OpenSCAD users](https://pr0m1th3as.github.io/drafting/guide/12_from_openscad.html):
+    OpenSCAD's words in the package's, and a classic model rebuilt.
 
-```
-D = draw.Drawing ('plate');
-D.Layer = 'OUTLINE';
-D = D.polyline (geom.Polyline ([-40, -40; 40, -40; 40, 40; -40, 40], ...
-                               'Closed', true));
-D = D.circle ([0, 0], 25);
-
-D.Layer = 'DIMENSIONS';
-D = D.dim ([-40, -40], [40, -40], -12, 'horizontal');
-D = D.diam ([0, 0], 25);
-
-plot (D);                     # on screen
-tex = tikz (D);               # into a report
-write (D, 'plate.dxf');       # to CAD
-```
-
-`plot` and `tikz` draw from one lowering of the drawing into lines, arcs and
-text, so the figure and the report show the same thing, dimension ornaments
-and hatch fills included. `write` writes each entity as itself: a polyline with
-its bulges, an ellipse, a spline, a hatch over its region, a dimension a CAD
-program measures again, a block once however often it is placed. Line-type dash
-lengths follow one rule everywhere, millimetres times a scale factor as CAD's
-`LTSCALE` does, and `write` states `$LTSCALE` in the file, so its dashes do not
-depend on the recipient's setting.
-
-`draw.read` reads a DXF file back into a `Drawing`. Dimensions come back as
-dimensions and measure their geometry again, blocks come back with their
-inserts, and hatches over their regions, so a DXF is a round trip rather than a
-one-way door, and a drawing another program wrote can be edited and written
-again.
-
-The geom objects have files of their own. `write` on a `geom.Polyline`,
-`geom.Spline`, `geom.Path` or `geom.Region` writes it to DXF, and `geom.write`
-writes several to one file; each keeps its `geom.UCS`, so `geom.read` gives back
-what was written. A file from anywhere else is read one geom object per entity,
-in any plane, and `'Type'` builds one object from it, chaining lines and arcs
-into a path or nesting closed loops into a region, ready to extrude:
-
-```
-R = geom.read ('profile.dxf', 'Type', 'region', 'Layer', 'PROFILE');
-S = solid.extrude (R, 10);
-```
-
-`polymesh.read` reads an STL, OBJ, PLY or 3MF file, binary or ASCII, into a
-`polymesh.Mesh`, with the colours of its vertices or faces where the file has
-them, cutting faces of more than three corners into triangles and welding the
-corners an STL file repeats. Its `write` saves a mesh to any of the four, OBJ,
-PLY and 3MF exactly, and its `section` cuts it with the plane of a `geom.UCS`
-into `geom.Region` objects, as `solid.Shape.section` cuts a solid, healing small
-gaps in the mesh to a tolerance and returning what will not close; the regions
-build solids like any others. `fit` on a region turns the cut's facets back into
-lines, arcs and splines within a tolerance, absolute or relative, so a faceted
-bore is a circle again and a filleted corner an arc. All of them are compiled
-and need nothing but Octave:
-
-```
-M = polymesh.read ('bracket.stl');
-R = section (M, geom.UCS ([0, 0, 1], [0, 0, 5]));
-R = fit (R{1}, 'arcs', 'AbsTol', 0.01);
-```
-
-`+solid` models solids through [Open CASCADE](https://dev.opencascade.org/), the
-kernel FreeCAD is built on, so curved faces stay exact. `solid.Shape` holds a
-solid, each of its parts in a colour of its own if wished, with the booleans
-`union`, `subtract` and `intersect`, translation, rotation, mirroring and
-scaling, resizing to a box, evenly or stretched, copies in rows, columns and
-layers or round an axis, the convex hull of shapes and points, and volume, area,
-centroid and bounding box; `solid.box`, `solid.wedge`, `solid.cylinder`,
-`solid.cone`, `solid.sphere`, `solid.ellipsoid` and `solid.torus` make the
-primitives, placed in a `geom.UCS` by a corner, the centre of the base or the
-centroid; `solid.extrude`, `solid.revolve`, `solid.loft`, `solid.sweep` and
-`solid.helix` make a solid from a `geom.Region`, where the region's plane puts
-it, its arcs carried as true arcs and its holes right through. Methods drill
-holes (plain, counterbored, countersunk, tapping size), cut pockets, round and
-bevel edges and hollow a shape, on edges and faces chosen by kind, direction and
-position. `section` cuts a solid with a plane into regions exact enough to build
-from again, and `projection` gives its outline seen along a direction, the
-shadow it casts, as OpenSCAD's `projection` does. `solid.polyhedron` makes a
-solid of a closed `polymesh.Mesh`, so a mesh `polymesh.read` reads takes part in
-booleans like any other, and `tessellate` turns a solid into a mesh within a
-tolerance. `solid.read` reads STEP, and `write` writes a solid to STEP for a CAD
-program, or to STL, OBJ, PLY or 3MF, tessellated, for a slicer:
-
-```
-plate = solid.box (80, 40, 12);
-plate = hole (plate, [20, 20, 12; 60, 20, 12], 'M8', Inf);
-plate = fillet (plate, edges (plate, 'Direction', [0, 0, 1], ...
-                              'Type', 'line'), 5);
-write (plate, 'plate.step');
-write (plate, 'plate.stl');
-
-section = geom.Region ([0, 0; 10, 0; 10, 30; 6, 30; 6, 50; 0, 50]);
-section.UCS = geom.UCS ([0, -1, 0], [0, 0, 0]);  # the xz plane: y is world z
-shaft = solid.revolve (section);                  # turned about z
-```
-
-A `model.Assembly` places named parts, solids or meshes, in the frames of
-`geom.UCS` objects, a part defined once however often it is placed, and
-sub-assemblies the same way. `write` saves it to STEP with its structure, names
-and colours, so a CAD program opens the product as it was built, or to 3MF, the
-archive slicers take, each part a mesh written once and placed as often as it is
-used; and `model.read` reads either back:
-
-```
-ring = model.Assembly ('ring');
-ring = add (ring, 'plate', plate, geom.UCS ());
-ring = add (ring, 'shaft', shaft, geom.UCS ([0, 0, 1], [20, 20, 12]));
-write (ring, 'ring.step');
-```
-
-`show` shows a solid in a `model.Viewer`, a window Open CASCADE draws in a
-process of its own, so a complex part turns smoothly and never holds up the
-prompt. Every variable gets a window of its own, titled with its name; showing
-it again redraws that window and keeps the camera, as does assigning to the
-`Shape` of the viewer it returns. `pick` on the viewer returns the edges and
-faces clicked, and prints the `edges` or `faces` query that finds them again,
-for the script to use in place of the numbers:
-
-```
-V = show (plate);
-E = pick (V, 'edge');     # click edges, then press Enter
-U = geom.UCS (V);         # click a face, two points for +x, then the origin
-```
-
-A `geom.UCS` is a user coordinate system, a plane with an origin and axes of
-its own. Every polyline and region lies in one, and assigning a region another
-moves it there, so a profile drawn in the xy plane is laid on any face of a
-part. It is made from a normal and points, or picked with the mouse as above,
-and the pick prints the line that makes it again from coordinates.
-
-The viewer shows a `polymesh.Mesh` as well, millions of triangles shaded facet
-by facet in its faces' colours, its vertices' or grey, which the key C turns
-between, with its triangle edges drawn when the key E asks for them. A UCS
-picked on it, from a facet or three points snapped to corners and the middles of
-sides, is the plane to cut it with, and `pick` returns points clicked on it with
-the triangle each lies on:
-
-```
-M = polymesh.read ('bracket.stl');
-V = show (M);
-R = section (M, pickucs (V));
-```
-
-Open CASCADE is optional: a package built without it works as before, and
-every `solid` function raises an error saying so.
-
-All geometry is in millimetres.
-
-## DXF R2000
-
-DXF is read and written by compiled code that needs nothing but Octave. Files
-are written as R2000 (`AC1015`), which holds what the package draws as itself:
-`LWPOLYLINE` with its bulges, `SPLINE`, `ELLIPSE`, `HATCH`, groups that bind a
-path's pieces or a region's loops, and the extended data that keeps a geom
-object's frame. `'Version', 'R12'` writes R12 (`AC1009`) for a program that
-reads nothing later, where the geometry is lines and arcs. Files from R12 to
-R2018 are read, text in the code page a file names or in UTF-8, and text
-outside ASCII is written as `\U+XXXX`, so it reads the same whatever the
-recipient's code page.
+The scripts the pages are built from are in [`docs/guide/src`](docs/guide/src).
 
 ## Documentation
 
 Every function and class method is documented in
 [texinfo](https://www.gnu.org/software/texinfo/), reachable from the Octave
 prompt with `help`. Use dot notation for namespaced functions and for the
-methods and properties of `draw.Drawing`:
+methods and properties of the classes:
 
 ```
 help geom.offset
 help draw.Drawing
 help draw.Drawing.print
-help draw.Drawing.Layer
+help solid.Shape.hole
 ```
 
-You can also find the entire documentation of the **drafting** package along
-with its function index at
-[https://pr0m1th3as.github.io/drafting/](https://pr0m1th3as.github.io/drafting/).
-Alternatively, you can build the online documentation locally using the
-[`pkg-octave-doc`](https://github.com/gnu-octave/pkg-octave-doc) package.
-Assuming both packages are installed and loaded, browse to any directory of
-your choice with *write* permission and run:
+The function reference, with every docstring and demo, is at
+[https://pr0m1th3as.github.io/drafting/](https://pr0m1th3as.github.io/drafting/),
+and the guide with its tutorials at
+[https://pr0m1th3as.github.io/drafting/guide/](https://pr0m1th3as.github.io/drafting/guide/).
+The reference can also be built locally with the
+[`pkg-octave-doc`](https://github.com/gnu-octave/pkg-octave-doc) package: with
+both packages installed and loaded, in any folder you can write to, run:
 
 ```
 package_texi2html ("drafting")
 ```
-
-The guide at
-[https://pr0m1th3as.github.io/drafting/guide/](https://pr0m1th3as.github.io/drafting/guide/)
-goes beyond the reference: how the namespaces and classes fit together, how
-each class is written to DXF and read back, and twelve tutorials that build
-parts and drawings step by step, every picture made by the code above it.
 
 ## Where it is going
 
@@ -284,9 +132,9 @@ You can automatically download and install the latest development version of the
 
   `pkg install "https://github.com/pr0m1th3as/drafting/archive/refs/heads/main.zip"`
 
-If you need to install a specific release, for example `0.1.0`, type:
+If you need to install a specific release, for example `0.2.0`, type:
 
-  `pkg install "https://github.com/pr0m1th3as/drafting/archive/refs/tags/release-0.1.0.tar.gz"`
+  `pkg install "https://github.com/pr0m1th3as/drafting/archive/refs/tags/release-0.2.0.tar.gz"`
 
 The `+solid` namespace needs Open CASCADE 7.8 or later at build time, and is
 built only where its headers are found, by default in
@@ -309,6 +157,5 @@ macOS are not yet.
 After installation, type:
 - `pkg load drafting` to load the **drafting** package.
 - `news drafting` to review all the user visible changes since last version.
-- `pkg test drafting` to run a test suite for all 56 functions and class
-  definitions currently available and ensure that they work properly on your
+- `pkg test drafting` to run its test suite and check that it works on your
   system.
