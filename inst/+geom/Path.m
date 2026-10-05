@@ -406,8 +406,8 @@ classdef Path
         this.UCS = V.UCS;
         return;
       endif
-      if (! isnumeric (V) || ! isreal (V) || ! ismatrix (V) ...
-          || ! any (columns (V) == [2, 3]) || rows (V) < 2 ...
+      if (! isnumeric (V) || ! isreal (V) || ! ismatrix (V)
+          || ! any (columns (V) == [2, 3]) || rows (V) < 2
           || ! all (isfinite (V(:))))
         error (strcat ("geom.Path: V must be an M-by-2 or M-by-3 real", ...
                        " matrix of finite values with at least two rows."));
@@ -418,13 +418,13 @@ classdef Path
       opt = struct ('Closed', false, 'UCS', geom.UCS ());
       for k = 1:2:numel (varargin)
         name = varargin{k};
-        if (! ischar (name) || ! isrow (name) ...
+        if (! ischar (name) || ! isrow (name)
             || ! any (strcmp (name, fieldnames (opt))))
           error ("geom.Path: unknown parameter.");
         endif
         opt.(name) = varargin{k+1};
       endfor
-      if (! (islogical (opt.Closed) || isnumeric (opt.Closed)) ...
+      if (! (islogical (opt.Closed) || isnumeric (opt.Closed))
           || ! isscalar (opt.Closed) || ! any (opt.Closed == [0, 1]))
         error ("geom.Path: Closed must be a logical scalar.");
       endif
@@ -488,7 +488,7 @@ classdef Path
       if (nargin < 2)
         error ("geom.Path.fillet: invalid number of input arguments.");
       endif
-      if (! isnumeric (RADIUS) || ! isreal (RADIUS) || ! isscalar (RADIUS) ...
+      if (! isnumeric (RADIUS) || ! isreal (RADIUS) || ! isscalar (RADIUS)
           || ! isfinite (RADIUS) || ! (RADIUS > 0))
         error (strcat ("geom.Path.fillet: RADIUS must be a positive and", ...
                        " finite real scalar."));
@@ -556,7 +556,7 @@ classdef Path
       if (nargin < 2)
         error ("geom.Path.chamfer: invalid number of input arguments.");
       endif
-      if (! isnumeric (D) || ! isreal (D) || ! isvector (D) ...
+      if (! isnumeric (D) || ! isreal (D) || ! isvector (D)
           || numel (D) > 2 || ! all (isfinite (D)) || ! all (D > 0))
         error (strcat ("geom.Path.chamfer: D must be one positive finite", ...
                        " distance, or two."));
@@ -572,7 +572,7 @@ classdef Path
           error ("geom.Path.chamfer: unknown parameter.");
         endif
         A = varargin{k+1};
-        if (! isnumeric (A) || ! isreal (A) || ! isscalar (A) ...
+        if (! isnumeric (A) || ! isreal (A) || ! isscalar (A)
             || ! (A > 0) || ! (A < 180))
           error (strcat ("geom.Path.chamfer: Angle must be in the range", ...
                          " (0, 180) degrees."));
@@ -664,7 +664,7 @@ classdef Path
           error ("geom.Path.join: unknown parameter.");
         endif
         tangent = opts{k+1};
-        if (! (islogical (tangent) || isnumeric (tangent)) ...
+        if (! (islogical (tangent) || isnumeric (tangent))
             || ! isscalar (tangent) || ! any (tangent == [0, 1]))
           error ("geom.Path.join: Tangent must be a logical scalar.");
         endif
@@ -1178,7 +1178,7 @@ function [errmsg, C] = corners (P, IDX)
   corner = ! ends & straight(prev) & straight & th > 1e-12;
   if (isempty (IDX))
     IDX = find (corner);
-  elseif (! isnumeric (IDX) || ! isreal (IDX) || ! isvector (IDX) ...
+  elseif (! isnumeric (IDX) || ! isreal (IDX) || ! isvector (IDX)
           || any (IDX != fix (IDX)) || any (IDX < 1) || any (IDX > n))
     errmsg = "IDX must be a vector of vertex indices of P.";
   else
@@ -1202,7 +1202,7 @@ function errmsg = fits (C, TIN, TOUT, WHAT)
 
   errmsg = '';
   for i = C.idx
-    if (TOUT(i) + TIN(C.next(i)) > C.lv(i) * (1 + 1e-12) ...
+    if (TOUT(i) + TIN(C.next(i)) > C.lv(i) * (1 + 1e-12)
         || TIN(i) + TOUT(C.prev(i)) > C.lu(i) * (1 + 1e-12))
       errmsg = sprintf ("the %s at vertex %d does not fit its segments.", ...
                         WHAT, i);

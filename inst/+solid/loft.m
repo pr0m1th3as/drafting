@@ -64,8 +64,8 @@ function S = loft (REGIONS, varargin)
   if (nargin < 1)
     error ("solid.loft: invalid number of input arguments.");
   endif
-  if (! iscell (REGIONS) || ! isvector (REGIONS) || numel (REGIONS) < 2 ...
-      || ! all (cellfun (@(r) isa (r, 'geom.Region') && isscalar (r), ...
+  if (! iscell (REGIONS) || ! isvector (REGIONS) || numel (REGIONS) < 2
+      || ! all (cellfun (@(r) isa (r, 'geom.Region') && isscalar (r),
                          REGIONS)))
     error (strcat ("solid.loft: REGIONS must be a cell array of at least", ...
                    " two geom.Region objects."));
@@ -84,7 +84,7 @@ function S = loft (REGIONS, varargin)
     endif
     opt.(name) = varargin{k+1};
   endfor
-  if (! (islogical (opt.Ruled) || isnumeric (opt.Ruled)) ...
+  if (! (islogical (opt.Ruled) || isnumeric (opt.Ruled))
       || ! isscalar (opt.Ruled) || ! any (opt.Ruled == [0, 1]))
     error ("solid.loft: Ruled must be a logical scalar.");
   endif

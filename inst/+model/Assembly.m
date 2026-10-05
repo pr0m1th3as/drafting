@@ -376,15 +376,14 @@ classdef Assembly
       endif
       [~, ~, ext] = fileparts (FILE);
       fmt = lower (ext);
-      if (! any (strcmp (fmt, {'.step', '.stp', '.3mf', '.stl', '.obj', ...
-                               '.ply'})))
+      if (! any (strcmpi (fmt, {'.step', '.3mf', '.stl', '.obj', '.ply'})))
         error (strcat ("model.Assembly.write: FILE must end in .step,", ...
-                       " .stp, .3mf, .stl, .obj or .ply."));
+                       " .3mf, .stl, .obj or .ply."));
       endif
-      isstep = any (strcmp (fmt, {'.step', '.stp'}));
+      isstep = any (strcmpi (fmt, '.step'));
       TOL = 0.01;
       if (nargin == 4)
-        if (! ischar (varargin{1}) || ! strcmp (varargin{1}, 'Tolerance'))
+        if (! ischar (varargin{1}) || ! strcmpi (varargin{1}, 'Tolerance'))
           error ("model.Assembly.write: unknown parameter.");
         endif
         if (isstep)
@@ -399,7 +398,7 @@ classdef Assembly
       if (isempty (this.Instances))
         error ("model.Assembly.write: the assembly places nothing.");
       endif
-      if (any (strcmp (fmt, {'.stl', '.obj', '.ply'})))
+      if (any (strcmpi (fmt, {'.stl', '.obj', '.ply'})))
         write (tessellate (this, TOL), FILE);
         return;
       endif
@@ -419,7 +418,7 @@ classdef Assembly
                   'instances', {{}});
       T = definitions (this, T);
       ispart = ! cellfun (@isempty, T.parts);
-      if (strcmp (fmt, '.3mf'))
+      if (strcmpi (fmt, '.3mf'))
         n = numel (T.names);
         [V, F, FC] = deal (cell (1, n));
         for k = find (ispart)

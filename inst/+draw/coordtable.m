@@ -68,7 +68,7 @@ function D = coordtable (P, ORIGIN, varargin)
   if (! isempty (errmsg))
     error ("draw.coordtable: %s", errmsg);
   endif
-  if (! isnumeric (ORIGIN) || ! isreal (ORIGIN) ...
+  if (! isnumeric (ORIGIN) || ! isreal (ORIGIN)
       || ! isequal (size (ORIGIN), [1, 2]) || ! all (isfinite (ORIGIN)))
     error ("draw.coordtable: ORIGIN must be a 1-by-2 real finite point.");
   endif
@@ -89,7 +89,7 @@ function D = coordtable (P, ORIGIN, varargin)
   if (! isnumeric (opt.Height) || ! isscalar (opt.Height) || opt.Height <= 0)
     error ("draw.coordtable: Height must be a positive scalar.");
   endif
-  if (! isnumeric (opt.Decimals) || ! isscalar (opt.Decimals) ...
+  if (! isnumeric (opt.Decimals) || ! isscalar (opt.Decimals)
       || opt.Decimals < 0 || opt.Decimals != fix (opt.Decimals))
     error ("draw.coordtable: Decimals must be a non-negative integer.");
   endif
@@ -97,7 +97,7 @@ function D = coordtable (P, ORIGIN, varargin)
     error ("draw.coordtable: Heading must be three character vectors.");
   endif
   n = rows (P);
-  if (! isempty (opt.Labels) ...
+  if (! isempty (opt.Labels)
       && (! iscellstr (opt.Labels) || numel (opt.Labels) != n))
     error (strcat ("draw.coordtable: Labels must be a cell array with one", ...
                    " entry per point."));

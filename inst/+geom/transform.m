@@ -78,7 +78,7 @@ function Q = transform (P, varargin)
       error ("geom.transform: invalid number of input arguments.");
     endif
     T = varargin{1};
-    if (! isnumeric (T) || ! isreal (T) || ! isequal (size (T), [3, 3]) ...
+    if (! isnumeric (T) || ! isreal (T) || ! isequal (size (T), [3, 3])
         || ! all (isfinite (T(:))))
       error ("geom.transform: T must be a real finite 3-by-3 matrix.");
     endif
@@ -105,7 +105,7 @@ function T = buildmatrix (OP, varargin)
   CENTRE = [0, 0];
   if (hasCentre)
     CENTRE = varargin{2};
-    if (! isnumeric (CENTRE) || ! isreal (CENTRE) ...
+    if (! isnumeric (CENTRE) || ! isreal (CENTRE)
         || ! isequal (size (CENTRE), [1, 2]) || ! all (isfinite (CENTRE)))
       error (strcat ("geom.transform: CENTRE must be a real finite", ...
                      " 1-by-2 vector."));
@@ -119,7 +119,7 @@ function T = buildmatrix (OP, varargin)
         error (strcat ("geom.transform: 'translate' does not take a", ...
                        " CENTRE argument."));
       endif
-      if (! isnumeric (VAL) || ! isreal (VAL) ...
+      if (! isnumeric (VAL) || ! isreal (VAL)
           || ! isequal (size (VAL), [1, 2]) || ! all (isfinite (VAL)))
         error (strcat ("geom.transform: VAL must be a real finite 1-by-2", ...
                        " vector for 'translate'."));
@@ -128,7 +128,7 @@ function T = buildmatrix (OP, varargin)
       return;
 
     case 'rotate'
-      if (! isnumeric (VAL) || ! isreal (VAL) || ! isscalar (VAL) ...
+      if (! isnumeric (VAL) || ! isreal (VAL) || ! isscalar (VAL)
           || ! isfinite (VAL))
         error (strcat ("geom.transform: VAL must be a real finite scalar", ...
                        " angle in degrees for 'rotate'."));
@@ -136,7 +136,7 @@ function T = buildmatrix (OP, varargin)
       M = [cosd(VAL), -sind(VAL), 0; sind(VAL), cosd(VAL), 0; 0, 0, 1];
 
     case 'scale'
-      if (! isnumeric (VAL) || ! isreal (VAL) || ! all (isfinite (VAL(:))) ...
+      if (! isnumeric (VAL) || ! isreal (VAL) || ! all (isfinite (VAL(:)))
           || ! (isscalar (VAL) || isequal (size (VAL), [1, 2])))
         error (strcat ("geom.transform: VAL must be a real finite scalar", ...
                        " or 1-by-2 vector for 'scale'."));

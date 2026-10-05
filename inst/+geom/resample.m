@@ -110,7 +110,7 @@ function [Q, S] = resample (P, varargin)
   if (rows (P) < 2)
     error ("geom.resample: P must contain at least two points.");
   endif
-  if (! isnumeric (val) || ! isreal (val) || ! isscalar (val) ...
+  if (! isnumeric (val) || ! isreal (val) || ! isscalar (val)
       || ! isfinite (val) || val <= 0)
     if (bySpacing)
       error ("geom.resample: D must be a positive real finite scalar.");

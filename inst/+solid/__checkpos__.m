@@ -26,7 +26,7 @@ function errmsg = __checkpos__ (X, NAME)
 
   errmsg = '';
 
-  if (! isnumeric (X) || ! isreal (X) || ! isscalar (X) || ! isfinite (X) ...
+  if (! isnumeric (X) || ! isreal (X) || ! isscalar (X) || ! isfinite (X)
       || X <= 0)
     errmsg = sprintf ("%s must be a positive and finite real scalar.", NAME);
   endif

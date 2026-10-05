@@ -69,7 +69,7 @@ function [P, T] = curvesample (FCN, TRANGE, TOL, MAXPTS = 100000)
   if (! is_function_handle (FCN))
     error ("geom.curvesample: FCN must be a function handle.");
   endif
-  if (! isnumeric (TRANGE) || ! isreal (TRANGE) || ! isvector (TRANGE) ...
+  if (! isnumeric (TRANGE) || ! isreal (TRANGE) || ! isvector (TRANGE)
       || numel (TRANGE) != 2 || ! all (isfinite (TRANGE)))
     error (strcat ("geom.curvesample: TRANGE must be a two-element real", ...
                    " finite vector."));
@@ -77,11 +77,11 @@ function [P, T] = curvesample (FCN, TRANGE, TOL, MAXPTS = 100000)
   if (TRANGE(2) <= TRANGE(1))
     error ("geom.curvesample: TRANGE must be increasing.");
   endif
-  if (! isnumeric (TOL) || ! isreal (TOL) || ! isscalar (TOL) ...
+  if (! isnumeric (TOL) || ! isreal (TOL) || ! isscalar (TOL)
       || ! isfinite (TOL) || TOL <= 0)
     error ("geom.curvesample: TOL must be a positive finite scalar.");
   endif
-  if (! isnumeric (MAXPTS) || ! isreal (MAXPTS) || ! isscalar (MAXPTS) ...
+  if (! isnumeric (MAXPTS) || ! isreal (MAXPTS) || ! isscalar (MAXPTS)
       || MAXPTS < 3 || MAXPTS != fix (MAXPTS))
     error ("geom.curvesample: MAXPTS must be an integer of at least 3.");
   endif
@@ -128,7 +128,7 @@ endfunction
 function P = evaluate (FCN, T)
 
   P = FCN (T);
-  if (! isnumeric (P) || ! isreal (P) || ndims (P) != 2 ...
+  if (! isnumeric (P) || ! isreal (P) || ndims (P) != 2
       || columns (P) != 2 || rows (P) != numel (T))
     error (strcat ("geom.curvesample: FCN must return a real N-by-2 matrix", ...
                    " with one row per parameter value."));

@@ -148,8 +148,8 @@ classdef Polyline
       if (nargin < 1)
         error ("geom.Polyline: invalid number of input arguments.");
       endif
-      if (! isnumeric (P) || ! isreal (P) || ! ismatrix (P) ...
-          || ! any (columns (P) == [2, 3]) || rows (P) < 2 ...
+      if (! isnumeric (P) || ! isreal (P) || ! ismatrix (P)
+          || ! any (columns (P) == [2, 3]) || rows (P) < 2
           || ! all (isfinite (P(:))))
         error (strcat ("geom.Polyline: P must be an N-by-2 or N-by-3 real", ...
                        " matrix of finite values with at least two rows."));
@@ -160,13 +160,13 @@ classdef Polyline
       opt = struct ('Closed', false, 'UCS', geom.UCS ());
       for k = 1:2:numel (varargin)
         name = varargin{k};
-        if (! ischar (name) || ! isrow (name) ...
+        if (! ischar (name) || ! isrow (name)
             || ! any (strcmp (name, fieldnames (opt))))
           error ("geom.Polyline: unknown parameter.");
         endif
         opt.(name) = varargin{k+1};
       endfor
-      if (! (islogical (opt.Closed) || isnumeric (opt.Closed)) ...
+      if (! (islogical (opt.Closed) || isnumeric (opt.Closed))
           || ! isscalar (opt.Closed) || ! any (opt.Closed == [0, 1]))
         error ("geom.Polyline: Closed must be a logical scalar.");
       endif
@@ -239,7 +239,7 @@ classdef Polyline
       if (nargin < 2)
         error ("geom.Polyline.fillet: invalid number of input arguments.");
       endif
-      if (! isnumeric (RADIUS) || ! isreal (RADIUS) || ! isscalar (RADIUS) ...
+      if (! isnumeric (RADIUS) || ! isreal (RADIUS) || ! isscalar (RADIUS)
           || ! isfinite (RADIUS) || ! (RADIUS > 0))
         error (strcat ("geom.Polyline.fillet: RADIUS must be a positive", ...
                        " and finite real scalar."));
@@ -311,7 +311,7 @@ classdef Polyline
       if (nargin < 2)
         error ("geom.Polyline.chamfer: invalid number of input arguments.");
       endif
-      if (! isnumeric (D) || ! isreal (D) || ! isvector (D) ...
+      if (! isnumeric (D) || ! isreal (D) || ! isvector (D)
           || numel (D) > 2 || ! all (isfinite (D)) || ! all (D > 0))
         error (strcat ("geom.Polyline.chamfer: D must be one positive", ...
                        " finite distance, or two."));
@@ -327,7 +327,7 @@ classdef Polyline
           error ("geom.Polyline.chamfer: unknown parameter.");
         endif
         A = varargin{k+1};
-        if (! isnumeric (A) || ! isreal (A) || ! isscalar (A) ...
+        if (! isnumeric (A) || ! isreal (A) || ! isscalar (A)
             || ! (A > 0) || ! (A < 180))
           error (strcat ("geom.Polyline.chamfer: Angle must be in the", ...
                          " range (0, 180) degrees."));
@@ -455,7 +455,7 @@ function [errmsg, C] = corners (V, closed, IDX)
   if (isempty (IDX))
     IDX = find (corner);
   else
-    if (! isnumeric (IDX) || ! isreal (IDX) || ! isvector (IDX) ...
+    if (! isnumeric (IDX) || ! isreal (IDX) || ! isvector (IDX)
         || any (IDX != fix (IDX)) || any (IDX < 1) || any (IDX > n))
       errmsg = "IDX must be a vector of vertex indices of PL.";
     else
@@ -480,7 +480,7 @@ function errmsg = fits (C, TIN, TOUT, WHAT)
 
   errmsg = '';
   for i = C.idx
-    if (TOUT(i) + TIN(C.next(i)) > C.len(i) * (1 + 1e-12) ...
+    if (TOUT(i) + TIN(C.next(i)) > C.len(i) * (1 + 1e-12)
         || TIN(i) + TOUT(C.prev(i)) > C.len(C.prev(i)) * (1 + 1e-12))
       errmsg = sprintf ("the %s at vertex %d does not fit its segments.", ...
                         WHAT, i);

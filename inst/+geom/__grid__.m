@@ -26,11 +26,11 @@ function [errmsg, D] = __grid__ (COUNT, SPACING, K)
   errmsg = '';
   D = [];
 
-  if (! isnumeric (COUNT) || ! isreal (COUNT) || numel (COUNT) != K ...
+  if (! isnumeric (COUNT) || ! isreal (COUNT) || numel (COUNT) != K
       || any (COUNT != fix (COUNT)) || any (COUNT < 1))
     errmsg = sprintf (strcat ("COUNT must be a %d-element vector of", ...
                               " positive integers."), K);
-  elseif (! isnumeric (SPACING) || ! isreal (SPACING) ...
+  elseif (! isnumeric (SPACING) || ! isreal (SPACING)
           || numel (SPACING) != K || ! all (isfinite (SPACING)))
     errmsg = sprintf (strcat ("SPACING must be a real %d-element vector", ...
                               " of finite values."), K);

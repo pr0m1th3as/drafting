@@ -101,14 +101,14 @@ function R = text (STR, varargin)
                 'HAlign', 'left', 'VAlign', 'baseline', 'UCS', geom.UCS ());
   for k = 1:2:numel (varargin)
     name = varargin{k};
-    if (! ischar (name) || ! isrow (name) ...
+    if (! ischar (name) || ! isrow (name)
         || ! any (strcmp (name, fieldnames (opt))))
       error ("geom.text: unknown parameter.");
     endif
     opt.(name) = varargin{k+1};
   endfor
   H = opt.Height;
-  if (! isnumeric (H) || ! isreal (H) || ! isscalar (H) || ! isfinite (H) ...
+  if (! isnumeric (H) || ! isreal (H) || ! isscalar (H) || ! isfinite (H)
       || ! (H > 0))
     error ("geom.text: Height must be a positive and finite real scalar.");
   endif

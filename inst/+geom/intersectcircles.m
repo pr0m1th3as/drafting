@@ -95,7 +95,7 @@ function P = intersectcircles (C1, R1, C2, R2)
 endfunction
 
 function checkcentre (C, name)
-  if (! isnumeric (C) || ! isreal (C) || ! isequal (size (C), [1, 2]) ...
+  if (! isnumeric (C) || ! isreal (C) || ! isequal (size (C), [1, 2])
       || ! all (isfinite (C)))
     error (strcat ("geom.intersectcircles: %s must be a 1-by-2 real", ...
                    " finite point."), name);
@@ -103,7 +103,7 @@ function checkcentre (C, name)
 endfunction
 
 function checkradius (R, name)
-  if (! isnumeric (R) || ! isreal (R) || ! isscalar (R) || ! isfinite (R) ...
+  if (! isnumeric (R) || ! isreal (R) || ! isscalar (R) || ! isfinite (R)
       || R <= 0)
     error (strcat ("geom.intersectcircles: %s must be a positive real", ...
                    " finite scalar."), name);

@@ -211,7 +211,9 @@ and arcs, and anything R12 cannot hold is an error naming it.
 - A `Polyline` is one `LWPOLYLINE` and a `Spline` one `SPLINE`. A `Path` is
   its pieces, `LINE`, `ARC` in its own plane and `SPLINE`, bound by a
   `GROUP`. A `Region` is its loops bound by a `GROUP`; `'Fill', true` adds a
-  `HATCH`, which reads back with its group and never as a second region.
+  solid `HATCH`, which reads back with its group and never as a second
+  region. Groups are written in model space only; a path or region in a
+  block is written as its pieces.
 - Geom objects carry no layer, line type or colour. `'Layer'`, `'Linetype'`
   and `'Colour'` give them, one value for every object or one per object.
   Line types are CONTINUOUS, HIDDEN, CENTER, PHANTOM, DASHED, DASHDOT and DOT;
@@ -223,26 +225,25 @@ and arcs, and anything R12 cannot hold is an error naming it.
   There is no append mode: adding to a DXF rewrites its tables, its handles
   and its objects section.
 - Every geom object carries its `UCS` as extended data under the registered
-  application `DRAFTING`: the origin in group 1011 and the x axis in group
-  1013, and for a path or spline the normal in a second 1013, since a flat
+  application `DRAFTING`: the origin in group 1011 and the x axis in group 1013,
+  and for a path, a spline or a region the normal in a second 1013, since a flat
   entity keeps its normal in group 210. On a group the same block names the
-  class, `geom.Path` or `geom.Region`, in group 1000. `geom.read` restores
-  the `UCS`, for a flat object only when the stored normal matches group 210
-  and the origin lies in the plane. The entities' own coordinates stay
-  authoritative, so a stale frame can never move the geometry.
+  class, `geom.Path` or `geom.Region`, in group 1000. `geom.read` restores the
+  `UCS`, for a flat object only when the stored normal matches group 210 and the
+  origin lies in the plane. The entities' own coordinates stay authoritative, so
+  a stale frame can never move the geometry.
 - Without that data, any plane is read: a normal of +Z in the world frame, a
   normal of -Z mirrored into +Z first, as 2-D CAD programs treat it, and any
   other normal in DXF's own frame. Paths and splines are read in world
   coordinates.
-- Without `'Type'`, `geom.read` returns what is in the file: a row cell
-  with one geom object per entity, nothing joined and nothing reclassified.
-  `LINE`, `ARC`, `CIRCLE` and `LWPOLYLINE` are polylines, `SPLINE` and
-  `ELLIPSE` splines, a `HATCH` a region; a line slanting in 3-D and a 3-D
-  `POLYLINE` are paths, since no single plane holds them, and meshes and
-  solids in the file are skipped. A group the package wrote is one
-  item, the class its extended data names, so what was written is what is
-  read: a closed path stays a path, the route `solid.sweep` turns into a
-  ring.
+- Without `'Type'`, `geom.read` returns what is in the file: a row cell with one
+  geom object per entity, nothing joined and nothing reclassified. `LINE`,
+  `ARC`, `CIRCLE` and `LWPOLYLINE` are polylines, `SPLINE` and `ELLIPSE`
+  splines, a `HATCH` a region; a line slanting in 3-D and a 3-D `POLYLINE` are
+  paths, since no single plane holds them, and text, dimensions, inserts,
+  points, meshes and solids in the file are skipped. A group the package wrote
+  is one item, the class its extended data names, so what was written is what is
+  read: a closed path stays a path, the route `solid.sweep` turns into a ring.
 - With `'Type'` (`'path'`, `'polyline'`, `'region'`, `'spline'`) it builds
   that class and returns one object: `'path'` chains entities end to end
   (`geom.Path.chain`), `'region'` chains them and nests loops that share a
@@ -253,16 +254,19 @@ and arcs, and anything R12 cannot hold is an error naming it.
   candidates on several layers with no `'Layer'` given, and finding none:
   separate parts belong on separate layers.
 - `draw.read` restores everything a drawing holds: dimensions as
-  dimensions, blocks and inserts, text.
+  dimensions, blocks and inserts, text, hatches over their regions; a hatch
+  pattern the package does not define is drawn as ANSI31 and reported.
 - Entities skipped, or left over under `'Type'`, are reported in one warning
   per read, counted by type.
 - A `draw.Drawing` holds only flat geom objects lying in z = 0; one facing
   down is mirrored into +Z. Its `write` writes no frames; its path and
   region groups carry only their class name, from which `draw.read` gives
-  them back. `write (D, FILE, ...)` takes `'Version'`,
+  them back, and a hatch is its `HATCH` alone. `write (D, FILE, ...)` takes
+  `'Version'`,
   `'Dimensions'` (`'associative'`, or `'explode'` for programs that cannot
   read a `DIMENSION`), `'Blocks'` (`'reference'`, or `'expand'` for programs
-  that ignore `INSERT`) and `'DimScale'`.
+  that ignore `INSERT`), `'DimScale'` and `'LTScale'`, which every `write`
+  takes.
 - The reader takes ASCII DXF from R12 (`AC1009`) to R2018 (`AC1032`); a
   binary DXF is an error. Text before R2007 is decoded from the code page
   the header names, and from R2007 as UTF-8.
@@ -319,11 +323,9 @@ with nested inserts, polyline widths and bulges, an inch file, a layer table,
 each drawn elsewhere, checked in with the values it was drawn to, and read by
 tests that assert them.
 
-*Units in the model.* An inch file is read in millimetres and the writer
-declares millimetres, so nothing is mis-scaled; what is missing is working in
-anything else. A `Units` property on `Drawing`, honoured by `print` and
-`write`, would let a drawing be authored in inches. It is ergonomic rather
-than a fix, and may slip to a later release.
+*Millimetres only.* Every length in the package is in millimetres, and there
+is no `Units` property. An inch file is read in millimetres and the writer
+declares millimetres, so nothing is mis-scaled.
 
 **Meshes.** `polymesh.read` reads STL, OBJ, PLY and 3MF with their colours,
 `section` cuts a `polymesh.Mesh` with a plane into regions, healed to a

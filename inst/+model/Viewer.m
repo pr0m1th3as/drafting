@@ -489,7 +489,7 @@ classdef Viewer < handle
           error ("model.Viewer: unknown parameter.");
         endif
         hidden = varargin{k+1};
-        if (! (islogical (hidden) || isnumeric (hidden)) ...
+        if (! (islogical (hidden) || isnumeric (hidden))
             || ! isscalar (hidden) || ! any (hidden == [0, 1]))
           error ("model.Viewer: Hidden must be a logical scalar.");
         endif

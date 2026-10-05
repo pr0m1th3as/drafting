@@ -44,15 +44,15 @@ function P = tangentpoints (C, R, Q)
   if (nargin != 3)
     error ("geom.tangentpoints: invalid number of input arguments.");
   endif
-  if (! isnumeric (C) || ! isreal (C) || ! isequal (size (C), [1, 2]) ...
+  if (! isnumeric (C) || ! isreal (C) || ! isequal (size (C), [1, 2])
       || ! all (isfinite (C)))
     error ("geom.tangentpoints: C must be a 1-by-2 real finite point.");
   endif
-  if (! isnumeric (Q) || ! isreal (Q) || ! isequal (size (Q), [1, 2]) ...
+  if (! isnumeric (Q) || ! isreal (Q) || ! isequal (size (Q), [1, 2])
       || ! all (isfinite (Q)))
     error ("geom.tangentpoints: Q must be a 1-by-2 real finite point.");
   endif
-  if (! isnumeric (R) || ! isreal (R) || ! isscalar (R) || ! isfinite (R) ...
+  if (! isnumeric (R) || ! isreal (R) || ! isscalar (R) || ! isfinite (R)
       || R <= 0)
     error ("geom.tangentpoints: R must be a positive real finite scalar.");
   endif

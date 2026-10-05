@@ -55,7 +55,7 @@ function [P, T] = intersectcircle (L, C, R)
   if (nargin != 3)
     error ("geom.intersectcircle: invalid number of input arguments.");
   endif
-  if (! isnumeric (L) || ! isreal (L) || ! isequal (size (L), [2, 2]) ...
+  if (! isnumeric (L) || ! isreal (L) || ! isequal (size (L), [2, 2])
       || ! all (isfinite (L(:))))
     error (strcat ("geom.intersectcircle: L must be a 2-by-2 matrix of two", ...
                    " real finite points."));
@@ -63,11 +63,11 @@ function [P, T] = intersectcircle (L, C, R)
   if (isequal (L(1,:), L(2,:)))
     error ("geom.intersectcircle: L must be two distinct points.");
   endif
-  if (! isnumeric (C) || ! isreal (C) || ! isequal (size (C), [1, 2]) ...
+  if (! isnumeric (C) || ! isreal (C) || ! isequal (size (C), [1, 2])
       || ! all (isfinite (C)))
     error ("geom.intersectcircle: C must be a 1-by-2 real finite point.");
   endif
-  if (! isnumeric (R) || ! isreal (R) || ! isscalar (R) || ! isfinite (R) ...
+  if (! isnumeric (R) || ! isreal (R) || ! isscalar (R) || ! isfinite (R)
       || R <= 0)
     error ("geom.intersectcircle: R must be a positive real finite scalar.");
   endif

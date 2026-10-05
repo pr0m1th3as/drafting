@@ -73,8 +73,8 @@ function [R, B] = largestrect (P, MARGINS = 0)
   if (! isempty (errmsg))
     error ("geom.largestrect: %s", errmsg);
   endif
-  if (! isnumeric (MARGINS) || ! isreal (MARGINS) ...
-      || ! all (isfinite (MARGINS(:))) || any (MARGINS(:) < 0) ...
+  if (! isnumeric (MARGINS) || ! isreal (MARGINS)
+      || ! all (isfinite (MARGINS(:))) || any (MARGINS(:) < 0)
       || ! (isscalar (MARGINS) || isequal (size (MARGINS), [1, 4])))
     error (strcat ("geom.largestrect: MARGINS must be a non-negative real", ...
                    " finite scalar or 1-by-4 vector."));
@@ -93,7 +93,7 @@ function [R, B] = largestrect (P, MARGINS = 0)
   ## re-entrant one included.
   box = geom.bbox (P);
   win = box;
-  if (MARGINS(1) + MARGINS(3) >= box(3) - box(1) ...
+  if (MARGINS(1) + MARGINS(3) >= box(3) - box(1)
       || MARGINS(2) + MARGINS(4) >= box(4) - box(2))
     error (strcat ("geom.largestrect: MARGINS leave no room inside the", ...
                    " bounding box of P."));

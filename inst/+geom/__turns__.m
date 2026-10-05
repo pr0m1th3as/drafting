@@ -27,10 +27,10 @@ function [errmsg, A] = __turns__ (N, ANGLE)
   errmsg = '';
   A = [];
 
-  if (! isnumeric (N) || ! isreal (N) || ! isscalar (N) || N != fix (N) ...
+  if (! isnumeric (N) || ! isreal (N) || ! isscalar (N) || N != fix (N)
       || ! (N >= 1))
     errmsg = "N must be a positive integer.";
-  elseif (! isnumeric (ANGLE) || ! isreal (ANGLE) || ! isscalar (ANGLE) ...
+  elseif (! isnumeric (ANGLE) || ! isreal (ANGLE) || ! isscalar (ANGLE)
           || ! (ANGLE != 0) || ! (abs (ANGLE) <= 360))
     errmsg = "ANGLE must be a nonzero real scalar of at most 360 degrees.";
   elseif (abs (ANGLE) == 360)

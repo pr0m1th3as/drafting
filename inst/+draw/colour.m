@@ -101,7 +101,7 @@ function OUT = colour (varargin)
     return;
   endif
 
-  if (isnumeric (ARG) && isreal (ARG) && isscalar (ARG) && isfinite (ARG) ...
+  if (isnumeric (ARG) && isreal (ARG) && isscalar (ARG) && isfinite (ARG)
       && ARG == fix (ARG) && ARG >= 0 && ARG <= 256)
     k = find (ARG == [T{:,2}], 1);
     if (isempty (k))

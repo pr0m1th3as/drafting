@@ -120,11 +120,11 @@ function S = hatchlines (varargin)
   if (numel (varargin) > 3 && ! isempty (varargin{4}))
     SPACING = varargin{4};
   endif
-  if (! isnumeric (ANGLE) || ! isreal (ANGLE) || ! isscalar (ANGLE) ...
+  if (! isnumeric (ANGLE) || ! isreal (ANGLE) || ! isscalar (ANGLE)
       || ! isfinite (ANGLE))
     error ("geom.hatchlines: ANGLE must be a real finite scalar.");
   endif
-  if (! isnumeric (SPACING) || ! isreal (SPACING) || ! isscalar (SPACING) ...
+  if (! isnumeric (SPACING) || ! isreal (SPACING) || ! isscalar (SPACING)
       || ! isfinite (SPACING) || SPACING <= 0)
     error ("geom.hatchlines: SPACING must be a positive real finite scalar.");
   endif

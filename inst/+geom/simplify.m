@@ -68,7 +68,7 @@ function [Q, KEPT] = simplify (P, TOL)
   if (! isempty (errmsg))
     error ("geom.simplify: %s", errmsg);
   endif
-  if (! isnumeric (TOL) || ! isreal (TOL) || ! isscalar (TOL) ...
+  if (! isnumeric (TOL) || ! isreal (TOL) || ! isscalar (TOL)
       || ! isfinite (TOL) || TOL < 0)
     error ("geom.simplify: TOL must be a non-negative real finite scalar.");
   endif

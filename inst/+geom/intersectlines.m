@@ -81,7 +81,7 @@ endfunction
 ## A line is two distinct points, one per row
 function L = checkline (L, name)
 
-  if (! isnumeric (L) || ! isreal (L) || ! isequal (size (L), [2, 2]) ...
+  if (! isnumeric (L) || ! isreal (L) || ! isequal (size (L), [2, 2])
       || ! all (isfinite (L(:))))
     error (strcat ("geom.intersectlines: %s must be a 2-by-2 matrix of two", ...
                    " real finite points."), name);

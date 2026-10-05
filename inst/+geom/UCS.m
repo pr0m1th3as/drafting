@@ -281,7 +281,7 @@ classdef UCS
     function TF = eq (U1, U2)
 
       ## Input validation
-      if (! isa (U1, 'geom.UCS') || ! isa (U2, 'geom.UCS') ...
+      if (! isa (U1, 'geom.UCS') || ! isa (U2, 'geom.UCS')
           || ! isscalar (U1) || ! isscalar (U2))
         error ("geom.UCS.eq: both operands must be geom.UCS objects.");
       endif
@@ -310,7 +310,7 @@ classdef UCS
       if (nargin != 2)
         error ("geom.UCS.toworld: invalid number of input arguments.");
       endif
-      if (! isnumeric (P) || ! isreal (P) || ! ismatrix (P) ...
+      if (! isnumeric (P) || ! isreal (P) || ! ismatrix (P)
           || ! any (columns (P) == [2, 3]) || ! all (isfinite (P(:))))
         error (strcat ("geom.UCS.toworld: P must be an N-by-2 or N-by-3", ...
                        " real matrix of finite values."));
@@ -342,7 +342,7 @@ classdef UCS
       if (nargin != 2)
         error ("geom.UCS.tolocal: invalid number of input arguments.");
       endif
-      if (! isnumeric (W) || ! isreal (W) || ! ismatrix (W) ...
+      if (! isnumeric (W) || ! isreal (W) || ! ismatrix (W)
           || columns (W) != 3 || ! all (isfinite (W(:))))
         error (strcat ("geom.UCS.tolocal: W must be an N-by-3 real", ...
                        " matrix of finite values."));

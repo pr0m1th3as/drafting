@@ -75,7 +75,7 @@ function S = wedge (DX, DY, DZ, TOP, varargin)
   if (! isempty (errmsg))
     error ("solid.wedge: %s", errmsg);
   endif
-  if (! isnumeric (TOP) || ! isreal (TOP) || ! isvector (TOP) ...
+  if (! isnumeric (TOP) || ! isreal (TOP) || ! isvector (TOP)
       || ! any (numel (TOP) == [1, 4]) || ! all (isfinite (TOP)))
     error (strcat ("solid.wedge: TOP must be a length TX or a rectangle", ...
                    " [XMIN, YMIN, XMAX, YMAX] of finite values."));

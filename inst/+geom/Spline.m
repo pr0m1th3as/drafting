@@ -358,8 +358,8 @@ classdef Spline
       if (nargin < 1)
         error ("geom.Spline: invalid number of input arguments.");
       endif
-      if (! isnumeric (V) || ! isreal (V) || ! ismatrix (V) ...
-          || ! any (columns (V) == [2, 3]) || rows (V) < 2 ...
+      if (! isnumeric (V) || ! isreal (V) || ! ismatrix (V)
+          || ! any (columns (V) == [2, 3]) || rows (V) < 2
           || ! all (isfinite (V(:))))
         error (strcat ("geom.Spline: V must be an M-by-2 or M-by-3 real", ...
                        " matrix of finite values with at least two rows."));
@@ -371,7 +371,7 @@ classdef Spline
                     'UCS', geom.UCS ());
       for k = 1:2:numel (varargin)
         name = varargin{k};
-        if (! ischar (name) || ! isrow (name) ...
+        if (! ischar (name) || ! isrow (name)
             || ! any (strcmp (name, fieldnames (opt))))
           error ("geom.Spline: unknown parameter.");
         endif
@@ -392,7 +392,7 @@ classdef Spline
         error (strcat ("geom.Spline: Tangents must be a 2-by-3 real", ...
                        " matrix, each row a nonzero direction or NaN."));
       endif
-      if (! (islogical (opt.Closed) || isnumeric (opt.Closed)) ...
+      if (! (islogical (opt.Closed) || isnumeric (opt.Closed))
           || ! isscalar (opt.Closed) || ! any (opt.Closed == [0, 1]))
         error ("geom.Spline: Closed must be a logical scalar.");
       endif
@@ -488,7 +488,7 @@ classdef Spline
       if (nargin != 2)
         error ("geom.Spline.points: invalid number of input arguments.");
       endif
-      if (! isnumeric (N) || ! isreal (N) || ! isscalar (N) || N != fix (N) ...
+      if (! isnumeric (N) || ! isreal (N) || ! isscalar (N) || N != fix (N)
           || N < 2)
         error ("geom.Spline.points: N must be an integer of at least 2.");
       endif
@@ -646,16 +646,16 @@ classdef Spline
           error ("geom.Spline.nurbs: UCS must be a geom.UCS object.");
         endif
       endfor
-      if (! isnumeric (P) || ! isreal (P) || ! ismatrix (P) ...
-          || ! any (columns (P) == [2, 3]) || rows (P) < 2 ...
+      if (! isnumeric (P) || ! isreal (P) || ! ismatrix (P)
+          || ! any (columns (P) == [2, 3]) || rows (P) < 2
           || ! all (isfinite (P(:))))
         error (strcat ("geom.Spline.nurbs: P must be an N-by-2 or N-by-3", ...
                        " real matrix of finite values with at least two", ...
                        " rows."));
       endif
       n = rows (P);
-      if (! isnumeric (KNOTS) || ! isreal (KNOTS) || ! isvector (KNOTS) ...
-          || numel (KNOTS) < n + 2 || ! all (isfinite (KNOTS)) ...
+      if (! isnumeric (KNOTS) || ! isreal (KNOTS) || ! isvector (KNOTS)
+          || numel (KNOTS) < n + 2 || ! all (isfinite (KNOTS))
           || any (diff (KNOTS) < 0) || KNOTS(1) == KNOTS(end))
         error (strcat ("geom.Spline.nurbs: KNOTS must be a nondecreasing", ...
                        " real vector of at least N + 2 finite values, not", ...
@@ -678,7 +678,7 @@ classdef Spline
       endif
       if (isempty (W))
         W = ones (n, 1);
-      elseif (! isnumeric (W) || ! isreal (W) || ! isvector (W) ...
+      elseif (! isnumeric (W) || ! isreal (W) || ! isvector (W)
               || numel (W) != n || ! all (isfinite (W)) || ! all (W > 0))
         error (strcat ("geom.Spline.nurbs: W must be a vector of N", ...
                        " positive finite weights."));
@@ -736,12 +736,12 @@ classdef Spline
       if (nargin != 2 && nargin != 4)
         error ("geom.Spline.ellipse: invalid number of input arguments.");
       endif
-      if (! isnumeric (A) || ! isreal (A) || ! isscalar (A) ...
+      if (! isnumeric (A) || ! isreal (A) || ! isscalar (A)
           || ! isfinite (A) || ! (A > 0))
         error (strcat ("geom.Spline.ellipse: A must be a positive and", ...
                        " finite real scalar."));
       endif
-      if (! isnumeric (B) || ! isreal (B) || ! isscalar (B) ...
+      if (! isnumeric (B) || ! isreal (B) || ! isscalar (B)
           || ! isfinite (B) || ! (B > 0))
         error (strcat ("geom.Spline.ellipse: B must be a positive and", ...
                        " finite real scalar."));

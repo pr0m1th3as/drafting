@@ -100,8 +100,8 @@ function S = extrude (R, H, varargin)
   if (! isempty (errmsg))
     error ("solid.extrude: %s", errmsg);
   endif
-  if (! isnumeric (H) || ! isreal (H) || ! isvector (H) || numel (H) > 2 ...
-      || ! all (isfinite (H)) || any (H == 0) ...
+  if (! isnumeric (H) || ! isreal (H) || ! isvector (H) || numel (H) > 2
+      || ! all (isfinite (H)) || any (H == 0)
       || (numel (H) == 2 && any (H < 0)))
     error (strcat ("solid.extrude: H must be a nonzero finite real", ...
                    " scalar, or two positive ones for both sides."));
@@ -112,14 +112,14 @@ function S = extrude (R, H, varargin)
   opt = struct ('Taper', 0, 'Twist', 0, 'Scale', 1);
   for k = 1:2:numel (varargin)
     name = varargin{k};
-    if (! ischar (name) || ! isrow (name) ...
+    if (! ischar (name) || ! isrow (name)
         || ! any (strcmp (name, fieldnames (opt))))
       error ("solid.extrude: unknown parameter.");
     endif
     opt.(name) = varargin{k+1};
   endfor
   A = opt.Taper;
-  if (! isnumeric (A) || ! isreal (A) || ! isvector (A) || numel (A) > 2 ...
+  if (! isnumeric (A) || ! isreal (A) || ! isvector (A) || numel (A) > 2
       || ! all (abs (A) < 90))
     error (strcat ("solid.extrude: Taper must be one angle, or two for", ...
                    " both sides, each in the range (-90, 90) degrees."));
@@ -131,7 +131,7 @@ function S = extrude (R, H, varargin)
   if (splines && any (A != 0))
     error ("solid.extrude: Taper cannot be applied to a region with splines.");
   endif
-  if (! isnumeric (opt.Twist) || ! isreal (opt.Twist) ...
+  if (! isnumeric (opt.Twist) || ! isreal (opt.Twist)
       || ! isscalar (opt.Twist) || ! isfinite (opt.Twist))
     error ("solid.extrude: Twist must be a finite real scalar.");
   endif

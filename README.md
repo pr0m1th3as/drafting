@@ -93,7 +93,7 @@ text, so the figure and the report show the same thing, dimension ornaments
 and hatch fills included. `write` writes each entity as itself: a polyline with
 its bulges, an ellipse, a spline, a hatch over its region, a dimension a CAD
 program measures again, a block once however often it is placed. Line-type dash
-lengths follow one rule everywhere, model units times a scale factor as CAD's
+lengths follow one rule everywhere, millimetres times a scale factor as CAD's
 `LTSCALE` does, and `write` states `$LTSCALE` in the file, so its dashes do not
 depend on the recipient's setting.
 

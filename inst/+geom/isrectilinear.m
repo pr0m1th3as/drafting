@@ -55,7 +55,7 @@ function TF = isrectilinear (P, TOL = 1e-6)
   if (! isempty (errmsg))
     error ("geom.isrectilinear: %s", errmsg);
   endif
-  if (! isnumeric (TOL) || ! isreal (TOL) || ! isscalar (TOL) ...
+  if (! isnumeric (TOL) || ! isreal (TOL) || ! isscalar (TOL)
       || ! isfinite (TOL) || TOL < 0)
     error (strcat ("geom.isrectilinear: TOL must be a non-negative", ...
                    " real finite scalar."));

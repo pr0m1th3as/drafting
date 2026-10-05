@@ -399,7 +399,7 @@ classdef Region
       opt = struct ('RelTol', [], 'AbsTol', [], 'Corner', 20, 'Window', []);
       for k = 1:2:numel (varargin)
         name = varargin{k};
-        if (! ischar (name) || ! isrow (name) ...
+        if (! ischar (name) || ! isrow (name)
             || ! any (strcmp (name, fieldnames (opt))))
           error ("geom.Region.fit: unknown parameter.");
         endif
@@ -415,7 +415,7 @@ classdef Region
         endif
       endfor
       A = opt.Corner;
-      if (! isnumeric (A) || ! isreal (A) || ! isscalar (A) || ! (A > 0) ...
+      if (! isnumeric (A) || ! isreal (A) || ! isscalar (A) || ! (A > 0)
           || ! (A < 180))
         error (strcat ("geom.Region.fit: Corner must be an angle in the", ...
                        " range (0, 180) degrees."));
@@ -651,10 +651,11 @@ classdef Region
         a = varargin{k};
         if (isa (a, 'geom.Region') && isscalar (a))
           L{end+1} = a;
-        elseif (iscell (a) && all (cellfun (@(r) isa (r, 'geom.Region') ...
-                                             && isscalar (r), a(:)')))
+        elseif (iscell (a) &&
+                all (cellfun (@(r) isa (r, 'geom.Region') && isscalar (r),
+                              a(:)')))
           L = [L, a(:)'];
-        elseif (k > 1 && isnumeric (a) && isreal (a) && ismatrix (a) ...
+        elseif (k > 1 && isnumeric (a) && isreal (a) && ismatrix (a)
                 && columns (a) == 2 && all (isfinite (a(:))))
           P = [P; double(a)];
         else
@@ -668,7 +669,7 @@ classdef Region
       for k = 1:numel (L)
         V = L{k}.UCS;
         scale = max ([1, abs(U.Origin), abs(V.Origin)]);
-        if (abs (V.Normal * U.Normal') < 1 - 1e-9 ...
+        if (abs (V.Normal * U.Normal') < 1 - 1e-9
             || abs ((V.Origin - U.Origin) * U.Normal') > 1e-9 * scale)
           error (strcat ("geom.Region.hull: every region must lie in the", ...
                          " plane of the first."));
@@ -722,7 +723,7 @@ classdef Region
       if (nargin != 2 && nargin != 4)
         error ("geom.Region.resize: invalid number of input arguments.");
       endif
-      if (! isnumeric (SZ) || ! isreal (SZ) || numel (SZ) != 2 ...
+      if (! isnumeric (SZ) || ! isreal (SZ) || numel (SZ) != 2
           || ! all (isfinite (SZ)) || any (SZ < 0) || ! any (SZ > 0))
         error (strcat ("geom.Region.resize: SZ must be a 2-element vector", ...
                        " of nonnegative finite sizes, not all zero."));
@@ -766,7 +767,7 @@ classdef Region
       if (nargin < 2 || nargin > 3)
         error ("geom.Region.mirror: invalid number of input arguments.");
       endif
-      if (! isnumeric (N) || ! isreal (N) || numel (N) != 2 ...
+      if (! isnumeric (N) || ! isreal (N) || numel (N) != 2
           || ! all (isfinite (N)) || ! any (N != 0))
         error (strcat ("geom.Region.mirror: N must be a nonzero real", ...
                        " 2-element vector."));
@@ -804,7 +805,7 @@ classdef Region
       if (nargin != 2)
         error ("geom.Region.copy: invalid number of input arguments.");
       endif
-      if (! isnumeric (D) || ! isreal (D) || ! ismatrix (D) ...
+      if (! isnumeric (D) || ! isreal (D) || ! ismatrix (D)
           || columns (D) != 2 || rows (D) < 1 || ! all (isfinite (D(:))))
         error (strcat ("geom.Region.copy: D must be an N-by-2 real matrix", ...
                        " of finite offsets."));
@@ -1302,7 +1303,7 @@ function [errmsg, TF] = flag (ARGS, NAME, DEF)
     errmsg = "Name/Value arguments must come in pairs.";
   elseif (! ischar (ARGS{1}) || ! strcmp (ARGS{1}, NAME))
     errmsg = "unknown parameter.";
-  elseif (! (islogical (ARGS{2}) || isnumeric (ARGS{2})) ...
+  elseif (! (islogical (ARGS{2}) || isnumeric (ARGS{2}))
           || ! isscalar (ARGS{2}) || ! any (ARGS{2} == [0, 1]))
     errmsg = sprintf ("%s must be true or false.", NAME);
   else
@@ -1316,7 +1317,7 @@ endfunction
 function errmsg = checkpoint (P, NAME)
 
   errmsg = '';
-  if (! isnumeric (P) || ! isreal (P) || numel (P) != 2 ...
+  if (! isnumeric (P) || ! isreal (P) || numel (P) != 2
       || ! all (isfinite (P)))
     errmsg = sprintf (strcat ("%s must be a real 2-element vector of", ...
                               " finite values."), NAME);
@@ -1347,8 +1348,8 @@ function [errmsg, P] = toloop (ARG, NAME, IN)
     end_try_catch
     return;
   endif
-  if (! isscalar (ARG) || ! (isa (ARG, 'geom.Polyline') ...
-                             || isa (ARG, 'geom.Path') ...
+  if (! isscalar (ARG) || ! (isa (ARG, 'geom.Polyline')
+                             || isa (ARG, 'geom.Path')
                              || isa (ARG, 'geom.Spline')))
     errmsg = sprintf (strcat ("%s must be a closed geom.Polyline,", ...
                               " geom.Path or geom.Spline, or a matrix of", ...
@@ -1424,8 +1425,9 @@ function R = combine (op, caller, args)
     a = args{k};
     if (isa (a, 'geom.Region') && isscalar (a))
       L{end+1} = a;
-    elseif (iscell (a) && all (cellfun (@(r) isa (r, 'geom.Region') ...
-                                         && isscalar (r), a(:)')))
+    elseif (iscell (a) &&
+            all (cellfun (@(r) isa (r, 'geom.Region') && isscalar (r),
+                          a(:)')))
       L = [L, a(:)'];
     else
       error (strcat ("%s: every argument must be a geom.Region object or", ...
@@ -1440,7 +1442,7 @@ function R = combine (op, caller, args)
   for k = 2:numel (L)
     V = L{k}.UCS;
     scale = max ([1, abs(U.Origin), abs(V.Origin)]);
-    if (abs (V.Normal * U.Normal') < 1 - 1e-9 ...
+    if (abs (V.Normal * U.Normal') < 1 - 1e-9
         || abs ((V.Origin - U.Origin) * U.Normal') > 1e-9 * scale)
       error ("%s: every region must lie in the plane of the first.", caller);
     endif

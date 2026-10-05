@@ -71,7 +71,7 @@ function [CTR, TA, TB, ANG] = fillet (A, B, R)
   endif
   A = checkline (A, 'A');
   B = checkline (B, 'B');
-  if (! isnumeric (R) || ! isreal (R) || ! isscalar (R) || ! isfinite (R) ...
+  if (! isnumeric (R) || ! isreal (R) || ! isscalar (R) || ! isfinite (R)
       || R <= 0)
     error ("geom.fillet: R must be a positive real finite scalar.");
   endif
@@ -144,7 +144,7 @@ function d = lengthfrom (L, X)
 endfunction
 
 function L = checkline (L, name)
-  if (! isnumeric (L) || ! isreal (L) || ! isequal (size (L), [2, 2]) ...
+  if (! isnumeric (L) || ! isreal (L) || ! isequal (size (L), [2, 2])
       || ! all (isfinite (L(:))))
     error (strcat ("geom.fillet: %s must be a 2-by-2 matrix of two real", ...
                    " finite points."), name);
