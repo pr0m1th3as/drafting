@@ -357,7 +357,7 @@ classdef Mesh
     ##
     ## So OBJ, PLY and 3MF keep every coordinate exactly, and STL keeps a few
     ## microns on a part tens of millimetres across.  @code{polymesh.read}
-    ## reads STL, OBJ and PLY back.
+    ## reads all four back.
     ##
     ## @seealso{polymesh.read}
     ## @end deftypefn

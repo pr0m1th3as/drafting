@@ -1021,6 +1021,11 @@ classdef Shape
     ## radius left by a cutter does.  Where rounded edges meet at a corner the
     ## corner is blended.
     ##
+    ## An edge is rounded together with every edge that runs on from it
+    ## smoothly, tangent where they meet, as Open CASCADE rounds a chain.  On
+    ## a box whose upright edges are already rounded, choosing one top edge
+    ## rounds the whole top rim.
+    ##
     ## A radius too large for the faces beside an edge cannot be built and
     ## raises an error, as does an edge that cannot be rounded at all.
     ##
@@ -1059,6 +1064,10 @@ classdef Shape
     ## @var{S} indexed by @var{E}, as @code{solid.Shape.edges} returns them,
     ## back by @var{D} millimetres on both faces, so a chamfer on a square
     ## corner is the 45 degree bevel a drawing calls @code{@var{D} x 45}.
+    ## An edge is bevelled together with every edge that runs on from it
+    ## smoothly, tangent where they meet, as Open CASCADE bevels a chain.  On
+    ## a box whose upright edges are already rounded, choosing one top edge
+    ## bevels the whole top rim.
     ##
     ## @code{@var{S} = chamfer (@var{S}, @var{E}, [@var{D1}, @var{D2}],
     ## @var{F})} cuts each edge back by @var{D1} along the face @var{F}, a face

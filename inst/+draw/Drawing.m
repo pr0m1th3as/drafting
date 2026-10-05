@@ -2581,17 +2581,14 @@ classdef Drawing
     ## Render a drawing as a TikZ picture for inclusion in the LaTeX report.
     ##
     ## @code{@var{S} = tikz (@var{D})} returns the TikZ code for the
-    ## @code{draw.Drawing} object @var{D} as a character array, one line per row
-    ## of
-    ## the drawing, ready to be written to a @file{.tex} file and pulled into a
-    ## document with @code{\input}.
+    ## @code{draw.Drawing} object @var{D} as one character vector, its lines
+    ## separated by newlines, ready to be written to a @file{.tex} file and
+    ## pulled into a document with @code{\input}.
     ##
     ## The picture is emitted at a stated plot scale, so it arrives on the page
-    ## at
-    ## the size a drawing is meant to be read at rather than at whatever size
-    ## fits.
-    ## Model coordinates are written unchanged, in millimetres, and the scale is
-    ## carried by the @code{x} and @code{y} unit vectors of the
+    ## at the size a drawing is meant to be read at rather than at whatever
+    ## size fits.  Model coordinates are written unchanged, in millimetres, and
+    ## the scale is carried by the @code{x} and @code{y} unit vectors of the
     ## @code{tikzpicture}: a wall at @math{x = 1600} appears in the output as
     ## @code{1600} whatever the scale, which is what makes the generated source
     ## readable against the drawing it came from.
@@ -2599,33 +2596,27 @@ classdef Drawing
     ## Radii, text sizes and dimension ornament cannot follow that convention,
     ## since they must come out at a fixed size on paper regardless of scale.
     ## Those are emitted in absolute millimetres and points, already divided by
-    ## the
-    ## scale.
+    ## the scale.
     ##
     ## @subheading Options
     ##
     ## @multitable @columnfractions .16 .84
     ## @item @qcode{'Scale'} @tab Plot scale denominator: @math{50} means
     ## @math{1:50}, which is a common scale for a general-arrangement plan and
-    ## the
-    ## default.  A drawing at @math{1:1} wants @math{1}.
+    ## the default.  A drawing at @math{1:1} wants @math{1}.
     ## @item @qcode{'File'} @tab Also write the result to this file.  The code
-    ## is
-    ## returned either way.
+    ## is returned either way.
     ## @item @qcode{'Styles'} @tab Emit a @code{\tikzset} block defining one
-    ## empty
-    ## style per layer, so that the document can restyle a layer by redefining
-    ## it.
-    ## True by default; set it false when the styles are already defined and
-    ## redefining them would undo that.
+    ## empty style per layer, so that the document can restyle a layer by
+    ## redefining it.  True by default; set it false when the styles are
+    ## already defined and redefining them would undo that.
     ## @item @qcode{'LTScale'} @tab Multiplies line-type dash lengths.  Patterns
     ## are model lengths times this factor, exactly as in
-    ## @code{draw.Drawing.plot} and as
-    ## CAD's own @code{LTSCALE} works.  Defaults to the drawing scale, which
-    ## cancels the reduction so dashes reach the page at their nominal size ---
-    ## a
-    ## centre line reads as a centre line whether the view is at 1:1 or 1:50 ---
-    ## while leaving the factor visible and adjustable.
+    ## @code{draw.Drawing.plot} and as CAD's own @code{LTSCALE} works.
+    ## Defaults to the drawing scale, which cancels the reduction so dashes
+    ## reach the page at their nominal size, and a centre line reads as a
+    ## centre line whether the view is at 1:1 or 1:50, while leaving the factor
+    ## visible and adjustable.
     ## @end multitable
     ##
     ## @subheading Dimensions
@@ -2648,10 +2639,9 @@ classdef Drawing
     ## library beyond TikZ itself.
     ##
     ## Text is written through as UTF-8 and LaTeX's special characters are
-    ## escaped.  Greek text needs a Unicode-aware engine --- @code{xelatex} or
-    ## @code{lualatex} --- or @code{babel} configured for Greek; that is a
-    ## property
-    ## of the document, not of this output.
+    ## escaped.  Greek text needs a Unicode-aware engine, @code{xelatex} or
+    ## @code{lualatex}, or @code{babel} configured for Greek; that is a
+    ## property of the document, not of this output.
     ##
     ## @seealso{draw.Drawing, draw.Drawing.plot, draw.Drawing.write}
     ## @end deftypefn

@@ -65,8 +65,9 @@ classdef Assembly
     ## Parts defined
     ##
     ## A struct array with the fields @code{name} and @code{item}, the
-    ## @code{solid.Shape} or the @code{model.Assembly} defined under that
-    ## name, one element for each part however often it is placed.
+    ## @code{solid.Shape}, @code{polymesh.Mesh} or @code{model.Assembly}
+    ## defined under that name, one element for each part however often it
+    ## is placed.
     ##
     ## @end deftp
     Parts = struct ('name', {}, 'item', {});
