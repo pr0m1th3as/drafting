@@ -77,10 +77,6 @@ function S = polyhedron (M, varargin)
       error ("solid.polyhedron: Merge must be true or false.");
     endif
   endif
-  errmsg = solid.__checkocct__ ();
-  if (! isempty (errmsg))
-    error ("solid.polyhedron: %s", errmsg);
-  endif
 
   ## Points that are equal are one vertex
   [V, ~, j] = unique (M.Vertices, 'rows');
@@ -118,7 +114,7 @@ endfunction
 %!  vol = sum (dot (V(F(:,1),:), cross (V(F(:,2),:), V(F(:,3),:), 2), 2)) / 6;
 %!endfunction
 
-%!testif ; exist ('__occt__') == 3  # a box, its coplanar triangles merged
+%!test  # a box, its coplanar triangles merged
 %! [V, F] = boxmesh ([10, 20, 30]);
 %! S = solid.polyhedron (polymesh.Mesh (V, F));
 %! assert_equal (volume (S), 6000, -1e-12);
@@ -128,7 +124,7 @@ endfunction
 %! assert_equal (numfaces (S), 12);
 %! assert_equal (bbox (S), [0, 0, 0, 10, 20, 30], 1e-12);
 
-%!testif ; exist ('__occt__') == 3  # triangles turned anyhow
+%!test  # triangles turned anyhow
 %! [V, F] = boxmesh ([10, 10, 10]);
 %! F([2, 5, 9],:) = F([2, 5, 9], [1, 3, 2]);
 %! S = solid.polyhedron (polymesh.Mesh (V, F));
@@ -136,13 +132,13 @@ endfunction
 %! S = solid.polyhedron (polymesh.Mesh (V, F(:,[1, 3, 2])));
 %! assert_equal (volume (S), 1000, -1e-12);
 
-%!testif ; exist ('__occt__') == 3  # equal points welded, flat ones dropped
+%!test  # equal points welded, flat ones dropped
 %! [V, F] = boxmesh ([1, 1, 1]);
 %! W = V(F',:);
 %! S = solid.polyhedron (polymesh.Mesh (W, [reshape(1:36, 3, [])'; 1, 1, 2]));
 %! assert_equal (volume (S), 1, -1e-12);
 
-%!testif ; exist ('__occt__') == 3  # a piece inside another turned in is a void
+%!test  # a piece inside another turned in is a void
 %! [V, F] = boxmesh ([10, 10, 10]);
 %! S = solid.polyhedron (polymesh.Mesh ([V; V / 2 + 2.5], ...
 %!                                    [F; F(:,[1, 3, 2]) + 8]));
@@ -152,7 +148,7 @@ endfunction
 %! assert_equal (volume (S), 2000, -1e-12);
 %! assert_equal (numsolids (S), 2);
 
-%!testif ; exist ('__occt__') == 3  # pieces that overlap are united
+%!test  # pieces that overlap are united
 %! [V, F] = boxmesh ([10, 10, 10]);
 %! S = solid.polyhedron (polymesh.Mesh ([V; V + 5], [F; F + 8]));
 %! assert_equal (volume (S), 1875, -1e-12);
@@ -166,7 +162,7 @@ endfunction
 %! assert_equal (numsolids (S), 1);
 %! assert_equal (numfaces (S), 6);
 
-%!testif ; exist ('__occt__') == 3  # a torus, cut by a box
+%!test  # a torus, cut by a box
 %! [V, F] = wrapped (48, 24, 20, 5, false);
 %! S = solid.polyhedron (polymesh.Mesh (V, F));
 %! assert_equal (volume (S), abs (meshvolume (V, F)), -1e-9);

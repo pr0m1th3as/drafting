@@ -58,9 +58,6 @@ function S = cone (R1, R2, H, varargin)
   if (isempty (errmsg))
     [frame, errmsg] = solid.__place__ (varargin, {'base'}, [0, 0, 0]);
   endif
-  if (isempty (errmsg))
-    errmsg = solid.__checkocct__ ();
-  endif
   if (! isempty (errmsg))
     error ("solid.cone: %s", errmsg);
   endif
@@ -82,22 +79,22 @@ function errmsg = checkradius (R, name)
 
 endfunction
 
-%!testif ; exist ('__occt__') == 3  # a pointed cone
+%!test  # a pointed cone
 %! S = solid.cone (3, 0, 10);
 %! assert_equal (volume (S), pi * 9 * 10 / 3, 1e-9);
 %! assert_equal (bbox (S), [-3, -3, 0, 3, 3, 10], 1e-9);
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # pointing down
+%!test  # pointing down
 %! S = solid.cone (0, 3, 10);
 %! assert_equal (volume (S), pi * 9 * 10 / 3, 1e-9);
 
-%!testif ; exist ('__occt__') == 3  # a frustum
+%!test  # a frustum
 %! S = solid.cone (5, 2, 6);
 %! assert_equal (volume (S), pi * 6 * (25 + 10 + 4) / 3, 1e-9);
 %! assert_equal (numfaces (S), 3);
 
-%!testif ; exist ('__occt__') == 3  # pointing along -y from a point
+%!test  # pointing along -y from a point
 %! U = geom.UCS ([0, -1, 0], [1, 2, 3]);
 %! S = solid.cone (3, 0, 10, U);
 %! assert_equal (bbox (S), [-2, -8, 0, 4, 2, 6], 1e-9);

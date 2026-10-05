@@ -1132,7 +1132,7 @@ endfunction
 %! assert_equal (isempty (writeread (polymesh.Mesh (), '.obj')), true);
 %! assert_equal (isempty (writeread (polymesh.Mesh (), '.ply')), true);
 
-%!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
+%!testif ; ! isempty (getenv ('DISPLAY'))
 %! ## show: the mesh in its variable's viewer
 %! old = getappdata (0, 'drafting_model_show');
 %! VP = model.Viewer ('Hidden', true);

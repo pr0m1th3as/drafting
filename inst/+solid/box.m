@@ -77,9 +77,6 @@ function S = box (DX, DY, DZ, varargin)
     [frame, errmsg] = solid.__place__ (varargin, {'corner', 'base', ...
                                        'centroid'}, [0, 0, 0; D(1:2), 0; D]);
   endif
-  if (isempty (errmsg))
-    errmsg = solid.__checkocct__ ();
-  endif
   if (! isempty (errmsg))
     error ("solid.box: %s", errmsg);
   endif
@@ -89,33 +86,33 @@ function S = box (DX, DY, DZ, varargin)
 
 endfunction
 
-%!testif ; exist ('__occt__') == 3
+%!test
 %! S = solid.box (10, 20, 30);
 %! assert_equal (volume (S), 6000, 1e-9);
 %! assert_equal (bbox (S), [0, 0, 0, 10, 20, 30], 1e-9);
 %! assert_equal (numfaces (S), 6);
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # integer-valued input
+%!test  # integer-valued input
 %! assert_equal (volume (solid.box (int16 (2), 3, 4)), 24, 1e-9);
 
-%!testif ; exist ('__occt__') == 3  # in a UCS turned onto the yz plane
+%!test  # in a UCS turned onto the yz plane
 %! U = geom.UCS ([1, 0, 0], [5, 0, 0], [5, 1, 0]);
 %! S = solid.box (10, 20, 30, U);
 %! assert_equal (bbox (S), [5, 0, 0, 35, 10, 20], 1e-9);
 
-%!testif ; exist ('__occt__') == 3  # standing on the centre of its base
+%!test  # standing on the centre of its base
 %! U = geom.UCS ([0, 0, 1], [20, 10, 8]);
 %! S = solid.box (6, 4, 3, U, 'Anchor', 'base');
 %! assert_equal (bbox (S), [17, 8, 8, 23, 12, 11], 1e-9);
 
-%!testif ; exist ('__occt__') == 3  # centred on a tilted UCS
+%!test  # centred on a tilted UCS
 %! U = geom.UCS ([0, 1, 1], [1, 2, 3]);
 %! S = solid.box (6, 4, 3, U, 'Anchor', 'centroid');
 %! assert_equal (centroid (S), [1, 2, 3], 1e-9);
 %! assert_equal (volume (S), 72, 1e-9);
 
-%!testif ; exist ('__occt__') == 3  # an anchor in the world axes
+%!test  # an anchor in the world axes
 %! S = solid.box (6, 4, 2, 'Anchor', 'centroid');
 %! assert_equal (bbox (S), [-3, -2, -1, 3, 2, 1], 1e-9);
 

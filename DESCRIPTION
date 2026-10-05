@@ -8,9 +8,9 @@ Description: Planar geometry, technical drawing and solid modelling:
  polylines, splines, paths and regions with booleans, offsets and hulls;
  a technical drawing model plotted, printed to scale, set in TikZ and
  written to DXF; DXF read and written from R12 to R2018; triangle meshes
- in STL, OBJ, PLY and 3MF; and, when built with Open CASCADE, exact solids
- with holes, fillets, sections and projections, assemblies in STEP and
- 3MF, and a viewer.  Provides the drafting layer for engineering design
+ in STL, OBJ, PLY and 3MF; and exact solids through Open CASCADE with
+ holes, fillets, sections and projections, assemblies in STEP and 3MF,
+ and a viewer.  Provides the drafting layer for engineering design
  packages.
 Categories: Graphics
 Depends: octave (>= 11.1.0)

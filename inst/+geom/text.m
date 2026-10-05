@@ -78,9 +78,7 @@
 ## @end group
 ## @end example
 ##
-## Open CASCADE builds the outlines from the font, and its visualization
-## libraries must be present when the package is built, as for the viewer,
-## @code{model.Viewer}.
+## Open CASCADE builds the outlines from the font.
 ##
 ## @seealso{geom.Region, solid.extrude, geom.Region.offset}
 ## @end deftypefn
@@ -133,11 +131,6 @@ function R = text (STR, varargin)
   if (! isa (opt.UCS, 'geom.UCS') || ! isscalar (opt.UCS))
     error ("geom.text: UCS must be a geom.UCS object.");
   endif
-  if (exist ('__occtfont__') != 3 || exist ('__occt__') != 3)
-    error (strcat ("geom.text: Open CASCADE's text is not available: the", ...
-                   " drafting package was built without its visualization", ...
-                   " libraries."));
-  endif
 
   font = opt.Font;
   strict = ! isempty (font);
@@ -167,7 +160,7 @@ endfunction
 %!  B = [min(Q, [], 1), max(Q, [], 1)];
 %!endfunction
 
-%!testif ; exist ('__occtfont__') == 3
+%!test
 %! ## A capital is the height asked, on the baseline, from the origin
 %! R = geom.text ('H', 'Height', 7);
 %! assert_equal (numel (R), 1);
@@ -175,7 +168,7 @@ endfunction
 %! assert_equal (B([2, 4]), [0, 7], 1e-6);
 %! assert_equal (B(1) >= 0, true);
 
-%!testif ; exist ('__occtfont__') == 3
+%!test
 %! ## A counter is a hole, a dotted letter two pieces, a descender below
 %! R = geom.text ('o');
 %! assert_equal (numel (R{1}.Holes), 1);
@@ -185,7 +178,7 @@ endfunction
 %! assert_equal (geom.text (''), cell (1, 0));
 %! assert_equal (geom.text ('   '), cell (1, 0));
 
-%!testif ; exist ('__occtfont__') == 3
+%!test
 %! ## Aligned on the origin by the box round the ink
 %! R = geom.text ('HELLO', 'HAlign', 'center', 'VAlign', 'center');
 %! B = inkbox (R);
@@ -194,7 +187,7 @@ endfunction
 %! B = inkbox (geom.text ('HELLO', 'HAlign', 'right', 'VAlign', 'top'));
 %! assert_equal (B([3, 4]), [0, 0], 1e-6);
 
-%!testif ; exist ('__occtfont__') == 3
+%!test
 %! ## Laid in a UCS, and bold wider than regular
 %! U = geom.UCS ([1, 0, 0], [5, 5, 5]);
 %! R = geom.text ('A', 'UCS', U);
@@ -203,7 +196,7 @@ endfunction
 %! B2 = inkbox (geom.text ('W', 'Style', 'bold'));
 %! assert_equal (B2(3) - B2(1) > B1(3) - B1(1), true);
 
-%!testif ; exist ('__occtfont__') == 3 && exist ('__occt__') == 3
+%!test
 %! ## Extruded into a valid solid
 %! R = geom.text ('A');
 %! S = solid.extrude (R{1}, 2);

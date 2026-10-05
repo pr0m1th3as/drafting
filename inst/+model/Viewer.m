@@ -61,8 +61,7 @@ classdef Viewer < handle
   ## Closing the window ends the viewer; assigning a shape again opens a new
   ## one.  The window closes with Octave.
   ##
-  ## The viewer is built with the package when Open CASCADE and X11 are found,
-  ## and needs a display to run.  It runs on Linux.
+  ## The viewer needs a display to run.  It runs on Linux.
   ##
   ## @seealso{solid.Shape.show, polymesh.Mesh.show, model.Viewer.pick}
   ## @end deftp
@@ -890,10 +889,6 @@ classdef Viewer < handle
         error ("model.Viewer: the viewer needs a display, and none is set.");
       endif
       exe = file_in_loadpath ('__occtview__');
-      if (isempty (exe))
-        error (strcat ("model.Viewer: the viewer is not available: the", ...
-                       " drafting package was built without it."));
-      endif
       st = state (this);
       args = {};
       if (st.hidden)
@@ -1054,7 +1049,7 @@ function report (Q, N, n, kind)
 
 endfunction
 
-%!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
+%!testif ; ! isempty (getenv ('DISPLAY'))
 %! ## The window opens with the first shape and closes on demand
 %! V = model.Viewer ('Hidden', true);
 %! assert_equal (isopen (V), false);
@@ -1064,7 +1059,7 @@ endfunction
 %! close (V);
 %! assert_equal (isopen (V), false);
 
-%!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
+%!testif ; ! isempty (getenv ('DISPLAY'))
 %! ## A double click takes the point of the shape under it
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
@@ -1075,7 +1070,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
+%!testif ; ! isempty (getenv ('DISPLAY'))
 %! ## and the view turns about it: the point stays where it is on screen
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
@@ -1088,7 +1083,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
+%!testif ; ! isempty (getenv ('DISPLAY'))
 %! ## A double click that misses the shape takes nothing
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
@@ -1098,7 +1093,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
+%!testif ; ! isempty (getenv ('DISPLAY'))
 %! ## A pixel picks the face and the edge the queries name
 %! B = solid.box (10, 20, 30);
 %! V = model.Viewer ('Hidden', true);
@@ -1114,7 +1109,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
+%!testif ; ! isempty (getenv ('DISPLAY'))
 %! ## The seam of a cylinder is never offered
 %! C = solid.cylinder (4, 12);
 %! V = model.Viewer ('Hidden', true);
@@ -1127,7 +1122,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
+%!testif ; ! isempty (getenv ('DISPLAY'))
 %! ## A new shape replaces the old one, and the empty shape clears the view
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
@@ -1141,7 +1136,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
+%!testif ; ! isempty (getenv ('DISPLAY'))
 %! ## What a pick holds is drawn in orange, so that a click visibly took
 %! orange = @(I) I(:,:,1) > 200 & I(:,:,2) < 150 & I(:,:,3) < 60;
 %! near = @(M, p) any (any (M(round (p(2)) + (-3:5), round (p(1)) + (-3:5))));
@@ -1163,7 +1158,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
+%!testif ; ! isempty (getenv ('DISPLAY'))
 %! ## A bore cut by a tool longer than the part is picked where it is, not in
 %! ## the air beside the part (Open CASCADE 7.8 places its analytic cylinder
 %! ## where the untrimmed surface begins)
@@ -1180,7 +1175,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; exist ('__occt__') == 3  # the query for four upright edges
+%!test  # the query for four upright edges
 %! B = solid.box (10, 20, 30);
 %! [Q, N] = model.Viewer.__query__ (B, 'edge', edges (B, 'Direction', ...
 %!                                                    [0, 0, 1]), 'part');
@@ -1188,7 +1183,7 @@ endfunction
 %!                          " [0, 0, 1], 'Within', [0, 0, 0, 10, 20, 30])"));
 %! assert_equal (N, 4);
 
-%!testif ; exist ('__occt__') == 3  # a query that finds more than was picked
+%!test  # a query that finds more than was picked
 %! B = solid.box (10, 20, 30);
 %! [Q, N] = model.Viewer.__query__ (B, 'face', faces (B, 'Normal', ...
 %!                                                    [0, 0, 1]), 'B');
@@ -1200,7 +1195,7 @@ endfunction
 %! assert_equal (Q, "faces (C, 'Within', [-4, -4, 0, 4, 4, 12])");
 %! assert_equal (N, 3);
 
-%!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
+%!testif ; ! isempty (getenv ('DISPLAY'))
 %! ## The window is titled with the name, before it opens and after
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
@@ -1213,7 +1208,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
+%!testif ; ! isempty (getenv ('DISPLAY'))
 %! ## The empty shape opens the window empty
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
@@ -1247,7 +1242,7 @@ endfunction
 %! assert_equal (U.XAxis, [1, 0, 0]);
 %! assert_equal (U.Normal, [0, 0, 1]);
 
-%!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
+%!testif ; ! isempty (getenv ('DISPLAY'))
 %! ## A face and two corners, then a hole's rim for the origin: its centre
 %! B = hole (solid.box (80, 40, 12), [20, 20, 12], 8, Inf);
 %! V = model.Viewer ('Hidden', true);
@@ -1271,7 +1266,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
+%!testif ; ! isempty (getenv ('DISPLAY'))
 %! ## A curved face is refused and asked for again; a datum corner from a
 %! ## point on the right face and one on the front
 %! B = hole (solid.box (80, 40, 12), [20, 20, 12], 8, Inf);
@@ -1288,7 +1283,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
+%!testif ; ! isempty (getenv ('DISPLAY'))
 %! ## Three corners, Enter keeping the first, and the line it prints
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
@@ -1302,7 +1297,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
+%!testif ; ! isempty (getenv ('DISPLAY'))
 %! ## Escape cancels the pick with an error, and the viewer goes on
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
@@ -1330,7 +1325,7 @@ endfunction
 %!  M = polymesh.Mesh (P, F);
 %!endfunction
 
-%!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
+%!testif ; ! isempty (getenv ('DISPLAY'))
 %! ## A mesh is shown and handed back; a click on it is a facet or a point
 %! M = boxmesh (80, 40, 12);
 %! V = model.Viewer ('Hidden', true);
@@ -1354,7 +1349,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
+%!testif ; ! isempty (getenv ('DISPLAY'))
 %! ## A UCS picked on a mesh: a facet and two corners, Enter for the origin
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
@@ -1373,7 +1368,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
+%!testif ; ! isempty (getenv ('DISPLAY'))
 %! ## Points picked on a mesh, with the triangle each lies on and its normal;
 %! ## a click that misses adds nothing, and a shape replaces the mesh.  The
 %! ## top's triangles 3 and 4 meet on its diagonal, y = x / 2; the side's 7
@@ -1397,7 +1392,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
+%!testif ; ! isempty (getenv ('DISPLAY'))
 %! ## Each solid is shown in its colour, one without a colour in grey
 %! B = solid.box (10, 10, 10);
 %! U = union (B, translate (B, [20, 0, 0]));
@@ -1415,7 +1410,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
+%!testif ; ! isempty (getenv ('DISPLAY'))
 %! ## A mesh is shown in its faces' colours, its vertices' or grey
 %! M = boxmesh (80, 40, 12);
 %! M.FaceColour = repmat ([1, 0, 0], 12, 1);
@@ -1439,7 +1434,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
+%!testif ; ! isempty (getenv ('DISPLAY'))
 %! ## A colouring chosen holds for the meshes after that have it; one that
 %! ## lacks it is shown in the first it has
 %! M = boxmesh (10, 20, 30);
@@ -1458,7 +1453,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
+%!testif ; ! isempty (getenv ('DISPLAY'))
 %! ## A mesh's triangle edges are drawn when asked for, and only then
 %! dark = @(I) all (I < 90, 3);
 %! near = @(D, p) any (any (D(round (p(2)) + (-3:3), round (p(1)) + (-3:3))));

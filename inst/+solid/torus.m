@@ -52,9 +52,6 @@ function S = torus (R1, R2, varargin)
   if (isempty (errmsg))
     [frame, errmsg] = solid.__place__ (varargin, {'centroid'}, [0, 0, 0]);
   endif
-  if (isempty (errmsg))
-    errmsg = solid.__checkocct__ ();
-  endif
   if (! isempty (errmsg))
     error ("solid.torus: %s", errmsg);
   endif
@@ -64,14 +61,14 @@ function S = torus (R1, R2, varargin)
 
 endfunction
 
-%!testif ; exist ('__occt__') == 3
+%!test
 %! S = solid.torus (10, 2);
 %! assert_equal (volume (S), 2 * pi ^ 2 * 10 * 4, 1e-9);
 %! assert_equal (area (S), 4 * pi ^ 2 * 10 * 2, 1e-9);
 %! assert_equal (bbox (S), [-12, -12, -2, 12, 12, 2], 1e-6);
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # in the xz plane through a point
+%!test  # in the xz plane through a point
 %! U = geom.UCS ([0, 1, 0], [1, 2, 3]);
 %! S = solid.torus (10, 2, U);
 %! assert_equal (bbox (S), [-11, 0, -9, 13, 4, 15], 1e-6);

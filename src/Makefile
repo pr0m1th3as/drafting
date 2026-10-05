@@ -2,11 +2,8 @@
 
 MKOCTFILE ?= mkoctfile
 
-# Open CASCADE is optional.  Where its headers are not found, or are older
-# than 7.8, nothing is built and the solid namespace reports that the package
-# was built without it; every other namespace works as before.  Set OCCT_INC
-# to use another location.  The viewer behind model.Viewer is a program of its
-# own, built where the X11 headers are found as well.
+# Open CASCADE 7.8 or later, its visualization libraries and X11 are
+# required.  Set OCCT_INC or X11_INC to use other locations.
 OCCT_INC ?= /usr/include/opencascade
 X11_INC ?= /usr/include
 OCCT_LIBS = -lTKernel -lTKMath -lTKG2d -lTKG3d -lTKGeomBase -lTKBRep \
@@ -18,48 +15,40 @@ VIEW_LIBS = -lTKernel -lTKMath -lTKG3d -lTKBRep -lTKTopAlgo -lTKMesh \
 FONT_LIBS = -lTKernel -lTKMath -lTKG2d -lTKG3d -lTKGeomBase -lTKBRep \
             -lTKTopAlgo -lTKService -lTKV3d
 
+APT = libocct-foundation-dev libocct-modeling-data-dev \
+      libocct-modeling-algorithms-dev libocct-data-exchange-dev \
+      libocct-visualization-dev libx11-dev
+
 # 7.8 is the first release with the data exchange libraries linked above
 OCCT_HDR = $(wildcard $(OCCT_INC)/Standard_Version.hxx)
-ifneq ($(OCCT_HDR),)
+ifeq ($(OCCT_HDR),)
+$(error drafting needs Open CASCADE, not found in $(OCCT_INC); on Debian or \
+  Ubuntu install $(APT), or set OCCT_INC)
+endif
 OCCT_VERSION := $(shell awk '/define OCC_VERSION_COMPLETE/ \
                   {gsub (/"/, "", $$3); print $$3}' $(OCCT_HDR))
 OCCT_RECENT := $(shell awk '/define OCC_VERSION_MAJOR/ {M = $$3} \
                  /define OCC_VERSION_MINOR/ {m = $$3} \
                  END {if (M > 7 || (M == 7 && m >= 8)) print "yes"}' \
                  $(OCCT_HDR))
+ifneq ($(OCCT_RECENT),yes)
+$(error drafting needs Open CASCADE 7.8 or later, found $(OCCT_VERSION) in \
+  $(OCCT_INC))
+endif
+ifeq ($(wildcard $(OCCT_INC)/StdPrs_BRepFont.hxx),)
+$(error drafting needs the visualization libraries of Open CASCADE, not \
+  found in $(OCCT_INC); on Debian or Ubuntu install libocct-visualization-dev)
+endif
+ifeq ($(wildcard $(X11_INC)/X11/Xlib.h),)
+$(error drafting needs X11, not found in $(X11_INC); on Debian or Ubuntu \
+  install libx11-dev, or set X11_INC)
 endif
 
-# The triangle meshes behind the polymesh namespace, and DXF reading and
-# writing, need nothing but Octave
-OCTFILES = __mesh__.oct __dxf__.oct
-
-ifeq ($(OCCT_RECENT),yes)
-OCTFILES += __occt__.oct
-# The outlines of text come from Open CASCADE's visualization libraries
-ifneq ($(wildcard $(OCCT_INC)/StdPrs_BRepFont.hxx),)
-OCTFILES += __occtfont__.oct
-endif
-ifneq ($(wildcard $(X11_INC)/X11/Xlib.h),)
+OCTFILES = __mesh__.oct __dxf__.oct __occt__.oct __occtfont__.oct
 PROGRAMS = __occtview__
-endif
-endif
 
 .PHONY: all FILES
 all: $(OCTFILES) $(PROGRAMS) FILES
-ifeq ($(OCCT_HDR),)
-	@echo "drafting: Open CASCADE not found in $(OCCT_INC);" \
-	      "building without the solid namespace."
-else ifneq ($(OCCT_RECENT),yes)
-	@echo "drafting: Open CASCADE $(OCCT_VERSION) found in $(OCCT_INC)," \
-	      "7.8 or later is needed; building without the solid namespace."
-endif
-
-ifeq ($(OCCT_RECENT),yes)
-ifeq ($(PROGRAMS),)
-	@echo "drafting: X11 not found in $(X11_INC);" \
-	      "building without the viewer behind model.Viewer."
-endif
-endif
 
 __mesh__.oct: __mesh__.cc
 	$(MKOCTFILE) -O2 __mesh__.cc -lz

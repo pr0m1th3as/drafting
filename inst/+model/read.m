@@ -67,10 +67,6 @@ function A = read (FILE)
     A = model.Assembly.__from3mf__ (T);
     return;
   endif
-  errmsg = solid.__checkocct__ ();
-  if (! isempty (errmsg))
-    error ("model.read: %s", errmsg);
-  endif
 
   T = __occt__ ('readassembly', 'model.read', FILE, base);
   A = model.Assembly.__fromtree__ (T, base);
@@ -88,7 +84,7 @@ endfunction
 %!  end_unwind_protect
 %!endfunction
 
-%!testif ; exist ('__occt__') == 3  # names, placements and colours come back
+%!test  # names, placements and colours come back
 %! pin = solid.cylinder (2, 12);
 %! pin.Colour = [0.8, 0.2, 0.2];
 %! A = model.Assembly ('ring');
@@ -104,7 +100,7 @@ endfunction
 %! assert_equal (R.Instances(3).placement == A.Instances(3).placement, true);
 %! assert_equal (R.Parts(2).item.Colour, [0.8, 0.2, 0.2], 1e-6);
 
-%!testif ; exist ('__occt__') == 3  # a sub-assembly placed twice, once defined
+%!test  # a sub-assembly placed twice, once defined
 %! A = add (model.Assembly ('stage'), 'pin', solid.cylinder (2, 12), ...
 %!          geom.UCS ());
 %! B = add (model.Assembly ('top'), 'stage', A, geom.UCS ());
@@ -113,7 +109,7 @@ endfunction
 %! assert_equal ([numparts(R), numinstances(R)], [1, 2]);
 %! assert_equal (class (R.Parts(1).item), 'model.Assembly');
 
-%!testif ; exist ('__occt__') == 3  # a single part, placed once, named by file
+%!test  # a single part, placed once, named by file
 %! f = [tempname(), '.step'];
 %! [~, base] = fileparts (f);
 %! unwind_protect

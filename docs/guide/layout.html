@@ -158,9 +158,9 @@ functions above.</p>
     <code>geom.UCS</code>; planar geometry on point sets (area, offset,
     curvature, intersections, fillets, hatch lines); <code>geom.text</code>;
     <code>geom.read</code> and <code>geom.write</code> for DXF.</td>
-    <td>Octave alone, except region booleans, <code>offset</code> and the
-    copies and arrays of regions, which need Open CASCADE, and
-    <code>geom.text</code>, which needs its font support as well.</td>
+    <td>Octave alone, except region booleans, <code>offset</code>, the
+    copies and arrays of regions, and <code>geom.text</code>, which use Open
+    CASCADE.</td>
   </tr>
   <tr>
     <td><code>+draw</code></td>
@@ -187,19 +187,20 @@ functions above.</p>
     <code>solid.loft</code>, <code>solid.sweep</code>,
     <code>solid.helix</code>) and from meshes
     (<code>solid.polyhedron</code>); <code>solid.read</code> for STEP.</td>
-    <td>Open CASCADE 7.8 or later, at build time.</td>
+    <td>Open CASCADE.</td>
   </tr>
   <tr>
     <td><code>+model</code></td>
     <td><code>model.Assembly</code>, named parts placed together;
     <code>model.Viewer</code>, the window that shows solids and meshes;
     <code>model.read</code> for STEP and 3MF.</td>
-    <td>Open CASCADE; the viewer needs X11 as well.</td>
+    <td>Open CASCADE; the viewer needs a display as well.</td>
   </tr>
 </table>
 
-<p>A package built without Open CASCADE works as before: every function that
-needs it raises an error saying so, and everything else is unaffected.</p>
+<p>Open CASCADE 7.8 or later, its visualization libraries and X11 are
+needed to build the package; <code>pkg install</code> stops and names what is
+missing.</p>
 
 <h2 id="rules">Rules that hold everywhere</h2>
 

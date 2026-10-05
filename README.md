@@ -6,8 +6,8 @@ The package is the drafting layer an engineering design package builds on,
 and an alternative to OpenSCAD written in Octave itself: compute geometry,
 model a part, draw it, and send it to a CAD program as DXF or STEP, to a
 slicer as STL or 3MF, to a report as LaTeX, or to the screen. Solids come
-through [Open CASCADE](https://dev.opencascade.org/) when the package is built
-with it. All geometry is in millimetres.
+through [Open CASCADE](https://dev.opencascade.org/). All geometry is in
+millimetres.
 
 ## What it does
 
@@ -122,8 +122,8 @@ solver, each with the reason it was ruled out.
 ## Install
 
 To install the latest release, you need Octave (>=11.1.0) installed on your
-system. The **drafting** package has no further required dependencies. Install
-it by typing:
+system, and the Open CASCADE and X11 libraries set out below. Install it by
+typing:
 
   `pkg install drafting`
 
@@ -136,23 +136,17 @@ If you need to install a specific release, for example `0.2.0`, type:
 
   `pkg install "https://github.com/pr0m1th3as/drafting/archive/refs/tags/release-0.2.0.tar.gz"`
 
-The `+solid` namespace needs Open CASCADE 7.8 or later at build time, and is
-built only where its headers are found, by default in
-`/usr/include/opencascade`. On Debian or Ubuntu, where the packaged version is
-7.8 or later, install them before the package with:
+The package needs Open CASCADE 7.8 or later, with its visualization
+libraries, and the X11 headers at build time, by default in
+`/usr/include/opencascade` and `/usr/include`. On Debian or Ubuntu, where the
+packaged version is 7.8 or later, install them before the package with:
 
-  `sudo apt install libocct-foundation-dev libocct-modeling-data-dev libocct-modeling-algorithms-dev libocct-data-exchange-dev`
+  `sudo apt install libocct-foundation-dev libocct-modeling-data-dev libocct-modeling-algorithms-dev libocct-data-exchange-dev libocct-visualization-dev libx11-dev`
 
-The viewer behind `model.Viewer` is a program of its own, built where the X11
-headers are found as well, and needs Open CASCADE's visualization libraries,
-which `geom.text` needs too:
-
-  `sudo apt install libocct-visualization-dev libx11-dev`
-
-If the headers are elsewhere, name their directory before installing, for
-example `setenv ("OCCT_INC", "/opt/occt/include/opencascade")`; the libraries
-must be where the linker finds them. Linux is supported first; Windows and
-macOS are not yet.
+If the headers are elsewhere, name their directories before installing, for
+example `setenv ("OCCT_INC", "/opt/occt/include/opencascade")` or `X11_INC`;
+the libraries must be where the linker finds them. Linux is supported first;
+Windows and macOS are not yet.
 
 After installation, type:
 - `pkg load drafting` to load the **drafting** package.

@@ -72,11 +72,6 @@ classdef Shape
   ## intersection of two solids that do not meet, returns it.  A shape is
   ## saved and loaded with @code{save} and @code{load} like any other value.
   ##
-  ## The @code{solid} namespace needs Open CASCADE, which the package uses
-  ## where it is found when the package is built.  On a build without it, the
-  ## empty shape can still be made, but every function and method that needs
-  ## the library raises an error saying so.
-  ##
   ## @seealso{solid.box, solid.read, solid.Shape.write, solid.Shape.show}
   ## @end deftp
 
@@ -114,8 +109,6 @@ classdef Shape
 
       if (isempty (this.Data))
         printf ("  solid.Shape: empty\n");
-      elseif (! isempty (solid.__checkocct__ ()))
-        printf ("  solid.Shape: Open CASCADE not available\n");
       else
         c = '';
         if (! isempty (this.Colour))
@@ -487,10 +480,6 @@ classdef Shape
       if (isempty (this))
         error (strcat ("solid.Shape.write: S is empty, so there is", ...
                        " nothing to write."));
-      endif
-      errmsg = solid.__checkocct__ ();
-      if (! isempty (errmsg))
-        error ("solid.Shape.write: %s", errmsg);
       endif
 
       if (isstep)
@@ -2034,10 +2023,6 @@ endclassdef
 ## Run an Open CASCADE operation on behalf of CALLER, which names any error
 function out = occt (caller, cmd, varargin)
 
-  errmsg = solid.__checkocct__ ();
-  if (! isempty (errmsg))
-    error ("%s: %s", caller, errmsg);
-  endif
   out = __occt__ (cmd, caller, varargin{:});
 
 endfunction
@@ -2305,12 +2290,12 @@ endfunction
 %! assert_equal (isempty (mirror (S, [1, 0, 0])), true);
 %! assert_equal (isempty (scale (S, 2)), true);
 
-%!testif ; exist ('__occt__') == 3  # the bytes survive a round trip
+%!test  # the bytes survive a round trip
 %! A = solid.box (10, 20, 30);
 %! B = solid.Shape (A.Data);
 %! assert_equal (volume (B), volume (A));
 
-%!testif ; exist ('__occt__') == 3  # two overlapping blocks
+%!test  # two overlapping blocks
 %! A = solid.box (10, 10, 10);
 %! C = union (A, translate (A, [5, 0, 0]));
 %! assert_equal (volume (C), 1500, 1e-9);
@@ -2318,58 +2303,58 @@ endfunction
 %! assert_equal (numfaces (C), 6);
 %! assert_equal (isvalid (C), true);
 
-%!testif ; exist ('__occt__') == 3  # three blocks in one operation
+%!test  # three blocks in one operation
 %! A = solid.box (10, 10, 10);
 %! C = union (A, translate (A, [20, 0, 0]), translate (A, [5, 5, 0]));
 %! assert_equal (volume (C), 2750, 1e-9);
 %! assert_equal (numsolids (C), 2);
 
-%!testif ; exist ('__occt__') == 3  # empty shapes add nothing
+%!test  # empty shapes add nothing
 %! A = solid.box (10, 10, 10);
 %! assert_equal (volume (union (A, solid.Shape ())), 1000, 1e-9);
 %! assert_equal (volume (union (solid.Shape (), A)), 1000, 1e-9);
 %! assert_equal (volume (union (A)), 1000, 1e-9);
 %! assert_equal (isempty (union (solid.Shape (), solid.Shape ())), true);
 
-%!testif ; exist ('__occt__') == 3  # a through hole
+%!test  # a through hole
 %! C = subtract (solid.box (80, 40, 12), ...
 %!               translate (solid.cylinder (4, 12), [20, 20, 0]));
 %! assert_equal (volume (C), 38400 - 192 * pi, 1e-9);
 %! assert_equal (numfaces (C), 7);
 %! assert_equal (isvalid (C), true);
 
-%!testif ; exist ('__occt__') == 3  # several holes in one operation
+%!test  # several holes in one operation
 %! h = solid.cylinder (3, 10);
 %! C = subtract (solid.box (100, 20, 10), translate (h, [10, 10, 0]), ...
 %!               translate (h, [50, 10, 0]), translate (h, [90, 10, 0]));
 %! assert_equal (volume (C), 20000 - 3 * 90 * pi, 1e-9);
 %! assert_equal (numfaces (C), 9);
 
-%!testif ; exist ('__occt__') == 3  # cutting a bar in two
+%!test  # cutting a bar in two
 %! C = subtract (solid.box (100, 10, 10), ...
 %!               translate (solid.box (2, 10, 10), [49, 0, 0]));
 %! assert_equal (numsolids (C), 2);
 %! assert_equal (volume (C), 9800, 1e-9);
 
-%!testif ; exist ('__occt__') == 3  # subtracting empty shapes or nothing
+%!test  # subtracting empty shapes or nothing
 %! A = solid.box (10, 10, 10);
 %! assert_equal (volume (subtract (A, solid.Shape ())), 1000, 1e-9);
 %! assert_equal (volume (subtract (A)), 1000, 1e-9);
 %! assert_equal (isempty (subtract (solid.Shape (), A)), true);
 
-%!testif ; exist ('__occt__') == 3  # two overlapping blocks
+%!test  # two overlapping blocks
 %! A = solid.box (10, 10, 10);
 %! C = intersect (A, translate (A, [5, 5, 0]));
 %! assert_equal (volume (C), 250, 1e-9);
 %! assert_equal (bbox (C), [5, 5, 0, 10, 10, 10], 1e-9);
 
-%!testif ; exist ('__occt__') == 3  # common to all three, not to the first
+%!test  # common to all three, not to the first
 %! A = solid.box (10, 10, 10);
 %! C = intersect (A, translate (A, [5, 0, 0]), translate (A, [0, 5, 0]));
 %! assert_equal (volume (C), 250, 1e-9);
 %! assert_equal (bbox (C), [5, 5, 0, 10, 10, 10], 1e-9);
 
-%!testif ; exist ('__occt__') == 3  # shapes that do not all meet
+%!test  # shapes that do not all meet
 %! A = solid.box (10, 10, 10);
 %! assert_equal (isempty (intersect (A, translate (A, [20, 0, 0]))), true);
 %! assert_equal (isempty (intersect (A, translate (A, [5, 0, 0]), ...
@@ -2377,45 +2362,45 @@ endfunction
 %! assert_equal (isempty (intersect (A, solid.Shape ())), true);
 %! assert_equal (volume (intersect (A)), 1000, 1e-9);
 
-%!testif ; exist ('__occt__') == 3  # the operands are left unchanged
+%!test  # the operands are left unchanged
 %! A = solid.box (10, 10, 10);
 %! B = translate (A, [5, 0, 0]);
 %! C = subtract (A, B);
 %! assert_equal (volume (A), 1000, 1e-9);
 %! assert_equal (bbox (B), [5, 0, 0, 15, 10, 10], 1e-9);
 
-%!testif ; exist ('__occt__') == 3
+%!test
 %! S = translate (solid.box (10, 20, 30), [1, -2, 3]);
 %! assert_equal (bbox (S), [1, -2, 3, 11, 18, 33], 1e-9);
 
-%!testif ; exist ('__occt__') == 3  # a quarter turn about z
+%!test  # a quarter turn about z
 %! S = rotate (solid.box (10, 20, 30), 90, [0, 0, 1]);
 %! assert_equal (bbox (S), [-20, 0, 0, 0, 10, 30], 1e-9);
 
-%!testif ; exist ('__occt__') == 3  # about an axis through a point
+%!test  # about an axis through a point
 %! S = rotate (solid.box (10, 20, 30), 180, [0, 0, 1], [10, 0, 0]);
 %! assert_equal (bbox (S), [10, -20, 0, 20, 0, 30], 1e-9);
 
-%!testif ; exist ('__occt__') == 3  # a reflection keeps volume and validity
+%!test  # a reflection keeps volume and validity
 %! S = mirror (solid.box (10, 20, 30), [1, 0, 0]);
 %! assert_equal (bbox (S), [-10, 0, 0, 0, 20, 30], 1e-9);
 %! assert_equal (volume (S), 6000, 1e-9);
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # in a plane through a point
+%!test  # in a plane through a point
 %! S = mirror (solid.box (10, 20, 30), [0, 0, 1], [0, 0, 40]);
 %! assert_equal (bbox (S), [0, 0, 50, 10, 20, 80], 1e-9);
 
-%!testif ; exist ('__occt__') == 3
+%!test
 %! S = scale (solid.box (10, 20, 30), 2);
 %! assert_equal (volume (S), 48000, 1e-9);
 %! assert_equal (bbox (S), [0, 0, 0, 20, 40, 60], 1e-9);
 
-%!testif ; exist ('__occt__') == 3  # about a point that stays put
+%!test  # about a point that stays put
 %! S = scale (solid.box (10, 10, 10), 0.5, [10, 10, 10]);
 %! assert_equal (bbox (S), [5, 5, 5, 10, 10, 10], 1e-9);
 
-%!testif ; exist ('__occt__') == 3
+%!test
 %! S = solid.box (10, 20, 30);
 %! assert_equal (area (S), 2200, 1e-9);
 %! assert_equal (centroid (S), [5, 10, 15], 1e-9);
@@ -2423,7 +2408,7 @@ endfunction
 %! assert_equal (B, [0, 0, 0, 10, 20, 30], 1e-9);
 %! assert_equal (L, [10, 20, 30], 1e-9);
 
-%!testif ; exist ('__occt__') == 3  # spline faces: volume, centroid, area
+%!test  # spline faces: volume, centroid, area
 %! H = geom.Spline ([20, 15; 35, 12; 40, 25; 28, 35; 18, 28], 'Closed', true);
 %! R = geom.Region ([0, 0; 80, 0; 80, 50; 0, 50], {H});
 %! A = 4000 + __area__ (R.Holes{1});
@@ -2432,44 +2417,44 @@ endfunction
 %! assert_equal (centroid (S)(3), 3, 1e-9);
 %! assert_equal (area (S), 2 * A + 6 * (260 + length (H)), -1e-5);
 
-%!testif ; exist ('__occt__') == 3  # the box of a cylinder is tight
+%!test  # the box of a cylinder is tight
 %! assert_equal (bbox (solid.cylinder (4, 12)), [-4, -4, 0, 4, 4, 12], 1e-9);
 
-%!testif ; exist ('__occt__') == 3
+%!test
 %! S = solid.box (10, 20, 30);
 %! assert_equal (numsolids (S), 1);
 %! assert_equal (numfaces (S), 6);
 %! assert_equal (numedges (S), 12);
 
-%!testif ; exist ('__occt__') == 3  # a seam edge closes the curved face
+%!test  # a seam edge closes the curved face
 %! assert_equal (numedges (solid.cylinder (4, 12)), 3);
 
-%!testif ; exist ('__occt__') == 3  # every edge but the seam
+%!test  # every edge but the seam
 %! assert_equal (edges (solid.cylinder (4, 12)), [1, 3]);
 %! assert_equal (numel (edges (solid.box (10, 20, 30))), 12);
 
-%!testif ; exist ('__occt__') == 3  # the poles of a sphere are no edges
+%!test  # the poles of a sphere are no edges
 %! assert_equal (edges (solid.sphere (5)), zeros (1, 0));
 
-%!testif ; exist ('__occt__') == 3  # by direction, either way
+%!test  # by direction, either way
 %! B = solid.box (10, 20, 30);
 %! assert_equal (numel (edges (B, 'Direction', [0, 0, 1])), 4);
 %! assert_equal (edges (B, 'Direction', [0, 0, -2]), ...
 %!               edges (B, 'Direction', [0, 0, 1]));
 
-%!testif ; exist ('__occt__') == 3  # by type and by the axis of a circle
+%!test  # by type and by the axis of a circle
 %! C = solid.cylinder (4, 12);
 %! assert_equal (edges (C, 'Type', 'circle'), [1, 3]);
 %! assert_equal (edges (C, 'Type', {'line', 'bspline'}), zeros (1, 0));
 %! assert_equal (edges (C, 'Direction', [0, 0, 1]), [1, 3]);
 
-%!testif ; exist ('__occt__') == 3  # the four edges round the top
+%!test  # the four edges round the top
 %! B = solid.box (10, 20, 30);
 %! assert_equal (numel (edges (B, 'Within', [0, 0, 30, 10, 20, 30])), 4);
 %! assert_equal (numel (edges (B, 'Within', [0, 0, 30, 10, 20, 30], ...
 %!                             'Direction', [1, 0, 0])), 2);
 
-%!testif ; exist ('__occt__') == 3  # faces by outward normal
+%!test  # faces by outward normal
 %! B = solid.box (10, 20, 30);
 %! F = faces (B, 'Normal', [0, 0, 1]);
 %! assert_equal (numel (F), 1);
@@ -2477,7 +2462,7 @@ endfunction
 %! assert_equal (numel (faces (B, 'Type', 'plane')), 6);
 %! assert_equal (numel (faces (B, 'Normal', [1, 1, 0])), 0);
 
-%!testif ; exist ('__occt__') == 3  # faces by type, axis and box
+%!test  # faces by type, axis and box
 %! C = solid.cylinder (4, 12);
 %! assert_equal (numel (faces (C, 'Type', 'cylinder')), 1);
 %! assert_equal (faces (C, 'Axis', [0, 0, -1]), faces (C, 'Type', 'cylinder'));
@@ -2486,14 +2471,14 @@ endfunction
 %!                                  5, 50; 0, 50]));
 %! assert_equal (numel (faces (S, 'Type', {'cylinder', 'cone'})), 3);
 
-%!testif ; exist ('__occt__') == 3  # four parallel edges rounded
+%!test  # four parallel edges rounded
 %! B = solid.box (10, 20, 30);
 %! S = fillet (B, edges (B, 'Direction', [0, 0, 1]), 2);
 %! assert_equal (volume (S), 6000 - 4 * (4 - pi) * 30, 1e-9);
 %! assert_equal (numfaces (S), 10);
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # a rounded end of a cylinder
+%!test  # a rounded end of a cylinder
 %! C = solid.cylinder (4, 12);
 %! S = fillet (C, edges (C, 'Within', [-4, -4, 12, 4, 4, 12]), 1);
 %! ## The ring removed: the area outside a quarter circle in a unit square,
@@ -2505,14 +2490,14 @@ endfunction
 %! assert_equal (numfaces (S), 4);
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # four parallel edges bevelled
+%!test  # four parallel edges bevelled
 %! B = solid.box (10, 20, 30);
 %! S = chamfer (B, edges (B, 'Direction', [0, 0, 1]), 2);
 %! assert_equal (volume (S), 6000 - 4 * 2 * 30, 1e-9);
 %! assert_equal (numfaces (S), 10);
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # the edges round a face
+%!test  # the edges round a face
 %! B = solid.box (10, 20, 30);
 %! F = faces (B, 'Normal', [0, 0, 1]);
 %! assert_equal (numel (edges (B, 'Face', F)), 4);
@@ -2522,7 +2507,7 @@ endfunction
 %! assert_equal (isvalid (S), true);
 %! assert_equal (numfaces (S), 10);
 
-%!testif ; exist ('__occt__') == 3  # two distances, D1 along the face given
+%!test  # two distances, D1 along the face given
 %! B = solid.box (10, 20, 30);
 %! F = faces (B, 'Normal', [0, 0, 1]);
 %! E = edges (B, 'Face', F, 'Direction', [1, 0, 0]);
@@ -2533,7 +2518,7 @@ endfunction
 %! assert_equal (numel (faces (S, 'Normal', [0, -2, 5])), 0);
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # a distance along the face and an angle
+%!test  # a distance along the face and an angle
 %! B = solid.box (10, 20, 30);
 %! F = faces (B, 'Normal', [0, 0, 1]);
 %! E = edges (B, 'Face', F, 'Direction', [1, 0, 0]);
@@ -2543,7 +2528,7 @@ endfunction
 %! assert_equal (numel (faces (S, 'Normal', [0, -sind(30), cosd(30)])), 1);
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # an edge not on the face is refused
+%!test  # an edge not on the face is refused
 %! B = solid.box (10, 20, 30);
 %! F = faces (B, 'Normal', [0, 0, 1]);
 %! E = edges (B, 'Within', [0, 0, 0, 10, 20, 0]);
@@ -2556,18 +2541,18 @@ endfunction
 %! assert_equal (msg, strcat ("solid.Shape.chamfer: every edge in E must", ...
 %!                           " bound the face F."));
 
-%!testif ; exist ('__occt__') == 3  # an open box
+%!test  # an open box
 %! B = solid.box (10, 20, 30);
 %! S = shell (B, faces (B, 'Normal', [0, 0, 1]), 1);
 %! assert_equal (volume (S), 6000 - 8 * 18 * 29, 1e-9);
 %! assert_equal (bbox (S), [0, 0, 0, 10, 20, 30], 1e-9);
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # a closed shell round a cavity
+%!test  # a closed shell round a cavity
 %! B = solid.box (10, 20, 30);
 %! assert_equal (volume (shell (B, [], 1)), 6000 - 8 * 18 * 28, 1e-9);
 
-%!testif ; exist ('__occt__') == 3  # walls grown outwards, open and closed
+%!test  # walls grown outwards, open and closed
 %! B = solid.box (10, 20, 30);
 %! S = shell (B, faces (B, 'Normal', [0, 0, 1]), 1, 'Outward', true);
 %! assert_equal (volume (S), 12 * 22 * 31 - 6000, 1e-9);
@@ -2576,7 +2561,7 @@ endfunction
 %! assert_equal (volume (S), 12 * 22 * 32 - 6000, 1e-9);
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # a floor of its own thickness
+%!test  # a floor of its own thickness
 %! B = solid.box (10, 20, 30);
 %! top = faces (B, 'Normal', [0, 0, 1]);
 %! bot = faces (B, 'Normal', [0, 0, -1]);
@@ -2589,19 +2574,19 @@ endfunction
 %! assert_equal (volume (S), 6000 - 8 * 18 * 25, 1e-9);
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # a cup
+%!test  # a cup
 %! C = solid.cylinder (4, 12);
 %! S = shell (C, faces (C, 'Normal', [0, 0, 1]), 1);
 %! assert_equal (volume (S), (192 - 99) * pi, 1e-9);
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # through holes, several at once
+%!test  # through holes, several at once
 %! S = hole (solid.box (80, 40, 12), [20, 20, 12; 60, 20, 12], 8, Inf);
 %! assert_equal (volume (S), 38400 - 2 * 16 * pi * 12, 1e-9);
 %! assert_equal (numfaces (S), 8);
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # a blind hole, flat and with a drill tip
+%!test  # a blind hole, flat and with a drill tip
 %! B = solid.box (80, 40, 12);
 %! S = hole (B, [20, 20, 12], 8, 5);
 %! assert_equal (volume (S), 38400 - 16 * pi * 5, 1e-9);
@@ -2609,7 +2594,7 @@ endfunction
 %! assert_equal (volume (S), 38400 - 16 * pi * (5 + 4 / tand (59) / 3), 1e-9);
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # into a sloping face, clean all round
+%!test  # into a sloping face, clean all round
 %! R = geom.Region ([0, 0; 80, 0; 80, 20; 0, 40]);
 %! R.UCS = geom.UCS ([0, -1, 0], [0, 40, 0]);
 %! B = solid.extrude (R, 40);
@@ -2619,26 +2604,26 @@ endfunction
 %! assert_equal (volume (B) - volume (T), 16 * pi * 10, -1e-8);
 %! assert_equal (isvalid (T), true);
 
-%!testif ; exist ('__occt__') == 3  # counterbored
+%!test  # counterbored
 %! S = hole (solid.box (80, 40, 12), [20, 20, 12], 8, Inf, ...
 %!           'Counterbore', [14, 4]);
 %! assert_equal (volume (S), 38400 - pi * (49 * 4 + 16 * 8), 1e-9);
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # countersunk at 90 degrees
+%!test  # countersunk at 90 degrees
 %! S = hole (solid.box (80, 40, 12), [20, 20, 12], 8, Inf, ...
 %!           'Countersink', 16);
 %! assert_equal (volume (S), 38400 - pi * (4 / 3 * (64 + 32 + 16) + 16 * 8), ...
 %!               1e-9);
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # tapping size for M6, drilled from the side
+%!test  # tapping size for M6, drilled from the side
 %! S = hole (solid.box (80, 40, 12), [0, 20, 6], 'M6', Inf, ...
 %!           'Direction', [1, 0, 0]);
 %! assert_equal (volume (S), 38400 - 6.25 * pi * 80, 1e-9);
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # straight up from underneath
+%!test  # straight up from underneath
 %! S = hole (solid.box (80, 40, 12), [20, 20, 0], 'M2.5', 3, ...
 %!           'Direction', [0, 0, 1]);
 %! assert_equal (volume (S), 38400 - 1.025 ^ 2 * pi * 3, 1e-9);
@@ -2646,7 +2631,7 @@ endfunction
 %!test  # drilling the empty shape
 %! assert_equal (isempty (hole (solid.Shape (), [0, 0, 0], 5, Inf)), true);
 
-%!testif ; exist ('__occt__') == 3  # a rectangle 4 deep in the top of a plate
+%!test  # a rectangle 4 deep in the top of a plate
 %! R = geom.Region ([30, 15; 50, 15; 50, 25; 30, 25]);
 %! R.UCS = geom.UCS ([0, 0, 1], [0, 0, 12]);
 %! S = pocket (solid.box (80, 40, 12), R, 4);
@@ -2654,7 +2639,7 @@ endfunction
 %! assert_equal (numfaces (S), 11);
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # right through, and an island left standing
+%!test  # right through, and an island left standing
 %! R = geom.Region ([30, 15; 50, 15; 50, 25; 30, 25], ...
 %!                  {[38, 18; 42, 18; 42, 22; 38, 22]});
 %! R.UCS = geom.UCS ([0, 0, 1], [0, 0, 12]);
@@ -2665,7 +2650,7 @@ endfunction
 %! assert_equal (volume (T), 38400 - (200 - 16) * 4, 1e-9);
 %! assert_equal (numsolids (T), 1);
 
-%!testif ; exist ('__occt__') == 3  # tapered walls, a prismatoid
+%!test  # tapered walls, a prismatoid
 %! R = geom.Region ([30, 15; 50, 15; 50, 25; 30, 25]);
 %! R.UCS = geom.UCS ([0, 0, 1], [0, 0, 12]);
 %! S = pocket (solid.box (80, 40, 12), R, 4, 'Taper', 10);
@@ -2675,7 +2660,7 @@ endfunction
 %! assert_equal (volume (S), 38400 - 4 / 6 * (200 + A2 + 4 * Am), 1e-9);
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # a smooth pocket, a closed spline
+%!test  # a smooth pocket, a closed spline
 %! R = geom.Region (geom.Spline ([20, 10; 50, 8; 60, 25; 35, 32; 18, 25], ...
 %!                               'Closed', true));
 %! R.UCS = geom.UCS ([0, 0, 1], [0, 0, 12]);
@@ -2684,7 +2669,7 @@ endfunction
 %! assert_equal (isvalid (S), true);
 
 
-%!testif ; exist ('__occt__') == 3 && ! isempty (getenv ('DISPLAY')) && ! isempty (file_in_loadpath ('__occtview__'))
+%!testif ; ! isempty (getenv ('DISPLAY'))
 %! ## show: each variable has a viewer of its own, titled with its name, and
 %! ## shapes without a name share one
 %! old = getappdata (0, 'drafting_model_show');
@@ -2719,21 +2704,21 @@ endfunction
 %!   close (VU);
 %!   setappdata (0, 'drafting_model_show', old);
 %! end_unwind_protect
-%!testif ; exist ('__occt__') == 3  # tessellate: a box is twelve triangles
+%!test  # tessellate: a box is twelve triangles
 %! M = tessellate (solid.box (10, 20, 30));
 %! assert_equal (numvertices (M), 8);
 %! assert_equal (numfaces (M), 12);
 %! assert_equal (isclosed (M), true);
 %! assert_equal (volume (M), 6000, -1e-12);
 
-%!testif ; exist ('__occt__') == 3  # tessellate: corners on the surface
+%!test  # tessellate: corners on the surface
 %! M = tessellate (solid.cylinder (4, 12), 0.05);
 %! r = hypot (M.Vertices(:,1), M.Vertices(:,2));
 %! z = M.Vertices(:,3);
 %! assert_equal (all (abs (r - 4) < 1e-9 | ((z == 0 | z == 12) & r < 4)), ...
 %!               true);
 
-%!testif ; exist ('__occt__') == 3  # tessellate: side facets within TOL
+%!test  # tessellate: side facets within TOL
 %! M = tessellate (solid.cylinder (4, 12), 0.05);
 %! z = M.Vertices(:,3);
 %! F = M.Faces(any (z(M.Faces) != z(M.Faces(:,1)), 2),:);
@@ -2741,12 +2726,12 @@ endfunction
 %! m = (M.Vertices(E(:,1),:) + M.Vertices(E(:,2),:)) / 2;
 %! assert_equal (min (hypot (m(:,1), m(:,2))) >= 4 - 0.05 - 1e-9, true);
 
-%!testif ; exist ('__occt__') == 3  # tessellate: a finer TOL, more triangles
+%!test  # tessellate: a finer TOL, more triangles
 %! S = solid.sphere (20);
 %! assert_equal (numfaces (tessellate (S, 0.5)) < ...
 %!               numfaces (tessellate (S, 0.05)), true);
 
-%!testif ; exist ('__occt__') == 3  # tessellate: a mirrored part turned out
+%!test  # tessellate: a mirrored part turned out
 %! M = tessellate (mirror (solid.cone (5, 2, 8), [1, 0, 0]));
 %! V = M.Vertices;
 %! F = M.Faces;
@@ -2754,7 +2739,7 @@ endfunction
 %! assert_equal (dot (V(F(:,1),:), cross (V(F(:,2),:), V(F(:,3),:), 2), ...
 %!                    2)' * ones (rows (F), 1) > 0, true);
 
-%!testif ; exist ('__occt__') == 3  # tessellate: each triangle its colour
+%!test  # tessellate: each triangle its colour
 %! B = solid.box (1, 1, 1);
 %! U = union (B, translate (B, [5, 0, 0]));
 %! U.Colour = [1, 0, 0; NaN, NaN, NaN];
@@ -2777,7 +2762,7 @@ endfunction
 %!                       3, [])');
 %!endfunction
 
-%!testif ; exist ('__occt__') == 3  # STEP keeps the exact surfaces
+%!test  # STEP keeps the exact surfaces
 %! f = [tempname(), '.step'];
 %! unwind_protect
 %!   write (solid.cylinder (4, 12), f);
@@ -2789,7 +2774,7 @@ endfunction
 %!   unlink (f);
 %! end_unwind_protect
 
-%!testif ; exist ('__occt__') == 3  # STEP carries a solid's colour
+%!test  # STEP carries a solid's colour
 %! f = [tempname(), '.step'];
 %! S = solid.box (1, 2, 3);
 %! S.Colour = [0.2, 0.4, 0.6];
@@ -2800,7 +2785,7 @@ endfunction
 %!   unlink (f);
 %! end_unwind_protect
 
-%!testif ; exist ('__occt__') == 3  # the product is named after the file
+%!test  # the product is named after the file
 %! f = [tempname(), '.step'];
 %! [~, base] = fileparts (f);
 %! unwind_protect
@@ -2811,7 +2796,7 @@ endfunction
 %!   unlink (f);
 %! end_unwind_protect
 
-%!testif ; exist ('__occt__') == 3  # STL: a box is twelve triangles
+%!test  # STL: a box is twelve triangles
 %! f = [tempname(), '.stl'];
 %! unwind_protect
 %!   write (solid.box (10, 20, 30), f);
@@ -2823,7 +2808,7 @@ endfunction
 %!   unlink (f);
 %! end_unwind_protect
 
-%!testif ; exist ('__occt__') == 3  # facets stay within the tolerance
+%!test  # facets stay within the tolerance
 %! f = [tempname(), '.stl'];
 %! unwind_protect
 %!   write (solid.cylinder (4, 12), f, 'Tolerance', 0.05);
@@ -2844,7 +2829,7 @@ endfunction
 %!   unlink (f);
 %! end_unwind_protect
 
-%!testif ; exist ('__occt__') == 3  # a finer tolerance gives more facets
+%!test  # a finer tolerance gives more facets
 %! f1 = [tempname(), '.stl'];
 %! f2 = [tempname(), '.stl'];
 %! unwind_protect
@@ -2856,7 +2841,7 @@ endfunction
 %!   unlink (f2);
 %! end_unwind_protect
 
-%!testif ; exist ('__occt__') == 3  # OBJ: the mesh of the solid, closed
+%!test  # OBJ: the mesh of the solid, closed
 %! f = [tempname(), '.obj'];
 %! unwind_protect
 %!   write (solid.box (10, 20, 30), f);
@@ -2867,7 +2852,7 @@ endfunction
 %!   unlink (f);
 %! end_unwind_protect
 
-%!testif ; exist ('__occt__') == 3  # PLY: the mesh of the solid, closed
+%!test  # PLY: the mesh of the solid, closed
 %! f = [tempname(), '.ply'];
 %! unwind_protect
 %!   write (solid.box (10, 20, 30), f);
@@ -2878,7 +2863,7 @@ endfunction
 %!   unlink (f);
 %! end_unwind_protect
 
-%!testif ; exist ('__occt__') == 3  # PLY: the triangles in the solid's colour
+%!test  # PLY: the triangles in the solid's colour
 %! f = [tempname(), '.ply'];
 %! S = solid.box (10, 20, 30);
 %! S.Colour = [0.2, 0.4, 0.6];
@@ -2890,7 +2875,7 @@ endfunction
 %!   unlink (f);
 %! end_unwind_protect
 
-%!testif ; exist ('__occt__') == 3 && (! isempty (file_in_path (getenv ('PATH'), 'unzip')) || ! isempty (file_in_path (getenv ('PATH'), 'unzip.exe')))
+%!testif ; ! isempty (file_in_path (getenv ('PATH'), 'unzip')) || ! isempty (file_in_path (getenv ('PATH'), 'unzip.exe'))
 %! ## 3MF: the solid's mesh in its colour
 %! f = [tempname(), '.3mf'];
 %! d = tempname ();
@@ -2929,13 +2914,13 @@ endfunction
 %!error<solid.Shape.write: S is empty, so there is nothing to write.> ...
 %! write (solid.Shape (), 'a.stl')
 
-%!testif ; exist ('__occt__') == 3  # Colour: one row colours every solid
+%!test  # Colour: one row colours every solid
 %! B = solid.box (1, 1, 1);
 %! U = union (B, translate (B, [5, 0, 0]));
 %! U.Colour = [1, 0.5, 0];
 %! assert_equal (U.Colour, [1, 0.5, 0; 1, 0.5, 0]);
 
-%!testif ; exist ('__occt__') == 3  # Colour: a NaN row leaves a solid bare
+%!test  # Colour: a NaN row leaves a solid bare
 %! B = solid.box (1, 1, 1);
 %! U = union (B, translate (B, [5, 0, 0]));
 %! U.Colour = [NaN, NaN, NaN; 0, 0, 1];
@@ -2943,7 +2928,7 @@ endfunction
 %! U.Colour = [NaN, NaN, NaN];
 %! assert_equal (U.Colour, []);
 
-%!testif ; exist ('__occt__') == 3  # Colour: overlapping, the first operand's
+%!test  # Colour: overlapping, the first operand's
 %! A = solid.box (10, 10, 10);
 %! A.Colour = [1, 0, 0];
 %! B = translate (solid.box (10, 10, 10), [5, 5, 5]);
@@ -2951,58 +2936,58 @@ endfunction
 %! assert_equal (union (A, B).Colour, [1, 0, 0]);
 %! assert_equal (union (B, A).Colour, [0, 0, 1]);
 
-%!testif ; exist ('__occt__') == 3  # Colour: parts apart keep their own
+%!test  # Colour: parts apart keep their own
 %! A = solid.box (10, 10, 10);
 %! A.Colour = [1, 0, 0];
 %! B = translate (solid.box (10, 10, 10), [30, 0, 0]);
 %! B.Colour = [0, 0, 1];
 %! assert_equal (sortrows (union (A, B).Colour), [0, 0, 1; 1, 0, 0]);
 
-%!testif ; exist ('__occt__') == 3  # Colour: the first coloured operand's
+%!test  # Colour: the first coloured operand's
 %! A = solid.box (10, 10, 10);
 %! B = translate (solid.box (10, 10, 10), [5, 5, 5]);
 %! B.Colour = [0, 0, 1];
 %! assert_equal (union (A, B).Colour, [0, 0, 1]);
 
-%!testif ; exist ('__occt__') == 3  # Colour: a tool's never colours the part
+%!test  # Colour: a tool's never colours the part
 %! A = solid.box (10, 10, 10);
 %! B = translate (solid.box (10, 10, 10), [5, 5, 5]);
 %! B.Colour = [0, 0, 1];
 %! assert_equal (subtract (A, B).Colour, []);
 
-%!testif ; exist ('__occt__') == 3  # Colour: subtract keeps the part's
+%!test  # Colour: subtract keeps the part's
 %! A = solid.box (10, 10, 10);
 %! A.Colour = [1, 0, 0];
 %! B = translate (solid.box (10, 10, 10), [5, 5, 5]);
 %! B.Colour = [0, 0, 1];
 %! assert_equal (subtract (A, B).Colour, [1, 0, 0]);
 
-%!testif ; exist ('__occt__') == 3  # Colour: intersect, the first operand's
+%!test  # Colour: intersect, the first operand's
 %! A = solid.box (10, 10, 10);
 %! A.Colour = [1, 0, 0];
 %! B = translate (solid.box (10, 10, 10), [5, 5, 5]);
 %! B.Colour = [0, 0, 1];
 %! assert_equal (intersect (B, A).Colour, [0, 0, 1]);
 
-%!testif ; exist ('__occt__') == 3  # Colour: a fillet keeps it
+%!test  # Colour: a fillet keeps it
 %! A = solid.box (10, 10, 10);
 %! A.Colour = [0, 1, 0];
 %! F = fillet (A, edges (A, 'Direction', [0, 0, 1]), 1);
 %! assert_equal (F.Colour, [0, 1, 0]);
 
-%!testif ; exist ('__occt__') == 3  # Colour: a shell keeps it
+%!test  # Colour: a shell keeps it
 %! A = solid.box (10, 10, 10);
 %! A.Colour = [0, 1, 0];
 %! H = shell (A, faces (A, 'Normal', [0, 0, 1]), 1);
 %! assert_equal (H.Colour, [0, 1, 0]);
 
-%!testif ; exist ('__occt__') == 3  # Colour: copies keep it
+%!test  # Colour: copies keep it
 %! A = solid.box (10, 10, 10);
 %! A.Colour = [0, 1, 0];
 %! assert_equal (rectarray (A, [3, 1, 1], [20, 0, 0]).Colour, ...
 %!               repmat ([0, 1, 0], 3, 1));
 
-%!testif ; exist ('__occt__') == 3  # Colour: transforms keep it
+%!test  # Colour: transforms keep it
 %! S = solid.box (1, 2, 3);
 %! S.Colour = [0.2, 0.4, 0.6];
 %! assert_equal (translate (S, [1, 2, 3]).Colour, [0.2, 0.4, 0.6]);
@@ -3014,7 +2999,7 @@ endfunction
 %! R = geom.Region (geom.Spline ([20, 10; 50, 8; 35, 32], 'Closed', true));
 %! pocket (solid.box (80, 40, 12), R, 4, 'Taper', 5);
 
-%!testif ; exist ('__occt__') == 3  # in a sloping face, clean all round
+%!test  # in a sloping face, clean all round
 %! W = geom.Region ([0, 0; 80, 0; 80, 20; 0, 40]);
 %! W.UCS = geom.UCS ([0, -1, 0], [0, 40, 0]);
 %! B = solid.extrude (W, 40);
@@ -3219,33 +3204,33 @@ endfunction
 %!error<solid.Shape.pocket: Taper must be an angle in the range \(-90, 90\) degrees.> ...
 %! pocket (solid.Shape (), geom.Region ([0, 0; 1, 0; 1, 1]), 1, 'Taper', 90)
 
-%!testif ; exist ('__occt__') == 3  # a box cut through the middle
+%!test  # a box cut through the middle
 %! U = geom.UCS ([0, 0, 1], [0, 0, 15]);
 %! R = section (solid.box (10, 20, 30), U);
 %! assert_equal (numel (R), 1);
 %! assert_equal (R{1}.UCS, U);
 %! assert_equal (__area__ (R{1}.Outline), 200, 1e-9);
 
-%!testif ; exist ('__occt__') == 3  # a face in the plane is the cut
+%!test  # a face in the plane is the cut
 %! R = section (solid.box (10, 20, 30), geom.UCS ([0, 0, 1], [0, 0, 0]));
 %! assert_equal (__area__ (R{1}.Outline), 200, 1e-9);
 %! R = section (solid.box (10, 20, 30), geom.UCS ([0, 0, 1], [0, 0, 30]));
 %! assert_equal (numel (R), 1);
 
-%!testif ; exist ('__occt__') == 3  # a face in the plane and a cut, one piece
+%!test  # a face in the plane and a cut, one piece
 %! S = solid.extrude (geom.Region ([0, 0; 30, 0; 30, 5; 5, 5; 5, 20; ...
 %!                                  0, 20]), 10);
 %! R = section (S, geom.UCS ([0, 1, 0], [0, 5, 0]));
 %! assert_equal (numel (R), 1);
 %! assert_equal (abs (__area__ (R{1}.Outline)), 300, 1e-9);
 
-%!testif ; exist ('__occt__') == 3  # missed, or touched along an edge
+%!test  # missed, or touched along an edge
 %! S = solid.box (10, 20, 30);
 %! assert_equal (section (S, geom.UCS ([0, 0, 1], [0, 0, 31])), cell (1, 0));
 %! assert_equal (section (S, geom.UCS ([1, 1, 0], [0, 0, 0])), cell (1, 0));
 %! assert_equal (section (solid.Shape (), geom.UCS ()), cell (1, 0));
 
-%!testif ; exist ('__occt__') == 3  # a bore: two half arcs, made again
+%!test  # a bore: two half arcs, made again
 %! S = solid.extrude (geom.Region ([0, 0; 60, 0; 60, 40; 0, 40], ...
 %!                                 {[20, 20, 1; 40, 20, 1]}), 8);
 %! R = section (S, geom.UCS ([0, 0, 1], [0, 0, 4]));
@@ -3255,7 +3240,7 @@ endfunction
 %! assert_equal (volume (solid.extrude (R{1}, 2)), 2 * (2400 - 100 * pi), ...
 %!               -1e-9);
 
-%!testif ; exist ('__occt__') == 3  # a cylinder cut at a slant, an ellipse
+%!test  # a cylinder cut at a slant, an ellipse
 %! R = section (solid.cylinder (5, 40), ...
 %!              geom.UCS ([0, sind(30), cosd(30)], [0, 0, 20]));
 %! SP = R{1}.Outline.Splines{1};
@@ -3263,7 +3248,7 @@ endfunction
 %! assert_equal (any (SP.Weights != 1), true);
 %! assert_equal (__area__ (R{1}.Outline), 25 * pi / cosd (30), -1e-12);
 
-%!testif ; exist ('__occt__') == 3  # separate pieces, largest first
+%!test  # separate pieces, largest first
 %! S = solid.extrude (geom.Region ([0, 0; 30, 0; 30, 20; 25, 20; 25, 5; ...
 %!                                  10, 5; 10, 20; 0, 20]), 10);
 %! R = section (S, geom.UCS ([0, 1, 0], [0, 10, 0]));
@@ -3271,14 +3256,14 @@ endfunction
 %! assert_equal (abs ([__area__(R{1}.Outline), __area__(R{2}.Outline)]), ...
 %!               [100, 50], 1e-9);
 
-%!testif ; exist ('__occt__') == 3  # a torus, across and through its axis
+%!test  # a torus, across and through its axis
 %! S = solid.torus (10, 2);
 %! R = section (S, geom.UCS ([0, 0, 1], [0, 0, 0]));
 %! assert_equal (__area__ (R{1}.Outline) + __area__ (R{1}.Holes{1}), ...
 %!               80 * pi, 1e-9);
 %! assert_equal (numel (section (S, geom.UCS ([0, 1, 0], [0, 0, 0]))), 2);
 
-%!testif ; exist ('__occt__') == 3  # a spline outline made again from its cut
+%!test  # a spline outline made again from its cut
 %! H = geom.Spline ([20, 15; 35, 12; 40, 25; 28, 35; 18, 28], 'Closed', true);
 %! Q = geom.Region ([0, 0; 80, 0; 80, 50; 0, 50], {H});
 %! R = section (solid.extrude (Q, 6), geom.UCS ([0, 0, 1], [0, 0, 3]));
@@ -3289,7 +3274,7 @@ endfunction
 %!error<solid.Shape.section: U must be a geom.UCS object.> ...
 %! section (solid.Shape (), [0, 0, 1])
 
-%!testif ; exist ('__occt__') == 3  # a bore seen along its axis is a hole
+%!test  # a bore seen along its axis is a hole
 %! S = subtract (solid.box (80, 40, 12), ...
 %!               translate (solid.cylinder (4, 12), [20, 20, 0]));
 %! R = projection (S, geom.UCS ());
@@ -3298,69 +3283,69 @@ endfunction
 %! assert_equal (numel (R{1}.Holes), 1);
 %! assert_equal (abs (__area__ (R{1}.Holes{1})), 16 * pi, 1e-9);
 
-%!testif ; exist ('__occt__') == 3  # a bore seen from the side is not there
+%!test  # a bore seen from the side is not there
 %! S = subtract (solid.box (80, 40, 12), ...
 %!               translate (solid.cylinder (4, 12), [20, 20, 0]));
 %! R = projection (S, geom.UCS ([0, -1, 0], [0, 0, 0]));
 %! assert_equal (numel (R{1}.Holes), 0);
 %! assert_equal (abs (__area__ (R{1}.Outline)), 960, 1e-9);
 
-%!testif ; exist ('__occt__') == 3  # a circle seen edge on is one straight side
+%!test  # a circle seen edge on is one straight side
 %! R = projection (solid.cylinder (5, 10), geom.UCS ([0, -1, 0], [0, 0, 0]));
 %! assert_equal (sortrows (R{1}.Outline.Vertices(:,1:2)), ...
 %!               [-5, 0; -5, 10; 5, 0; 5, 10], 1e-9);
 
-%!testif ; exist ('__occt__') == 3  # pieces along one line are one side
+%!test  # pieces along one line are one side
 %! S = union (solid.cylinder (10, 5), ...
 %!            translate (solid.cylinder (5, 10), [0, 0, 5]));
 %! R = projection (S, geom.UCS ([0, -1, 0], [0, 0, 0]));
 %! assert_equal (rows (R{1}.Outline.Vertices), 8);
 %! assert_equal (abs (__area__ (R{1}.Outline)), 200, 1e-9);
 
-%!testif ; exist ('__occt__') == 3  # the xy plane by default
+%!test  # the xy plane by default
 %! R = projection (solid.box (10, 20, 30));
 %! assert_equal (R{1}.UCS, geom.UCS ());
 %! assert_equal (abs (__area__ (R{1}.Outline)), 200, 1e-9);
 
-%!testif ; exist ('__occt__') == 3  # the regions lie in the plane of U
+%!test  # the regions lie in the plane of U
 %! U = geom.UCS ([0, 0, 1], [0, 0, -5]);
 %! R = projection (solid.box (10, 20, 30), U);
 %! assert_equal (R{1}.UCS, U);
 
-%!testif ; exist ('__occt__') == 3  # a sphere's outline is its great circle
+%!test  # a sphere's outline is its great circle
 %! R = projection (solid.sphere (5), geom.UCS ([1, 2, 3], [0, 0, 0]));
 %! assert_equal (abs (__area__ (R{1}.Outline)), 25 * pi, 1e-9);
 
-%!testif ; exist ('__occt__') == 3  # a cylinder at a slant, ellipses and lines
+%!test  # a cylinder at a slant, ellipses and lines
 %! S = rotate (solid.cylinder (5, 20), 30, [1, 0, 0]);
 %! R = projection (S);
 %! assert_equal (abs (__area__ (R{1}.Outline)), ...
 %!               25 * pi * cosd (30) + 200 * sind (30), 1e-9);
 
-%!testif ; exist ('__occt__') == 3  # a torus seen edge on
+%!test  # a torus seen edge on
 %! R = projection (solid.torus (20, 5), geom.UCS ([0, 1, 0], [0, 0, 0]));
 %! assert_equal (abs (__area__ (R{1}.Outline)), 400 + 25 * pi, 1e-4);
 
-%!testif ; exist ('__occt__') == 3  # a coil seen along its axis is a ring
+%!test  # a coil seen along its axis is a ring
 %! S = solid.helix (geom.Region ([10, -1; 12, -1; 12, 1; 10, 1]), 5, 3);
 %! R = projection (S, geom.UCS ([0, 1, 0], [0, 0, 0]));
 %! assert_equal (abs (__area__ (R{1}.Outline)) ...
 %!               - abs (__area__ (R{1}.Holes{1})), 44 * pi, 1e-3);
 
-%!testif ; exist ('__occt__') == 3  # a piece in a hole is a piece of its own
+%!test  # a piece in a hole is a piece of its own
 %! S = union (subtract (solid.cylinder (10, 5), solid.cylinder (6, 5)), ...
 %!            translate (solid.cylinder (3, 5), [0, 0, 10]));
 %! R = projection (S);
 %! assert_equal (numel (R), 2);
 %! assert_equal (abs (__area__ (R{2}.Outline)), 9 * pi, 1e-9);
 
-%!testif ; exist ('__occt__') == 3  # what overlaps is covered once
+%!test  # what overlaps is covered once
 %! S = union (solid.box (10, 10, 2), ...
 %!            translate (solid.box (30, 4, 2), [0, 3, 8]));
 %! R = projection (S);
 %! assert_equal (abs (__area__ (R{1}.Outline)), 180, 1e-9);
 
-%!testif ; exist ('__occt__') == 3  # solids apart are pieces apart
+%!test  # solids apart are pieces apart
 %! B = solid.box (5, 5, 5);
 %! assert_equal (numel (projection (union (B, translate (B, [10, 0, 0])))), 2);
 
@@ -3370,7 +3355,7 @@ endfunction
 %!error<solid.Shape.projection: U must be a geom.UCS object.> ...
 %! projection (solid.Shape (), [0, 0, 1])
 
-%!testif ; exist ('__occt__') == 3  # boxes: exact, in whole faces
+%!test  # boxes: exact, in whole faces
 %! A = solid.box (10, 10, 10);
 %! H = hull (A, translate (A, [20, 0, 0]));
 %! assert_equal (volume (H), 3000, -1e-12);
@@ -3379,14 +3364,14 @@ endfunction
 %! B = subtract (A, translate (solid.cylinder (2, 10), [5, 5, 0]));
 %! assert_equal (volume (hull (B)), 1000, -1e-12);
 
-%!testif ; exist ('__occt__') == 3  # a box and a point, a pyramid on it
+%!test  # a box and a point, a pyramid on it
 %! H = hull (solid.box (10, 10, 10), [5, 5, 20]);
 %! assert_equal (volume (H), 1000 + 1000 / 3, -1e-12);
 %! H = hull (solid.Shape (), [0, 0, 0; 6, 0, 0; 0, 6, 0; 0, 0, 6]);
 %! assert_equal (volume (H), 36, -1e-12);
 %! assert_equal (isempty (hull (solid.Shape (), zeros (0, 3))), true);
 
-%!testif ; exist ('__occt__') == 3  # a slot: inside the exact hull, within TOL
+%!test  # a slot: inside the exact hull, within TOL
 %! C = solid.cylinder (5, 4);
 %! H = hull (C, translate (C, [20, 0, 0]));
 %! V = (25 * pi + 200) * 4;
@@ -3409,7 +3394,7 @@ endfunction
 %!error<solid.Shape.hull: the hull is flat and encloses no volume.> ...
 %! hull (solid.Shape (), [0, 0, 0; 1, 0, 0; 0, 1, 0; 1, 1, 0])
 
-%!testif ; exist ('__occt__') == 3  # resized evenly, the least corner kept
+%!test  # resized evenly, the least corner kept
 %! B = resize (translate (solid.box (10, 20, 5), [1, 2, 3]), [0, 40, 0]);
 %! assert_equal (bbox (B), [1, 2, 3, 21, 42, 13], 1e-12);
 %! C = resize (solid.cylinder (5, 10), [40, 40, 40]);
@@ -3417,7 +3402,7 @@ endfunction
 %! assert_equal (volume (C), 16000 * pi, -1e-12);
 %! assert_equal (isempty (resize (solid.Shape (), [1, 1, 1])), true);
 
-%!testif ; exist ('__occt__') == 3  # resized unevenly: planes stay planes
+%!test  # resized unevenly: planes stay planes
 %! C = resize (solid.cylinder (5, 10), [20, 0, 0], 'Uniform', false);
 %! assert_equal (volume (C), 500 * pi, -1e-9);
 %! assert_equal (isvalid (C), true);
@@ -3429,7 +3414,7 @@ endfunction
 %! assert_equal (volume (B), 2000 - 45 * pi, -1e-9);
 %! assert_equal (isvalid (B), true);
 
-%!testif ; exist ('__occt__') == 3  # copies apart side by side, others fused
+%!test  # copies apart side by side, others fused
 %! A = solid.box (1, 1, 1);
 %! K = copy (A, [0, 0, 0; 3, 0, 0; 0.5, 0, 0]);
 %! assert_equal ([numsolids(K), volume(K)], [2, 2.5], 1e-12);
@@ -3437,7 +3422,7 @@ endfunction
 %! assert_equal (bbox (K), [5, 5, 5, 6, 6, 6], 1e-12);
 %! assert_equal (isempty (copy (solid.Shape (), [0, 0, 0; 1, 0, 0])), true);
 
-%!testif ; exist ('__occt__') == 3  # a rectangular array of holes cut
+%!test  # a rectangular array of holes cut
 %! H = rectarray (translate (solid.cylinder (2, 5), [10, 10, 0]), ...
 %!                [6, 4, 1], [10, 10, 0]);
 %! assert_equal (numsolids (H), 24);
@@ -3446,7 +3431,7 @@ endfunction
 %! assert_equal (bbox (rectarray (solid.box (1, 1, 1), [1, 1, 3], ...
 %!                               [0, 0, -2])), [0, 0, -4, 1, 1, 1], 1e-12);
 
-%!testif ; exist ('__occt__') == 3  # a bolt circle, and a ring of blades fused
+%!test  # a bolt circle, and a ring of blades fused
 %! F = polararray (translate (solid.cylinder (3, 8), [20, 0, 0]), 6, 360);
 %! assert_equal (numsolids (F), 6);
 %! C = centroid (F);
@@ -3456,7 +3441,7 @@ endfunction
 %! Z = polararray (translate (solid.box (10, 2, 2), [15, -1, 0]), 2, 90);
 %! assert_equal (bbox (Z), [-1, -1, 0, 25, 25, 2], 1e-12);
 
-%!testif ; exist ('__occt__') == 3  # about another axis; copies kept facing
+%!test  # about another axis; copies kept facing
 %! Z = polararray (translate (solid.box (2, 2, 2), [10, -1, -1]), 2, 180, ...
 %!                 [0, 1, 0], [0, 0, 0]);
 %! assert_equal (bbox (Z), [-12, -1, -1, 12, 1, 1], 1e-12);

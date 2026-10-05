@@ -77,9 +77,6 @@ function S = revolve (R, ANGLE = 360)
                            || ! (ANGLE <= 360)))
     errmsg = "ANGLE must be a real scalar in the range (0, 360].";
   endif
-  if (isempty (errmsg))
-    errmsg = solid.__checkocct__ ();
-  endif
   if (! isempty (errmsg))
     error ("solid.revolve: %s", errmsg);
   endif
@@ -88,48 +85,48 @@ function S = revolve (R, ANGLE = 360)
 
 endfunction
 
-%!testif ; exist ('__occt__') == 3  # a cylinder about the model's y axis
+%!test  # a cylinder about the model's y axis
 %! S = solid.revolve (geom.Region ([0, 0; 4, 0; 4, 12; 0, 12]));
 %! assert_equal (volume (S), 192 * pi, 1e-9);
 %! assert_equal (bbox (S), [-4, 0, -4, 4, 12, 4], 1e-9);
 %! assert_equal (numfaces (S), 3);
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # in the xz plane, about the z axis
+%!test  # in the xz plane, about the z axis
 %! R = geom.Region ([0, 0; 4, 0; 4, 12; 0, 12]);
 %! R.UCS = geom.UCS ([0, -1, 0], [0, 0, 0]);
 %! S = solid.revolve (R);
 %! assert_equal (bbox (S), [-4, -4, 0, 4, 4, 12], 1e-9);
 
-%!testif ; exist ('__occt__') == 3  # a stepped shaft with a chamfer
+%!test  # a stepped shaft with a chamfer
 %! R = geom.Region ([0, 0; 10, 0; 10, 30; 6, 30; 6, 49; 5, 50; 0, 50]);
 %! S = solid.revolve (R);
 %! assert_equal (volume (S), pi * (3000 + 36 * 19 + (36 + 30 + 25) / 3), 1e-9);
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # a bush, clear of the axis
+%!test  # a bush, clear of the axis
 %! S = solid.revolve (geom.Region ([5, 0; 8, 0; 8, 10; 5, 10]));
 %! assert_equal (volume (S), pi * (64 - 25) * 10, 1e-9);
 %! assert_equal (numfaces (S), 4);
 
-%!testif ; exist ('__occt__') == 3  # a quarter turn, anticlockwise about y
+%!test  # a quarter turn, anticlockwise about y
 %! S = solid.revolve (geom.Region ([0, 0; 4, 0; 4, 12; 0, 12]), 90);
 %! assert_equal (volume (S), 48 * pi, 1e-9);
 %! assert_equal (bbox (S), [0, 0, -4, 4, 12, 0], 1e-9);
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # a sphere from a semicircle on the axis
+%!test  # a sphere from a semicircle on the axis
 %! S = solid.revolve (geom.Region ([0, -5, 1; 0, 5, 0]));
 %! assert_equal (volume (S), 4 / 3 * pi * 125, 1e-9);
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # a hollow ring, by Pappus
+%!test  # a hollow ring, by Pappus
 %! R = geom.Region ([8, -2; 12, -2; 12, 2; 8, 2], {[9, 0, 1; 11, 0, 1]});
 %! S = solid.revolve (R);
 %! assert_equal (volume (S), (16 - pi) * 2 * pi * 10, 1e-9);
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # a closed spline, by Pappus
+%!test  # a closed spline, by Pappus
 %! O = geom.Spline ([10, 0; 20, -5; 30, 5; 22, 15; 12, 10], 'Closed', true);
 %! Q = points (O, 100001);
 %! c = Q(1:end-1,1) .* Q(2:end,2) - Q(2:end,1) .* Q(1:end-1,2);

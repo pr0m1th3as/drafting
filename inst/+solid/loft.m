@@ -88,10 +88,6 @@ function S = loft (REGIONS, varargin)
       || ! isscalar (opt.Ruled) || ! any (opt.Ruled == [0, 1]))
     error ("solid.loft: Ruled must be a logical scalar.");
   endif
-  errmsg = solid.__checkocct__ ();
-  if (! isempty (errmsg))
-    error ("solid.loft: %s", errmsg);
-  endif
 
   D = cell (1, numel (REGIONS));
   for k = 1:numel (REGIONS)
@@ -108,14 +104,14 @@ endfunction
 %!  R.UCS = geom.UCS ([0, 0, 1], [0, 0, z]);
 %!endfunction
 
-%!testif ; exist ('__occt__') == 3  # a frustum of a square pyramid
+%!test  # a frustum of a square pyramid
 %! S = solid.loft ({at([0, 0; 10, 0; 10, 10; 0, 10], 0), ...
 %!                  at([2.5, 2.5; 7.5, 2.5; 7.5, 7.5; 2.5, 7.5], 10)});
 %! assert_equal (volume (S), 10 / 3 * (100 + 25 + 50), 1e-9);
 %! assert_equal (bbox (S), [0, 0, 0, 10, 10, 10], 1e-6);
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # ruled through three, two frustums
+%!test  # ruled through three, two frustums
 %! sq = @(a) [-a, -a; a, -a; a, a; -a, a];
 %! S = solid.loft ({at(sq (5), 0), at(sq (3), 5), at(sq (5), 10)}, ...
 %!                 'Ruled', true);
@@ -123,21 +119,21 @@ endfunction
 %! assert_equal (numfaces (S), 10);
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # smooth through three, bulging outwards
+%!test  # smooth through three, bulging outwards
 %! sq = @(a) [-a, -a; a, -a; a, a; -a, a];
 %! S = solid.loft ({at(sq (3), 0), at(sq (5), 5), at(sq (3), 10)});
 %! assert_equal (volume (S) > 2 * 5 / 3 * (36 + 100 + 60), true);
 %! assert_equal (numfaces (S), 6);
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # equal circles give a cylinder
+%!test  # equal circles give a cylinder
 %! c = [5, 0, 1; -5, 0, 1];
 %! S = solid.loft ({at(c, 0), at(c, 10), at(c, 20)});
 %! assert_equal (volume (S), 500 * pi, -1e-8);
 %! assert_equal (bbox (S), [-5, -5, 0, 5, 5, 20], 1e-6);
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # a square becoming a circle
+%!test  # a square becoming a circle
 %! S = solid.loft ({at([-10, -10; 10, -10; 10, 10; -10, 10], 0), ...
 %!                  at([6, 0, 1; -6, 0, 1], 30)});
 %! assert_equal (bbox (S), [-10, -10, 0, 10, 10, 30], 1e-6);
@@ -145,13 +141,13 @@ endfunction
 %! assert_equal (volume (S) < 30 * 400, true);
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # a duct of uniform wall, its hole lofted
+%!test  # a duct of uniform wall, its hole lofted
 %! sq = @(a) [-a, -a; a, -a; a, a; -a, a];
 %! S = solid.loft ({at(sq (5), 0, {sq(4)}), at(sq (5), 10, {sq(4)})});
 %! assert_equal (volume (S), (100 - 64) * 10, 1e-9);
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # sections that are not parallel
+%!test  # sections that are not parallel
 %! B = at ([-5, -5; 5, -5; 5, 5; -5, 5], 0);
 %! T = geom.Region ([-5, -5; 5, -5; 5, 5; -5, 5]);
 %! T.UCS = geom.UCS ([1, 0, 1], [0, 0, 20]);
@@ -159,7 +155,7 @@ endfunction
 %! assert_equal (isvalid (S), true);
 %! assert_equal (volume (S) > 0, true);
 
-%!testif ; exist ('__occt__') == 3  # between two closed splines
+%!test  # between two closed splines
 %! P = [-3, -2; 3, -2; 4, 2; 0, 4; -4, 2];
 %! R = geom.Region (geom.Spline (P, 'Closed', true));
 %! S = solid.loft ({R, at(geom.Spline (P, 'Closed', true), 20)}, ...

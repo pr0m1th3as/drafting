@@ -146,10 +146,6 @@ function S = extrude (R, H, varargin)
   if (twisted && any (A != 0))
     error ("solid.extrude: Taper cannot be combined with Twist or Scale.");
   endif
-  errmsg = solid.__checkocct__ ();
-  if (! isempty (errmsg))
-    error ("solid.extrude: %s", errmsg);
-  endif
 
   H = double (H);
   if (twisted)
@@ -189,20 +185,20 @@ function S = twist (R, H, TW, SC)
 
 endfunction
 
-%!testif ; exist ('__occt__') == 3
+%!test
 %! S = solid.extrude (geom.Region ([0, 0; 10, 0; 10, 20; 0, 20]), 5);
 %! assert_equal (volume (S), 1000, 1e-9);
 %! assert_equal (bbox (S), [0, 0, 0, 10, 20, 5], 1e-9);
 %! assert_equal (numfaces (S), 6);
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # an L-shaped bracket
+%!test  # an L-shaped bracket
 %! R = geom.Region ([0, 0; 30, 0; 30, 5; 5, 5; 5, 20; 0, 20]);
 %! S = solid.extrude (R, 10);
 %! assert_equal (volume (S), (150 + 75) * 10, 1e-9);
 %! assert_equal (numfaces (S), 8);
 
-%!testif ; exist ('__occt__') == 3  # a slot-ended link
+%!test  # a slot-ended link
 %! R = geom.Region ([0, -6, 0; 40, -6, 1; 40, 6, 0; 0, 6, 1]);
 %! S = solid.extrude (R, 5);
 %! assert_equal (volume (S), (480 + 36 * pi) * 5, 1e-9);
@@ -210,19 +206,19 @@ endfunction
 %! assert_equal (numfaces (S), 6);
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # a disc from two vertices
+%!test  # a disc from two vertices
 %! S = solid.extrude (geom.Region ([0, 0, 1; 10, 0, 1]), 2);
 %! assert_equal (volume (S), 50 * pi, 1e-9);
 %! assert_equal (area (S), 50 * pi + 20 * pi, 1e-9);
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # a negative bulge rounds inwards
+%!test  # a negative bulge rounds inwards
 %! R = geom.Region ([0, 0, 0; 20, 0, 0; 20, 20, -1; 0, 20, 0]);
 %! S = solid.extrude (R, 1);
 %! assert_equal (volume (S), 400 - 50 * pi, 1e-9);
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # a smooth hole, a closed spline
+%!test  # a smooth hole, a closed spline
 %! H = geom.Spline ([20, 15; 35, 12; 40, 25; 28, 35; 18, 28], 'Closed', true);
 %! R = geom.Region ([0, 0; 80, 0; 80, 50; 0, 50], {H});
 %! S = solid.extrude (R, 6);
@@ -230,14 +226,14 @@ endfunction
 %! assert_equal (numfaces (S), 7);
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # a spline region scaled along the height
+%!test  # a spline region scaled along the height
 %! R = geom.Region (geom.Spline ([-3, -2; 3, -2; 4, 2; 0, 4; -4, 2], ...
 %!                               'Closed', true));
 %! S = solid.extrude (R, 6, 'Scale', 0.5);
 %! assert_equal (volume (S), 6 * __area__ (R.Outline) * 1.75 / 3, -1e-9);
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # a hole of a rational spline, a circle
+%!test  # a hole of a rational spline, a circle
 %! w = sqrt (2) / 2;
 %! C = [1, 0; 1, 1; 0, 1; -1, 1; -1, 0; -1, -1; 0, -1; 1, -1; 1, 0];
 %! H = geom.Spline.nurbs (5 * C + [20, 10], ...
@@ -247,7 +243,7 @@ endfunction
 %! assert_equal (volume (S), (800 - 25 * pi) * 3, -1e-9);
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # holes of any shape go right through
+%!test  # holes of any shape go right through
 %! R = geom.Region ([0, 0; 60, 0; 60, 40; 0, 40], ...
 %!                  {[20, 20, 1; 40, 20, 1], [4, 4; 10, 4; 10, 10; 4, 10]});
 %! S = solid.extrude (R, 3);
@@ -255,7 +251,7 @@ endfunction
 %! assert_equal (numfaces (S), 6 + 2 + 4);   # a bore of two arcs, two faces
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # square to a sloping plane
+%!test  # square to a sloping plane
 %! n = [0, -0.6, 0.8];
 %! R = geom.Region ([0, 0; 10, 0; 10, 10; 0, 10]);
 %! R.UCS = geom.UCS (n, [0, 0, 5]);
@@ -265,17 +261,17 @@ endfunction
 %! assert_equal (centroid (S), c, 1e-9);
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # a negative height runs the other way
+%!test  # a negative height runs the other way
 %! S = solid.extrude (geom.Region ([0, 0; 10, 0; 10, 20; 0, 20]), -5);
 %! assert_equal (bbox (S), [0, 0, -5, 10, 20, 0], 1e-9);
 %! assert_equal (volume (S), 1000, 1e-9);
 
-%!testif ; exist ('__occt__') == 3  # to both sides of the plane
+%!test  # to both sides of the plane
 %! S = solid.extrude (geom.Region ([0, 0; 10, 0; 10, 20; 0, 20]), [5, 3]);
 %! assert_equal (bbox (S), [0, 0, -3, 10, 20, 5], 1e-9);
 %! assert_equal (numfaces (S), 6);
 
-%!testif ; exist ('__occt__') == 3  # tapered walls leave a frustum
+%!test  # tapered walls leave a frustum
 %! S = solid.extrude (geom.Region ([0, 0; 10, 0; 10, 10; 0, 10]), 5, ...
 %!                    'Taper', 10);
 %! w = 10 - 10 * tand (10);
@@ -284,7 +280,7 @@ endfunction
 %! assert_equal (numel (faces (S, 'Type', 'plane')), 6);
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # an outward taper, and a hole opening up
+%!test  # an outward taper, and a hole opening up
 %! R = geom.Region ([0, 0; 20, 0; 20, 20; 0, 20], {[4, 6, 1; 8, 6, 1]});
 %! S = solid.extrude (R, 5, 'Taper', 10);
 %! fr = @(a1, a2, h) h / 3 * (a1 + a2 + sqrt (a1 * a2));
@@ -297,7 +293,7 @@ endfunction
 %! w = 10 + 10 * tand (10);
 %! assert_equal (volume (T), fr (100, w ^ 2, 5), 1e-9);
 
-%!testif ; exist ('__occt__') == 3  # each side its own taper
+%!test  # each side its own taper
 %! S = solid.extrude (geom.Region ([0, 0; 10, 0; 10, 10; 0, 10]), [5, 3], ...
 %!                    'Taper', [10, 20]);
 %! fr = @(a1, a2, h) h / 3 * (a1 + a2 + sqrt (a1 * a2));
@@ -306,13 +302,13 @@ endfunction
 %! assert_equal (volume (S), fr (100, w1 ^ 2, 5) + fr (100, w2 ^ 2, 3), 1e-9);
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # scaled at the far end, exactly
+%!test  # scaled at the far end, exactly
 %! S = solid.extrude (geom.Region ([-5, -5; 5, -5; 5, 5; -5, 5]), -6, ...
 %!                    'Scale', 0.5);
 %! assert_equal (volume (S), 6 / 3 * (100 + 25 + 50), 1e-9);
 %! assert_equal (bbox (S), [-5, -5, -6, 5, 5, 0], 1e-6);
 
-%!testif ; exist ('__occt__') == 3  # twisted, the section kept
+%!test  # twisted, the section kept
 %! S = solid.extrude (geom.Region ([-5, -2; 5, -2; 5, 2; -5, 2]), 20, ...
 %!                    'Twist', 90);
 %! assert_equal (volume (S), 40 * 20, -1e-3);

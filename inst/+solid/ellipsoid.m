@@ -61,9 +61,6 @@ function S = ellipsoid (A, B, C, varargin)
   if (isempty (errmsg))
     [frame, errmsg] = solid.__place__ (varargin, {'centroid'}, [0, 0, 0]);
   endif
-  if (isempty (errmsg))
-    errmsg = solid.__checkocct__ ();
-  endif
   if (! isempty (errmsg))
     error ("solid.ellipsoid: %s", errmsg);
   endif
@@ -81,26 +78,26 @@ endfunction
 
 ## A volume of an ellipsoid takes Open CASCADE seconds, so the tests measure
 ## its cuts, ellipses whose areas are known
-%!testif ; exist ('__occt__') == 3
+%!test
 %! S = solid.ellipsoid (20, 10, 5);
 %! assert_equal (bbox (S), [-20, -10, -5, 20, 10, 5], 1e-6);
 %! assert_equal (isvalid (S), true);
 %! R = section (S, geom.UCS ([0, 0, 1], [0, 0, 3]));
 %! assert_equal (__area__ (R{1}.Outline), 128 * pi, -1e-8);
 
-%!testif ; exist ('__occt__') == 3  # laid in a UCS, the semi-axes on its axes
+%!test  # laid in a UCS, the semi-axes on its axes
 %! U = geom.UCS ([1, 0, 0], [5, 0, 0]);
 %! S = solid.ellipsoid (4, 3, 2, U);
 %! [B, L] = bbox (S);
 %! assert_equal (L, [4, 8, 6], 1e-6);
 %! assert_equal ((B(1:3) + B(4:6)) / 2, [5, 0, 0], 1e-6);
 
-%!testif ; exist ('__occt__') == 3  # equal semi-axes, a true sphere
+%!test  # equal semi-axes, a true sphere
 %! S = solid.ellipsoid (5, 5, 5);
 %! assert_equal (numel (faces (S, 'Type', 'sphere')), 1);
 %! assert_equal (volume (S), 4 / 3 * pi * 125, -1e-12);
 
-%!testif ; exist ('__occt__') == 3  # cut by a box, a valid solid
+%!test  # cut by a box, a valid solid
 %! S = subtract (solid.ellipsoid (20, 10, 5), solid.box (40, 40, 40, ...
 %!                                                     'Anchor', 'base'));
 %! assert_equal (isvalid (S), true);

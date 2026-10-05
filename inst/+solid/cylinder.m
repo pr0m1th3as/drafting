@@ -54,9 +54,6 @@ function S = cylinder (R, H, varargin)
     [frame, errmsg] = solid.__place__ (varargin, {'base', 'centroid'}, ...
                                        [0, 0, 0; 0, 0, double(H) / 2]);
   endif
-  if (isempty (errmsg))
-    errmsg = solid.__checkocct__ ();
-  endif
   if (! isempty (errmsg))
     error ("solid.cylinder: %s", errmsg);
   endif
@@ -66,7 +63,7 @@ function S = cylinder (R, H, varargin)
 
 endfunction
 
-%!testif ; exist ('__occt__') == 3
+%!test
 %! S = solid.cylinder (4, 12);
 %! assert_equal (volume (S), 192 * pi, 1e-9);
 %! assert_equal (area (S), 2 * pi * 4 * 12 + 2 * pi * 16, 1e-9);
@@ -74,13 +71,13 @@ endfunction
 %! assert_equal (numfaces (S), 3);
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # lying along x, centred on a point
+%!test  # lying along x, centred on a point
 %! U = geom.UCS ([1, 0, 0], [5, 6, 7]);
 %! S = solid.cylinder (2, 10, U, 'Anchor', 'centroid');
 %! assert_equal (bbox (S), [0, 4, 5, 10, 8, 9], 1e-9);
 %! assert_equal (centroid (S), [5, 6, 7], 1e-9);
 
-%!testif ; exist ('__occt__') == 3  # standing on a point of a UCS
+%!test  # standing on a point of a UCS
 %! U = geom.UCS ([0, 0, -1], [1, 2, 3]);
 %! S = solid.cylinder (2, 10, U);
 %! assert_equal (bbox (S), [-1, 0, -7, 3, 4, 3], 1e-9);

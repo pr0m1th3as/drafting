@@ -83,9 +83,6 @@ function S = helix (R, PITCH, TURNS)
   if (isempty (errmsg))
     errmsg = solid.__checkpos__ (TURNS, 'TURNS');
   endif
-  if (isempty (errmsg))
-    errmsg = solid.__checkocct__ ();
-  endif
   if (! isempty (errmsg))
     error ("solid.helix: %s", errmsg);
   endif
@@ -97,13 +94,13 @@ function S = helix (R, PITCH, TURNS)
 
 endfunction
 
-%!testif ; exist ('__occt__') == 3  # a square section, two turns about y
+%!test  # a square section, two turns about y
 %! S = solid.helix (geom.Region ([9.5, 0; 10.5, 0; 10.5, 1; 9.5, 1]), 3, 2);
 %! assert_equal (volume (S), 2 * pi * 10 * 2, -5e-6);
 %! assert_equal (bbox (S), [-10.5, 0, -10.5, 10.5, 7, 10.5], 1e-4);
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # a spring of round wire along z
+%!test  # a spring of round wire along z
 %! R = geom.Region ([9, 1, 1; 11, 1, 1]);
 %! R.UCS = geom.UCS ([0, -1, 0], [0, 0, 0]);
 %! S = solid.helix (R, 4, 5);
@@ -111,19 +108,19 @@ endfunction
 %! assert_equal (bbox (S)([3, 6]), [0, 22], 1e-4);
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # a triangular thread, half a turn
+%!test  # a triangular thread, half a turn
 %! S = solid.helix (geom.Region ([5, 0; 6, 0.5; 5, 1]), 2, 0.5);
 %! assert_equal (volume (S), 0.5 * 2 * pi * (5 + 1 / 3) * 0.5, -5e-6);
 %! assert_equal (bbox (S)([2, 5]), [0, 2], 1e-4);
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # a coiled tube, its hole carried round
+%!test  # a coiled tube, its hole carried round
 %! R = geom.Region ([9, 1, 1; 11, 1, 1], {[9.5, 1, 1; 10.5, 1, 1]});
 %! S = solid.helix (R, 4, 1);
 %! assert_equal (volume (S), (pi - pi / 4) * 2 * pi * 10, -5e-6);
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # a section of a closed spline
+%!test  # a section of a closed spline
 %! R = geom.Region (geom.Spline ([10, 0; 12, 0; 13, 1.5; 11, 2.5; 9.5, 1.2], ...
 %!                               'Closed', true));
 %! S = solid.helix (R, 4, 2);

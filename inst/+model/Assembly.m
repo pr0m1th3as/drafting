@@ -235,10 +235,6 @@ classdef Assembly
         error (strcat ("model.Assembly.shape: the part '%s' is a mesh; use", ...
                        " tessellate for the whole as a mesh."), name);
       endif
-      errmsg = solid.__checkocct__ ();
-      if (! isempty (errmsg))
-        error ("model.Assembly.shape: %s", errmsg);
-      endif
       n = numel (this.Instances);
       data = cell (1, n);
       C = cell (n, 1);
@@ -415,10 +411,6 @@ classdef Assembly
         if (! isempty (name))
           error (strcat ("model.Assembly.write: STEP cannot hold the mesh", ...
                          " part '%s'."), name);
-        endif
-        errmsg = solid.__checkocct__ ();
-        if (! isempty (errmsg))
-          error ("model.Assembly.write: %s", errmsg);
         endif
       endif
 
@@ -699,24 +691,24 @@ endfunction
 %! A = add (A, 'pin', pin, geom.UCS ([0, 0, 1], [10, 0, 0]));
 %! assert_equal ([numparts(A), numinstances(A)], [1, 2]);
 
-%!testif ; exist ('__occt__') == 3  # shape: the parts apart, in their colours
+%!test  # shape: the parts apart, in their colours
 %! S = shape (pinring ());
 %! assert_equal (numsolids (S), 4);
 %! assert_equal (S.Colour, [0.2, 0.4, 0.8; repmat([0.8, 0.2, 0.2], 3, 1)]);
 
-%!testif ; exist ('__occt__') == 3  # shape: a part where its frame puts it
+%!test  # shape: a part where its frame puts it
 %! A = add (model.Assembly (), 'pin', solid.cylinder (2, 12), ...
 %!          geom.UCS ([1, 0, 0], [5, 0, 0]));
 %! assert_equal (bbox (shape (A)), [5, -2, -2, 17, 2, 2], 1e-9);
 
-%!testif ; exist ('__occt__') == 3  # shape: a sub-assembly placed twice
+%!test  # shape: a sub-assembly placed twice
 %! B = model.Assembly ('top');
 %! B = add (B, 'stage', pinring (), geom.UCS ());
 %! B = add (B, 'stage', [], geom.UCS ([0, 0, 1], [0, 0, 50]));
 %! assert_equal ([numparts(B), numinstances(B)], [1, 2]);
 %! assert_equal (numsolids (shape (B)), 8);
 
-%!testif ; exist ('__occt__') == 3  # write: STEP defines each part once
+%!test  # write: STEP defines each part once
 %! B = model.Assembly ('top');
 %! B = add (B, 'stage', pinring (), geom.UCS ());
 %! B = add (B, 'stage', [], geom.UCS ([0, 0, 1], [0, 0, 50]));
@@ -743,7 +735,7 @@ endfunction
 %!  end_unwind_protect
 %!endfunction
 
-%!testif ; exist ('__occt__') == 3 && (! isempty (file_in_path (getenv ('PATH'), 'unzip')) || ! isempty (file_in_path (getenv ('PATH'), 'unzip.exe')))
+%!testif ; ! isempty (file_in_path (getenv ('PATH'), 'unzip')) || ! isempty (file_in_path (getenv ('PATH'), 'unzip.exe'))
 %! ## write: 3MF, each part one object, placed as components
 %! f = [tempname(), '.3mf'];
 %! unwind_protect
@@ -759,7 +751,7 @@ endfunction
 %!   unlink (f);
 %! end_unwind_protect
 
-%!testif ; exist ('__occt__') == 3  # write: an STL of every part placed
+%!test  # write: an STL of every part placed
 %! f = [tempname(), '.stl'];
 %! unwind_protect
 %!   write (pinring (), f, 'Tolerance', 0.05);
@@ -770,7 +762,7 @@ endfunction
 %!   unlink (f);
 %! end_unwind_protect
 
-%!testif ; exist ('__occt__') == 3  # write: .STEP in capitals is STEP
+%!test  # write: .STEP in capitals is STEP
 %! f = [tempname(), '.STEP'];
 %! unwind_protect
 %!   write (pinring (), f);
@@ -781,7 +773,7 @@ endfunction
 %!   unlink (f);
 %! end_unwind_protect
 
-%!testif ; exist ('__occt__') == 3  # write: .3MF in capitals is 3MF
+%!test  # write: .3MF in capitals is 3MF
 %! f = [tempname(), '.3MF'];
 %! unwind_protect
 %!   write (pinring (), f);
@@ -791,7 +783,7 @@ endfunction
 %!   unlink (f);
 %! end_unwind_protect
 
-%!testif ; exist ('__occt__') == 3  # write: .Stl in mixed case is STL
+%!test  # write: .Stl in mixed case is STL
 %! f = [tempname(), '.Stl'];
 %! unwind_protect
 %!   write (pinring (), f, 'Tolerance', 0.05);
@@ -820,7 +812,7 @@ endfunction
 %! assert_equal ([min(M.Vertices); max(M.Vertices)], [5, 0, 0; 6, 1, 1], ...
 %!               1e-12);
 
-%!testif ; exist ('__occt__') == 3  # tessellate: solids and meshes, coloured
+%!test  # tessellate: solids and meshes, coloured
 %! T = tetrapart ();
 %! T.FaceColour = repmat ([1, 0, 0], 4, 1);
 %! A = add (model.Assembly (), 'tet', T, geom.UCS ([0, 0, 1], [5, 0, 0]));

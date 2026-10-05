@@ -91,9 +91,6 @@ function S = wedge (DX, DY, DZ, TOP, varargin)
   endif
   [frame, errmsg] = solid.__place__ (varargin, {'corner', 'base'}, ...
                                      [0, 0, 0; double([DX, DY]) / 2, 0]);
-  if (isempty (errmsg))
-    errmsg = solid.__checkocct__ ();
-  endif
   if (! isempty (errmsg))
     error ("solid.wedge: %s", errmsg);
   endif
@@ -104,27 +101,27 @@ function S = wedge (DX, DY, DZ, TOP, varargin)
 
 endfunction
 
-%!testif ; exist ('__occt__') == 3  # a block cut back at the top
+%!test  # a block cut back at the top
 %! S = solid.wedge (10, 20, 8, 4);
 %! assert_equal (volume (S), (10 + 4) / 2 * 8 * 20, 1e-9);
 %! assert_equal (bbox (S), [0, 0, 0, 10, 20, 8], 1e-9);
 %! assert_equal (numfaces (S), 6);
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # a ramp, a triangular prism
+%!test  # a ramp, a triangular prism
 %! S = solid.wedge (40, 20, 10, 0);
 %! assert_equal (volume (S), 4000, 1e-9);
 %! assert_equal (numfaces (S), 5);
 %! assert_equal (numel (faces (S, 'Normal', [1, 0, 4])), 1);
 
-%!testif ; exist ('__occt__') == 3  # a frustum of a pyramid, a pyramid
+%!test  # a frustum of a pyramid, a pyramid
 %! S = solid.wedge (10, 20, 8, [2, 3, 7, 5]);
 %! assert_equal (volume (S), 720, 1e-9);
 %! assert_equal (isvalid (S), true);
 %! S = solid.wedge (10, 20, 8, [5, 5, 5, 5]);
 %! assert_equal (volume (S), 10 * 20 * 8 / 3, 1e-9);
 
-%!testif ; exist ('__occt__') == 3  # on the centre of its base in a UCS
+%!test  # on the centre of its base in a UCS
 %! U = geom.UCS ([0, 0, 1], [1, 2, 3], [1, 3, 3]);
 %! S = solid.wedge (10, 20, 8, 4, U, 'Anchor', 'base');
 %! assert_equal (bbox (S), [-9, -3, 3, 11, 7, 11], 1e-9);

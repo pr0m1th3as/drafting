@@ -40,9 +40,6 @@ function S = sphere (R, varargin)
   if (isempty (errmsg))
     [frame, errmsg] = solid.__place__ (varargin, {'centroid'}, [0, 0, 0]);
   endif
-  if (isempty (errmsg))
-    errmsg = solid.__checkocct__ ();
-  endif
   if (! isempty (errmsg))
     error ("solid.sphere: %s", errmsg);
   endif
@@ -52,7 +49,7 @@ function S = sphere (R, varargin)
 
 endfunction
 
-%!testif ; exist ('__occt__') == 3
+%!test
 %! S = solid.sphere (5);
 %! assert_equal (volume (S), 4 / 3 * pi * 125, 1e-9);
 %! assert_equal (area (S), 4 * pi * 25, 1e-9);
@@ -60,7 +57,7 @@ endfunction
 %! assert_equal (bbox (S), [-5, -5, -5, 5, 5, 5], 1e-9);
 %! assert_equal (isvalid (S), true);
 
-%!testif ; exist ('__occt__') == 3  # centred on the origin of a UCS
+%!test  # centred on the origin of a UCS
 %! U = geom.UCS ([1, 1, 0], [4, 5, 6]);
 %! S = solid.sphere (2, U);
 %! assert_equal (centroid (S), [4, 5, 6], 1e-9);

@@ -60,10 +60,6 @@ function S = read (FILE)
   if (! isstep (FILE))
     error ("solid.read: FILE is not a readable STEP file.");
   endif
-  errmsg = solid.__checkocct__ ();
-  if (! isempty (errmsg))
-    error ("solid.read: %s", errmsg);
-  endif
 
   c = __occt__ ('readstep', 'solid.read', FILE);
   S = solid.Shape (c{1});
@@ -102,7 +98,7 @@ function TF = isstep (FILE)
 
 endfunction
 
-%!testif ; exist ('__occt__') == 3  # a round trip keeps the exact geometry
+%!test  # a round trip keeps the exact geometry
 %! A = subtract (solid.box (80, 40, 12), ...
 %!               translate (solid.cylinder (4, 12), [20, 20, 0]));
 %! f = [tempname(), '.step'];
@@ -116,7 +112,7 @@ endfunction
 %!   unlink (f);
 %! end_unwind_protect
 
-%!testif ; exist ('__occt__') == 3  # the extension in upper case
+%!test  # the extension in upper case
 %! f = [tempname(), '.STEP'];
 %! unwind_protect
 %!   write (solid.sphere (5), f);
@@ -125,7 +121,7 @@ endfunction
 %!   unlink (f);
 %! end_unwind_protect
 
-%!testif ; exist ('__occt__') == 3  # several parts come back together
+%!test  # several parts come back together
 %! A = solid.box (10, 10, 10);
 %! f = [tempname(), '.step'];
 %! unwind_protect
@@ -135,7 +131,7 @@ endfunction
 %!   unlink (f);
 %! end_unwind_protect
 
-%!testif ; exist ('__occt__') == 3  # a comment before the keyword
+%!test  # a comment before the keyword
 %! f = [tempname(), '.step'];
 %! unwind_protect
 %!   write (solid.box (1, 2, 3), f);
@@ -148,7 +144,7 @@ endfunction
 %!   unlink (f);
 %! end_unwind_protect
 
-%!testif ; exist ('__occt__') == 3  # the colours of the solids come back
+%!test  # the colours of the solids come back
 %! B = solid.box (10, 10, 10);
 %! U = union (B, translate (B, [20, 0, 0]));
 %! U.Colour = [1, 0, 0; 0, 0.5, 1];
@@ -161,7 +157,7 @@ endfunction
 %!   unlink (f);
 %! end_unwind_protect
 
-%!testif ; exist ('__occt__') == 3  # a solid without a colour comes back bare
+%!test  # a solid without a colour comes back bare
 %! B = solid.box (10, 10, 10);
 %! U = union (B, translate (B, [20, 0, 0]));
 %! U.Colour = [NaN, NaN, NaN; 0, 1, 0];

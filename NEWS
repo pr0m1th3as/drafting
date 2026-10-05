@@ -52,9 +52,8 @@ Summary of important user-visible changes for drafting 0.2.0:
  ** The guide at https://pr0m1th3as.github.io/drafting/guide/ sets out how
     the package fits together and how it meets DXF, with twelve tutorials.
 
- ** Open CASCADE 7.8 or later is needed at build time for solids, and X11
-    for the viewer.  Without them the package installs and works as before,
-    and the functions that need them say so.
+ ** Open CASCADE 7.8 or later, with its visualization libraries, and X11
+    are needed at build time.
 
  ** Bug fixes:
     - An angular dimension was written to DXF with its points out of place,

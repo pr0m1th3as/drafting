@@ -168,11 +168,9 @@ The package wraps it in compiled functions and writes none of that geometry
 itself. OCCT is LGPL 2.1 with an exception, which GPLv3 code may link, and
 Debian ships it as `libocct-*-dev`.
 
-**OCCT is optional at build time.** Only `+solid`, and the parts of `+geom`
-and `+model` that call it, need it. Where it is not found the package builds
-without it, everything else works as before, and every function that needs it
-raises an error naming the missing library; its BISTs run under a runtime
-condition and skip on such a build. Linux comes first. Windows, which needs a
+**OCCT is required at build time**, with its visualization libraries and
+X11: one build, with no part left out and no test that skips for want of it.
+Linux comes first. Windows, which needs a
 MinGW build of OCCT since the MSVC binaries do not link against Octave, and
 macOS follow.
 

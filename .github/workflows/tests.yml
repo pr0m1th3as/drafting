@@ -14,20 +14,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # The package as most users build it, without Open CASCADE: everything
-  # else must work, and the solid tests skip
+  # As the Octave Packages index tests a release: the Octave image with the
+  # build packages DESCRIPTION lists installed first; latest is Ubuntu 26.04
   test:
-    uses: pr0m1th3as/octave-ci/.github/workflows/package-test.yml@v1
-    with:
-      windows-versions: '[]'
-      macos: false
-
-  # As the Octave Packages index tests a release: the latest Octave image,
-  # Ubuntu 26.04, with the build packages DESCRIPTION lists installed first
-  occt:
-    name: Ubuntu 26.04 with Open CASCADE, latest Octave
+    name: Linux, Octave ${{ matrix.version }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ['11.1.0', 'latest']
     steps:
       - uses: actions/checkout@v7
 
@@ -44,6 +40,7 @@ jobs:
       - name: Install the build packages, then install and test
         shell: bash
         env:
+          VERSION: ${{ matrix.version }}
           NAME: ${{ steps.archive.outputs.name }}
           PACKAGES: >-
             libocct-foundation-dev libocct-modeling-data-dev
@@ -51,18 +48,12 @@ jobs:
             libocct-visualization-dev libx11-dev
         run: |
           set -euo pipefail
-          # Open CASCADE must be built: without it the solid tests skip and
-          # the suite passes regardless
-          code="pkg ('install', '-local', '/work/package.tar.gz'); "
-          code+="pkg ('load', '$NAME'); "
-          code+="if (exist ('__occt__') != 3 || exist ('__occtfont__') != 3 "
-          code+="|| isempty (file_in_loadpath ('__occtview__'))); "
-          code+="error ('Open CASCADE parts were not built'); endif; "
-          code+="printf ('Open CASCADE parts built\\n'); "
-          code+="pkg ('test', '$NAME');"
+          code="printf ('Octave %s\\n', version ()); "
+          code+="pkg ('install', '-local', '/work/package.tar.gz'); "
+          code+="pkg ('load', '$NAME'); pkg ('test', '$NAME');"
           docker run --rm --volume "$PWD:/work" --workdir /work \
             --env PACKAGES --env CODE="$code" \
-            ghcr.io/gnu-octave/octave:latest bash -c '
+            "ghcr.io/gnu-octave/octave:$VERSION" bash -c '
               set -euo pipefail
               S=""
               if [ "$(id -u)" != 0 ]; then S=sudo; fi
@@ -116,7 +107,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: test-logs-occt
+          name: test-logs-linux-${{ matrix.version }}
           path: test-logs/
           if-no-files-found: ignore
           retention-days: 14

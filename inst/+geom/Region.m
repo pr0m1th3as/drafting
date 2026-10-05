@@ -442,8 +442,6 @@ classdef Region
     ## @end group
     ## @end example
     ##
-    ## Open CASCADE computes it, so the package must be built with it.
-    ##
     ## @seealso{geom.Region.subtract, geom.Region.intersect, geom.Region.offset}
     ## @end deftypefn
     function R = union (varargin)
@@ -513,8 +511,7 @@ classdef Region
     ##
     ## The edges of the result are those of the region moved, straight edges
     ## straight and arcs exact; a spline's offset is a spline that Open CASCADE
-    ## fits to it, to about a part in ten million.  It computes the offset, so
-    ## the package must be built with it.
+    ## fits to it, to about a part in ten million.
     ##
     ## @example
     ## @group
@@ -551,10 +548,6 @@ classdef Region
       if (D == 0)
         R = {this};
         return;
-      endif
-      if (exist ('__occt__') != 3)
-        error (strcat ("geom.Region.offset: Open CASCADE is not available:", ...
-                       " the drafting package was built without it."));
       endif
 
       U = this.UCS;
@@ -757,8 +750,6 @@ classdef Region
     ## cell array of regions, largest first.  The region itself is among them
     ## only where a row of @var{D} is zero.  Copies that overlap become one
     ## region.
-    ##
-    ## Open CASCADE unites the copies, so the package must be built with it.
     ##
     ## @seealso{geom.Region.rectarray, geom.Region.polararray, solid.Shape.copy}
     ## @end deftypefn
@@ -1456,10 +1447,6 @@ function R = combine (op, caller, args)
       error ("%s: every region must lie in the plane of the first.", caller);
     endif
   endfor
-  if (exist ('__occt__') != 3)
-    error (strcat ("%s: Open CASCADE is not available: the drafting", ...
-                   " package was built without it."), caller);
-  endif
   F = __occt__ ('region2d', caller, op, cellfun (@__data__, L, ...
                                                  'UniformOutput', false), ...
                 [U.Origin; U.XAxis; U.YAxis; U.Normal]);
@@ -1824,7 +1811,7 @@ endfunction
 %! assert_equal (F.UCS, U);
 %! assert_equal (__area__ (F.Outline), 25 * pi, 1e-9);
 
-%!testif ; exist ('__occt__') == 3  # union: one outline, or pieces
+%!test  # union: one outline, or pieces
 %! A = geom.Region ([0, 0; 60, 0; 60, 40; 0, 40]);
 %! R = union (A, geom.Region ([50, 10; 80, 10; 80, 30; 50, 30]));
 %! assert_equal (numel (R), 1);
@@ -1836,7 +1823,7 @@ endfunction
 %! R = union (A, geom.Region ([60, 0; 70, 0; 70, 40; 60, 40]));
 %! assert_equal (rows (R{1}.Outline.Vertices), 4);
 
-%!testif ; exist ('__occt__') == 3  # two discs, their arcs exact
+%!test  # two discs, their arcs exact
 %! D = @(x) geom.Region ([x - 10, 0, 1; x + 10, 0, 1]);
 %! R = union (D (0), D (10));
 %! A = 2 * 100 * acos (0.5) - 10 * sqrt (100 - 25);
@@ -1844,7 +1831,7 @@ endfunction
 %! R = intersect (D (0), D (10));
 %! assert_equal (__area__ (R{1}.Outline), A, 1e-9);
 
-%!testif ; exist ('__occt__') == 3  # subtract: a hole, or a cut in two
+%!test  # subtract: a hole, or a cut in two
 %! A = geom.Region ([0, 0; 60, 0; 60, 40; 0, 40]);
 %! R = subtract (A, geom.Region ([20, 20, 1; 40, 20, 1]));
 %! assert_equal (numel (R{1}.Holes), 1);
@@ -1853,7 +1840,7 @@ endfunction
 %! assert_equal (cellfun (@(r) __area__ (r.Outline), R), [1200, 800], 1e-9);
 %! assert_equal (subtract (A, A), cell (1, 0));
 
-%!testif ; exist ('__occt__') == 3  # chained, and in a UCS of their own
+%!test  # chained, and in a UCS of their own
 %! U = geom.UCS ([0, 1, 1], [1, 2, 3]);
 %! A = geom.Region ([0, 0; 60, 0; 60, 40; 0, 40]);
 %! A.UCS = U;
@@ -1866,7 +1853,7 @@ endfunction
 %! assert_equal (__area__ (R{1}.Outline) + __area__ (R{1}.Holes{1}), ...
 %!               2800 - 100 * pi, 1e-9);
 
-%!testif ; exist ('__occt__') == 3  # offset: round, sharp and cut corners
+%!test  # offset: round, sharp and cut corners
 %! S = geom.Region ([0, 0; 10, 0; 10, 10; 0, 10]);
 %! R = offset (S, 1);
 %! assert_equal (__area__ (R{1}.Outline), 140 + pi, 1e-9);
@@ -1881,7 +1868,7 @@ endfunction
 %! R = offset (S, 0);
 %! assert_equal (__area__ (R{1}.Outline), 100);
 
-%!testif ; exist ('__occt__') == 3  # an outline of arcs, a hole that closes in
+%!test  # an outline of arcs, a hole that closes in
 %! S = geom.Region ([0, -6, 0; 40, -6, 1; 40, 6, 0; 0, 6, 1]);
 %! R = offset (S, 1);
 %! assert_equal (__area__ (R{1}.Outline), 560 + 49 * pi, 1e-9);
@@ -1891,13 +1878,13 @@ endfunction
 %! assert_equal (__area__ (R{1}.Outline), 480 + pi, 1e-9);
 %! assert_equal (__area__ (R{1}.Holes{1}), -4, 1e-9);
 
-%!testif ; exist ('__occt__') == 3  # shrinking a dumbbell parts it
+%!test  # shrinking a dumbbell parts it
 %! P = [0, 0; 10, 0; 10, 4.5; 20, 4.5; 20, 0; 30, 0; 30, 10; 20, 10; ...
 %!      20, 5.5; 10, 5.5; 10, 10; 0, 10];
 %! R = offset (geom.Region (P), -1);
 %! assert_equal (numel (R), 2);
 
-%!testif ; exist ('__occt__') == 3  # a spline outline, to Open CASCADE's fit
+%!test  # a spline outline, to Open CASCADE's fit
 %! H = geom.Spline ([0, 0; 30, -5; 45, 15; 25, 30; 5, 20], 'Closed', true);
 %! S = geom.Region (H);
 %! R = offset (S, 1);
@@ -2098,14 +2085,14 @@ endfunction
 %! R = geom.Region ([0, 0, 0; 10, 0, 0; 10, 5, 1; 0, 5, 0]);
 %! assert_equal (regionarea (mirror (R, [1, 1])), regionarea (R), -1e-12);
 
-%!testif ; exist ('__occt__') == 3  # copies: overlapping ones united
+%!test  # copies: overlapping ones united
 %! D = geom.Region ([-5, 0, 1; 5, 0, 1]);
 %! C = copy (D, [0, 0; 20, 0; 8, 0]);
 %! assert_equal (numel (C), 2);
 %! assert_equal (regionarea (C{2}), 25 * pi, -1e-12);
 %! assert_equal (regionbox (C{1}), [-5, -5; 13, 5], 1e-9);
 
-%!testif ; exist ('__occt__') == 3  # a rectangular array of holes
+%!test  # a rectangular array of holes
 %! H = rectarray (geom.Region ([8, 10, 1; 12, 10, 1]), [3, 2], [10, 10]);
 %! assert_equal (numel (H), 6);
 %! P = subtract (geom.Region ([0, 0; 40, 0; 40, 30; 0, 30]), H);
@@ -2121,7 +2108,7 @@ endfunction
 %! assert_equal (numel (R.Holes), 49);
 %! assert_equal (regionarea (R), 6400 - 196 * pi, -1e-12);
 
-%!testif ; exist ('__occt__') == 3  # a bolt circle, and a quarter turn
+%!test  # a bolt circle, and a quarter turn
 %! H = polararray (geom.Region ([17, 0, 1; 23, 0, 1]), 6, 360);
 %! c = cell2mat (cellfun (@(r) mean (regionbox (r), 1), H(:), ...
 %!                        'UniformOutput', false));
@@ -2132,7 +2119,7 @@ endfunction
 %! assert_equal (numel (Q), 3);
 %! assert_equal (sum (cellfun (@regionarea, Q)), 60, -1e-12);
 
-%!testif ; exist ('__occt__') == 3  # copies kept as the region faces
+%!test  # copies kept as the region faces
 %! Q = polararray (geom.Region ([15, -1; 25, -1; 25, 1; 15, 1]), 2, 90, ...
 %!                 [0, 0], 'Rotate', false);
 %! B = sortrows (cell2mat (cellfun (@(r) regionbox (r)(:)', Q(:), ...
