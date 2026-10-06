@@ -1386,7 +1386,7 @@ draw.Drawing.print
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 3222
+# length: 3460
 draw.Drawing: print (D, FILE)
 draw.Drawing: print (D, FILE, NAME, VALUE, ...)
 draw.Drawing: [PAPER, SCALE] = print (...)
@@ -1433,6 +1433,12 @@ on such a layer still places the sheet on the paper.
 [PAPER, SCALE] = draw.Drawing.print (...) returns
 the sheet size actually used, in millimetres, and the scale denominator,
 which is worth having when the scale was fitted rather than given.
+
+Printing needs the qt or gnuplot graphics toolkit.
+fltk, which octave-cli uses on a desktop, cannot print
+a figure that is not shown, so there print is an error; run
+Octave as octave --no-gui, or call
+graphics_toolkit ('gnuplot') first.
 
 The scale is chosen from the preferred series
 
@@ -6224,7 +6230,7 @@ geom.text
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1985
+# length: 2375
 drafting: R = geom.text (STR)
 drafting: R = geom.text (STR, Name, Value, ...)
 The outlines of text, as regions.
@@ -6263,6 +6269,14 @@ default, 'center' or 'right', by the box round the ink.
 Which part lies on the origin upwards: 'baseline', the default,
 the line the letters stand on, or 'bottom', 'center' or
 'top' of the box round the ink.
+'Box'
+The largest size [W, H] in millimetres the ink may
+take, descenders included. The text is scaled evenly until it touches a
+side; a size of 0 leaves that direction free, so [40, 0] makes the
+text 40 wide. With 'Height' given as well, 'Box' only
+shrinks the text, and only when it would not fit at that height. It sets
+the size alone: 'HAlign', 'VAlign' and 'UCS'
+still place the text.
 'UCS'
 The geom.UCS the text is laid in, the world xy plane by
 default.
