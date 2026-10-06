@@ -28,12 +28,35 @@ classdef Shape
   ## operators combine, and what its @code{write} method saves as STEP for
   ## exchange or STL for printing.
   ##
-  ## Shapes are made by @code{solid.box}, @code{solid.cylinder},
-  ## @code{solid.cone}, @code{solid.sphere} and @code{solid.torus}, from
-  ## regions by @code{solid.extrude}, @code{solid.revolve}, @code{solid.loft},
-  ## @code{solid.sweep} and @code{solid.helix}, and from files by
-  ## @code{solid.read}, and combined by three methods, each taking any number
-  ## of shapes:
+  ## Primitives are made by
+  ##
+  ## @itemize
+  ## @item @code{solid.box}
+  ## @item @code{solid.cylinder}
+  ## @item @code{solid.cone}
+  ## @item @code{solid.sphere}
+  ## @item @code{solid.ellipsoid}
+  ## @item @code{solid.torus}
+  ## @item @code{solid.wedge}
+  ## @end itemize
+  ##
+  ## and solids from @code{+geom} objects by
+  ##
+  ## @itemize
+  ## @item @code{solid.extrude}
+  ## @item @code{solid.revolve}
+  ## @item @code{solid.loft}
+  ## @item @code{solid.sweep}
+  ## @item @code{solid.helix}
+  ## @end itemize
+  ##
+  ## A solid is made from a closed triangle mesh by @code{solid.polyhedron},
+  ## and from a grid of points by @code{solid.surface}, which fits a surface
+  ## through the grid and thickens it.  @code{hull} wraps shapes and points in
+  ## their convex hull, and @code{solid.read} loads solids from a STEP file.
+  ##
+  ## Finally, shapes can be combined by the three boolean CAD operations, each
+  ## taking any number of shapes:
   ##
   ## @multitable @columnfractions 0.25 0.75
   ## @headitem Method @tab Result
@@ -42,18 +65,6 @@ classdef Shape
   ## the others
   ## @item @code{intersect} @tab the material common to all of them
   ## @end multitable
-  ##
-  ## @code{hull} wraps shapes and points in their convex hull.
-  ##
-  ## @example
-  ## @group
-  ## plate = solid.box (80, 40, 12);
-  ## bore = translate (solid.cylinder (4, 12), [20, 20, 0]);
-  ## part = subtract (plate, bore);
-  ## volume (part)
-  ## @result{} 3.7797e+04
-  ## @end group
-  ## @end example
   ##
   ## Features are worked on a shape by methods: @code{hole} drills plain,
   ## counterbored, countersunk and tapping holes, @code{pocket} cuts a region
