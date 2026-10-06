@@ -51,6 +51,37 @@ These apply to all the work below and are not restated in it.
   type produces a plausible and incomplete figure, which is worse than an
   error.
 
+## Surfaces through a grid (0.2.1)
+
+A shape written as a grid of points, rows and columns as `meshgrid` makes
+them, is how many OpenSCAD users think, and it suits Octave. The grid stays
+the input; what comes out is exact and smooth, where `solid.polyhedron` on the
+same grid gives facets.
+
+`S = solid.surface (X, Y, Z, H)` has Open CASCADE fit an exact B-spline
+surface through the grid (`GeomAPI_PointsToBSplineSurface`) and returns the
+solid that surface makes thickened along its normals
+(`BRepOffsetAPI_MakeThickSolid`). It always returns a solid: a bare face is
+no `solid.Shape`, which holds the boundary of solids.
+
+**The normal** is the step from one column to the next crossed with the step
+from one row to the next. For a `meshgrid` grid that is x then y, so the
+normal points up, +z. Transposing `X`, `Y` and `Z` turns it round.
+
+**Thickness** `H` is taken exactly as `solid.extrude` takes its height: a
+positive scalar along the normal, a negative one against it, `[H1, H2]`, both
+positive, to both sides, `H1` along the normal and `H2` against it.
+`[0.5, 0.5]` is a skin of 1 centred on the surface.
+
+**Curvature.** Thickening folds over itself wherever the surface curves
+tighter than the material reaching that side: the thickness along the
+normal on that side, the thickness against it on the other. That is checked on the fitted surface before Open CASCADE is asked,
+and refused with an error naming the side.
+
+**Shown** on a tutorial page of the guide: a rippled surface from `meshgrid`,
+built once with `solid.polyhedron` and once with `solid.surface`, and the
+one-sided thickness the curvature check refuses.
+
 ## The language of a technical drawing (0.3.0)
 
 The difference between a picture of a part and a drawing of a part is that the
@@ -169,13 +200,6 @@ expectations, and the test suite remains `pkg test`.
 same lowered list that `plot` and `tikz` take, so it is a third consumer rather
 than a new architecture. It serves documentation, the web, and everyone without
 a CAD program.
-
-**Surfaces through a grid.** A shape written as a grid of points, rows and
-columns as `meshgrid` makes them, is how many OpenSCAD users think, and it
-suits Octave. `solid.surface (X, Y, Z)` would have Open CASCADE fit an exact
-B-spline surface through the grid and, with a thickness, make a solid of it
-along its normals: the grid stays the input, and what comes out is exact and
-smooth, where `solid.polyhedron` on the same grid gives facets.
 
 ## Other platforms
 

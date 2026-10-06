@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Surfaces through a grid - drafting guide</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" integrity="sha512-1ycn6IcaQQ40/MKBW2W4Rhis/DbILU74C1vSrLJxCq57o941Ym01SwNsOMqvEBFlcgUa6xLiPY/NS5R+E6ztJQ==" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/css/bootstrap.min.css" integrity="sha384-KyZXEAg3QhqLMpG8r+8fhAXLRk2vvoC2f3B09zVXn8CA5QIVfZOJ3BCsw2P0p/We" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-U1DAWAznBHeqEIlVSCgzq+c9gqGAJn5c/t99JyeKa9xxaYpSvHU5awsuZVVFIhvj" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="guide.css">
+  </head>
+  <body>
+    <div class="bg-dark">
+      <div class="container-xl">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+          <div class="container-fluid">
+            <a class="navbar-brand" href="index.html">
+              <img src="../assets/drafting.png" alt="drafting" class="d-inline-block align-top" width="25" height="25">
+              drafting guide
+            </a>
+            <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+              <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+              <ul class="navbar-nav">
+                <li class="nav-item">
+                  <a class="nav-link" href="../index.html">
+                    <i class="fas fa-book"></i>
+                    Function reference
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="https://github.com/pr0m1th3as/drafting">
+                    <i class="fab fa-github"></i>
+                    Source
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </nav>
+      </div>
+    </div>
+    <div class="container-xl my-4">
+      <div class="row">
+        <div class="col-md-3 col-lg-2 mb-4">
+          <nav class="guide-nav">
+<!-- guide-nav -->
+            <h6>Guide</h6>
+            <ul>
+              <li><a href="index.html">Overview</a></li>
+              <li><a href="layout.html">Package layout</a></li>
+              <li><a href="dxf.html">DXF and the classes</a></li>
+            </ul>
+            <h6>Tutorials</h6>
+            <ul>
+              <li><a href="01_first_part.html">A first part</a></li>
+              <li><a href="02_outlines.html">Outlines: polylines, splines, paths and regions</a></li>
+              <li><a href="03_regions.html">Working with regions</a></li>
+              <li><a href="04_coordinate_systems.html">Coordinate systems</a></li>
+              <li><a href="05_solids_from_regions.html">Solids from regions</a></li>
+              <li><a href="06_primitives_and_booleans.html">Primitives, booleans and transforms</a></li>
+              <li><a href="07_features.html">Features: holes, pockets, fillets, chamfers and shells</a></li>
+              <li><a href="08_sections_and_projections.html">Sections and projections</a></li>
+              <li><a href="09_drawings.html">Technical drawings</a></li>
+              <li><a href="10_meshes.html">Meshes</a></li>
+              <li><a href="11_assemblies.html">Assemblies</a></li>
+              <li><a href="12_from_openscad.html">For OpenSCAD users</a></li>
+              <li><a href="13_surfaces.html" class="active">Surfaces through a grid</a></li>
+            </ul>
+<!-- /guide-nav -->
+          </nav>
+        </div>
+        <main class="col-md-9 col-lg-10">
+<h1>Surfaces through a grid</h1>
+<p>A shape written as rows and columns of points, as <code>meshgrid</code> makes them, is how many OpenSCAD users build what has no primitive: a ripple, a landscape, a lid that swells. This tutorial makes one such surface twice, first as facets with <a href="../solid.polyhedron.html"><code>solid.polyhedron</code></a>, then as an exact surface with <a href="../solid.surface.html"><code>solid.surface</code></a>, and gives it a thickness so it can be printed.</p>
+<h2>The grid</h2>
+<p>A ripple 20 mm across, its height the cosine of the distance from the centre: crests 2 mm apart in height and 5 mm apart across.</p>
+<pre class="code-in"><code>[x, y] = meshgrid (-10:0.5:10);
+Z = cosd (72 * hypot (x, y));</code></pre>
+<h2>As facets</h2>
+<p>A solid needs two sides, so the grid is moved half a millimetre along its normals each way, the normals worked out from the slopes <code>gradient</code> gives.</p>
+<pre class="code-in"><code>[zx, zy] = gradient (Z, 0.5);
+N = cat (3, -zx, -zy, ones (size (Z)));
+N = N ./ sqrt (sum (N .^ 2, 3));
+P = cat (3, x, y, Z);
+top = P + N / 2;
+bottom = P - N / 2;</code></pre>
+<p>Each cell of the grid is split into two triangles, on the top and on the bottom, and four strips of triangles close the edge of one to the edge of the other. <code>K</code> numbers the points of the grid, so the corners of every cell are four blocks of it.</p>
+<pre class="code-in"><code>[m, n] = size (Z);
+V = [reshape(top, [], 3); reshape(bottom, [], 3)];
+K = reshape (1:m*n, m, n);
+a = K(1:m-1, 1:n-1);
+b = K(2:m, 1:n-1);
+c = K(2:m, 2:n);
+d = K(1:m-1, 2:n);
+F = [a(:), b(:), c(:); a(:), c(:), d(:)];
+F = [F; fliplr(F) + m * n];
+e = [K(:,1); K(m,2:n)'; K(m-1:-1:1,n); K(1,n-1:-1:2)'];
+f = circshift (e, -1);
+F = [F; e, f, f + m * n; e, f + m * n, e + m * n];
+facets = solid.polyhedron (polymesh.Mesh (V, F));
+numfaces (facets)
+show (facets);</code></pre>
+<pre class="code-out"><code>ans = 6720</code></pre>
+<figure class="shot"><img src="img/13_surfaces-1.png" alt="Surfaces through a grid, picture 1"></figure>
+<p>Every triangle is a face of its own, flat, and the ripple is only as round as the grid is fine.</p>
+<h2>As an exact surface</h2>
+<p><a href="../solid.surface.html"><code>solid.surface</code></a> takes the same grid and has Open CASCADE fit one smooth surface through it, passing within 0.001 mm of every point, then makes a solid of it, the surface thickened square to itself. The thickness is given as <a href="../solid.extrude.html"><code>solid.extrude</code></a> takes its height: <code>[0.5, 0.5]</code> is half a millimetre to each side, a skin of 1 centred on the surface. The normals, the triangles and the edges are all its work.</p>
+<pre class="code-in"><code>S = solid.surface (x, y, Z, [0.5, 0.5]);
+numfaces (S)
+show (S);</code></pre>
+<pre class="code-out"><code>ans = 6</code></pre>
+<figure class="shot"><img src="img/13_surfaces-2.png" alt="Surfaces through a grid, picture 2"></figure>
+<p>Six faces: the ripple on top, the ripple below and the four sides. A cut through the middle shows the difference plainly: the facets give an outline of 82 short lines, the surface one of four pieces, the two curves of the ripple and the two sides.</p>
+<pre class="code-in"><code>U = geom.UCS ([0, -1, 0], [0, 0, 0]);
+cut = section (facets, U);
+cut{1}
+cut = section (S, U);
+cut{1}</code></pre>
+<pre class="code-out"><code>ans =
+
+  geom.Region: an outline of 82 segments, 0 holes
+
+ans =
+
+  geom.Region: an outline of 4 segments, 0 holes</code></pre>
+<h2>Which side</h2>
+<p>The normal of the surface is the step from one column of the grid to the next crossed with the step from one row to the next. For a grid from <code>meshgrid</code> that is <i>x</i> then <i>y</i>, so the normal points up. A positive thickness grows along the normal, the surface the bottom of the solid, a negative one against it, and two, <code>[H1, H2]</code>, lie along the normal and against it.</p>
+<p>A surface cannot be thickened by more than the radius it curves with, or it folds over itself. The crests and troughs of this ripple curve with a radius of 0.63 mm, so a centred skin of 1, reaching 0.5 each way, fits, but the whole millimetre on one side does not, and that is refused:</p>
+<pre class="code-in"><code>try
+  solid.surface (x, y, Z, 1);
+catch err
+  disp (err.message)
+end_try_catch</code></pre>
+<pre class="code-out"><code>solid.surface: the surface curves more tightly than the thickness along its normal allows; its tightest radius on that side is 0.632.</code></pre>
+<p>A thinner skin on that side fits:</p>
+<pre class="code-in"><code>T = solid.surface (x, y, Z, 0.6);
+show (T);</code></pre>
+<figure class="shot"><img src="img/13_surfaces-3.png" alt="Surfaces through a grid, picture 3"></figure>
+<p>A grid that comes to a point is rounded off there by the fit, tightly. The sine of the distance rises from the centre like a cone, so the ripple made with <code>sind</code> instead of <code>cosd</code> takes no skin of 1 even centred:</p>
+<pre class="code-in"><code>try
+  solid.surface (x, y, sind (72 * hypot (x, y)), [0.5, 0.5]);
+catch err
+  disp (err.message)
+end_try_catch</code></pre>
+<pre class="code-out"><code>solid.surface: the surface curves more tightly than the thickness along its normal allows; its tightest radius on that side is 0.115.</code></pre>
+<h2>To the printer</h2>
+<p>The solid is written like any other: STEP keeps the exact surface for another CAD program, and STL is meshed from it for a slicer, as finely as the tolerance asks.</p>
+<pre class="code-in"><code>write (S, 'ripple.step');
+write (S, 'ripple.stl');</code></pre>
+<nav class="d-flex justify-content-between my-5">
+<a href="12_from_openscad.html">&larr; For OpenSCAD users</a>
+</nav>
+
+        </main>
+      </div>
+    </div>
+  </body>
+</html>

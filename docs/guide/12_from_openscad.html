@@ -66,6 +66,7 @@
               <li><a href="10_meshes.html">Meshes</a></li>
               <li><a href="11_assemblies.html">Assemblies</a></li>
               <li><a href="12_from_openscad.html" class="active">For OpenSCAD users</a></li>
+              <li><a href="13_surfaces.html">Surfaces through a grid</a></li>
             </ul>
 <!-- /guide-nav -->
           </nav>
@@ -86,6 +87,7 @@
 <li><code>cylinder (h, r)</code> is <code>solid.cylinder (R, H)</code>, and <code>cylinder (h, r1, r2)</code> is <code>solid.cone (R1, R2, H)</code>; <code>center = true</code> is <code>'Anchor', 'centroid'</code>.</li>
 <li><code>sphere (r)</code> is <code>solid.sphere (R)</code>.</li>
 <li><code>polyhedron (points, faces)</code> is <code>solid.polyhedron (polymesh.Mesh (V, F))</code>, the faces given as triangles.</li>
+<li><code>surface (file)</code> builds a solid from a grid of heights down to a base; <code>solid.surface (X, Y, Z, H)</code> fits an exact surface through such a grid and makes a skin of it, <code>H</code> thick.</li>
 <li><a href="../solid.wedge.html"><code>solid.wedge</code></a>, <a href="../solid.ellipsoid.html"><code>solid.ellipsoid</code></a> and <a href="../solid.torus.html"><code>solid.torus</code></a> have no OpenSCAD counterpart.</li>
 </ul>
 <h2>Flat shapes</h2>
@@ -168,6 +170,7 @@ volume (solid.read ('csg.step'))</code></pre>
 <pre class="code-out"><code>ans = 959.08</code></pre>
 <nav class="d-flex justify-content-between my-5">
 <a href="11_assemblies.html">&larr; Assemblies</a>
+<a href="13_surfaces.html">Surfaces through a grid &rarr;</a>
 </nav>
 
         </main>

@@ -43,6 +43,9 @@
 ## - `sphere (r)` is `solid.sphere (R)`.
 ## - `polyhedron (points, faces)` is `solid.polyhedron (polymesh.Mesh (V,
 ##   F))`, the faces given as triangles.
+## - `surface (file)` builds a solid from a grid of heights down to a base;
+##   `solid.surface (X, Y, Z, H)` fits an exact surface through such a grid
+##   and makes a skin of it, `H` thick.
 ## - `solid.wedge`, `solid.ellipsoid` and `solid.torus` have no OpenSCAD
 ##   counterpart.
 ##

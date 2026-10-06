@@ -55,7 +55,7 @@ back is set out in the guide's
 
 ## Tutorials
 
-The [guide](https://pr0m1th3as.github.io/drafting/guide/) has twelve tutorials
+The [guide](https://pr0m1th3as.github.io/drafting/guide/) has thirteen tutorials
 that build parts and drawings step by step. Every output and every picture on
 them is made by the code above it.
 
@@ -83,6 +83,8 @@ them is made by the code above it.
     parts placed together, saved to STEP and 3MF.
 12. [For OpenSCAD users](https://pr0m1th3as.github.io/drafting/guide/12_from_openscad.html):
     OpenSCAD's words in the package's, and a classic model rebuilt.
+13. [Surfaces through a grid](https://pr0m1th3as.github.io/drafting/guide/13_surfaces.html):
+    a ripple from `meshgrid`, as facets and as an exact surface made a solid.
 
 The scripts the pages are built from are in [`docs/guide/src`](docs/guide/src).
 

@@ -66,6 +66,7 @@
               <li><a href="10_meshes.html">Meshes</a></li>
               <li><a href="11_assemblies.html">Assemblies</a></li>
               <li><a href="12_from_openscad.html">For OpenSCAD users</a></li>
+              <li><a href="13_surfaces.html">Surfaces through a grid</a></li>
             </ul>
 <!-- /guide-nav -->
           </nav>
@@ -185,8 +186,9 @@ functions above.</p>
     <code>solid.ellipsoid</code>, <code>solid.torus</code>; solids from
     regions (<code>solid.extrude</code>, <code>solid.revolve</code>,
     <code>solid.loft</code>, <code>solid.sweep</code>,
-    <code>solid.helix</code>) and from meshes
-    (<code>solid.polyhedron</code>); <code>solid.read</code> for STEP.</td>
+    <code>solid.helix</code>), from meshes (<code>solid.polyhedron</code>)
+    and from grids of points (<code>solid.surface</code>);
+    <code>solid.read</code> for STEP.</td>
     <td>Open CASCADE.</td>
   </tr>
   <tr>
@@ -348,6 +350,9 @@ the world.</p>
   back into lines, arcs and splines.</td></tr>
   <tr><td><code>polymesh.Mesh</code></td><td><code>solid.Shape</code></td>
   <td><code>solid.polyhedron (M)</code>, from a closed mesh.</td></tr>
+  <tr><td>A grid of points, as <code>meshgrid</code> makes it</td>
+  <td><code>solid.Shape</code></td><td><code>solid.surface (X, Y, Z, H)</code>,
+  an exact surface through it, thickened.</td></tr>
   <tr><td><code>solid.Shape</code></td><td><code>polymesh.Mesh</code></td>
   <td><code>tessellate (S, TOL)</code>, each triangle in the colour of its
   solid.</td></tr>

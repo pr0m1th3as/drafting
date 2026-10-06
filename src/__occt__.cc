@@ -82,6 +82,8 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <BRepMesh_IncrementalMesh.hxx>
 #include <BRepOffset_MakeOffset.hxx>
 #include <BRepOffsetAPI_MakeOffset.hxx>
+#include <BRepOffsetAPI_MakeOffsetShape.hxx>
+#include <BRepOffsetAPI_MakeThickSolid.hxx>
 #include <BRepOffsetAPI_MakePipeShell.hxx>
 #include <BRepOffsetAPI_ThruSections.hxx>
 #include <BRepPrimAPI_MakeBox.hxx>
@@ -99,6 +101,12 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <GeomConvert.hxx>
 #include <GeomConvert_ApproxCurve.hxx>
 #include <Geom_BSplineCurve.hxx>
+#include <Geom_BSplineSurface.hxx>
+#include <Approx_ParametrizationType.hxx>
+#include <GeomAPI_PointsToBSplineSurface.hxx>
+#include <GeomLProp_SLProps.hxx>
+#include <Precision.hxx>
+#include <TColgp_Array2OfPnt.hxx>
 #include <GeomLib_IsPlanarSurface.hxx>
 #include <Geom2d_BSplineCurve.hxx>
 #include <Geom2d_Line.hxx>
@@ -1334,6 +1342,104 @@ polyhedron (const Matrix& V, const Matrix& F, bool merge, const string& caller)
     s = u.Shape ();
   }
   return s;
+}
+
+// A face through the grid of points X, Y and Z, M by N, an exact B-spline
+// surface passing within 0.001 of every point.  The column index runs along u
+// and the row index along v, so the normal is the step to the next column
+// crossed with the step to the next row.  The parameters are spaced evenly by
+// index, as a grid is made: spaced by chord length, or interpolating every
+// point, the surface ripples near the edges of a fine grid.  With H1 or H2
+// positive it is a solid, the face thickened H1 along the normal and H2
+// against it, refused where the surface curves more tightly than the
+// thickness reaching that side.
+static TopoDS_Shape
+gridsurface (const Matrix& X, const Matrix& Y, const Matrix& Z, double h1,
+             double h2, const string& caller)
+{
+  const octave_idx_type m = X.rows ();
+  const octave_idx_type n = X.columns ();
+  TColgp_Array2OfPnt P (1, n, 1, m);
+  for (octave_idx_type j = 0; j < n; j++)
+  {
+    for (octave_idx_type i = 0; i < m; i++)
+    {
+      P.SetValue (j + 1, i + 1, gp_Pnt (X(i,j), Y(i,j), Z(i,j)));
+    }
+  }
+  GeomAPI_PointsToBSplineSurface fit;
+  fit.Init (P, Approx_IsoParametric, 3, 8, GeomAbs_C2, 1e-3);
+  if (! fit.IsDone ())
+  {
+    error ("%s: Open CASCADE could not fit a surface through the grid.",
+           caller.c_str ());
+  }
+  const Handle (Geom_BSplineSurface) bs = fit.Surface ();
+  const TopoDS_Face face = BRepBuilderAPI_MakeFace (bs,
+                                                    Precision::Confusion ());
+  if (h1 == 0 && h2 == 0)
+  {
+    return face;
+  }
+
+  // The tightest radius on each side of the surface, sampled four times
+  // across every cell of the grid.  A curvature is positive where the surface
+  // bends towards its normal.
+  double u1, u2, v1, v2;
+  bs->Bounds (u1, u2, v1, v2);
+  const int nu = 4 * (n - 1) + 1;
+  const int nv = 4 * (m - 1) + 1;
+  double along = 0;
+  double against = 0;
+  GeomLProp_SLProps props (bs, 2, Precision::Confusion ());
+  for (int a = 0; a < nu; a++)
+  {
+    for (int b = 0; b < nv; b++)
+    {
+      props.SetParameters (u1 + (u2 - u1) * a / (nu - 1),
+                           v1 + (v2 - v1) * b / (nv - 1));
+      if (props.IsCurvatureDefined ())
+      {
+        const double k1 = props.MaxCurvature ();
+        const double k2 = props.MinCurvature ();
+        along = max ({along, k1, k2});
+        against = max ({against, -k1, -k2});
+      }
+    }
+  }
+  if (h1 > 0 && h1 * along >= 1)
+  {
+    error ("%s: the surface curves more tightly than the thickness along its"
+           " normal allows; its tightest radius on that side is %.3g.",
+           caller.c_str (), 1 / along);
+  }
+  if (h2 > 0 && h2 * against >= 1)
+  {
+    error ("%s: the surface curves more tightly than the thickness against"
+           " its normal allows; its tightest radius on that side is %.3g.",
+           caller.c_str (), 1 / against);
+  }
+
+  // Thickened from one side: a face moved back by H2 first when both
+  // sides are thick
+  TopoDS_Shape base = face;
+  if (h1 > 0 && h2 > 0)
+  {
+    BRepOffsetAPI_MakeOffsetShape off;
+    off.PerformBySimple (face, -h2);
+    base = off.Shape ();
+  }
+  BRepOffsetAPI_MakeThickSolid thick;
+  thick.MakeThickSolidBySimple (base, (h1 > 0 ? h1 + h2 : -h2));
+  thick.Build ();
+  if (! thick.IsDone () || thick.Shape ().ShapeType () != TopAbs_SOLID)
+  {
+    error ("%s: Open CASCADE could not thicken the surface.", caller.c_str ());
+  }
+  // Thickened along the normal, the solid comes out turned inwards
+  TopoDS_Solid so = TopoDS::Solid (thick.Shape ());
+  BRepLib::OrientClosedSolid (so);
+  return so;
 }
 
 // A transformed copy of a shape
@@ -2867,6 +2973,14 @@ function directly. \n\
       out = todata (polyhedron (args(2).matrix_value (),
                                 args(3).matrix_value (),
                                 args(4).bool_value (), caller));
+    }
+    else if (cmd == "surface")
+    {
+      out = todata (gridsurface (args(2).matrix_value (),
+                                 args(3).matrix_value (),
+                                 args(4).matrix_value (),
+                                 args(5).double_value (),
+                                 args(6).double_value (), caller));
     }
     else if (cmd == "place")
     {
