@@ -173,6 +173,22 @@ classdef Shape
     ## not for direct use: bytes that do not begin with that format's signature
     ## are refused.
     ##
+    ## The empty shape is where a shape built up in a loop starts: it adds
+    ## nothing to a union, so the first pass needs no case of its own.
+    ##
+    ## @example
+    ## @group
+    ## ## A stair of four steps, gathered from nothing
+    ## S = solid.Shape ();
+    ## for k = 1:4
+    ##   step = solid.box (40, 10, 5 * k);
+    ##   S = union (S, translate (step, [0, 10 * (k - 1), 0]));
+    ## endfor
+    ## numsolids (S)
+    ## @result{} 1
+    ## @end group
+    ## @end example
+    ##
     ## @end deftypefn
     function this = Shape (DATA)
 
@@ -206,6 +222,19 @@ classdef Shape
     ## the union of two blocks that share a face reads as one block of six
     ## faces.  Empty shapes add nothing, and the union of a single shape is
     ## that shape.
+    ##
+    ## Each solid of the result takes the colour of the first coloured solid
+    ## it came from, as @code{solid.Shape.Colour} describes.
+    ##
+    ## @example
+    ## @group
+    ## ## Two blocks side by side become one block
+    ## A = solid.box (10, 10, 10);
+    ## B = translate (solid.box (10, 10, 10), [10, 0, 0]);
+    ## numfaces (union (A, B))
+    ## @result{} 6
+    ## @end group
+    ## @end example
     ##
     ## @seealso{solid.Shape.subtract, solid.Shape.intersect}
     ## @end deftypefn
@@ -246,6 +275,21 @@ classdef Shape
     ## Removing empty shapes, or nothing, leaves @var{A}, and removing
     ## anything from the empty shape leaves the empty shape.
     ##
+    ## The result takes its colours from @var{A}; the shapes taken away give
+    ## none, as @code{solid.Shape.Colour} describes.
+    ##
+    ## @example
+    ## @group
+    ## ## A plate drilled with twelve holes in one call
+    ## plate = solid.box (100, 60, 8);
+    ## [x, y] = meshgrid (10:16:90, [15, 45]);
+    ## P = [x(:), y(:), zeros(numel (x), 1)];
+    ## S = subtract (plate, copy (solid.cylinder (3, 8), P));
+    ## numfaces (S)
+    ## @result{} 18
+    ## @end group
+    ## @end example
+    ##
     ## @seealso{solid.Shape.union, solid.Shape.intersect}
     ## @end deftypefn
     function C = subtract (varargin)
@@ -279,6 +323,24 @@ classdef Shape
     ## lies inside every shape given.  Shapes that do not all meet, and an
     ## empty shape among them, give the empty shape.  The intersection of a
     ## single shape is that shape.
+    ##
+    ## Intersecting with a box trims a shape to the box, and intersecting two
+    ## parts tells whether they collide: the volume of their intersection is
+    ## the volume of the interference, and parts that stay apart give the
+    ## empty shape.  Each solid of the result takes the colour of the first
+    ## coloured solid it came from.
+    ##
+    ## @example
+    ## @group
+    ## ## A shaft through a gear, and the same shaft moved clear of it
+    ## gear = solid.cylinder (20, 5);
+    ## shaft = translate (solid.cylinder (4, 30), [0, 0, -10]);
+    ## volume (intersect (gear, shaft))
+    ## @result{} 251.33
+    ## isempty (intersect (gear, translate (shaft, [30, 0, 0])))
+    ## @result{} 1
+    ## @end group
+    ## @end example
     ##
     ## @seealso{solid.Shape.union, solid.Shape.subtract}
     ## @end deftypefn
@@ -463,6 +525,19 @@ classdef Shape
     ## of a curved surface, whatever @var{TOL}.  A STEP file is exact and takes
     ## no tolerance.
     ##
+    ## The empty shape has nothing to write and is refused, and so is a
+    ## folder that does not exist.
+    ##
+    ## @example
+    ## @group
+    ## ## Exact for a CAD program, and a coarser mesh for a slicer
+    ## S = subtract (solid.box (40, 30, 10), ...
+    ##               translate (solid.cylinder (5, 10), [20, 15, 0]));
+    ## write (S, 'block.step');
+    ## write (S, 'block.stl', 'Tolerance', 0.05);
+    ## @end group
+    ## @end example
+    ##
     ## @seealso{solid.read, solid.Shape.tessellate, polymesh.Mesh.write}
     ## @end deftypefn
     function write (this, FILE, varargin)
@@ -545,6 +620,18 @@ classdef Shape
     ##
     ## @var{V} is a 3-element vector in millimetres.
     ##
+    ## Like every method, it returns a new shape and leaves @var{S} as it was,
+    ## so one part can be placed many times.  The solids keep their colours.
+    ##
+    ## @example
+    ## @group
+    ## A = solid.box (10, 10, 10);
+    ## B = translate (A, [0, 0, 10]);
+    ## bbox (B)
+    ## @result{} 0   0   10   10   10   20
+    ## @end group
+    ## @end example
+    ##
     ## @seealso{solid.Shape.rotate, solid.Shape.mirror, solid.Shape.scale}
     ## @end deftypefn
     function this = translate (this, V)
@@ -575,6 +662,22 @@ classdef Shape
     ## from the tip of @var{AXIS} looking back, the right-hand rule.
     ## @var{AXIS} is a nonzero 3-element direction, and @var{P} a point on the
     ## axis, the origin by default.
+    ##
+    ## To turn a shape in place, give its own centroid as @var{P}.  The
+    ## solids keep their colours.
+    ##
+    ## @example
+    ## @group
+    ## ## A pin standing along z, laid down along x
+    ## [~, L] = bbox (rotate (solid.cylinder (2, 20), 90, [0, 1, 0]))
+    ## @result{} L = 20   4   4
+    ##
+    ## ## A block turned a quarter about its own centre
+    ## S = solid.box (20, 10, 5);
+    ## bbox (rotate (S, 90, [0, 0, 1], centroid (S)))
+    ## @result{} 5   -5   0   15   15   5
+    ## @end group
+    ## @end example
     ##
     ## @seealso{solid.Shape.translate, solid.Shape.mirror, solid.Shape.scale}
     ## @end deftypefn
@@ -615,6 +718,18 @@ classdef Shape
     ## part into its left-handed twin; the result is a valid solid of the same
     ## volume.
     ##
+    ## The solids keep their colours.
+    ##
+    ## @example
+    ## @group
+    ## ## An L-shaped bracket and its mirror image, joined into one part
+    ## L = union (solid.box (30, 10, 5), solid.box (5, 10, 20));
+    ## S = union (L, mirror (L, [1, 0, 0]));
+    ## bbox (S)
+    ## @result{} -30   0   0   30   10   20
+    ## @end group
+    ## @end example
+    ##
     ## @seealso{solid.Shape.translate, solid.Shape.rotate, solid.Shape.scale}
     ## @end deftypefn
     function this = mirror (this, N, P = [0, 0, 0])
@@ -648,7 +763,21 @@ classdef Shape
     ## grows by its cube.  @var{P}, the origin by default, is the point that
     ## stays where it is.
     ##
-    ## @seealso{solid.Shape.translate, solid.Shape.rotate, solid.Shape.mirror}
+    ## To bring a shape to a size, each axis on its own if need be, use
+    ## @code{solid.Shape.resize}.  The solids keep their colours.
+    ##
+    ## @example
+    ## @group
+    ## ## A ball doubled about its own centre, eight times the volume
+    ## S = translate (solid.sphere (5), [20, 0, 0]);
+    ## T = scale (S, 2, [20, 0, 0]);
+    ## volume (T) / volume (S)
+    ## @result{} 8
+    ## @end group
+    ## @end example
+    ##
+    ## @seealso{solid.Shape.translate, solid.Shape.rotate, solid.Shape.mirror,
+    ## solid.Shape.resize}
     ## @end deftypefn
     function this = scale (this, F, P = [0, 0, 0])
 
@@ -691,6 +820,21 @@ classdef Shape
     ## The volume is computed from the exact surfaces, not from facets, to a
     ## relative error of about 1e-9.  The empty shape has volume zero.
     ##
+    ## Multiplied by a density it gives the mass of a part.  The integration
+    ## holds its error on every face, so on the spline surfaces of a shape
+    ## made by @code{solid.surface} it can take seconds or more.
+    ##
+    ## @example
+    ## @group
+    ## ## The mass in grams of a steel block with a bore, steel weighing
+    ## ## 7.85e-3 grams per cubic millimetre
+    ## S = subtract (solid.box (80, 40, 12), ...
+    ##               translate (solid.cylinder (4, 12), [20, 20, 0]));
+    ## mass = volume (S) * 7.85e-3
+    ## @result{} mass = 296.70
+    ## @end group
+    ## @end example
+    ##
     ## @seealso{solid.Shape.area, solid.Shape.centroid}
     ## @end deftypefn
     function V = volume (this)
@@ -714,6 +858,16 @@ classdef Shape
     ## for a cylinder, a cone, a sphere or a torus, to about 1e-4 for a face
     ## swept from a spline.  The empty shape has area zero.
     ##
+    ## It is what a coating, a plating or a coat of paint is reckoned by.
+    ##
+    ## @example
+    ## @group
+    ## ## A sphere of radius 10, whose area is 4 pi r^2
+    ## area (solid.sphere (10))
+    ## @result{} 1256.6
+    ## @end group
+    ## @end example
+    ##
     ## @seealso{solid.Shape.volume}
     ## @end deftypefn
     function A = area (this)
@@ -735,6 +889,15 @@ classdef Shape
     ## the volume is.  The empty shape has no centroid and returns an empty
     ## @var{C}, and a shape that encloses no volume returns @code{NaN} in every
     ## coordinate.
+    ##
+    ## @example
+    ## @group
+    ## ## An L-shaped bracket balances off its corner
+    ## L = union (solid.box (30, 10, 5), solid.box (5, 10, 20));
+    ## centroid (L)
+    ## @result{} 10.8333    5.0000    5.8333
+    ## @end group
+    ## @end example
     ##
     ## @seealso{solid.Shape.volume, solid.Shape.bbox}
     ## @end deftypefn
@@ -765,6 +928,14 @@ classdef Shape
     ## true extent by up to 1e-7 millimetres, the precision Open CASCADE
     ## computes it to there.  The empty shape has no extent and returns an
     ## empty @var{B} and @var{L}.
+    ##
+    ## @example
+    ## @group
+    ## [B, L] = bbox (solid.cylinder (4, 10))
+    ## @result{} B = -4   -4   0   4   4   10
+    ## @result{} L = 8   8   10
+    ## @end group
+    ## @end example
     ##
     ## @seealso{solid.Shape.centroid, geom.bbox}
     ## @end deftypefn
@@ -805,6 +976,17 @@ classdef Shape
     ## not quite coincide, and the shape should not be written or drawn.  The
     ## empty shape is valid.
     ##
+    ## A test of a part can assert it after the booleans that made it.
+    ##
+    ## @example
+    ## @group
+    ## S = subtract (solid.box (20, 20, 20), ...
+    ##               translate (solid.sphere (8), [10, 10, 20]));
+    ## isvalid (S)
+    ## @result{} 1
+    ## @end group
+    ## @end example
+    ##
     ## @end deftypefn
     function TF = isvalid (this)
 
@@ -820,6 +1002,24 @@ classdef Shape
     ## @deftypefn {solid.Shape} {@var{TF} =} isempty (@var{S})
     ##
     ## True for the empty shape, which holds no material.
+    ##
+    ## @code{@var{TF} = isempty (@var{S})} is true for the shape
+    ## @code{solid.Shape ()} returns and for the result of a boolean that
+    ## leaves no material, such as the intersection of shapes that do not
+    ## meet.  A boolean returns the empty shape rather than raising an error,
+    ## so a script tests for it here.  It has no volume, area, faces or
+    ## extent, and @code{solid.Shape.write} refuses it.  For an array of
+    ## shapes, @var{TF} is true when the array has no elements.
+    ##
+    ## @example
+    ## @group
+    ## A = solid.box (10, 10, 10);
+    ## isempty (intersect (A, translate (A, [20, 0, 0])))
+    ## @result{} 1
+    ## isempty (intersect (A, translate (A, [5, 0, 0])))
+    ## @result{} 0
+    ## @end group
+    ## @end example
     ##
     ## @end deftypefn
     function TF = isempty (this)
@@ -840,6 +1040,15 @@ classdef Shape
     ## A boolean can leave more than one: cutting a bar across its whole
     ## section leaves two.
     ##
+    ## @example
+    ## @group
+    ## bar = solid.box (60, 10, 10);
+    ## cut = translate (solid.box (2, 20, 20), [29, -5, -5]);
+    ## numsolids (subtract (bar, cut))
+    ## @result{} 2
+    ## @end group
+    ## @end example
+    ##
     ## @seealso{solid.Shape.numfaces, solid.Shape.numedges}
     ## @end deftypefn
     function N = numsolids (this)
@@ -854,6 +1063,19 @@ classdef Shape
     ## The number of faces of a shape.
     ##
     ## A box has six.  A cylinder has three, its curved side being one face.
+    ##
+    ## It is a quick check that a feature did what was meant: a bore adds one
+    ## face, and a fillet one for each edge it rounds.
+    ##
+    ## @example
+    ## @group
+    ## ## Six flat faces and the bore
+    ## S = subtract (solid.box (40, 30, 10), ...
+    ##               translate (solid.cylinder (5, 10), [20, 15, 0]));
+    ## numfaces (S)
+    ## @result{} 7
+    ## @end group
+    ## @end example
     ##
     ## @seealso{solid.Shape.numsolids, solid.Shape.numedges}
     ## @end deftypefn
@@ -871,6 +1093,15 @@ classdef Shape
     ## An edge shared by two faces is one edge.  A box has twelve.  A cylinder
     ## has three: its two circles and the seam where its curved face closes on
     ## itself, which bounds that face but is not a feature of the part.
+    ##
+    ## @example
+    ## @group
+    ## numedges (solid.box (10, 20, 30))
+    ## @result{} 12
+    ## numedges (solid.cylinder (5, 10))
+    ## @result{} 3
+    ## @end group
+    ## @end example
     ##
     ## @seealso{solid.Shape.numsolids, solid.Shape.numfaces}
     ## @end deftypefn
@@ -1033,6 +1264,16 @@ classdef Shape
     ##
     ## The empty shape has no faces.
     ##
+    ## @example
+    ## @group
+    ## ## The bore of a block, its edges chamfered 1 x 45
+    ## S = subtract (solid.box (40, 30, 10), ...
+    ##               translate (solid.cylinder (5, 10), [20, 15, 0]));
+    ## bore = faces (S, 'Type', 'cylinder');
+    ## S = chamfer (S, edges (S, 'Face', bore), 1);
+    ## @end group
+    ## @end example
+    ##
     ## @seealso{solid.Shape.edges, solid.Shape.shell}
     ## @end deftypefn
     function F = faces (this, varargin)
@@ -1115,6 +1356,16 @@ classdef Shape
     ## A radius too large for the faces beside an edge cannot be built and
     ## raises an error, as does an edge that cannot be rounded at all.
     ##
+    ## @example
+    ## @group
+    ## ## A block with its four upright edges rounded to 5
+    ## S = solid.box (40, 30, 10);
+    ## S = fillet (S, edges (S, 'Direction', [0, 0, 1]), 5);
+    ## numfaces (S)
+    ## @result{} 10
+    ## @end group
+    ## @end example
+    ##
     ## @seealso{solid.Shape.edges, solid.Shape.chamfer}
     ## @end deftypefn
     function this = fillet (this, E, R)
@@ -1170,6 +1421,16 @@ classdef Shape
     ##
     ## A chamfer too large for the faces beside an edge cannot be built and
     ## raises an error, as does an edge that cannot be chamfered at all.
+    ##
+    ## @example
+    ## @group
+    ## ## The top rim of a plate bevelled 1 x 45, and 2 x 30
+    ## S = solid.box (40, 30, 10);
+    ## F = faces (S, 'Normal', [0, 0, 1]);
+    ## A = chamfer (S, edges (S, 'Face', F), 1);
+    ## B = chamfer (S, edges (S, 'Face', F), 2, F, 'Angle', 30);
+    ## @end group
+    ## @end example
     ##
     ## @seealso{solid.Shape.edges, solid.Shape.fillet}
     ## @end deftypefn
@@ -1978,6 +2239,16 @@ classdef Shape
     ## to compute; only copies that overlap or touch are fused, so a hundred
     ## pins standing apart cost little more than one.  This is OpenSCAD's
     ## @code{for} loop of @code{translate}.
+    ##
+    ## @example
+    ## @group
+    ## ## Four pins on the corners of a square, one shape of four solids
+    ## P = copy (solid.cylinder (2, 10), ...
+    ##           [0, 0, 0; 30, 0, 0; 0, 30, 0; 30, 30, 0]);
+    ## numsolids (P)
+    ## @result{} 4
+    ## @end group
+    ## @end example
     ##
     ## @seealso{solid.Shape.rectarray, solid.Shape.polararray, geom.Region.copy}
     ## @end deftypefn
