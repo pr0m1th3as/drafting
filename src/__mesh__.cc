@@ -1732,20 +1732,67 @@ fitrun (const run& r, int mode, double tol, double size)
         smooth = false;
         continue;
       }
-      if (loose)
+    }
+    // A piece grown as far as the tolerance lets it runs on past where the
+    // outline starts to turn, by as much as the turn takes to stray TOL from
+    // it, and leaves the piece after it to start tangent to it from a point
+    // already on the turn, where nothing fits for long.  So it ends instead
+    // where the piece after it, tangent to it, reaches furthest.
+    piece chosen = best;
+    size_t ce = e;
+    if (e < m)
+    {
+      auto next = [&] (size_t k, const piece& p)
       {
-        const pt T1 = starttangent (best);
-        spline (a, S, &T1);
-        loose = false;
+        const size_t a0 = a;
+        const pt S0 = S;
+        a = k;
+        S = p.P.back ();
+        const pt tk = endtangent (p);
+        piece q;
+        double sw = 0;
+        size_t n = reach (a, m, [&] (size_t f) { return line (f, &tk, q); });
+        if (mode >= 2)
+        {
+          n = std::max (n, reach (a, m, [&] (size_t f)
+                                  { return circ (f, &tk, q, sw); }));
+        }
+        a = a0;
+        S = S0;
+        return n;
+      };
+      size_t far = next (e, best);
+      const size_t lo = (e > a + 64) ? e - 64 : a + 1;
+      for (size_t k = e - 1; k >= lo && k > a; k--)
+      {
+        piece p;
+        double sw = 0;
+        if (! (isarc ? circ (k, t, p, sw) : line (k, t, p)))
+        {
+          continue;
+        }
+        const size_t n = next (k, p);
+        if (n > far)
+        {
+          far = n;
+          chosen = p;
+          ce = k;
+        }
       }
     }
-    out.push_back (best);
-    out.back ().e = e;
+    if (loose)
+    {
+      const pt T1 = starttangent (chosen);
+      spline (a, S, &T1);
+      loose = false;
+    }
+    out.push_back (chosen);
+    out.back ().e = ce;
     out.back ().b = a;
-    S = best.P.back ();
-    T = endtangent (best);
+    S = chosen.P.back ();
+    T = endtangent (chosen);
     smooth = true;
-    a = e;
+    a = ce;
   }
   if (loose)
   {

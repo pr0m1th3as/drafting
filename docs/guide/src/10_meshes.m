@@ -87,28 +87,78 @@ endfor
 ##
 ## ## Cutting a mesh
 ##
-## `section` cuts a mesh with the plane of a `geom.UCS`, as it cuts a solid,
-## and returns the cut as regions. The cut of a mesh is made of its facets,
-## so the bore comes back as a polygon of straight segments.
+## A part that arrives as an STL file has no model behind it, only its
+## triangles. This one is the bracket of the coordinate systems tutorial,
+## built here and written as an STL, then read back as a mesh with nothing
+## exact left in it.
 
-C = section (T, geom.UCS ([0, 0, 1], [0, 0, 4]));
-C{1}.Holes{1}
+bracket = union (solid.box (90, 40, 8), ...
+                 translate (solid.wedge (60, 40, 30, 10), [0, 0, 8]));
+U = geom.UCS ([0.5144957554, 0, 0.8574929257], [60, 0, 8], [60, 1, 8]);
+slot = geom.Region ([16, 15, 1; 24, 15, 0; 24, 40, 1; 16, 40, 0]);
+slot.UCS = U;
+bracket = pocket (bracket, slot, Inf);
+bracket = fillet (bracket, edges (bracket, 'Direction', [0, 0, 1], ...
+                                  'Within', [85, -1, -1, 91, 1, 9]), 5);
+bracket = hole (bracket, [75, 12, 8; 75, 28, 8], 6, Inf);
+write (bracket, 'bracket.stl');
+M = polymesh.read ('bracket.stl')
+
+## To remake its plate, the mesh is cut through the plate, half way up.
+## `pickucs` with `'points'` picks the plane from three points, which need
+## not lie on one face: here the middles of three upright edges of the
+## plate, all 4 above its base, where the rounded corner meets the end of
+## the plate, at the far corner of that end, and where the rounded corner
+## meets the front. On a mesh a click snaps to a corner of the triangle under
+## it, or to the middle of one of its sides when it lands near, so each of
+## these takes the middle of its edge.
+
+V = show (M);
+px = @(p) V.__project__ (p);                                     #: hidden
+C = [px([90, 5, 4]); px([90, 40, 4]); px([85, 0, 4]); NaN, NaN];  #: hidden
+[U, CODE] = pickucs (V, 'points')                                #: not run
+[U, ~, CODE] = V.__pickucs__ ('points', C)                       #: hidden
+picked = U;                                                      #: hidden
+
+## `CODE` goes in the script in place of the pick, and `section` cuts the
+## mesh with the plane, as it cuts a solid, returning the cut as regions.
+## The cut of a mesh is made of its facets, so the rounded corner and the
+## holes come back as polygons of straight segments.
+
+U = geom.UCS ([0, 0, 1], [90, 5, 4], [90, 6, 4]);
+assert_equal ([U.Normal, U.Origin, U.XAxis], ...                 #: hidden
+              [picked.Normal, picked.Origin, picked.XAxis], 1e-9);  #: hidden
+C = section (M, U);
+C{1}
 
 ## `fit` turns the segments back into lines and arcs where they follow them
-## within a tolerance, a thousandth of the region's size by default. The bore
-## is two arcs again, a circle, and the outline four straight sides.
+## within a tolerance, a thousandth of the region's size by default. The
+## outline is four straight sides and the rounded corner, one arc, and each
+## bolt hole is two arcs, a circle. The slot runs through the plate at a
+## slant, so its ends are parts of ellipses, which arcs can only follow
+## within the tolerance: each end comes back as two arcs and a short line.
 
 R = fit (C{1});
-R.Holes{1}
 R.Outline
+R.Holes{1}
+R.Holes{2}
+
+## The region is the plate as it was drawn, and extruded half its thickness
+## each way from the plane of the cut, it is an exact solid again. Only the
+## slot, which runs through the part at a slant, now runs straight down, as
+## its cut half way up has it.
+
+plate = solid.extrude (R, [4, 4]);
+[~, L] = bbox (plate)
+show (plate);
 
 ## ## A mesh with a gap
 ##
 ## A mesh from a scan or a careless export may have holes in its surface.
-## Taking away one triangle of the bore makes one here. The cut through the
-## gap no longer closes: `section` returns what it can make into regions, the
-## plate without its bore, and the rest in a second output, as chains of
-## points.
+## Taking away one triangle of the bore of the plate saved under Files makes
+## one here. The cut through the gap no longer closes: `section` returns what
+## it can make into regions, the plate without its bore, and the rest in a
+## second output, as chains of points.
 
 c = (T.Vertices(T.Faces(:,1),:) + T.Vertices(T.Faces(:,2),:) ...
      + T.Vertices(T.Faces(:,3),:)) / 3;

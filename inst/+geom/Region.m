@@ -1772,6 +1772,34 @@ endfunction
 %! assert_equal (all (isnan (F.Outline.Midpoints(:))), true);
 %! assert_equal (gap (P, F.Outline.Vertices(:,1:2)) <= 0.05, true);
 
+## A 90 by 40 rectangle with one corner a fillet of radius 5 in 13 facets,
+## as a mesh of the package cuts it
+%!function P = onefillet ()
+%!  a = linspace (-90, 0, 14)';
+%!  P = [0, 0; [85 + 5 * cosd(a), 5 + 5 * sind(a)]; 90, 40; 0, 40];
+%!endfunction
+%!test  # a fillet between long straight sides is one arc
+%! F = fit (geom.Region (onefillet ()));
+%! narcs = sum (! isnan (F.Outline.Midpoints(:,1)));
+%! assert_equal ([rows(F.Outline.Vertices), narcs], [5, 1]);
+%!test  # and stays one at a looser tolerance
+%! F = fit (geom.Region (onefillet ()), 'arcs', 'AbsTol', 0.05);
+%! narcs = sum (! isnan (F.Outline.Midpoints(:,1)));
+%! assert_equal ([rows(F.Outline.Vertices), narcs], [5, 1]);
+%!test  # of the fillet's radius
+%! F = fit (geom.Region (onefillet ()), 'arcs', 'AbsTol', 0.05);
+%! V = F.Outline.Vertices(:,1:2);
+%! k = find (! isnan (F.Outline.Midpoints(:,1)), 1);
+%! A = V(k,:);
+%! B = V(mod (k, rows (V)) + 1,:);
+%! M = F.Outline.Midpoints(k,1:2);
+%! h = abs (det ([B - A; M - A])) / norm (B - A);
+%! assert_equal ((norm (B - A) ^ 2 / 4 + h ^ 2) / (2 * h), 5, 1e-3);
+%!test  # four fillets of a rectangle are an arc each
+%! F = fit (geom.Region (rounded (5, 12)));
+%! narcs = sum (! isnan (F.Outline.Midpoints(:,1)));
+%! assert_equal ([rows(F.Outline.Vertices), narcs], [8, 4]);
+
 %!test  # curves: splines within the tolerance both ways, smooth throughout
 %! t = linspace (0, 2 * pi, 2001)';
 %! t(end) = [];
