@@ -345,11 +345,14 @@ classdef Drawing
     ##
     ## @code{@var{E} = entities (@var{D})} converts the @code{draw.Drawing}
     ## @var{D} into a struct array of @code{LINE}, @code{POLYLINE}, @code{ARC},
-    ## @code{CIRCLE}, @code{TEXT}, @code{POINT} and @code{INSERT} records, each
+    ## @code{CIRCLE}, @code{ELLIPSE}, @code{TEXT}, @code{POINT} and
+    ## @code{INSERT} records, each
     ## on the layer, line type and colour it was drawn with.  A spline, a path
     ## and a region become polylines along them, a region one per loop; a
     ## hatch becomes its loops and its fill lines, clear of its holes.  An
-    ## ellipse becomes a closed polyline to the chordal tolerance.
+    ## ellipse is an @code{ELLIPSE} record with its centre in @code{pts}, its
+    ## semi-axes in @code{radius} and its rotation in degrees in
+    ## @code{rotation}.
     ##
     ## A dimension, a centre mark and a leader become the lines and text that
     ## draw them, the ornament in millimetres of model space scaled by
@@ -528,21 +531,10 @@ classdef Drawing
             E(end+1) = t;
 
           case 'ellipse'
-            ## A closed polyline sampled to the chordal tolerance
-            a = e.radius(1);
-            b = e.radius(2);
-            c = cosd (e.angle);
-            sn = sind (e.angle);
-            pts = geom.curvesample (@(t) ellipsepts (t, e.pts, a, b, c, sn), ...
-                                    [0, 2*pi], chordTol);
-            pts(end,:) = [];
-            q = mkent ('POLYLINE', e, pts);
-            q.closed = true;
+            q = mkent ('ELLIPSE', e, e.pts);
+            q.radius = e.radius;
+            q.rotation = e.angle;
             E(end+1) = q;
-            LOST(end+1) = struct ('index', ii, 'type', 'ellipse', 'reason', ...
-                                  sprintf (strcat ('ellipse drawn as a', ...
-                                                   ' closed polyline of', ...
-                                                   ' %d points'), rows (pts)));
 
           case 'spline'
             Q = __sample__ (e.shape)(:,1:2);
@@ -2527,8 +2519,7 @@ classdef Drawing
       ## file will hold rather than a kinder version of it
       ## A renderer wants the picture, not the semantics: the associative form
       ## exists for a file, where a reader can re-measure it.  What it reports
-      ## lost is no loss on screen: an ellipse within 0.01 mm, a fill dropped
-      ## only when asked for
+      ## lost is no loss on screen: a fill dropped only when asked for
       [E, ~] = entities (D, 'hatch', lower (opt.Hatch), 'bulges', 'flatten', ...
                          'dimensions', 'explode', 'DimScale', opt.DimScale);
       if (! isempty (opt.Layers) && ! isempty (E))
@@ -2571,6 +2562,12 @@ classdef Drawing
               endif
               P = [e.pts(1) + e.radius * cosd(a)', ...
                    e.pts(2) + e.radius * sind(a)'];
+              H = [H; polydraw(ax, P, e.linetype, col, po)];
+
+            case 'ELLIPSE'
+              t = linspace (0, 2*pi, opt.Arc + 1)';
+              P = ellipsepts (t, e.pts, e.radius(1), e.radius(2), ...
+                              cosd (e.rotation), sind (e.rotation));
               H = [H; polydraw(ax, P, e.linetype, col, po)];
 
             case 'TEXT'
@@ -3065,8 +3062,7 @@ classdef Drawing
       ## type.
       ## That is not hypothetical: this one did, when the dimensioning entities
       ## arrived and only this backend still rendered from the drawing model.
-      ## What an entity takes from its layer is left to the layer's style.  The
-      ## only loss it reports, an ellipse within 0.01 mm, is none on paper
+      ## What an entity takes from its layer is left to the layer's style
       [E, ~] = entities (D, 'bulges', 'flatten', 'dimensions', 'explode', ...
                          'layers', 'keep');
 
@@ -4191,7 +4187,7 @@ function parts = explodeleader (e, scale)
 
 endfunction
 
-## The ellipse, parameterised for geom.curvesample
+## The points of an ellipse at the parameters T, for plot
 function P = ellipsepts (t, C, a, b, c, s)
 
   x = a * cos (t);
@@ -4497,6 +4493,28 @@ function lines = render (e, scale, ltscale)
     case 'CIRCLE'
       lines = {sprintf('\\draw%s %s circle[radius=%smm];', o, pt (e.pts), ...
                        fmt (e.radius / scale))};
+
+    case 'ELLIPSE'
+      ## TikZ turns the ellipse about its own centre
+      opts = sprintf ('x radius=%smm, y radius=%smm', ...
+                      fmt (e.radius(1) / scale), fmt (e.radius(2) / scale));
+      if (e.rotation != 0)
+        opts = sprintf ('%s, rotate=%s', opts, fmt (e.rotation));
+      endif
+      lines = {sprintf('\\draw%s %s ellipse[%s];', o, pt (e.pts), opts)};
+      ## TikZ's bounding box of a turned ellipse can fall short of the curve
+      ## and crop the picture, so it is set aside for the exact extent
+      if (mod (e.rotation, 90) != 0)
+        a = e.radius(1);
+        b = e.radius(2);
+        c = cosd (e.rotation);
+        s = sind (e.rotation);
+        h = [hypot(a * c, b * s), hypot(a * s, b * c)];
+        lines = {'\begin{pgfinterruptboundingbox}', ['  ', lines{1}], ...
+                 '\end{pgfinterruptboundingbox}', ...
+                 sprintf('\\path %s rectangle %s;', pt (e.pts - h), ...
+                         pt (e.pts + h))};
+      endif
 
     case 'ARC'
       ## TikZ draws an arc from the current point, counter-clockwise when the

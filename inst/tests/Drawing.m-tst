@@ -899,23 +899,6 @@
 %! assert_equal (D.Entities(1).radius, [20, 8]);
 %! assert_equal (D.Entities(1).angle, 30);
 
-%!test  # an ellipse with equal axes is a circle, and measures like one
-%! D = draw.Drawing ().ellipse ([0, 0], 10, 10);
-%! E = entities (D, 'dimensions', 'explode');
-%! r = sqrt (sum (E(1).pts .^ 2, 2));
-%! assert_equal (r, 10 * ones (rows (E(1).pts), 1), 0.01);
-
-%!test  # its area is that of an ellipse, to the sampling tolerance
-%! D = draw.Drawing ().ellipse ([0, 0], 20, 8);
-%! E = entities (D, 'chordtol', 1e-4, 'dimensions', 'explode');
-%! assert_equal (abs (geom.signedarea (E(1).pts)), pi * 20 * 8, 0.1);
-
-%!test  # rotating an ellipse turns its extent with it
-%! D = draw.Drawing ().ellipse ([0, 0], 20, 5, 90);
-%! [B, W, H] = bbox (D.transform ('translate', [0, 0]));
-%! E = entities (D, 'dimensions', 'explode');
-%! assert_equal (max (E(1).pts(:,2)) > max (E(1).pts(:,1)), true);
-
 %!test  # a bulge of one makes a semicircle on the chord it spans
 %! D = draw.Drawing ().polyline (geom.Polyline ([0, 0, 1; 20, 0, 0]));
 %! E = entities (D, 'bulges', 'flatten', 'dimensions', 'explode');
@@ -1258,6 +1241,17 @@
 %!   e = get (t(1), 'extent');
 %!   xl = get (ax, 'xlim');
 %!   assert_equal (e(1) + e(3) < xl(2), true);
+%! unwind_protect_cleanup
+%!   close (f);
+%! end_unwind_protect
+
+%!test  # an ellipse is plotted along its turned axes
+%! f = figure ('visible', 'off');
+%! unwind_protect
+%!   H = plot (draw.Drawing ().ellipse ([0, 0], 20, 5, 90), ...
+%!             'Axes', axes ('parent', f));
+%!   assert_equal ([max(get (H, 'xdata')), max(get (H, 'ydata'))], [5, 20], ...
+%!                 1e-9);
 %! unwind_protect_cleanup
 %!   close (f);
 %! end_unwind_protect
@@ -1898,6 +1892,28 @@
 %! S = tikz (draw.Drawing ().circle ([0, 0], 500), 'Scale', 50);
 %! assert_equal (! isempty (strfind (S, 'circle[radius=10mm]')), true);
 
+%!test  # an ellipse is drawn as one, its semi-axes divided by the scale
+%! S = tikz (draw.Drawing ().ellipse ([10, 20], 500, 250, 30), 'Scale', 50);
+%! assert_equal (! isempty (strfind (S, ['\draw (10,20) ellipse[x radius', ...
+%!                                       '=10mm, y radius=5mm, rotate=30];'])), ...
+%!               true);
+
+%!test  # an unrotated ellipse states no rotation
+%! S = tikz (draw.Drawing ().ellipse ([0, 0], 20, 8), 'Scale', 1);
+%! assert_equal (! isempty (strfind (S, ['ellipse[x radius=20mm,', ...
+%!                                       ' y radius=8mm];'])), true);
+
+%!test  # a turned ellipse is bounded by its exact extent, not by TikZ's
+%! S = tikz (draw.Drawing ().ellipse ([0, 0], 5, 5 / sqrt (3), 30), ...
+%!           'Scale', 1);
+%! assert_equal (! isempty (strfind (S, ['\path (-4.56435,-3.53553)', ...
+%!                                       ' rectangle (4.56435,3.53553);'])), ...
+%!               true);
+
+%!test  # an ellipse on its axes keeps TikZ's bounding box
+%! S = tikz (draw.Drawing ().ellipse ([0, 0], 20, 8, 90), 'Scale', 1);
+%! assert_equal (isempty (strfind (S, 'pgfinterruptboundingbox')), true);
+
 %!test  # an arc is unrolled so that the end angle exceeds the start
 %! S = tikz (draw.Drawing ().arc ([0, 0], 100, 315, 45), 'Scale', 1);
 %! t = 'start angle=315, end angle=405';
@@ -2242,9 +2258,13 @@
 %! D = __allentities__ ();
 %! [E, LOST] = entities (D);
 %! assert_equal (strjoin (sort (unique ({E.type})), ' '), ...
-%!               'ARC CIRCLE DIMENSION LINE POINT POLYLINE TEXT');
-%! assert_equal (numel (LOST), 1);
-%! assert_equal (LOST(1).type, 'ellipse');
+%!               'ARC CIRCLE DIMENSION ELLIPSE LINE POINT POLYLINE TEXT');
+%! assert_equal (isempty (LOST), true);
+
+%!test  # an ellipse is one record with its centre, axes and rotation
+%! E = entities (draw.Drawing ().ellipse ([1, 2], 20, 8, 30));
+%! assert_equal ({E.type, E.pts, E.radius, E.rotation}, ...
+%!               {'ELLIPSE', [1, 2], [20, 8], 30});
 
 %!test  # the picture of a dimension is its extension lines, ticks and label
 %! B = __ornament__ (draw.Drawing ().dim ([0, 0], [100, 0], -20), 1, 1);
