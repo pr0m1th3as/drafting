@@ -170,6 +170,15 @@ endfor
 plot (D);</code></pre>
 <pre class="code-out"><code>ans = 6</code></pre>
 <figure class="shot"><img src="img/03_regions-6.png" alt="Working with regions, picture 6"></figure>
+<p><code>'Box'</code> sizes text to fit instead: the ink, descenders included, grows evenly until it touches a side of the box. Given with <code>'Height'</code>, it only shrinks text that would not fit at that height.</p>
+<pre class="code-in"><code>T = geom.text ('Hgjy', 'Box', [40, 12], 'VAlign', 'bottom');
+frame = geom.Polyline ([0, 0; 40, 0; 40, 12; 0, 12], 'Closed', true);
+D = draw.Drawing ().polyline (frame);
+for k = 1:numel (T)
+  D = D.hatch (T{k});
+endfor
+plot (D);</code></pre>
+<figure class="shot"><img src="img/03_regions-7.png" alt="Working with regions, picture 7"></figure>
 <h2>A part from them</h2>
 <p>The lever, finished flat, needs only to be raised into a solid, and the text to be raised on top of it.</p>
 <pre class="code-in"><code>S = solid.extrude (L{1}, 6);
@@ -179,7 +188,7 @@ for k = 1:numel (name)
   S = union (S, solid.extrude (name{k}, 1));
 endfor
 show (S);</code></pre>
-<figure class="shot"><img src="img/03_regions-7.png" alt="Working with regions, picture 7"></figure>
+<figure class="shot"><img src="img/03_regions-8.png" alt="Working with regions, picture 8"></figure>
 <nav class="d-flex justify-content-between my-5">
 <a href="02_outlines.html">&larr; Outlines: polylines, splines, paths and regions</a>
 <a href="04_coordinate_systems.html">Coordinate systems &rarr;</a>
