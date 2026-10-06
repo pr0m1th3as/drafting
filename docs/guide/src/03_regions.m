@@ -99,12 +99,17 @@ plot (D);
 ##
 ## `hull` is the shape a band stretched round regions takes, with its straight
 ## sides truly tangent to the arcs. Two circles make the outline of a lever,
-## and subtracting two smaller ones gives it its bores.
+## and `hull` returns it as one region:
 
 circle = @(x, r) geom.Region ([x - r, 0, 1; x + r, 0, 1]);
-L = hull (circle (0, 10), circle (40, 5))
-L = subtract (L, circle (0, 5), circle (40, 2.5));
-plot (draw.Drawing ().hatch (L{1}));
+Lever_outline = hull (circle (0, 10), circle (40, 5))
+
+## Subtracting two smaller circles gives the lever its bores. Like every
+## boolean, `subtract` returns a cell array of regions, even when, as here,
+## only one piece is left, so the lever is `Lever_region{1}`.
+
+Lever_region = subtract (Lever_outline, circle (0, 5), circle (40, 2.5));
+plot (draw.Drawing ().hatch (Lever_region{1}));
 
 ## ## Size, mirror and copies
 ##
@@ -164,7 +169,7 @@ plot (D);
 ## The lever, finished flat, needs only to be raised into a solid, and the
 ## text to be raised on top of it.
 
-S = solid.extrude (L{1}, 6);
+S = solid.extrude (Lever_region{1}, 6);
 name = geom.text ('L1', 'Height', 5, 'HAlign', 'center', ...
                   'VAlign', 'center', 'UCS', geom.UCS ([0, 0, 1], [20, 0, 6]));
 for k = 1:numel (name)
