@@ -359,13 +359,24 @@ classdef Region
         error ("geom.Region.fit: Name/Value arguments must come in pairs.");
       endif
       opt = struct ('RelTol', [], 'AbsTol', [], 'Corner', 20, 'Window', []);
-      for k = 1:2:numel (varargin)
-        name = varargin{k};
-        if (! ischar (name) || ! isrow (name)
-            || ! any (strcmp (name, fieldnames (opt))))
-          error ("geom.Region.fit: unknown parameter.");
+      for ii = 1:2:numel (varargin)
+        name = varargin{ii};
+        val = varargin{ii+1};
+        if (! ischar (name) || ! isrow (name))
+          error ("geom.Region.fit: option names must be character vectors.");
         endif
-        opt.(name) = varargin{k+1};
+        switch (lower (name))
+          case 'reltol'
+            opt.RelTol = val;
+          case 'abstol'
+            opt.AbsTol = val;
+          case 'corner'
+            opt.Corner = val;
+          case 'window'
+            opt.Window = val;
+          otherwise
+            error ("geom.Region.fit: unknown option '%s'.", name);
+        endswitch
       endfor
       pos = @(x) isnumeric (x) && isreal (x) && isscalar (x) ...
                  && isfinite (x) && x > 0;
@@ -527,23 +538,35 @@ classdef Region
     function R = offset (this, D, varargin)
 
       ## Input validation
-      if (nargin != 2 && nargin != 4)
+      if (nargin < 2)
         error ("geom.Region.offset: invalid number of input arguments.");
       endif
       if (! isnumeric (D) || ! isreal (D) || ! isscalar (D) || ! isfinite (D))
         error ("geom.Region.offset: D must be a finite real scalar.");
       endif
-      C = 'round';
-      if (nargin == 4)
-        if (! ischar (varargin{1}) || ! strcmp (varargin{1}, 'Corners'))
-          error ("geom.Region.offset: unknown parameter.");
-        endif
-        C = varargin{2};
-        if (! ischar (C) || ! any (strcmp (C, {'round', 'sharp', 'chamfer'})))
-          error (strcat ("geom.Region.offset: Corners must be 'round',", ...
-                         " 'sharp' or 'chamfer'."));
-        endif
+      if (mod (numel (varargin), 2) != 0)
+        error ("geom.Region.offset: Name/Value arguments must come in pairs.");
       endif
+      C = 'round';
+      for ii = 1:2:numel (varargin)
+        name = varargin{ii};
+        val = varargin{ii+1};
+        if (! ischar (name) || ! isrow (name))
+          error (strcat ("geom.Region.offset: option names must be", ...
+                         " character vectors."));
+        endif
+        switch (lower (name))
+          case 'corners'
+            C = val;
+            if (! ischar (C)
+                || ! any (strcmp (C, {'round', 'sharp', 'chamfer'})))
+              error (strcat ("geom.Region.offset: Corners must be", ...
+                             " 'round', 'sharp' or 'chamfer'."));
+            endif
+          otherwise
+            error ("geom.Region.offset: unknown option '%s'.", name);
+        endswitch
+      endfor
       if (D == 0)
         R = {this};
         return;
@@ -1267,19 +1290,30 @@ function [errmsg, TF] = flag (ARGS, NAME, DEF)
 
   errmsg = '';
   TF = DEF;
-  if (isempty (ARGS))
+  if (mod (numel (ARGS), 2) != 0)
+    errmsg = "Name/Value arguments must come in pairs.";
     return;
   endif
-  if (numel (ARGS) != 2)
-    errmsg = "Name/Value arguments must come in pairs.";
-  elseif (! ischar (ARGS{1}) || ! strcmp (ARGS{1}, NAME))
-    errmsg = "unknown parameter.";
-  elseif (! (islogical (ARGS{2}) || isnumeric (ARGS{2}))
-          || ! isscalar (ARGS{2}) || ! any (ARGS{2} == [0, 1]))
-    errmsg = sprintf ("%s must be true or false.", NAME);
-  else
-    TF = logical (ARGS{2});
-  endif
+  for ii = 1:2:numel (ARGS)
+    name = ARGS{ii};
+    val = ARGS{ii+1};
+    if (! ischar (name) || ! isrow (name))
+      errmsg = "option names must be character vectors.";
+      return;
+    endif
+    switch (lower (name))
+      case lower (NAME)
+        if (! (islogical (val) || isnumeric (val)) || ! isscalar (val)
+            || ! any (val == [0, 1]))
+          errmsg = sprintf ("%s must be true or false.", NAME);
+          return;
+        endif
+        TF = logical (val);
+      otherwise
+        errmsg = sprintf ("unknown option '%s'.", name);
+        return;
+    endswitch
+  endfor
 
 endfunction
 
@@ -1863,8 +1897,19 @@ endfunction
 %! offset (geom.Region ([0, 0; 1, 0; 1, 1]))
 %!error<geom.Region.offset: D must be a finite real scalar.> ...
 %! offset (geom.Region ([0, 0; 1, 0; 1, 1]), NaN)
-%!error<geom.Region.offset: unknown parameter.> ...
+%!error<geom.Region.offset: unknown option 'Join'.> ...
 %! offset (geom.Region ([0, 0; 1, 0; 1, 1]), 1, 'Join', 'round')
+%!error<geom.Region.offset: option names must be character vectors.> ...
+%! offset (geom.Region ([0, 0; 1, 0; 1, 1]), 1, 1, 'round')
+%!error<geom.Region.offset: Name/Value arguments must come in pairs.> ...
+%! offset (geom.Region ([0, 0; 1, 0; 1, 1]), 1, 'Corners')
+%!test  # option names ignore case
+%! R = geom.Region ([0, 0; 2, 0; 2, 2; 0, 2]);
+%! R1 = offset (R, 1, 'corners', 'sharp');
+%! R2 = offset (R, 1, 'Corners', 'sharp');
+%! S1 = solid.extrude (R1{1}, 1);
+%! S2 = solid.extrude (R2{1}, 1);
+%! assert_equal (isequal (S1, S2), true);
 %!error<geom.Region.offset: Corners must be 'round', 'sharp' or 'chamfer'.> ...
 %! offset (geom.Region ([0, 0; 1, 0; 1, 1]), 1, 'Corners', 'square')
 
@@ -1929,8 +1974,15 @@ endfunction
 %! fit (geom.Region ([0, 0; 1, 0; 1, 1]), 'splines')
 %!error<geom.Region.fit: Name/Value arguments must come in pairs.> ...
 %! fit (geom.Region ([0, 0; 1, 0; 1, 1]), 'arcs', 'AbsTol')
-%!error<geom.Region.fit: unknown parameter.> ...
+%!error<geom.Region.fit: unknown option 'Tol'.> ...
 %! fit (geom.Region ([0, 0; 1, 0; 1, 1]), 'arcs', 'Tol', 1)
+%!error<geom.Region.fit: option names must be character vectors.> ...
+%! fit (geom.Region ([0, 0; 1, 0; 1, 1]), 'arcs', 1, 1)
+%!test  # option names ignore case
+%! R = geom.Region ([0, 0; 2, 0; 2, 2; 0, 2]);
+%! S1 = solid.extrude (fit (R, 'lines', 'abstol', 0.1), 1);
+%! S2 = solid.extrude (fit (R, 'lines', 'AbsTol', 0.1), 1);
+%! assert_equal (isequal (S1, S2), true);
 %!error<geom.Region.fit: AbsTol must be a positive and finite real scalar.> ...
 %! fit (geom.Region ([0, 0; 1, 0; 1, 1]), 'arcs', 'AbsTol', 0)
 %!error<geom.Region.fit: RelTol must be a positive and finite real scalar.> ...
@@ -2106,8 +2158,15 @@ endfunction
 %! resize (geom.Region ([0, 0; 1, 0; 0, 1]), [0, 0])
 %!error<geom.Region.resize: SZ must be a 2-element vector of nonnegative finite sizes, not all zero.> ...
 %! resize (geom.Region ([0, 0; 1, 0; 0, 1]), [1, 1, 1])
-%!error<geom.Region.resize: unknown parameter.> ...
+%!error<geom.Region.resize: unknown option 'Even'.> ...
 %! resize (geom.Region ([0, 0; 1, 0; 0, 1]), [1, 1], 'Even', true)
+%!error<geom.Region.resize: option names must be character vectors.> ...
+%! resize (geom.Region ([0, 0; 1, 0; 0, 1]), [1, 1], 1, true)
+%!test  # option names ignore case
+%! R = geom.Region ([0, 0; 2, 0; 2, 1; 0, 1]);
+%! S1 = solid.extrude (resize (R, [4, 4], 'uniform', false), 1);
+%! S2 = solid.extrude (resize (R, [4, 4], 'Uniform', false), 1);
+%! assert_equal (isequal (S1, S2), true);
 %!error<geom.Region.resize: Uniform must be true or false.> ...
 %! resize (geom.Region ([0, 0; 1, 0; 0, 1]), [1, 1], 'Uniform', 2)
 %!error<geom.Region.mirror: invalid number of input arguments.> ...

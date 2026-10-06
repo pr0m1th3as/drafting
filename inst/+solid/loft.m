@@ -77,12 +77,18 @@ function S = loft (REGIONS, varargin)
     error ("solid.loft: Name/Value arguments must come in pairs.");
   endif
   opt = struct ('Ruled', false);
-  for k = 1:2:numel (varargin)
-    name = varargin{k};
-    if (! ischar (name) || ! isrow (name) || ! any (strcmp (name, {'Ruled'})))
-      error ("solid.loft: unknown parameter.");
+  for ii = 1:2:numel (varargin)
+    name = varargin{ii};
+    val = varargin{ii+1};
+    if (! ischar (name) || ! isrow (name))
+      error ("solid.loft: option names must be character vectors.");
     endif
-    opt.(name) = varargin{k+1};
+    switch (lower (name))
+      case 'ruled'
+        opt.Ruled = val;
+      otherwise
+        error ("solid.loft: unknown option '%s'.", name);
+    endswitch
   endfor
   if (! (islogical (opt.Ruled) || isnumeric (opt.Ruled))
       || ! isscalar (opt.Ruled) || ! any (opt.Ruled == [0, 1]))
@@ -176,9 +182,18 @@ endfunction
 %!error<solid.loft: Name/Value arguments must come in pairs.> ...
 %! solid.loft ({geom.Region([0, 0; 1, 0; 1, 1]), ...
 %!              geom.Region([0, 0; 1, 0; 1, 1])}, 'Ruled')
-%!error<solid.loft: unknown parameter.> ...
+%!error<solid.loft: unknown option 'Smooth'.> ...
 %! solid.loft ({geom.Region([0, 0; 1, 0; 1, 1]), ...
 %!              geom.Region([0, 0; 1, 0; 1, 1])}, 'Smooth', 1)
+%!error<solid.loft: option names must be character vectors.> ...
+%! solid.loft ({geom.Region([0, 0; 1, 0; 1, 1]), ...
+%!              geom.Region([0, 0; 1, 0; 1, 1])}, 1, 1)
+%!test  # option names ignore case
+%! T = geom.Region ([0, 0; 2, 0; 2, 2]);
+%! T.UCS = geom.UCS ([0, 0, 1], [0, 0, 3]);
+%! R = {geom.Region([0, 0; 1, 0; 1, 1]), T};
+%! assert_equal (isequal (solid.loft (R, 'ruled', true), ...
+%!                       solid.loft (R, 'Ruled', true)), true);
 %!error<solid.loft: Ruled must be a logical scalar.> ...
 %! solid.loft ({geom.Region([0, 0; 1, 0; 1, 1]), ...
 %!              geom.Region([0, 0; 1, 0; 1, 1])}, 'Ruled', 2)

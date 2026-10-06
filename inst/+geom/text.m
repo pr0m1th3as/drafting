@@ -97,13 +97,28 @@ function R = text (STR, varargin)
   endif
   opt = struct ('Height', 10, 'Font', '', 'Style', 'regular', ...
                 'HAlign', 'left', 'VAlign', 'baseline', 'UCS', geom.UCS ());
-  for k = 1:2:numel (varargin)
-    name = varargin{k};
-    if (! ischar (name) || ! isrow (name)
-        || ! any (strcmp (name, fieldnames (opt))))
-      error ("geom.text: unknown parameter.");
+  for ii = 1:2:numel (varargin)
+    name = varargin{ii};
+    val = varargin{ii+1};
+    if (! ischar (name) || ! isrow (name))
+      error ("geom.text: option names must be character vectors.");
     endif
-    opt.(name) = varargin{k+1};
+    switch (lower (name))
+      case 'height'
+        opt.Height = val;
+      case 'font'
+        opt.Font = val;
+      case 'style'
+        opt.Style = val;
+      case 'halign'
+        opt.HAlign = val;
+      case 'valign'
+        opt.VAlign = val;
+      case 'ucs'
+        opt.UCS = val;
+      otherwise
+        error ("geom.text: unknown option '%s'.", name);
+    endswitch
   endfor
   H = opt.Height;
   if (! isnumeric (H) || ! isreal (H) || ! isscalar (H) || ! isfinite (H)
@@ -208,7 +223,13 @@ endfunction
 %!error<geom.text: STR must be a character vector.> geom.text (5)
 %!error<geom.text: Name/Value arguments must come in pairs.> ...
 %! geom.text ('A', 'Height')
-%!error<geom.text: unknown parameter.> geom.text ('A', 'Size', 5)
+%!error<geom.text: unknown option 'Size'.> geom.text ('A', 'Size', 5)
+%!error<geom.text: option names must be character vectors.> geom.text ('A', 1, 5)
+%!test  # option names ignore case
+%! T1 = geom.text ('H', 'height', 5);
+%! T2 = geom.text ('H', 'Height', 5);
+%! assert_equal (isequal (solid.extrude (T1{1}, 1), ...
+%!                       solid.extrude (T2{1}, 1)), true);
 %!error<geom.text: Height must be a positive and finite real scalar.> ...
 %! geom.text ('A', 'Height', 0)
 %!error<geom.text: Font must be a character vector.> ...

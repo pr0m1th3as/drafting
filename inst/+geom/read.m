@@ -115,14 +115,15 @@ function C = read (FILE, varargin)
   endif
   TYPE = '';
   LAYER = '';
-  for k = 1:2:numel (varargin)
-    name = varargin{k};
+  for ii = 1:2:numel (varargin)
+    name = varargin{ii};
+    val = varargin{ii+1};
     if (! ischar (name) || ! isrow (name))
-      error ("geom.read: unknown parameter.");
+      error ("geom.read: option names must be character vectors.");
     endif
     switch (lower (name))
       case 'type'
-        TYPE = varargin{k+1};
+        TYPE = val;
         if (! ischar (TYPE) || ! isrow (TYPE)
             || ! any (strcmpi (TYPE, {'path', 'polyline', 'region', 'spline'})))
           error (strcat ("geom.read: Type must be 'path', 'polyline',", ...
@@ -130,12 +131,12 @@ function C = read (FILE, varargin)
         endif
         TYPE = lower (TYPE);
       case 'layer'
-        LAYER = varargin{k+1};
+        LAYER = val;
         if (! ischar (LAYER) || ! isrow (LAYER) || isempty (LAYER))
           error ("geom.read: Layer must be a non-empty character vector.");
         endif
       otherwise
-        error ("geom.read: unknown parameter.");
+        error ("geom.read: unknown option '%s'.", name);
     endswitch
   endfor
 
@@ -470,7 +471,16 @@ endfunction
 %!error<geom.read: FILE must be a non-empty character vector.> geom.read (1)
 %!error<geom.read: Name/Value arguments must come in pairs.> ...
 %! geom.read ('a.dxf', 'Type')
-%!error<geom.read: unknown parameter.> geom.read ('a.dxf', 'Colour', 1)
+%!error<geom.read: unknown option 'Colour'.> geom.read ('a.dxf', 'Colour', 1)
+%!error<geom.read: option names must be character vectors.> geom.read ('a.dxf', 1, 1)
+%!test  # option names ignore case
+%! f = [tempname(), '.dxf'];
+%! unwind_protect
+%!   geom.write ({geom.Polyline([0, 0; 1, 0])}, f, 'Layer', 'A');
+%!   assert_equal (numel (geom.read (f, 'layer', 'A')), 1);
+%! unwind_protect_cleanup
+%!   [~] = unlink (f);
+%! end_unwind_protect
 %!error<geom.read: Type must be 'path', 'polyline', 'region' or 'spline'.> ...
 %! geom.read ('a.dxf', 'Type', 'circle')
 %!error<geom.read: Layer must be a non-empty character vector.> ...

@@ -82,13 +82,24 @@ function D = coordtable (P, ORIGIN, varargin)
 
   opt = struct ('Height', 3.5, 'Decimals', 3, 'Labels', {{}}, ...
                 'Heading', {{'PT', 'X', 'Y'}});
-  known = fieldnames (opt);
-  for k = 1:2:numel (varargin)
-    name = varargin{k};
-    if (! ischar (name) || ! isrow (name) || ! any (strcmp (name, known)))
-      error ("draw.coordtable: unknown parameter.");
+  for ii = 1:2:numel (varargin)
+    name = varargin{ii};
+    val = varargin{ii+1};
+    if (! ischar (name) || ! isrow (name))
+      error ("draw.coordtable: option names must be character vectors.");
     endif
-    opt.(name) = varargin{k+1};
+    switch (lower (name))
+      case 'height'
+        opt.Height = val;
+      case 'decimals'
+        opt.Decimals = val;
+      case 'labels'
+        opt.Labels = val;
+      case 'heading'
+        opt.Heading = val;
+      otherwise
+        error ("draw.coordtable: unknown option '%s'.", name);
+    endswitch
   endfor
   if (! isnumeric (opt.Height) || ! isscalar (opt.Height) || opt.Height <= 0)
     error ("draw.coordtable: Height must be a positive scalar.");
@@ -240,8 +251,16 @@ endfunction
 %! draw.coordtable ([0, 0], [0, 0], 'Decimals', 1.5)
 %!error<draw.coordtable: Labels must be a cell array with one entry per point.> ...
 %! draw.coordtable ([0, 0; 1, 1], [0, 0], 'Labels', {'A'})
-%!error<draw.coordtable: unknown parameter.> ...
+%!error<draw.coordtable: unknown option 'Columns'.> ...
 %! draw.coordtable ([0, 0], [0, 0], 'Columns', 3)
+%!error<draw.coordtable: option names must be character vectors.> ...
+%! draw.coordtable ([0, 0], [0, 0], 1, 3)
+%!error<draw.coordtable: Name/Value arguments must come in pairs.> ...
+%! draw.coordtable ([0, 0], [0, 0], 'Height')
+%!test  # option names ignore case
+%! D1 = draw.coordtable ([1, 2], [0, 0], 'decimals', 1);
+%! D2 = draw.coordtable ([1, 2], [0, 0], 'Decimals', 1);
+%! assert_equal (isequal (D1, D2), true);
 %!error<draw.coordtable: P must be a real numeric matrix.> ...
 %! draw.coordtable ({1, 2}, [0, 0])
 %!error<draw.coordtable: P must be an N-by-2 matrix of point coordinates.> ...

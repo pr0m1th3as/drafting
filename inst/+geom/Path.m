@@ -429,13 +429,20 @@ classdef Path
         error ("geom.Path: Name/Value arguments must come in pairs.");
       endif
       opt = struct ('Closed', false, 'UCS', geom.UCS ());
-      for k = 1:2:numel (varargin)
-        name = varargin{k};
-        if (! ischar (name) || ! isrow (name)
-            || ! any (strcmp (name, fieldnames (opt))))
-          error ("geom.Path: unknown parameter.");
+      for ii = 1:2:numel (varargin)
+        name = varargin{ii};
+        val = varargin{ii+1};
+        if (! ischar (name) || ! isrow (name))
+          error ("geom.Path: option names must be character vectors.");
         endif
-        opt.(name) = varargin{k+1};
+        switch (lower (name))
+          case 'closed'
+            opt.Closed = val;
+          case 'ucs'
+            opt.UCS = val;
+          otherwise
+            error ("geom.Path: unknown option '%s'.", name);
+        endswitch
       endfor
       if (! (islogical (opt.Closed) || isnumeric (opt.Closed))
           || ! isscalar (opt.Closed) || ! any (opt.Closed == [0, 1]))
@@ -580,16 +587,23 @@ classdef Path
         varargin(1) = [];
       endif
       A = [];
-      for k = 1:2:numel (varargin)
-        if (! ischar (varargin{k}) || ! strcmp (varargin{k}, 'Angle'))
-          error ("geom.Path.chamfer: unknown parameter.");
+      for ii = 1:2:numel (varargin)
+        name = varargin{ii};
+        val = varargin{ii+1};
+        if (! ischar (name) || ! isrow (name))
+          error ("geom.Path.chamfer: option names must be character vectors.");
         endif
-        A = varargin{k+1};
-        if (! isnumeric (A) || ! isreal (A) || ! isscalar (A)
-            || ! (A > 0) || ! (A < 180))
-          error (strcat ("geom.Path.chamfer: Angle must be in the range", ...
-                         " (0, 180) degrees."));
-        endif
+        switch (lower (name))
+          case 'angle'
+            A = val;
+            if (! isnumeric (A) || ! isreal (A) || ! isscalar (A)
+                || ! (A > 0) || ! (A < 180))
+              error (strcat ("geom.Path.chamfer: Angle must be in the", ...
+                             " range (0, 180) degrees."));
+            endif
+          otherwise
+            error ("geom.Path.chamfer: unknown option '%s'.", name);
+        endswitch
       endfor
       if (! isempty (A) && numel (D) == 2)
         error ("geom.Path.chamfer: an angle goes with one distance D.");
@@ -672,15 +686,22 @@ classdef Path
         error ("geom.Path.join: Name/Value arguments must come in pairs.");
       endif
       tangent = true;
-      for k = 1:2:numel (opts)
-        if (! strcmp (opts{k}, 'Tangent'))
-          error ("geom.Path.join: unknown parameter.");
+      for ii = 1:2:numel (opts)
+        name = opts{ii};
+        val = opts{ii+1};
+        if (! ischar (name) || ! isrow (name))
+          error ("geom.Path.join: option names must be character vectors.");
         endif
-        tangent = opts{k+1};
-        if (! (islogical (tangent) || isnumeric (tangent))
-            || ! isscalar (tangent) || ! any (tangent == [0, 1]))
-          error ("geom.Path.join: Tangent must be a logical scalar.");
-        endif
+        switch (lower (name))
+          case 'tangent'
+            tangent = val;
+            if (! (islogical (tangent) || isnumeric (tangent))
+                || ! isscalar (tangent) || ! any (tangent == [0, 1]))
+              error ("geom.Path.join: Tangent must be a logical scalar.");
+            endif
+          otherwise
+            error ("geom.Path.join: unknown option '%s'.", name);
+        endswitch
       endfor
       for k = 1:numel (varargin)
         P = varargin{k};
@@ -1645,8 +1666,13 @@ endfunction
 %! geom.Path ([0, 0, 0; 1, 0, Inf])
 %!error<geom.Path: Name/Value arguments must come in pairs.> ...
 %! geom.Path ([0, 0, 0; 1, 0, 0], 'Closed')
-%!error<geom.Path: unknown parameter.> ...
+%!error<geom.Path: unknown option 'Bulge'.> ...
 %! geom.Path ([0, 0, 0; 1, 0, 0], 'Bulge', [0, 0])
+%!error<geom.Path: option names must be character vectors.> ...
+%! geom.Path ([0, 0, 0; 1, 0, 0], 1, [0, 0])
+%!test  # option names ignore case
+%! P = geom.Path ([0, 0; 1, 0; 1, 1], 'closed', true);
+%! assert_equal (P.Closed, true);
 %!error<geom.Path: UCS must be a geom.UCS object.> ...
 %! geom.Path ([0, 0, 0; 1, 0, 0], 'UCS', [0, 0, 1])
 %!error<geom.Path: UCS must be a geom.UCS object.>
@@ -1677,9 +1703,17 @@ endfunction
 %!error<geom.Path.join: Name/Value arguments must come in pairs.> ...
 %! join (geom.Path ([0, 0, 0; 1, 0, 0]), geom.Path ([1, 0, 0; 2, 0, 0]), ...
 %!       'Tangent')
-%!error<geom.Path.join: unknown parameter.> ...
+%!error<geom.Path.join: unknown option 'Smooth'.> ...
 %! join (geom.Path ([0, 0, 0; 1, 0, 0]), geom.Path ([1, 0, 0; 2, 0, 0]), ...
 %!       'Smooth', true)
+%!error<geom.Path.join: option names must be character vectors.> ...
+%! join (geom.Path ([0, 0, 0; 1, 0, 0]), geom.Path ([1, 0, 0; 2, 0, 0]), ...
+%!       'Tangent', true, 1, true)
+%!test  # option names ignore case
+%! P = geom.Path ([0, 0, 0; 1, 0, 0]);
+%! Q = geom.Path ([1, 0, 0; 2, 1, 0]);
+%! assert_equal (join (P, Q, 'tangent', false).Vertices, ...
+%!               join (P, Q, 'Tangent', false).Vertices);
 %!error<geom.Path.join: Tangent must be a logical scalar.> ...
 %! join (geom.Path ([0, 0, 0; 1, 0, 0]), geom.Path ([1, 0, 0; 2, 0, 0]), ...
 %!       'Tangent', 2)
@@ -1690,8 +1724,14 @@ endfunction
 %! chamfer (geom.Path ([0, 0; 1, 0]))
 %!error<geom.Path.chamfer: D must be one positive finite distance, or two.> ...
 %! chamfer (geom.Path ([0, 0; 1, 0; 1, 1]), [1, 2, 3])
-%!error<geom.Path.chamfer: unknown parameter.> ...
+%!error<geom.Path.chamfer: unknown option 'Slope'.> ...
 %! chamfer (geom.Path ([0, 0; 1, 0; 1, 1]), 0.1, 'Slope', 30)
+%!error<geom.Path.chamfer: option names must be character vectors.> ...
+%! chamfer (geom.Path ([0, 0; 1, 0; 1, 1]), 0.1, 1, 30)
+%!test  # option names ignore case
+%! P = geom.Path ([0, 0; 1, 0; 1, 1]);
+%! assert_equal (chamfer (P, 0.1, 'angle', 30).Vertices, ...
+%!               chamfer (P, 0.1, 'Angle', 30).Vertices);
 %!error<geom.Path.chamfer: Angle must be in the range \(0, 180\) degrees.> ...
 %! chamfer (geom.Path ([0, 0; 1, 0; 1, 1]), 0.1, 'Angle', 0)
 %!error<geom.Path.chamfer: an angle goes with one distance D.> ...

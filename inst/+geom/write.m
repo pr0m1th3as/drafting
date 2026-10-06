@@ -141,7 +141,16 @@ endfunction
 %! geom.write ({1}, 'a.dxf')
 %!error<geom.write: Name/Value arguments must come in pairs.> ...
 %! geom.write ({}, 'a.dxf', 'Layer')
-%!error<geom.write: unknown parameter.> geom.write ({}, 'a.dxf', 'Size', 1)
+%!error<geom.write: unknown option 'Size'.> geom.write ({}, 'a.dxf', 'Size', 1)
+%!error<geom.write: option names must be character vectors.> geom.write ({}, 'a.dxf', 1, 1)
+%!test  # option names ignore case
+%! f = [tempname(), '.dxf'];
+%! unwind_protect
+%!   geom.write ({geom.Polyline([0, 0; 1, 0])}, f, 'layer', 'A');
+%!   assert_equal (numel (geom.read (f, 'Layer', 'A')), 1);
+%! unwind_protect_cleanup
+%!   [~] = unlink (f);
+%! end_unwind_protect
 %!error<geom.write: Layer must be a non-empty character vector or a cell array of one per object.> ...
 %! geom.write ({geom.Polyline([0, 0; 1, 0])}, 'a.dxf', 'Layer', {'A', 'B'})
 %!error<geom.write: Linetype must be a non-empty character vector or a cell array of one per object.> ...

@@ -130,6 +130,11 @@ endfunction
 %!error<solid.box: U must be a geom.UCS object.> solid.box (1, 2, 3, [0, 0, 1])
 %!error<solid.box: Name/Value arguments must come in pairs.> ...
 %! solid.box (1, 2, 3, 'Anchor')
-%!error<solid.box: unknown parameter.> solid.box (1, 2, 3, 'Base', 'corner')
+%!error<solid.box: unknown option 'Base'.> solid.box (1, 2, 3, 'Base', 'corner')
+%!error<solid.box: option names must be character vectors.> ...
+%! solid.box (1, 2, 3, geom.UCS (), 1, 'corner')
+%!test  # option names ignore case
+%! B = bbox (solid.box (2, 4, 6, 'anchor', 'centroid'));
+%! assert_equal (B, [-1, -2, -3, 1, 2, 3], 1e-6);
 %!error<solid.box: Anchor must be 'corner', 'base' or 'centroid'.> ...
 %! solid.box (1, 2, 3, geom.UCS (), 'Anchor', 'top')

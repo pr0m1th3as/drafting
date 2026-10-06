@@ -448,14 +448,18 @@ classdef Shape
         error ("solid.Shape.write: Name/Value arguments must come in pairs.");
       endif
       opt = struct ('Tolerance', []);
-      known = fieldnames (opt);
-      for k = 1:2:numel (varargin)
-        name = varargin{k};
-        if (! ischar (name) || ! isrow (name)
-                            || ! any (strcmp (name, known)))
-          error ("solid.Shape.write: unknown parameter.");
+      for ii = 1:2:numel (varargin)
+        name = varargin{ii};
+        val = varargin{ii+1};
+        if (! ischar (name) || ! isrow (name))
+          error ("solid.Shape.write: option names must be character vectors.");
         endif
-        opt.(name) = varargin{k+1};
+        switch (lower (name))
+          case 'tolerance'
+            opt.Tolerance = val;
+          otherwise
+            error ("solid.Shape.write: unknown option '%s'.", name);
+        endswitch
       endfor
       [folder, base, ext] = fileparts (FILE);
       isstep = strcmpi (ext, '.step');
@@ -1717,15 +1721,22 @@ classdef Shape
       if (mod (numel (args), 2) != 0)
         error ("solid.Shape.hull: Name/Value arguments must come in pairs.");
       endif
-      for i = 1:2:numel (args)
-        if (! ischar (args{i}) || ! strcmp (args{i}, 'Tolerance'))
-          error ("solid.Shape.hull: unknown parameter.");
+      for ii = 1:2:numel (args)
+        name = args{ii};
+        val = args{ii+1};
+        if (! ischar (name) || ! isrow (name))
+          error ("solid.Shape.hull: option names must be character vectors.");
         endif
-        TOL = args{i+1};
-        errmsg = solid.__checkpos__ (TOL, 'Tolerance');
-        if (! isempty (errmsg))
-          error ("solid.Shape.hull: %s", errmsg);
-        endif
+        switch (lower (name))
+          case 'tolerance'
+            TOL = val;
+            errmsg = solid.__checkpos__ (TOL, 'Tolerance');
+            if (! isempty (errmsg))
+              error ("solid.Shape.hull: %s", errmsg);
+            endif
+          otherwise
+            error ("solid.Shape.hull: unknown option '%s'.", name);
+        endswitch
       endfor
       isshape = cellfun (@(x) isa (x, 'solid.Shape') && isscalar (x), ...
                          varargin);
@@ -2126,19 +2137,30 @@ function [errmsg, TF] = flag (ARGS, NAME, DEF)
 
   errmsg = '';
   TF = DEF;
-  if (isempty (ARGS))
+  if (mod (numel (ARGS), 2) != 0)
+    errmsg = "Name/Value arguments must come in pairs.";
     return;
   endif
-  if (numel (ARGS) != 2)
-    errmsg = "Name/Value arguments must come in pairs.";
-  elseif (! ischar (ARGS{1}) || ! strcmp (ARGS{1}, NAME))
-    errmsg = "unknown parameter.";
-  elseif (! (islogical (ARGS{2}) || isnumeric (ARGS{2}))
-          || ! isscalar (ARGS{2}) || ! any (ARGS{2} == [0, 1]))
-    errmsg = sprintf ("%s must be true or false.", NAME);
-  else
-    TF = logical (ARGS{2});
-  endif
+  for ii = 1:2:numel (ARGS)
+    name = ARGS{ii};
+    val = ARGS{ii+1};
+    if (! ischar (name) || ! isrow (name))
+      errmsg = "option names must be character vectors.";
+      return;
+    endif
+    switch (lower (name))
+      case lower (NAME)
+        if (! (islogical (val) || isnumeric (val)) || ! isscalar (val)
+            || ! any (val == [0, 1]))
+          errmsg = sprintf ("%s must be true or false.", NAME);
+          return;
+        endif
+        TF = logical (val);
+      otherwise
+        errmsg = sprintf ("unknown option '%s'.", name);
+        return;
+    endswitch
+  endfor
 
 endfunction
 
@@ -2178,13 +2200,20 @@ function [errmsg, opt] = options (args, opt)
     return;
   endif
   known = fieldnames (opt);
-  for k = 1:2:numel (args)
-    name = args{k};
-    if (! ischar (name) || ! isrow (name) || ! any (strcmp (name, known)))
-      errmsg = "unknown parameter.";
+  for ii = 1:2:numel (args)
+    name = args{ii};
+    val = args{ii+1};
+    if (! ischar (name) || ! isrow (name))
+      errmsg = "option names must be character vectors.";
       return;
     endif
-    opt.(name) = args{k+1};
+    switch (lower (name))
+      case lower (known)
+        opt.(known{strcmpi (name, known)}) = val;
+      otherwise
+        errmsg = sprintf ("unknown option '%s'.", name);
+        return;
+    endswitch
   endfor
 
 endfunction
@@ -2899,8 +2928,21 @@ endfunction
 %! write (solid.Shape (), '')
 %!error<solid.Shape.write: Name/Value arguments must come in pairs.> ...
 %! write (solid.Shape (), 'a.stl', 'Tolerance')
-%!error<solid.Shape.write: unknown parameter.> ...
+%!error<solid.Shape.write: unknown option 'Angle'.> ...
 %! write (solid.Shape (), 'a.stl', 'Angle', 5)
+%!error<solid.Shape.write: option names must be character vectors.> ...
+%! write (solid.Shape (), 'a.stl', 1, 5)
+%!test  # option names ignore case
+%! f1 = [tempname(), '.stl'];
+%! f2 = [tempname(), '.stl'];
+%! unwind_protect
+%!   write (solid.sphere (5), f1, 'tolerance', 0.1);
+%!   write (solid.sphere (5), f2, 'Tolerance', 0.1);
+%!   assert_equal (fileread (f1), fileread (f2));
+%! unwind_protect_cleanup
+%!   [~] = unlink (f1);
+%!   [~] = unlink (f2);
+%! end_unwind_protect
 %!error<solid.Shape.write: FILE must end in .step, .stl, .obj, .ply or .3mf.> ...
 %! write (solid.Shape (), 'a.dxf')
 %!error<solid.Shape.write: FILE must end in .step, .stl, .obj, .ply or .3mf.> ...
@@ -3071,8 +3113,13 @@ endfunction
 %! scale (solid.Shape (), 2, [1, 2])
 %!error<solid.Shape.edges: Name/Value arguments must come in pairs.> ...
 %! edges (solid.Shape (), 'Type')
-%!error<solid.Shape.edges: unknown parameter.> ...
+%!error<solid.Shape.edges: unknown option 'Normal'.> ...
 %! edges (solid.Shape (), 'Normal', [0, 0, 1])
+%!error<solid.Shape.edges: option names must be character vectors.> ...
+%! edges (solid.Shape (), 1, [0, 0, 1])
+%!test  # option names ignore case
+%! S = solid.cylinder (1, 2);
+%! assert_equal (edges (S, 'type', 'circle'), edges (S, 'Type', 'circle'));
 %!error<solid.Shape.edges: Type must name a kind of curve: line, circle, ellipse, bspline, other.> ...
 %! edges (solid.Shape (), 'Type', 'arc')
 %!error<solid.Shape.edges: Type must name a kind of curve: line, circle, ellipse, bspline, other.> ...
@@ -3083,8 +3130,10 @@ endfunction
 %! edges (solid.Shape (), 'Within', [0, 0, 0, 1, 1])
 %!error<solid.Shape.edges: Within must be a box \[xmin, ymin, zmin, xmax, ymax, zmax\] with each minimum no greater than its maximum.> ...
 %! edges (solid.Shape (), 'Within', [0, 0, 2, 1, 1, 1])
-%!error<solid.Shape.faces: unknown parameter.> ...
+%!error<solid.Shape.faces: unknown option 'Direction'.> ...
 %! faces (solid.Shape (), 'Direction', [0, 0, 1])
+%!error<solid.Shape.faces: option names must be character vectors.> ...
+%! faces (solid.Shape (), 1, [0, 0, 1])
 %!error<solid.Shape.faces: Type must name a kind of surface: plane, cylinder, cone, sphere, torus, revolution, extrusion, bspline, other.> ...
 %! faces (solid.Shape (), 'Type', 'line')
 %!error<solid.Shape.faces: Normal must be a real 3-element vector of finite values.> ...
@@ -3117,8 +3166,10 @@ endfunction
 %! chamfer (solid.Shape (), 1, [1, 2], 1, 'Angle', 30)
 %!error<solid.Shape.chamfer: an angle needs the face F of D.> ...
 %! chamfer (solid.Shape (), 1, 1, 'Angle', 30)
-%!error<solid.Shape.chamfer: unknown parameter.> ...
+%!error<solid.Shape.chamfer: unknown option 'Slope'.> ...
 %! chamfer (solid.Shape (), 1, 1, 1, 'Slope', 30)
+%!error<solid.Shape.chamfer: option names must be character vectors.> ...
+%! chamfer (solid.Shape (), 1, 1, 1, 1, 30)
 %!error<solid.Shape.chamfer: F must be a single face index of S.> ...
 %! chamfer (solid.Shape (), 1, [1, 2], [1, 2])
 %!error<solid.Shape.edges: Face must be a vector of face indices of S.> ...
@@ -3127,8 +3178,10 @@ endfunction
 %! shell (solid.Shape (), [])
 %!error<solid.Shape.shell: Name/Value arguments must come in pairs.> ...
 %! shell (solid.Shape (), [], 1, 'Outward')
-%!error<solid.Shape.shell: unknown parameter.> ...
+%!error<solid.Shape.shell: unknown option 'Inward'.> ...
 %! shell (solid.Shape (), [], 1, 'Inward', true)
+%!error<solid.Shape.shell: option names must be character vectors.> ...
+%! shell (solid.Shape (), [], 1, 1, true)
 %!error<solid.Shape.shell: Outward must be a logical scalar.> ...
 %! shell (solid.Shape (), [], 1, 'Outward', 2)
 %!error<solid.Shape.shell: Thickness must be a cell array of faces and thicknesses, in pairs.> ...
@@ -3168,8 +3221,10 @@ endfunction
 %! hole (solid.Shape (), [0, 0, 0], 5, 0)
 %!error<solid.Shape.hole: DEPTH must be positive, or Inf for a through hole.> ...
 %! hole (solid.Shape (), [0, 0, 0], 5, NaN)
-%!error<solid.Shape.hole: unknown parameter.> ...
+%!error<solid.Shape.hole: unknown option 'Depth'.> ...
 %! hole (solid.Shape (), [0, 0, 0], 5, 1, 'Depth', 2)
+%!error<solid.Shape.hole: option names must be character vectors.> ...
+%! hole (solid.Shape (), [0, 0, 0], 5, 1, 1, 2)
 %!error<solid.Shape.hole: Direction must not be the zero vector.> ...
 %! hole (solid.Shape (), [0, 0, 0], 5, 1, 'Direction', [0, 0, 0])
 %!error<solid.Shape.hole: Counterbore must be \[CD, CDEPTH\], wider than D and shallower than DEPTH.> ...
@@ -3199,8 +3254,10 @@ endfunction
 %! pocket (solid.Shape (), geom.Region ([0, 0; 1, 0; 1, 1]), NaN)
 %!error<solid.Shape.pocket: Name/Value arguments must come in pairs.> ...
 %! pocket (solid.Shape (), geom.Region ([0, 0; 1, 0; 1, 1]), 1, 'Taper')
-%!error<solid.Shape.pocket: unknown parameter.> ...
+%!error<solid.Shape.pocket: unknown option 'Draft'.> ...
 %! pocket (solid.Shape (), geom.Region ([0, 0; 1, 0; 1, 1]), 1, 'Draft', 2)
+%!error<solid.Shape.pocket: option names must be character vectors.> ...
+%! pocket (solid.Shape (), geom.Region ([0, 0; 1, 0; 1, 1]), 1, 1, 2)
 %!error<solid.Shape.pocket: Taper must be an angle in the range \(-90, 90\) degrees.> ...
 %! pocket (solid.Shape (), geom.Region ([0, 0; 1, 0; 1, 1]), 1, 'Taper', 90)
 
@@ -3383,8 +3440,14 @@ endfunction
 
 %!error<solid.Shape.hull: Name/Value arguments must come in pairs.> ...
 %! hull (solid.Shape (), 'Tolerance')
-%!error<solid.Shape.hull: unknown parameter.> ...
+%!error<solid.Shape.hull: unknown option 'Angle'.> ...
 %! hull (solid.Shape (), 'Angle', 1)
+%!error<solid.Shape.hull: option names must be character vectors.> ...
+%! hull (solid.Shape (), 'Tolerance', 0.1, 1, 1)
+%!test  # option names ignore case
+%! S = solid.sphere (1);
+%! assert_equal (isequal (hull (S, 'tolerance', 0.1), ...
+%!                       hull (S, 'Tolerance', 0.1)), true);
 %!error<solid.Shape.hull: Tolerance must be a positive and finite real scalar.> ...
 %! hull (solid.Shape (), 'Tolerance', 0)
 %!error<solid.Shape.hull: every operand must be a solid.Shape object or an N-by-3 matrix of points.> ...
@@ -3455,8 +3518,14 @@ endfunction
 %! resize (solid.Shape (), [0, 0, 0])
 %!error<solid.Shape.resize: SZ must be a 3-element vector of nonnegative finite sizes, not all zero.> ...
 %! resize (solid.Shape (), [1, 1])
-%!error<solid.Shape.resize: unknown parameter.> ...
+%!error<solid.Shape.resize: unknown option 'Even'.> ...
 %! resize (solid.Shape (), [1, 1, 1], 'Even', true)
+%!error<solid.Shape.resize: option names must be character vectors.> ...
+%! resize (solid.Shape (), [1, 1, 1], 1, true)
+%!test  # option names ignore case
+%! S = solid.box (1, 2, 3);
+%! assert_equal (isequal (resize (S, [2, 2, 2], 'uniform', false), ...
+%!                       resize (S, [2, 2, 2], 'Uniform', false)), true);
 %!error<solid.Shape.resize: Uniform must be true or false.> ...
 %! resize (solid.Shape (), [1, 1, 1], 'Uniform', 'yes')
 %!error<solid.Shape.copy: invalid number of input arguments.> ...
@@ -3483,8 +3552,10 @@ endfunction
 %! polararray (solid.Shape (), 3, 90, [0, 0, 1], [0, 0])
 %!error<solid.Shape.polararray: Rotate must be true or false.> ...
 %! polararray (solid.Shape (), 3, 90, 'Rotate', 2)
-%!error<solid.Shape.polararray: unknown parameter.> ...
+%!error<solid.Shape.polararray: unknown option 'Turn'.> ...
 %! polararray (solid.Shape (), 3, 90, 'Turn', true)
+%!error<solid.Shape.polararray: option names must be character vectors.> ...
+%! polararray (solid.Shape (), 3, 90, [0, 0, 1], [0, 0, 0], 1, true)
 %!error<solid.Shape.tessellate: TOL must be a positive and finite real scalar.> ...
 %! tessellate (solid.Shape (), 0)
 %!error<solid.Shape: Colour must be empty or a 1-by-3 or N-by-3 matrix of values from 0 to 1, N the number of solids, a row of NaN for no colour.>

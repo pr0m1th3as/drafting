@@ -509,15 +509,22 @@ classdef Viewer < handle
         error ("model.Viewer: Name/Value arguments must come in pairs.");
       endif
       hidden = false;
-      for k = 1:2:numel (varargin)
-        if (! ischar (varargin{k}) || ! strcmp (varargin{k}, 'Hidden'))
-          error ("model.Viewer: unknown parameter.");
+      for ii = 1:2:numel (varargin)
+        name = varargin{ii};
+        val = varargin{ii+1};
+        if (! ischar (name) || ! isrow (name))
+          error ("model.Viewer: option names must be character vectors.");
         endif
-        hidden = varargin{k+1};
-        if (! (islogical (hidden) || isnumeric (hidden))
-            || ! isscalar (hidden) || ! any (hidden == [0, 1]))
-          error ("model.Viewer: Hidden must be a logical scalar.");
-        endif
+        switch (lower (name))
+          case 'hidden'
+            hidden = val;
+            if (! (islogical (hidden) || isnumeric (hidden))
+                || ! isscalar (hidden) || ! any (hidden == [0, 1]))
+              error ("model.Viewer: Hidden must be a logical scalar.");
+            endif
+          otherwise
+            error ("model.Viewer: unknown option '%s'.", name);
+        endswitch
       endfor
 
       ## The state lives in the graphics root, where it outlasts clear all
@@ -1482,7 +1489,12 @@ endfunction
 
 %!error<model.Viewer: Name/Value arguments must come in pairs.> ...
 %! model.Viewer ('Hidden')
-%!error<model.Viewer: unknown parameter.> model.Viewer ('Visible', true)
+%!error<model.Viewer: unknown option 'Visible'.> model.Viewer ('Visible', true)
+%!error<model.Viewer: option names must be character vectors.> model.Viewer (1, true)
+## Option names ignore case
+%!testif ; ! isempty (getenv ('DISPLAY'))
+%! V = model.Viewer ('hidden', true);
+%! assert_equal (isopen (V), false);
 %!error<model.Viewer: Hidden must be a logical scalar.> ...
 %! model.Viewer ('Hidden', 2)
 %!error<model.Viewer: Shape must be a solid.Shape or a polymesh.Mesh object.>

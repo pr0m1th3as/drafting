@@ -110,13 +110,22 @@ function S = extrude (R, H, varargin)
     error ("solid.extrude: Name/Value arguments must come in pairs.");
   endif
   opt = struct ('Taper', 0, 'Twist', 0, 'Scale', 1);
-  for k = 1:2:numel (varargin)
-    name = varargin{k};
-    if (! ischar (name) || ! isrow (name)
-        || ! any (strcmp (name, fieldnames (opt))))
-      error ("solid.extrude: unknown parameter.");
+  for ii = 1:2:numel (varargin)
+    name = varargin{ii};
+    val = varargin{ii+1};
+    if (! ischar (name) || ! isrow (name))
+      error ("solid.extrude: option names must be character vectors.");
     endif
-    opt.(name) = varargin{k+1};
+    switch (lower (name))
+      case 'taper'
+        opt.Taper = val;
+      case 'twist'
+        opt.Twist = val;
+      case 'scale'
+        opt.Scale = val;
+      otherwise
+        error ("solid.extrude: unknown option '%s'.", name);
+    endswitch
   endfor
   A = opt.Taper;
   if (! isnumeric (A) || ! isreal (A) || ! isvector (A) || numel (A) > 2
@@ -329,8 +338,14 @@ endfunction
 %! solid.extrude (geom.Region ([0, 0; 1, 0; 1, 1]), [1, 2, 3])
 %!error<solid.extrude: Name/Value arguments must come in pairs.> ...
 %! solid.extrude (geom.Region ([0, 0; 1, 0; 1, 1]), 1, 'Taper')
-%!error<solid.extrude: unknown parameter.> ...
+%!error<solid.extrude: unknown option 'Draft'.> ...
 %! solid.extrude (geom.Region ([0, 0; 1, 0; 1, 1]), 1, 'Draft', 3)
+%!error<solid.extrude: option names must be character vectors.> ...
+%! solid.extrude (geom.Region ([0, 0; 1, 0; 1, 1]), 1, 1, 3)
+%!test  # option names ignore case
+%! R = geom.Region ([0, 0; 1, 0; 1, 1]);
+%! assert_equal (isequal (solid.extrude (R, 2, 'scale', 0.5), ...
+%!                       solid.extrude (R, 2, 'Scale', 0.5)), true);
 %!error<solid.extrude: Taper must be one angle, or two for both sides, each in the range \(-90, 90\) degrees.> ...
 %! solid.extrude (geom.Region ([0, 0; 1, 0; 1, 1]), 1, 'Taper', 90)
 %!error<solid.extrude: Taper must be one angle, or two for both sides, each in the range \(-90, 90\) degrees.> ...

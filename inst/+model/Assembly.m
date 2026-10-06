@@ -154,7 +154,7 @@ classdef Assembly
     function this = add (this, NAME, X, U, varargin)
 
       ## Input validation
-      if (nargin != 4 && nargin != 6)
+      if (nargin < 4)
         error ("model.Assembly.add: invalid number of input arguments.");
       endif
       if (! ischar (NAME) || ! isrow (NAME) || isempty (NAME))
@@ -164,21 +164,35 @@ classdef Assembly
       if (! isa (U, 'geom.UCS') || ! isscalar (U))
         error ("model.Assembly.add: U must be a geom.UCS object.");
       endif
-      inst = NAME;
+      if (mod (numel (varargin), 2) != 0)
+        error ("model.Assembly.add: Name/Value arguments must come in pairs.");
+      endif
+      inst = '';
       used = {this.Instances.name};
-      if (nargin == 6)
-        if (! ischar (varargin{1}) || ! strcmp (varargin{1}, 'Name'))
-          error ("model.Assembly.add: unknown parameter.");
+      for ii = 1:2:numel (varargin)
+        name = varargin{ii};
+        val = varargin{ii+1};
+        if (! ischar (name) || ! isrow (name))
+          error (strcat ("model.Assembly.add: option names must be", ...
+                         " character vectors."));
         endif
-        inst = varargin{2};
-        if (! ischar (inst) || ! isrow (inst) || isempty (inst))
-          error (strcat ("model.Assembly.add: INSTANCE must be a non-empty", ...
-                         " character vector."));
-        endif
-        if (any (strcmp (inst, used)))
-          error ("model.Assembly.add: a placement named '%s' exists.", inst);
-        endif
-      else
+        switch (lower (name))
+          case 'name'
+            inst = val;
+            if (! ischar (inst) || ! isrow (inst) || isempty (inst))
+              error (strcat ("model.Assembly.add: INSTANCE must be a", ...
+                             " non-empty character vector."));
+            endif
+            if (any (strcmp (inst, used)))
+              error ("model.Assembly.add: a placement named '%s' exists.", ...
+                     inst);
+            endif
+          otherwise
+            error ("model.Assembly.add: unknown option '%s'.", name);
+        endswitch
+      endfor
+      if (isempty (inst))
+        inst = NAME;
         n = 1;
         while (any (strcmp (inst, used)))
           n++;
@@ -371,7 +385,7 @@ classdef Assembly
     function write (this, FILE, varargin)
 
       ## Input validation
-      if (nargin != 2 && nargin != 4)
+      if (nargin < 2)
         error ("model.Assembly.write: invalid number of input arguments.");
       endif
       if (! ischar (FILE) || ! isrow (FILE) || isempty (FILE))
@@ -385,20 +399,33 @@ classdef Assembly
                        " .3mf, .stl, .obj or .ply."));
       endif
       isstep = any (strcmpi (fmt, '.step'));
-      TOL = 0.01;
-      if (nargin == 4)
-        if (! ischar (varargin{1}) || ! strcmpi (varargin{1}, 'Tolerance'))
-          error ("model.Assembly.write: unknown parameter.");
-        endif
-        if (isstep)
-          error ("model.Assembly.write: Tolerance applies to meshes only.");
-        endif
-        TOL = varargin{2};
-        errmsg = solid.__checkpos__ (TOL, 'TOL');
-        if (! isempty (errmsg))
-          error ("model.Assembly.write: %s", errmsg);
-        endif
+      if (mod (numel (varargin), 2) != 0)
+        error (strcat ("model.Assembly.write: Name/Value arguments must", ...
+                       " come in pairs."));
       endif
+      TOL = 0.01;
+      for ii = 1:2:numel (varargin)
+        name = varargin{ii};
+        val = varargin{ii+1};
+        if (! ischar (name) || ! isrow (name))
+          error (strcat ("model.Assembly.write: option names must be", ...
+                         " character vectors."));
+        endif
+        switch (lower (name))
+          case 'tolerance'
+            if (isstep)
+              error (strcat ("model.Assembly.write: Tolerance applies to", ...
+                             " meshes only."));
+            endif
+            TOL = val;
+            errmsg = solid.__checkpos__ (TOL, 'TOL');
+            if (! isempty (errmsg))
+              error ("model.Assembly.write: %s", errmsg);
+            endif
+          otherwise
+            error ("model.Assembly.write: unknown option '%s'.", name);
+        endswitch
+      endfor
       if (isempty (this.Instances))
         error ("model.Assembly.write: the assembly places nothing.");
       endif
@@ -842,15 +869,23 @@ endfunction
 %!error<model.Assembly.add: a part named 'pin' is already defined, as another shape.>
 %! A = add (model.Assembly (), 'pin', solid.cylinder (2, 12), geom.UCS ());
 %! add (A, 'pin', solid.cylinder (3, 12), geom.UCS ());
-%!error<model.Assembly.add: unknown parameter.> ...
+%!error<model.Assembly.add: unknown option 'Label'.> ...
 %! add (model.Assembly (), 'pin', [], geom.UCS (), 'Label', 'a')
+%!error<model.Assembly.add: option names must be character vectors.> ...
+%! add (model.Assembly (), 'pin', [], geom.UCS (), 1, 'a')
+%!error<model.Assembly.add: Name/Value arguments must come in pairs.> ...
+%! add (model.Assembly (), 'pin', [], geom.UCS (), 'Name')
+%!test  # option names ignore case
+%! A = add (model.Assembly (), 'pin', solid.box (1, 1, 1), geom.UCS (), ...
+%!          'name', 'first');
+%! assert_equal (A.Instances(1).name, 'first');
 %!error<model.Assembly.add: INSTANCE must be a non-empty character vector.>
 %! A = add (model.Assembly (), 'pin', solid.cylinder (2, 12), geom.UCS ());
 %! add (A, 'pin', [], geom.UCS (), 'Name', 3)
 %!error<model.Assembly.add: a placement named 'pin' exists.>
 %! A = add (model.Assembly (), 'pin', solid.cylinder (2, 12), geom.UCS ());
 %! add (A, 'pin', [], geom.UCS (), 'Name', 'pin')
-%!error<model.Assembly.write: invalid number of input arguments.> ...
+%!error<model.Assembly.write: Name/Value arguments must come in pairs.> ...
 %! write (model.Assembly (), 'a.step', 'Tolerance')
 %!error<model.Assembly.write: FILE must be a non-empty character vector.> ...
 %! write (model.Assembly (), 1)
@@ -864,8 +899,22 @@ endfunction
 %! write (model.Assembly (), 'a.stp')
 %!error<model.Assembly.write: FILE must end in .step, .3mf, .stl, .obj or .ply.> ...
 %! write (model.Assembly (), 'a.STP')
-%!error<model.Assembly.write: unknown parameter.> ...
+%!error<model.Assembly.write: unknown option 'Angle'.> ...
 %! write (model.Assembly (), 'a.3mf', 'Angle', 0.1)
+%!error<model.Assembly.write: option names must be character vectors.> ...
+%! write (model.Assembly (), 'a.3mf', 1, 0.1)
+%!test  # option names ignore case
+%! A = add (model.Assembly (), 'pin', solid.box (1, 1, 1), geom.UCS ());
+%! f1 = [tempname(), '.stl'];
+%! f2 = [tempname(), '.stl'];
+%! unwind_protect
+%!   write (A, f1, 'tolerance', 0.1);
+%!   write (A, f2, 'Tolerance', 0.1);
+%!   assert_equal (fileread (f1), fileread (f2));
+%! unwind_protect_cleanup
+%!   [~] = unlink (f1);
+%!   [~] = unlink (f2);
+%! end_unwind_protect
 %!error<model.Assembly.write: TOL must be a positive and finite real scalar.> ...
 %! write (model.Assembly (), 'a.3mf', 'Tolerance', 0)
 %!error<model.Assembly.write: the assembly places nothing.> ...

@@ -2402,7 +2402,7 @@ cmdwrite (const octave_value_list& args)
   for (octave_idx_type k = 0; k < opts.numel (); k += 2)
   {
     if (! ischarrow (opts(k)))
-      error ("%s: unknown parameter.",
+      error ("%s: option names must be character vectors.",
              g_caller.c_str ());
     string name = lower (opts(k).string_value ());
     octave_value v = opts(k+1);
@@ -2468,7 +2468,8 @@ cmdwrite (const octave_value_list& args)
       w.fill = x != 0;
     }
     else
-      error ("%s: unknown parameter.", g_caller.c_str ());
+      error ("%s: unknown option '%s'.", g_caller.c_str (),
+             opts(k).string_value ().c_str ());
   }
 
   Writer wr (w);

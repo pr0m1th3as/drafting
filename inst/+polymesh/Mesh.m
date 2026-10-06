@@ -209,17 +209,25 @@ classdef Mesh
                        " indices into the rows of V."));
       endif
       if (mod (numel (args), 2) != 0)
-        error ("polymesh.Mesh: optional arguments must be name-value pairs.");
+        error ("polymesh.Mesh: Name/Value arguments must come in pairs.");
       endif
 
       this.Vertices = double (V);
       this.Faces = double (F);
-      for k = 1:2:numel (args)
-        if (! ischar (args{k}) ||
-            ! any (strcmp (args{k}, {'VertexColour', 'FaceColour'})))
-          error ("polymesh.Mesh: unknown parameter.");
+      for ii = 1:2:numel (args)
+        name = args{ii};
+        val = args{ii+1};
+        if (! ischar (name) || ! isrow (name))
+          error ("polymesh.Mesh: option names must be character vectors.");
         endif
-        this.(args{k}) = args{k+1};
+        switch (lower (name))
+          case 'vertexcolour'
+            this.VertexColour = val;
+          case 'facecolour'
+            this.FaceColour = val;
+          otherwise
+            error ("polymesh.Mesh: unknown option '%s'.", name);
+        endswitch
       endfor
 
     endfunction
@@ -274,25 +282,37 @@ classdef Mesh
     function [R, OPEN] = section (this, U, varargin)
 
       ## Input validation
-      if (nargin != 2 && nargin != 4)
+      if (nargin < 2)
         error ("polymesh.Mesh.section: invalid number of input arguments.");
       endif
       if (! isa (U, 'geom.UCS') || ! isscalar (U))
         error ("polymesh.Mesh.section: U must be a geom.UCS object.");
       endif
       V = this.Vertices;
-      T = 1e-6 * norm (max (V, [], 1) - min (V, [], 1));
-      if (nargin == 4)
-        if (! ischar (varargin{1}) || ! strcmp (varargin{1}, 'Tolerance'))
-          error ("polymesh.Mesh.section: unknown parameter.");
-        endif
-        T = varargin{2};
-        if (! isnumeric (T) || ! isreal (T) || ! isscalar (T) ||
-            ! isfinite (T) || T < 0)
-          error (strcat ("polymesh.Mesh.section: Tolerance must be a", ...
-                         " non-negative finite real scalar."));
-        endif
+      if (mod (numel (varargin), 2) != 0)
+        error (strcat ("polymesh.Mesh.section: Name/Value arguments must", ...
+                       " come in pairs."));
       endif
+      T = 1e-6 * norm (max (V, [], 1) - min (V, [], 1));
+      for ii = 1:2:numel (varargin)
+        name = varargin{ii};
+        val = varargin{ii+1};
+        if (! ischar (name) || ! isrow (name))
+          error (strcat ("polymesh.Mesh.section: option names must be", ...
+                         " character vectors."));
+        endif
+        switch (lower (name))
+          case 'tolerance'
+            T = val;
+            if (! isnumeric (T) || ! isreal (T) || ! isscalar (T)
+                || ! isfinite (T) || T < 0)
+              error (strcat ("polymesh.Mesh.section: Tolerance must be a", ...
+                             " non-negative finite real scalar."));
+            endif
+          otherwise
+            error ("polymesh.Mesh.section: unknown option '%s'.", name);
+        endswitch
+      endfor
 
       R = cell (1, 0);
       OPEN = cell (1, 0);
@@ -364,7 +384,7 @@ classdef Mesh
     function write (this, FILE, varargin)
 
       ## Input validation
-      if (nargin != 2 && nargin != 4)
+      if (nargin < 2)
         error ("polymesh.Mesh.write: invalid number of input arguments.");
       endif
       if (! ischar (FILE) || ! isrow (FILE))
@@ -376,21 +396,33 @@ classdef Mesh
         error (strcat ("polymesh.Mesh.write: FILE must end in .stl, .obj,", ...
                        " .ply or .3mf."));
       endif
-      binary = true;
-      if (nargin == 4)
-        if (! ischar (varargin{1}) || ! strcmp (varargin{1}, 'Encoding'))
-          error ("polymesh.Mesh.write: unknown parameter.");
-        endif
-        E = varargin{2};
-        if (! ischar (E) || ! any (strcmp (E, {'binary', 'ascii'})))
-          error (strcat ("polymesh.Mesh.write: Encoding must be", ...
-                         " 'binary' or 'ascii'."));
-        endif
-        if (! strcmp (fmt, '.ply'))
-          error ("polymesh.Mesh.write: Encoding applies only to PLY files.");
-        endif
-        binary = strcmp (E, 'binary');
+      if (mod (numel (varargin), 2) != 0)
+        error ("polymesh.Mesh.write: Name/Value arguments must come in pairs.");
       endif
+      binary = true;
+      for ii = 1:2:numel (varargin)
+        name = varargin{ii};
+        val = varargin{ii+1};
+        if (! ischar (name) || ! isrow (name))
+          error (strcat ("polymesh.Mesh.write: option names must be", ...
+                         " character vectors."));
+        endif
+        switch (lower (name))
+          case 'encoding'
+            E = val;
+            if (! ischar (E) || ! any (strcmp (E, {'binary', 'ascii'})))
+              error (strcat ("polymesh.Mesh.write: Encoding must be", ...
+                             " 'binary' or 'ascii'."));
+            endif
+            if (! strcmp (fmt, '.ply'))
+              error (strcat ("polymesh.Mesh.write: Encoding applies only", ...
+                             " to PLY files."));
+            endif
+            binary = strcmp (E, 'binary');
+          otherwise
+            error ("polymesh.Mesh.write: unknown option '%s'.", name);
+        endswitch
+      endfor
 
       if (strcmp (fmt, '.3mf'))
         if (isempty (this))
@@ -1164,10 +1196,16 @@ endfunction
 %! polymesh.Mesh ([0, 0, 0; 1, 0, 0; 0, 1, 0], [1, 2.5, 3])
 %!error<polymesh.Mesh: F must be a K-by-3 matrix of indices into the rows of V.> ...
 %! polymesh.Mesh ([0, 0, 0; 1, 0, 0; 0, 1, 0], [1, 2, 3, 1])
-%!error<polymesh.Mesh: optional arguments must be name-value pairs.> ...
+%!error<polymesh.Mesh: Name/Value arguments must come in pairs.> ...
 %! polymesh.Mesh ([0, 0, 0; 1, 0, 0; 0, 1, 0], [1, 2, 3], 'FaceColour')
-%!error<polymesh.Mesh: unknown parameter.> ...
+%!error<polymesh.Mesh: unknown option 'Colour'.> ...
 %! polymesh.Mesh ([0, 0, 0; 1, 0, 0; 0, 1, 0], [1, 2, 3], 'Colour', [1, 0, 0])
+%!error<polymesh.Mesh: option names must be character vectors.> ...
+%! polymesh.Mesh ([0, 0, 0; 1, 0, 0; 0, 1, 0], [1, 2, 3], 1, [1, 0, 0])
+%!test  # option names ignore case
+%! M = polymesh.Mesh ([0, 0, 0; 1, 0, 0; 0, 1, 0], [1, 2, 3], ...
+%!                    'facecolour', [1, 0, 0]);
+%! assert_equal (M.FaceColour, [1, 0, 0]);
 %!error<polymesh.Mesh: VertexColour must be empty or an N-by-3 matrix of values from 0 to 1, a row for each vertex.> ...
 %! polymesh.Mesh ([0, 0, 0; 1, 0, 0; 0, 1, 0], [1, 2, 3], ...
 %!                'VertexColour', [1, 0, 0])
@@ -1210,20 +1248,42 @@ endfunction
 %! section (polymesh.Mesh ())
 %!error<polymesh.Mesh.section: U must be a geom.UCS object.> ...
 %! section (polymesh.Mesh (), 1)
-%!error<polymesh.Mesh.section: unknown parameter.> ...
+%!error<polymesh.Mesh.section: unknown option 'Heal'.> ...
 %! section (polymesh.Mesh (), geom.UCS (), 'Heal', 1)
+%!error<polymesh.Mesh.section: option names must be character vectors.> ...
+%! section (polymesh.Mesh (), geom.UCS (), 1, 1)
+%!error<polymesh.Mesh.section: Name/Value arguments must come in pairs.> ...
+%! section (polymesh.Mesh (), geom.UCS (), 'Tolerance')
+%!test  # option names ignore case
+%! M = tessellate (solid.box (2, 2, 2));
+%! U = geom.UCS ([0, 0, 1], [0, 0, 1]);
+%! R1 = section (M, U, 'tolerance', 1e-3);
+%! R2 = section (M, U, 'Tolerance', 1e-3);
+%! S1 = solid.extrude (R1{1}, 1);
+%! S2 = solid.extrude (R2{1}, 1);
+%! assert_equal (isequal (S1, S2), true);
 %!error<polymesh.Mesh.section: Tolerance must be a non-negative finite real scalar.> ...
 %! section (polymesh.Mesh (), geom.UCS (), 'Tolerance', NaN)
 %!error<polymesh.Mesh.write: invalid number of input arguments.> ...
 %! write (polymesh.Mesh ())
-%!error<polymesh.Mesh.write: invalid number of input arguments.> ...
+%!error<polymesh.Mesh.write: Name/Value arguments must come in pairs.> ...
 %! write (polymesh.Mesh (), 'a.ply', 'Encoding')
 %!error<polymesh.Mesh.write: FILE must be a character vector.> ...
 %! write (polymesh.Mesh (), 42)
 %!error<polymesh.Mesh.write: FILE must end in .stl, .obj, .ply or .3mf.> ...
 %! write (polymesh.Mesh (), 'a.off')
-%!error<polymesh.Mesh.write: unknown parameter.> ...
+%!error<polymesh.Mesh.write: unknown option 'Format'.> ...
 %! write (polymesh.Mesh (), 'a.ply', 'Format', 'ascii')
+%!error<polymesh.Mesh.write: option names must be character vectors.> ...
+%! write (polymesh.Mesh (), 'a.ply', 1, 'ascii')
+%!test  # option names ignore case
+%! f = [tempname(), '.ply'];
+%! unwind_protect
+%!   write (tessellate (solid.box (1, 1, 1)), f, 'encoding', 'ascii');
+%!   assert_equal (strncmp (fileread (f), "ply\nformat ascii", 16), true);
+%! unwind_protect_cleanup
+%!   [~] = unlink (f);
+%! end_unwind_protect
 %!error<polymesh.Mesh.write: Encoding must be 'binary' or 'ascii'.> ...
 %! write (polymesh.Mesh (), 'a.ply', 'Encoding', 'text')
 %!error<polymesh.Mesh.write: Encoding applies only to PLY files.> ...

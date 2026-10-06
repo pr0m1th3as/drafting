@@ -44,28 +44,36 @@ function [FRAME, errmsg] = __place__ (ARGS, ANCHORS, OFFSETS)
   endif
 
   k = 1;
-  if (! isempty (ARGS))
-    if (numel (ARGS) != 2)
-      errmsg = "Name/Value arguments must come in pairs.";
-      return;
-    endif
-    if (! ischar (ARGS{1}) || ! strcmp (ARGS{1}, 'Anchor'))
-      errmsg = "unknown parameter.";
-      return;
-    endif
-    A = ARGS{2};
-    if (ischar (A) && isrow (A))
-      k = find (strcmp (A, ANCHORS));
-    endif
-    if (isempty (k) || ! (ischar (A) && isrow (A)))
-      names = sprintf ("'%s', ", ANCHORS{:});
-      names = names(1:end-2);
-      p = find (names == ',', 1, 'last');
-      errmsg = sprintf ("Anchor must be %s or%s.", names(1:p-1), ...
-                        names(p+1:end));
-      return;
-    endif
+  if (mod (numel (ARGS), 2) != 0)
+    errmsg = "Name/Value arguments must come in pairs.";
+    return;
   endif
+  for ii = 1:2:numel (ARGS)
+    name = ARGS{ii};
+    val = ARGS{ii+1};
+    if (! ischar (name) || ! isrow (name))
+      errmsg = "option names must be character vectors.";
+      return;
+    endif
+    switch (lower (name))
+      case 'anchor'
+        k = [];
+        if (ischar (val) && isrow (val))
+          k = find (strcmp (val, ANCHORS));
+        endif
+        if (isempty (k))
+          names = sprintf ("'%s', ", ANCHORS{:});
+          names = names(1:end-2);
+          p = find (names == ',', 1, 'last');
+          errmsg = sprintf ("Anchor must be %s or%s.", names(1:p-1), ...
+                            names(p+1:end));
+          return;
+        endif
+      otherwise
+        errmsg = sprintf ("unknown option '%s'.", name);
+        return;
+    endswitch
+  endfor
 
   FRAME = [toworld(U, -OFFSETS(k,:)); U.XAxis; U.YAxis; U.Normal];
 

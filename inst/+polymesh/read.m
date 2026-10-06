@@ -99,7 +99,7 @@
 function M = read (FILE, varargin)
 
   ## Input validation
-  if (nargin != 1 && nargin != 3)
+  if (nargin < 1)
     error ("polymesh.read: invalid number of input arguments.");
   endif
   if (! ischar (FILE) || ! isrow (FILE))
@@ -110,18 +110,28 @@ function M = read (FILE, varargin)
   if (! any (strcmp (fmt, {'.stl', '.obj', '.ply', '.3mf'})))
     error ("polymesh.read: FILE must end in .stl, .obj, .ply or .3mf.");
   endif
-  T = 0;
-  if (nargin == 3)
-    if (! ischar (varargin{1}) || ! strcmp (varargin{1}, 'Tolerance'))
-      error ("polymesh.read: unknown parameter.");
-    endif
-    T = varargin{2};
-    if (! isnumeric (T) || ! isreal (T) || ! isscalar (T) || ! isfinite (T) ||
-        T < 0)
-      error (strcat ("polymesh.read: Tolerance must be a non-negative", ...
-                     " finite real scalar."));
-    endif
+  if (mod (numel (varargin), 2) != 0)
+    error ("polymesh.read: Name/Value arguments must come in pairs.");
   endif
+  T = 0;
+  for ii = 1:2:numel (varargin)
+    name = varargin{ii};
+    val = varargin{ii+1};
+    if (! ischar (name) || ! isrow (name))
+      error ("polymesh.read: option names must be character vectors.");
+    endif
+    switch (lower (name))
+      case 'tolerance'
+        T = val;
+        if (! isnumeric (T) || ! isreal (T) || ! isscalar (T)
+            || ! isfinite (T) || T < 0)
+          error (strcat ("polymesh.read: Tolerance must be a non-negative", ...
+                         " finite real scalar."));
+        endif
+      otherwise
+        error ("polymesh.read: unknown option '%s'.", name);
+    endswitch
+  endfor
   if (! isfile (FILE))
     error ("polymesh.read: FILE is not a readable %s file.", ...
            upper (fmt(2:end)));
@@ -571,12 +581,23 @@ endfunction
 %! end_unwind_protect
 
 %!error<polymesh.read: invalid number of input arguments.> polymesh.read ()
-%!error<polymesh.read: invalid number of input arguments.> ...
+%!error<polymesh.read: Name/Value arguments must come in pairs.> ...
 %! polymesh.read ('a.stl', 1)
 %!error<polymesh.read: FILE must be a character vector.> polymesh.read (1)
 %!error<polymesh.read: FILE must end in .stl, .obj, .ply or .3mf.> ...
 %! polymesh.read ('part.step')
-%!error<polymesh.read: unknown parameter.> polymesh.read ('a.stl', 'Weld', 1)
+%!error<polymesh.read: unknown option 'Weld'.> polymesh.read ('a.stl', 'Weld', 1)
+%!error<polymesh.read: option names must be character vectors.> polymesh.read ('a.stl', 1, 1)
+%!test  # option names ignore case
+%! f = [tempname(), '.stl'];
+%! unwind_protect
+%!   write (solid.box (1, 1, 1), f);
+%!   M1 = polymesh.read (f, 'tolerance', 0.1);
+%!   M2 = polymesh.read (f, 'Tolerance', 0.1);
+%!   assert_equal (M1.Vertices, M2.Vertices);
+%! unwind_protect_cleanup
+%!   [~] = unlink (f);
+%! end_unwind_protect
 %!error<polymesh.read: Tolerance must be a non-negative finite real scalar.> ...
 %! polymesh.read ('a.stl', 'Tolerance', -1)
 %!error<polymesh.read: FILE is not a readable STL file.> ...

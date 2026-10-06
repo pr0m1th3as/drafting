@@ -57,26 +57,33 @@
 function S = polyhedron (M, varargin)
 
   ## Input validation
-  if (nargin < 1 || nargin > 3)
+  if (nargin < 1)
     error ("solid.polyhedron: invalid number of input arguments.");
   endif
   if (! isa (M, 'polymesh.Mesh') || ! isscalar (M))
     error ("solid.polyhedron: M must be a polymesh.Mesh object.");
   endif
-  merge = true;
-  if (! isempty (varargin))
-    if (numel (varargin) != 2)
-      error ("solid.polyhedron: Name/Value arguments must come in pairs.");
-    endif
-    if (! ischar (varargin{1}) || ! strcmp (varargin{1}, 'Merge'))
-      error ("solid.polyhedron: unknown parameter.");
-    endif
-    merge = varargin{2};
-    if (! (islogical (merge) || isnumeric (merge)) || ! isscalar (merge) ||
-        ! any (merge == [0, 1]))
-      error ("solid.polyhedron: Merge must be true or false.");
-    endif
+  if (mod (numel (varargin), 2) != 0)
+    error ("solid.polyhedron: Name/Value arguments must come in pairs.");
   endif
+  merge = true;
+  for ii = 1:2:numel (varargin)
+    name = varargin{ii};
+    val = varargin{ii+1};
+    if (! ischar (name) || ! isrow (name))
+      error ("solid.polyhedron: option names must be character vectors.");
+    endif
+    switch (lower (name))
+      case 'merge'
+        merge = val;
+        if (! (islogical (merge) || isnumeric (merge)) || ! isscalar (merge)
+            || ! any (merge == [0, 1]))
+          error ("solid.polyhedron: Merge must be true or false.");
+        endif
+      otherwise
+        error ("solid.polyhedron: unknown option '%s'.", name);
+    endswitch
+  endfor
 
   ## Points that are equal are one vertex
   [V, ~, j] = unique (M.Vertices, 'rows');
@@ -173,7 +180,7 @@ endfunction
 
 %!error<solid.polyhedron: invalid number of input arguments.> ...
 %! solid.polyhedron ()
-%!error<solid.polyhedron: invalid number of input arguments.> ...
+%!error<solid.polyhedron: Name/Value arguments must come in pairs.> ...
 %! solid.polyhedron (polymesh.Mesh (), 'Merge', true, 1)
 %!error<solid.polyhedron: M must be a polymesh.Mesh object.> ...
 %! solid.polyhedron (eye (3))
@@ -181,8 +188,14 @@ endfunction
 %! solid.polyhedron (struct ('vertices', eye (3), 'faces', [1, 2, 3]))
 %!error<solid.polyhedron: Name/Value arguments must come in pairs.> ...
 %! solid.polyhedron (polymesh.Mesh (eye (3), [1, 2, 3]), 'Merge')
-%!error<solid.polyhedron: unknown parameter.> ...
+%!error<solid.polyhedron: unknown option 'Weld'.> ...
 %! solid.polyhedron (polymesh.Mesh (eye (3), [1, 2, 3]), 'Weld', true)
+%!error<solid.polyhedron: option names must be character vectors.> ...
+%! solid.polyhedron (polymesh.Mesh (eye (3), [1, 2, 3]), 1, true)
+%!test  # option names ignore case
+%! M = tessellate (solid.box (1, 1, 1));
+%! assert_equal (isequal (solid.polyhedron (M, 'merge', false), ...
+%!                       solid.polyhedron (M, 'Merge', false)), true);
 %!error<solid.polyhedron: Merge must be true or false.> ...
 %! solid.polyhedron (polymesh.Mesh (eye (3), [1, 2, 3]), 'Merge', 2)
 %!error<solid.polyhedron: the mesh has no triangles.> ...

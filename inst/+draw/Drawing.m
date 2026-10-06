@@ -381,8 +381,8 @@ classdef Drawing
         error ("draw.Drawing.entities: D must be a draw.Drawing object.");
       endif
       if (mod (numel (varargin), 2) != 0)
-        error (strcat ("draw.Drawing.entities: optional arguments", ...
-               " must come in name-value pairs."));
+        error (strcat ("draw.Drawing.entities: Name/Value arguments must", ...
+                       " come in pairs."));
       endif
 
       dimScale = 1;
@@ -394,13 +394,14 @@ classdef Drawing
       layerMode = 'resolve';
       for ii = 1:2:numel (varargin)
         name = varargin{ii};
+        val = varargin{ii+1};
         if (! ischar (name) || ! isrow (name))
           error (strcat ("draw.Drawing.entities: option names", ...
                  " must be character vectors."));
         endif
         switch (lower (name))
           case 'dimscale'
-            dimScale = varargin{ii+1};
+            dimScale = val;
             if (! isnumeric (dimScale) || ! isreal (dimScale)
                 || ! isscalar (dimScale) || ! isfinite (dimScale)
                 || dimScale <= 0)
@@ -410,7 +411,7 @@ classdef Drawing
             endif
             dimScale = double (dimScale);
           case 'chordtol'
-            chordTol = varargin{ii+1};
+            chordTol = val;
             if (! isnumeric (chordTol) || ! isreal (chordTol)
                   || ! isscalar (chordTol) || ! isfinite (chordTol)
                   || chordTol <= 0)
@@ -419,7 +420,7 @@ classdef Drawing
                              " finite scalar."));
             endif
           case 'dimensions'
-            dimMode = varargin{ii+1};
+            dimMode = val;
             if (! ischar (dimMode) || ! isrow (dimMode)
                 || ! any (strcmpi (dimMode, {'associative', 'explode'})))
               error (strcat ("draw.Drawing.entities: Dimensions must be", ...
@@ -428,7 +429,7 @@ classdef Drawing
             dimMode = lower (dimMode);
 
           case 'bulges'
-            bulgeMode = varargin{ii+1};
+            bulgeMode = val;
             if (! ischar (bulgeMode) || ! isrow (bulgeMode)
                 || ! any (strcmpi (bulgeMode, {'keep', 'flatten'})))
               error (strcat ("draw.Drawing.entities: Bulges", ...
@@ -436,7 +437,7 @@ classdef Drawing
             endif
             bulgeMode = lower (bulgeMode);
           case 'blocks'
-            blockMode = varargin{ii+1};
+            blockMode = val;
             if (! ischar (blockMode) || ! isrow (blockMode)
                 || ! any (strcmpi (blockMode, {'expand', 'reference'})))
               error (strcat ("draw.Drawing.entities: Blocks must be", ...
@@ -445,7 +446,7 @@ classdef Drawing
             endif
             blockMode = lower (blockMode);
           case 'layers'
-            layerMode = varargin{ii+1};
+            layerMode = val;
             if (! ischar (layerMode) || ! isrow (layerMode)
                 || ! any (strcmpi (layerMode, {'resolve', 'keep'})))
               error (strcat ("draw.Drawing.entities: Layers must be", ...
@@ -453,7 +454,7 @@ classdef Drawing
             endif
             layerMode = lower (layerMode);
           case 'hatch'
-            hatchMode = varargin{ii+1};
+            hatchMode = val;
             if (! ischar (hatchMode) || ! isrow (hatchMode)
                 || ! any (strcmpi (hatchMode, {'lines', 'boundary'})))
               error (strcat ("draw.Drawing.entities: Hatch must be", ...
@@ -894,44 +895,45 @@ classdef Drawing
       endif
       for ii = 1:2:numel (varargin)
         name = varargin{ii};
-        v = varargin{ii+1};
+        val = varargin{ii+1};
         if (! ischar (name) || ! isrow (name))
-          error ("draw.Drawing.layer: unknown parameter.");
+          error (strcat ("draw.Drawing.layer: option names must be", ...
+                         " character vectors."));
         endif
         switch (lower (name))
           case 'colour'
-            if (ischar (v))
-              v = draw.colour (v);
+            if (ischar (val))
+              val = draw.colour (val);
             endif
-            if (! isnumeric (v) || ! isreal (v) || ! isscalar (v)
-                || v != fix (v) || v < 1 || v > 255)
+            if (! isnumeric (val) || ! isreal (val) || ! isscalar (val)
+                || val != fix (val) || val < 1 || val > 255)
               error (strcat ("draw.Drawing.layer: Colour must be a name or", ...
                              " an integer index from 1 to 255."));
             endif
-            L.colour = double (v);
+            L.colour = double (val);
           case 'linetype'
-            if (! ischar (v) || ! isrow (v) || isempty (v)
-                || any (strcmpi (v, {'byLayer', 'byBlock'})))
+            if (! ischar (val) || ! isrow (val) || isempty (val)
+                || any (strcmpi (val, {'byLayer', 'byBlock'})))
               error (strcat ("draw.Drawing.layer: Linetype must be the", ...
                              " name of a line type."));
             endif
-            L.linetype = v;
+            L.linetype = val;
           case 'lineweight'
-            if (! (isempty (v) && isnumeric (v))
-                && ! (isnumeric (v) && isreal (v) && isscalar (v)
-                      && isfinite (v) && v >= 0))
+            if (! (isempty (val) && isnumeric (val))
+                && ! (isnumeric (val) && isreal (val) && isscalar (val)
+                      && isfinite (val) && val >= 0))
               error (strcat ("draw.Drawing.layer: LineWeight must be a", ...
                              " width in millimetres, or empty."));
             endif
-            L.lineweight = double (v);
+            L.lineweight = double (val);
           case {'visible', 'plot'}
-            if (! (islogical (v) || isnumeric (v)) || ! isscalar (v)
-                || ! any (v == [0, 1]))
+            if (! (islogical (val) || isnumeric (val)) || ! isscalar (val)
+                || ! any (val == [0, 1]))
               error ("draw.Drawing.layer: %s must be true or false.", name);
             endif
-            L.(lower (name)) = logical (v);
+            L.(lower (name)) = logical (val);
           otherwise
-            error ("draw.Drawing.layer: unknown parameter.");
+            error ("draw.Drawing.layer: unknown option '%s'.", name);
         endswitch
       endfor
       if (isempty (k))
@@ -2443,13 +2445,38 @@ classdef Drawing
                     'Layers', {{}}, 'Arc', 64, 'Hatch', 'lines', ...
                     'Linetypes', 'true', 'LTScale', 1, 'Margin', 0.05, ...
                     'FontScale', [], 'DimScale', 1);
-      known = fieldnames (opt);
-      for k = 1:2:numel (varargin)
-        name = varargin{k};
-        if (! ischar (name) || ! isrow (name) || ! any (strcmp (name, known)))
-          error ("draw.Drawing.plot: unknown parameter.");
+      for ii = 1:2:numel (varargin)
+        name = varargin{ii};
+        val = varargin{ii+1};
+        if (! ischar (name) || ! isrow (name))
+          error ("draw.Drawing.plot: option names must be character vectors.");
         endif
-        opt.(name) = varargin{k+1};
+        switch (lower (name))
+          case 'axes'
+            opt.Axes = val;
+          case 'linewidth'
+            opt.LineWidth = val;
+          case 'fontsize'
+            opt.FontSize = val;
+          case 'layers'
+            opt.Layers = val;
+          case 'arc'
+            opt.Arc = val;
+          case 'hatch'
+            opt.Hatch = val;
+          case 'linetypes'
+            opt.Linetypes = val;
+          case 'ltscale'
+            opt.LTScale = val;
+          case 'margin'
+            opt.Margin = val;
+          case 'fontscale'
+            opt.FontScale = val;
+          case 'dimscale'
+            opt.DimScale = val;
+          otherwise
+            error ("draw.Drawing.plot: unknown option '%s'.", name);
+        endswitch
       endfor
       if (! isempty (opt.Layers) && ! iscellstr (opt.Layers))
         error (strcat ("draw.Drawing.plot: Layers must be a cell array of", ...
@@ -2721,13 +2748,28 @@ classdef Drawing
 
       opt = struct ('Paper', 'A4', 'Orientation', 'landscape', 'Scale', [], ...
                     'Margin', 10, 'Resolution', 600, 'LineWidth', 0.35);
-      known = fieldnames (opt);
-      for k = 1:2:numel (varargin)
-        name = varargin{k};
-        if (! ischar (name) || ! isrow (name) || ! any (strcmp (name, known)))
-          error ("draw.Drawing.print: unknown parameter.");
+      for ii = 1:2:numel (varargin)
+        name = varargin{ii};
+        val = varargin{ii+1};
+        if (! ischar (name) || ! isrow (name))
+          error ("draw.Drawing.print: option names must be character vectors.");
         endif
-        opt.(name) = varargin{k+1};
+        switch (lower (name))
+          case 'paper'
+            opt.Paper = val;
+          case 'orientation'
+            opt.Orientation = val;
+          case 'scale'
+            opt.Scale = val;
+          case 'margin'
+            opt.Margin = val;
+          case 'resolution'
+            opt.Resolution = val;
+          case 'linewidth'
+            opt.LineWidth = val;
+          otherwise
+            error ("draw.Drawing.print: unknown option '%s'.", name);
+        endswitch
       endfor
 
       PAPER = papersize (opt.Paper, opt.Orientation);
@@ -2957,8 +2999,7 @@ classdef Drawing
         error ("draw.Drawing.tikz: D must be a draw.Drawing object.");
       endif
       if (mod (numel (varargin), 2) != 0)
-        error (strcat ("draw.Drawing.tikz: optional arguments", ...
-               " must come in name-value pairs."));
+        error ("draw.Drawing.tikz: Name/Value arguments must come in pairs.");
       endif
 
       scale = 50;

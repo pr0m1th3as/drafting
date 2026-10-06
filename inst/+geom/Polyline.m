@@ -167,13 +167,20 @@ classdef Polyline
         error ("geom.Polyline: Name/Value arguments must come in pairs.");
       endif
       opt = struct ('Closed', false, 'UCS', geom.UCS ());
-      for k = 1:2:numel (varargin)
-        name = varargin{k};
-        if (! ischar (name) || ! isrow (name)
-            || ! any (strcmp (name, fieldnames (opt))))
-          error ("geom.Polyline: unknown parameter.");
+      for ii = 1:2:numel (varargin)
+        name = varargin{ii};
+        val = varargin{ii+1};
+        if (! ischar (name) || ! isrow (name))
+          error ("geom.Polyline: option names must be character vectors.");
         endif
-        opt.(name) = varargin{k+1};
+        switch (lower (name))
+          case 'closed'
+            opt.Closed = val;
+          case 'ucs'
+            opt.UCS = val;
+          otherwise
+            error ("geom.Polyline: unknown option '%s'.", name);
+        endswitch
       endfor
       if (! (islogical (opt.Closed) || isnumeric (opt.Closed))
           || ! isscalar (opt.Closed) || ! any (opt.Closed == [0, 1]))
@@ -331,16 +338,24 @@ classdef Polyline
         varargin(1) = [];
       endif
       A = [];
-      for k = 1:2:numel (varargin)
-        if (! ischar (varargin{k}) || ! strcmp (varargin{k}, 'Angle'))
-          error ("geom.Polyline.chamfer: unknown parameter.");
+      for ii = 1:2:numel (varargin)
+        name = varargin{ii};
+        val = varargin{ii+1};
+        if (! ischar (name) || ! isrow (name))
+          error (strcat ("geom.Polyline.chamfer: option names must be", ...
+                         " character vectors."));
         endif
-        A = varargin{k+1};
-        if (! isnumeric (A) || ! isreal (A) || ! isscalar (A)
-            || ! (A > 0) || ! (A < 180))
-          error (strcat ("geom.Polyline.chamfer: Angle must be in the", ...
-                         " range (0, 180) degrees."));
-        endif
+        switch (lower (name))
+          case 'angle'
+            A = val;
+            if (! isnumeric (A) || ! isreal (A) || ! isscalar (A)
+                || ! (A > 0) || ! (A < 180))
+              error (strcat ("geom.Polyline.chamfer: Angle must be in the", ...
+                             " range (0, 180) degrees."));
+            endif
+          otherwise
+            error ("geom.Polyline.chamfer: unknown option '%s'.", name);
+        endswitch
       endfor
       if (! isempty (A) && numel (D) == 2)
         error ("geom.Polyline.chamfer: an angle goes with one distance D.");
@@ -612,8 +627,14 @@ endfunction
 %! chamfer (geom.Polyline ([0, 0; 1, 0; 1, 1]), [1, 2, 3])
 %!error<geom.Polyline.chamfer: D must be one positive finite distance, or two.> ...
 %! chamfer (geom.Polyline ([0, 0; 1, 0; 1, 1]), -1)
-%!error<geom.Polyline.chamfer: unknown parameter.> ...
+%!error<geom.Polyline.chamfer: unknown option 'Slope'.> ...
 %! chamfer (geom.Polyline ([0, 0; 1, 0; 1, 1]), 0.1, 'Slope', 30)
+%!error<geom.Polyline.chamfer: option names must be character vectors.> ...
+%! chamfer (geom.Polyline ([0, 0; 1, 0; 1, 1]), 0.1, 1, 30)
+%!test  # option names ignore case
+%! P = geom.Polyline ([0, 0; 1, 0; 1, 1]);
+%! assert_equal (chamfer (P, 0.1, 'angle', 30).Vertices, ...
+%!               chamfer (P, 0.1, 'Angle', 30).Vertices);
 %!error<geom.Polyline.chamfer: Angle must be in the range \(0, 180\) degrees.> ...
 %! chamfer (geom.Polyline ([0, 0; 1, 0; 1, 1]), 0.1, 'Angle', 180)
 %!error<geom.Polyline.chamfer: an angle goes with one distance D.> ...
@@ -638,8 +659,13 @@ endfunction
 %! geom.Polyline ({[0, 0; 1, 0]})
 %!error<geom.Polyline: Name/Value arguments must come in pairs.> ...
 %! geom.Polyline ([0, 0; 1, 0], 'Closed')
-%!error<geom.Polyline: unknown parameter.> ...
+%!error<geom.Polyline: unknown option 'Bulge'.> ...
 %! geom.Polyline ([0, 0; 1, 0], 'Bulge', [0, 0])
+%!error<geom.Polyline: option names must be character vectors.> ...
+%! geom.Polyline ([0, 0; 1, 0], 1, [0, 0])
+%!test  # option names ignore case
+%! P = geom.Polyline ([0, 0; 1, 0; 1, 1], 'closed', true);
+%! assert_equal (P.Closed, true);
 %!error<geom.Polyline: Closed must be a logical scalar.> ...
 %! geom.Polyline ([0, 0; 1, 0], 'Closed', 2)
 %!error<geom.Polyline: UCS must be a geom.UCS object.> ...
@@ -690,5 +716,7 @@ endfunction
 %! write (geom.Polyline ([0, 0; 1, 0]), 'a.dxf', 'Layer', {'A'})
 %!error<geom.Polyline.write: Colour must be an integer from 1 to 256.> ...
 %! write (geom.Polyline ([0, 0; 1, 0]), 'a.dxf', 'Colour', 1.5)
-%!error<geom.Polyline.write: unknown parameter.> ...
+%!error<geom.Polyline.write: unknown option 'Fill'.> ...
 %! write (geom.Polyline ([0, 0; 1, 0]), 'a.dxf', 'Fill', true)
+%!error<geom.Polyline.write: option names must be character vectors.> ...
+%! write (geom.Polyline ([0, 0; 1, 0]), 'a.dxf', 1, true)

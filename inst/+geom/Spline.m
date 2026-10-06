@@ -383,13 +383,22 @@ classdef Spline
       endif
       opt = struct ('Tangents', NaN (2, 3), 'Closed', false, ...
                     'UCS', geom.UCS ());
-      for k = 1:2:numel (varargin)
-        name = varargin{k};
-        if (! ischar (name) || ! isrow (name)
-            || ! any (strcmp (name, fieldnames (opt))))
-          error ("geom.Spline: unknown parameter.");
+      for ii = 1:2:numel (varargin)
+        name = varargin{ii};
+        val = varargin{ii+1};
+        if (! ischar (name) || ! isrow (name))
+          error ("geom.Spline: option names must be character vectors.");
         endif
-        opt.(name) = varargin{k+1};
+        switch (lower (name))
+          case 'tangents'
+            opt.Tangents = val;
+          case 'closed'
+            opt.Closed = val;
+          case 'ucs'
+            opt.UCS = val;
+          otherwise
+            error ("geom.Spline: unknown option '%s'.", name);
+        endswitch
       endfor
       T = opt.Tangents;
       if (! isnumeric (T) || ! isreal (T) || ! isequal (size (T), [2, 3]))
@@ -651,14 +660,21 @@ classdef Spline
         error ("geom.Spline.nurbs: Name/Value arguments must come in pairs.");
       endif
       U = geom.UCS ();
-      for k = 1:2:numel (varargin)
-        if (! ischar (varargin{k}) || ! strcmp (varargin{k}, 'UCS'))
-          error ("geom.Spline.nurbs: unknown parameter.");
+      for ii = 1:2:numel (varargin)
+        name = varargin{ii};
+        val = varargin{ii+1};
+        if (! ischar (name) || ! isrow (name))
+          error ("geom.Spline.nurbs: option names must be character vectors.");
         endif
-        U = varargin{k+1};
-        if (! isa (U, 'geom.UCS') || ! isscalar (U))
-          error ("geom.Spline.nurbs: UCS must be a geom.UCS object.");
-        endif
+        switch (lower (name))
+          case 'ucs'
+            U = val;
+            if (! isa (U, 'geom.UCS') || ! isscalar (U))
+              error ("geom.Spline.nurbs: UCS must be a geom.UCS object.");
+            endif
+          otherwise
+            error ("geom.Spline.nurbs: unknown option '%s'.", name);
+        endswitch
       endfor
       if (! isnumeric (P) || ! isreal (P) || ! ismatrix (P)
           || ! any (columns (P) == [2, 3]) || rows (P) < 2
@@ -747,7 +763,7 @@ classdef Spline
     function this = ellipse (A, B, varargin)
 
       ## Input validation
-      if (nargin != 2 && nargin != 4)
+      if (nargin < 2)
         error ("geom.Spline.ellipse: invalid number of input arguments.");
       endif
       if (! isnumeric (A) || ! isreal (A) || ! isscalar (A)
@@ -760,16 +776,27 @@ classdef Spline
         error (strcat ("geom.Spline.ellipse: B must be a positive and", ...
                        " finite real scalar."));
       endif
-      U = geom.UCS ();
-      if (nargin == 4)
-        if (! ischar (varargin{1}) || ! strcmp (varargin{1}, 'UCS'))
-          error ("geom.Spline.ellipse: unknown parameter.");
-        endif
-        U = varargin{2};
-        if (! isa (U, 'geom.UCS') || ! isscalar (U))
-          error ("geom.Spline.ellipse: UCS must be a geom.UCS object.");
-        endif
+      if (mod (numel (varargin), 2) != 0)
+        error ("geom.Spline.ellipse: Name/Value arguments must come in pairs.");
       endif
+      U = geom.UCS ();
+      for ii = 1:2:numel (varargin)
+        name = varargin{ii};
+        val = varargin{ii+1};
+        if (! ischar (name) || ! isrow (name))
+          error (strcat ("geom.Spline.ellipse: option names must be", ...
+                         " character vectors."));
+        endif
+        switch (lower (name))
+          case 'ucs'
+            U = val;
+            if (! isa (U, 'geom.UCS') || ! isscalar (U))
+              error ("geom.Spline.ellipse: UCS must be a geom.UCS object.");
+            endif
+          otherwise
+            error ("geom.Spline.ellipse: unknown option '%s'.", name);
+        endswitch
+      endfor
 
       ## A circle of four rational quarters, stretched
       P = [1, 0; 1, 1; 0, 1; -1, 1; -1, 0; -1, -1; 0, -1; 1, -1; 1, 0] ...
@@ -1091,8 +1118,13 @@ endfunction
 %! geom.Spline ([0, 0; NaN, 1])
 %!error<geom.Spline: Name/Value arguments must come in pairs.> ...
 %! geom.Spline ([0, 0; 1, 0], 'Tangents')
-%!error<geom.Spline: unknown parameter.> ...
+%!error<geom.Spline: unknown option 'Periodic'.> ...
 %! geom.Spline ([0, 0; 1, 0], 'Periodic', true)
+%!error<geom.Spline: option names must be character vectors.> ...
+%! geom.Spline ([0, 0; 1, 0], 1, true)
+%!test  # option names ignore case
+%! S = geom.Spline ([0, 0; 1, 0; 1, 1], 'closed', true);
+%! assert_equal (S.Closed, true);
 %!error<geom.Spline: Closed must be a logical scalar.> ...
 %! geom.Spline ([0, 0; 1, 0; 1, 1], 'Closed', 'yes')
 %!error<geom.Spline: a closed spline has no ends to give Tangents.> ...
@@ -1125,8 +1157,14 @@ endfunction
 %! geom.Spline.nurbs ([0, 0; 1, 0])
 %!error<geom.Spline.nurbs: Name/Value arguments must come in pairs.> ...
 %! geom.Spline.nurbs ([0, 0; 1, 0], [0, 0, 1, 1], 'UCS')
-%!error<geom.Spline.nurbs: unknown parameter.> ...
+%!error<geom.Spline.nurbs: unknown option 'Closed'.> ...
 %! geom.Spline.nurbs ([0, 0; 1, 0], [0, 0, 1, 1], 'Closed', true)
+%!error<geom.Spline.nurbs: option names must be character vectors.> ...
+%! geom.Spline.nurbs ([0, 0; 1, 0], [0, 0, 1, 1], 'UCS', geom.UCS (), 1, true)
+%!test  # option names ignore case
+%! U = geom.UCS ([0, 0, 1], [1, 2, 3]);
+%! S = geom.Spline.nurbs ([0, 0; 1, 0], [0, 0, 1, 1], 'ucs', U);
+%! assert_equal (S.UCS.Origin, [1, 2, 3]);
 %!error<geom.Spline.nurbs: UCS must be a geom.UCS object.> ...
 %! geom.Spline.nurbs ([0, 0; 1, 0], [0, 0, 1, 1], 'UCS', 1)
 %!error<geom.Spline.nurbs: P must be an N-by-2 or N-by-3 real matrix of finite values with at least two rows.> ...
@@ -1183,8 +1221,16 @@ endfunction
 %! geom.Spline.ellipse (0, 1)
 %!error<geom.Spline.ellipse: B must be a positive and finite real scalar.> ...
 %! geom.Spline.ellipse (1, Inf)
-%!error<geom.Spline.ellipse: unknown parameter.> ...
+%!error<geom.Spline.ellipse: unknown option 'Centre'.> ...
 %! geom.Spline.ellipse (1, 2, 'Centre', [0, 0])
+%!error<geom.Spline.ellipse: option names must be character vectors.> ...
+%! geom.Spline.ellipse (1, 2, 1, [0, 0])
+%!error<geom.Spline.ellipse: Name/Value arguments must come in pairs.> ...
+%! geom.Spline.ellipse (1, 2, 'UCS')
+%!test  # option names ignore case
+%! U = geom.UCS ([0, 0, 1], [1, 2, 3]);
+%! E = geom.Spline.ellipse (1, 2, 'ucs', U);
+%! assert_equal (E.UCS.Origin, [1, 2, 3]);
 %!error<geom.Spline.ellipse: UCS must be a geom.UCS object.> ...
 %! geom.Spline.ellipse (1, 2, 'UCS', 3)
 
