@@ -148,6 +148,14 @@ classdef Shape
 
   endmethods
 
+################################################################################
+##                        ** Creating and combining **                        ##
+################################################################################
+##                             Available Methods                              ##
+##                                                                            ##
+## 'Shape'           'union'           'subtract'        'intersect'          ##
+################################################################################
+
   methods (Access = public)
 
     ## -*- texinfo -*-
@@ -294,6 +302,18 @@ classdef Shape
       endif
 
     endfunction
+
+  endmethods
+
+################################################################################
+##                      ** Meshing, viewing and files **                      ##
+################################################################################
+##                             Available Methods                              ##
+##                                                                            ##
+## 'tessellate'      'show'            'write'                                ##
+################################################################################
+
+  methods (Access = public)
 
     ## -*- texinfo -*-
     ## @deftypefn  {solid.Shape} {@var{M} =} tessellate (@var{S})
@@ -506,6 +526,18 @@ classdef Shape
 
     endfunction
 
+  endmethods
+
+################################################################################
+##                              ** Transforms **                              ##
+################################################################################
+##                             Available Methods                              ##
+##                                                                            ##
+## 'translate'       'rotate'          'mirror'          'scale'              ##
+################################################################################
+
+  methods (Access = public)
+
     ## -*- texinfo -*-
     ## @deftypefn {solid.Shape} {@var{S} =} translate (@var{S}, @var{V})
     ##
@@ -639,6 +671,18 @@ classdef Shape
 
     endfunction
 
+  endmethods
+
+################################################################################
+##                               ** Measures **                               ##
+################################################################################
+##                             Available Methods                              ##
+##                                                                            ##
+## 'volume'          'area'            'centroid'        'bbox'               ##
+################################################################################
+
+  methods (Access = public)
+
     ## -*- texinfo -*-
     ## @deftypefn {solid.Shape} {@var{V} =} volume (@var{S})
     ##
@@ -736,6 +780,19 @@ classdef Shape
 
     endfunction
 
+  endmethods
+
+################################################################################
+##                               ** Queries **                                ##
+################################################################################
+##                             Available Methods                              ##
+##                                                                            ##
+## 'isvalid'         'isempty'         'numsolids'       'numfaces'           ##
+## 'numedges'                                                                 ##
+################################################################################
+
+  methods (Access = public)
+
     ## -*- texinfo -*-
     ## @deftypefn {solid.Shape} {@var{TF} =} isvalid (@var{S})
     ##
@@ -822,6 +879,18 @@ classdef Shape
       N = topology (this, 'edge', 'solid.Shape.numedges');
 
     endfunction
+
+  endmethods
+
+################################################################################
+##                           ** Edges and faces **                            ##
+################################################################################
+##                             Available Methods                              ##
+##                                                                            ##
+## 'edges'           'faces'                                                  ##
+################################################################################
+
+  methods (Access = public)
 
     ## -*- texinfo -*-
     ## @deftypefn  {solid.Shape} {@var{E} =} edges (@var{S})
@@ -1012,6 +1081,19 @@ classdef Shape
       F = find (keep)';
 
     endfunction
+
+  endmethods
+
+################################################################################
+##                               ** Features **                               ##
+################################################################################
+##                             Available Methods                              ##
+##                                                                            ##
+## 'fillet'          'chamfer'         'shell'           'hole'               ##
+## 'pocket'                                                                   ##
+################################################################################
+
+  methods (Access = public)
 
     ## -*- texinfo -*-
     ## @deftypefn {solid.Shape} {@var{S} =} fillet (@var{S}, @var{E}, @var{R})
@@ -1570,6 +1652,18 @@ classdef Shape
 
     endfunction
 
+  endmethods
+
+################################################################################
+##                       ** Sections and projections **                       ##
+################################################################################
+##                             Available Methods                              ##
+##                                                                            ##
+## 'section'         'projection'                                             ##
+################################################################################
+
+  methods (Access = public)
+
     ## -*- texinfo -*-
     ## @deftypefn {solid.Shape} {@var{R} =} section (@var{S}, @var{U})
     ##
@@ -1685,6 +1779,19 @@ classdef Shape
       R = geom.Region.__faces__ (F, U);
 
     endfunction
+
+  endmethods
+
+################################################################################
+##                       ** Hulls, sizes and copies **                        ##
+################################################################################
+##                             Available Methods                              ##
+##                                                                            ##
+## 'hull'            'resize'          'copy'            'rectarray'          ##
+## 'polararray'                                                               ##
+################################################################################
+
+  methods (Access = public)
 
     ## -*- texinfo -*-
     ## @deftypefn  {solid.Shape} {@var{H} =} hull (@var{A}, @var{B}, @dots{})
