@@ -2499,9 +2499,11 @@ classdef Drawing
       ## The same lowering the file backends use, so the figure shows what the
       ## file will hold rather than a kinder version of it
       ## A renderer wants the picture, not the semantics: the associative form
-      ## exists for a file, where a reader can re-measure it.
-      E = entities (D, 'hatch', lower (opt.Hatch), 'bulges', 'flatten', ...
-                    'dimensions', 'explode', 'DimScale', opt.DimScale);
+      ## exists for a file, where a reader can re-measure it.  What it reports
+      ## lost is no loss on screen: an ellipse within 0.01 mm, a fill dropped
+      ## only when asked for
+      [E, ~] = entities (D, 'hatch', lower (opt.Hatch), 'bulges', 'flatten', ...
+                         'dimensions', 'explode', 'DimScale', opt.DimScale);
       if (! isempty (opt.Layers) && ! isempty (E))
         E = E(ismember ({E.layer}, opt.Layers));
       endif
@@ -3022,9 +3024,10 @@ classdef Drawing
       ## type.
       ## That is not hypothetical: this one did, when the dimensioning entities
       ## arrived and only this backend still rendered from the drawing model.
-      ## What an entity takes from its layer is left to the layer's style
-      E = entities (D, 'bulges', 'flatten', 'dimensions', 'explode', ...
-                    'layers', 'keep');
+      ## What an entity takes from its layer is left to the layer's style.  The
+      ## only loss it reports, an ellipse within 0.01 mm, is none on paper
+      [E, ~] = entities (D, 'bulges', 'flatten', 'dimensions', 'explode', ...
+                         'layers', 'keep');
 
       if (isempty (E))
         L = {};

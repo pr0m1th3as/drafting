@@ -2291,9 +2291,7 @@
 
 %!test  # every entity type reaches the TikZ backend
 %! D = __allentities__ ();
-%! ws = warning ('off', 'all');
 %! S = tikz (D);
-%! warning (ws);
 %! assert_equal (numel (strfind (S, '\draw')) >= numentities (D), true);
 %! assert_equal (numel (strfind (S, '\node')) > 0, true);
 %! assert_equal (numel (strfind (S, '\fill')) > 0, true);
@@ -2302,9 +2300,7 @@
 %! f = figure ('visible', 'off');
 %! unwind_protect
 %!   D = __allentities__ ();
-%!   ws = warning ('off', 'all');
 %!   H = plot (D, 'Axes', axes ('parent', f));
-%!   warning (ws);
 %!   assert_equal (numel (H) >= numentities (D), true);
 %!   assert_equal (all (ishandle (H)), true);
 %!   assert_equal (strjoin (sort (unique (get (H, 'type'))'), ' '), ...
@@ -2317,9 +2313,7 @@
 %!testif ; any (strcmp (graphics_toolkit (), {'qt', 'gnuplot'}))
 %! fn = [tempname(), '.pdf'];
 %! unwind_protect
-%!   ws = warning ('off', 'all');
 %!   P = print (__allentities__ (), fn, 'Paper', 'A3');
-%!   warning (ws);
 %!   assert_equal (P, [420, 297]);
 %!   assert_equal (__mediabox__ (fn), [420, 297], 0.5);
 %! unwind_protect_cleanup
@@ -2382,10 +2376,8 @@
 %!testif ; any (strcmp (graphics_toolkit (), {'qt', 'gnuplot'}))
 %! fn = [tempname(), '.png'];
 %! unwind_protect
-%!   ws = warning ('off', 'all');
 %!   print (__allentities__ (), fn, 'Paper', 'A3', 'Scale', 1, ...
 %!          'Resolution', 150);
-%!   warning (ws);
 %!   [w, h] = __inkmm__ (fn, 150);
 %!   assert_equal (w > 90 && h > 60, true);
 %! unwind_protect_cleanup
