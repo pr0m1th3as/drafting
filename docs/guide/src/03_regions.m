@@ -147,6 +147,18 @@ for k = 1:numel (T)
 endfor
 plot (D);
 
+## `'Box'` sizes text to fit instead: the ink, descenders included, grows
+## evenly until it touches a side of the box. Given with `'Height'`, it only
+## shrinks text that would not fit at that height.
+
+T = geom.text ('Hgjy', 'Box', [40, 12], 'VAlign', 'bottom');
+frame = geom.Polyline ([0, 0; 40, 0; 40, 12; 0, 12], 'Closed', true);
+D = draw.Drawing ().polyline (frame);
+for k = 1:numel (T)
+  D = D.hatch (T{k});
+endfor
+plot (D);
+
 ## ## A part from them
 ##
 ## The lever, finished flat, needs only to be raised into a solid, and the

@@ -61,6 +61,15 @@
 ## the line the letters stand on, or @qcode{'bottom'}, @qcode{'center'} or
 ## @qcode{'top'} of the box round the ink.
 ##
+## @item @qcode{'Box'}
+## The largest size @code{[@var{W}, @var{H}]} in millimetres the ink may
+## take, descenders included.  The text is scaled evenly until it touches a
+## side; a size of 0 leaves that direction free, so @code{[40, 0]} makes the
+## text 40 wide.  With @qcode{'Height'} given as well, @qcode{'Box'} only
+## shrinks the text, and only when it would not fit at that height.  It sets
+## the size alone: @qcode{'HAlign'}, @qcode{'VAlign'} and @qcode{'UCS'}
+## still place the text.
+##
 ## @item @qcode{'UCS'}
 ## The @code{geom.UCS} the text is laid in, the world @math{xy} plane by
 ## default.
@@ -96,7 +105,9 @@ function R = text (STR, varargin)
     error ("geom.text: Name/Value arguments must come in pairs.");
   endif
   opt = struct ('Height', 10, 'Font', '', 'Style', 'regular', ...
-                'HAlign', 'left', 'VAlign', 'baseline', 'UCS', geom.UCS ());
+                'HAlign', 'left', 'VAlign', 'baseline', 'UCS', geom.UCS (), ...
+                'Box', []);
+  fixed = false;
   for ii = 1:2:numel (varargin)
     name = varargin{ii};
     val = varargin{ii+1};
@@ -106,6 +117,7 @@ function R = text (STR, varargin)
     switch (lower (name))
       case 'height'
         opt.Height = val;
+        fixed = true;
       case 'font'
         opt.Font = val;
       case 'style'
@@ -116,6 +128,8 @@ function R = text (STR, varargin)
         opt.VAlign = val;
       case 'ucs'
         opt.UCS = val;
+      case 'box'
+        opt.Box = val;
       otherwise
         error ("geom.text: unknown option '%s'.", name);
     endswitch
@@ -146,6 +160,13 @@ function R = text (STR, varargin)
   if (! isa (opt.UCS, 'geom.UCS') || ! isscalar (opt.UCS))
     error ("geom.text: UCS must be a geom.UCS object.");
   endif
+  box = opt.Box;
+  if (! isempty (box) && (! isnumeric (box) || ! isreal (box)
+                          || numel (box) != 2 || ! all (isfinite (box))
+                          || any (box < 0) || all (box == 0)))
+    error (strcat ("geom.text: Box must be two non-negative finite sizes,", ...
+                   " not both 0."));
+  endif
 
   font = opt.Font;
   strict = ! isempty (font);
@@ -157,6 +178,23 @@ function R = text (STR, varargin)
   R = cell (1, 0);
   if (isempty (D))
     return;
+  endif
+
+  ## The ink scales with the height, so one measurement gives the height
+  ## that fits the box
+  if (! isempty (box))
+    box = double (box(:)');
+    ink = [B(3) - B(1), B(4) - B(2)];
+    on = box > 0 & ink > 0;
+    s = min (box(on) ./ ink(on));
+    if (fixed)
+      s = min (s, 1);
+    endif
+    if (! isempty (s) && s != 1)
+      H *= s;
+      [D, B] = __occtfont__ ('geom.text', STR, font, style - 1, ...
+                             double (H), strict);
+    endif
   endif
 
   ## The point of the text that lies on the origin
@@ -203,6 +241,44 @@ endfunction
 %! assert_equal (B([3, 4]), [0, 0], 1e-6);
 
 %!test
+%! ## Box fills the height when the ink reaches it first, descenders included
+%! B = inkbox (geom.text ('Hgjy', 'Box', [40, 12]));
+%! assert_equal (B(4) - B(2), 12, 1e-6);
+%! assert_equal (B(3) - B(1) < 40, true);
+
+%!test
+%! ## and the width when the ink reaches that first
+%! B = inkbox (geom.text ('HELLO WORLD', 'Box', [40, 12]));
+%! assert_equal (B(3) - B(1), 40, 1e-6);
+%! assert_equal (B(4) - B(2) < 12, true);
+
+%!test
+%! ## A width of 0 leaves the width free
+%! B = inkbox (geom.text ('Hgjy', 'Box', [0, 5]));
+%! assert_equal (B(4) - B(2), 5, 1e-6);
+
+%!test
+%! ## A height of 0 leaves the height free
+%! B = inkbox (geom.text ('Hgjy', 'Box', [40, 0]));
+%! assert_equal (B(3) - B(1), 40, 1e-6);
+
+%!test
+%! ## With Height, Box leaves text that fits at its height
+%! B = inkbox (geom.text ('H', 'Height', 5, 'Box', [40, 12]));
+%! assert_equal (B([2, 4]), [0, 5], 1e-6);
+
+%!test
+%! ## and shrinks text that does not
+%! B = inkbox (geom.text ('HELLO WORLD', 'Height', 10, 'Box', [40, 12]));
+%! assert_equal (B(3) - B(1), 40, 1e-6);
+
+%!test
+%! ## Box sets the size; the alignment still places the text
+%! B = inkbox (geom.text ('Hgjy', 'Box', [40, 12], 'HAlign', 'center', ...
+%!                        'VAlign', 'center'));
+%! assert_equal ([(B(1) + B(3)) / 2, (B(2) + B(4)) / 2], [0, 0], 1e-6);
+
+%!test
 %! ## Laid in a UCS, and bold wider than regular
 %! U = geom.UCS ([1, 0, 0], [5, 5, 5]);
 %! R = geom.text ('A', 'UCS', U);
@@ -232,6 +308,16 @@ endfunction
 %!                       solid.extrude (T2{1}, 1)), true);
 %!error<geom.text: Height must be a positive and finite real scalar.> ...
 %! geom.text ('A', 'Height', 0)
+%!error<geom.text: Box must be two non-negative finite sizes, not both 0.> ...
+%! geom.text ('A', 'Box', 'ab')
+%!error<geom.text: Box must be two non-negative finite sizes, not both 0.> ...
+%! geom.text ('A', 'Box', [1, 2, 3])
+%!error<geom.text: Box must be two non-negative finite sizes, not both 0.> ...
+%! geom.text ('A', 'Box', [-1, 5])
+%!error<geom.text: Box must be two non-negative finite sizes, not both 0.> ...
+%! geom.text ('A', 'Box', [Inf, 5])
+%!error<geom.text: Box must be two non-negative finite sizes, not both 0.> ...
+%! geom.text ('A', 'Box', [0, 0])
 %!error<geom.text: Font must be a character vector.> ...
 %! geom.text ('A', 'Font', 3)
 %!error<geom.text: Style must be 'regular', 'bold', 'italic' or 'bold italic'.> ...
