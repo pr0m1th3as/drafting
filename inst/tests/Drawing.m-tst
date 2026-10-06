@@ -2214,9 +2214,7 @@
 
 %!test  # every entity type reaches the DXF backend
 %! D = __allentities__ ();
-%! ws = warning ('off', 'all');
 %! [E, LOST] = entities (D);
-%! warning (ws);
 %! assert_equal (strjoin (sort (unique ({E.type})), ' '), ...
 %!               'ARC CIRCLE DIMENSION LINE POINT POLYLINE TEXT');
 %! assert_equal (numel (LOST), 1);
@@ -2336,6 +2334,18 @@
 %!   D = draw.Drawing ().polyline (PL);
 %!   print (D, fn, 'Paper', 'A4', 'Orientation', 'portrait');
 %!   assert_equal (__mediabox__ (fn), [210, 297], 0.5);
+%! unwind_protect_cleanup
+%!   [~] = unlink (fn);
+%! end_unwind_protect
+
+## A landscape page is the sheet asked for, to within half a millimetre
+%!testif ; any (strcmp (graphics_toolkit (), {'qt', 'gnuplot'}))
+%! fn = [tempname(), '.pdf'];
+%! unwind_protect
+%!   PL = geom.Polyline ([0, 0; 150, 0; 150, 100; 0, 100], 'Closed', true);
+%!   D = draw.Drawing ().polyline (PL);
+%!   print (D, fn, 'Paper', 'A4');
+%!   assert_equal (__mediabox__ (fn), [297, 210], 0.5);
 %! unwind_protect_cleanup
 %!   [~] = unlink (fn);
 %! end_unwind_protect
@@ -2485,10 +2495,8 @@
 %! end_unwind_protect
 
 %!test  # a dimension's text clears its own dimension line, below it
-%! ws = warning ('off', 'all');
 %! [~, ~, BL] = entities (draw.Drawing ().dim ([0, 0], [100, 0], -15, ...
 %!                                             'horizontal'));
-%! warning (ws);
 %! p = BL(1).entities;
 %! L = p(strcmpi ({p.type}, 'LINE'));
 %! T = p(strcmpi ({p.type}, 'TEXT'));
@@ -2497,10 +2505,8 @@
 %! assert_equal (T.pts(1,2) + T.height < dl.pts(1,2), true);
 
 %!test  # and above it, when the dimension line is on the other side
-%! ws = warning ('off', 'all');
 %! [~, ~, BL] = entities (draw.Drawing ().dim ([0, 0], [100, 0], 15, ...
 %!                                             'horizontal'));
-%! warning (ws);
 %! p = BL(1).entities;
 %! L = p(strcmpi ({p.type}, 'LINE'));
 %! T = p(strcmpi ({p.type}, 'TEXT'));
