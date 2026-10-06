@@ -57,7 +57,9 @@ back is set out in the guide's
 
 The [guide](https://pr0m1th3as.github.io/drafting/guide/) has thirteen tutorials
 that build parts and drawings step by step. Every output and every picture on
-them is made by the code above it.
+them is made by the code above it. New to Octave? Start with
+[A brief Octave primer](https://pr0m1th3as.github.io/drafting/guide/primer.html),
+the Octave the tutorials use.
 
 1. [A first part](https://pr0m1th3as.github.io/drafting/guide/01_first_part.html):
    a mounting plate from outline to STEP and STL.

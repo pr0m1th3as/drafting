@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>A brief Octave primer - drafting guide</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" integrity="sha512-1ycn6IcaQQ40/MKBW2W4Rhis/DbILU74C1vSrLJxCq57o941Ym01SwNsOMqvEBFlcgUa6xLiPY/NS5R+E6ztJQ==" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/css/bootstrap.min.css" integrity="sha384-KyZXEAg3QhqLMpG8r+8fhAXLRk2vvoC2f3B09zVXn8CA5QIVfZOJ3BCsw2P0p/We" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-U1DAWAznBHeqEIlVSCgzq+c9gqGAJn5c/t99JyeKa9xxaYpSvHU5awsuZVVFIhvj" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="guide.css">
+  </head>
+  <body>
+    <div class="bg-dark">
+      <div class="container-xl">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+          <div class="container-fluid">
+            <a class="navbar-brand" href="index.html">
+              <img src="../assets/drafting.png" alt="drafting" class="d-inline-block align-top" width="25" height="25">
+              drafting guide
+            </a>
+            <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+              <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+              <ul class="navbar-nav">
+                <li class="nav-item">
+                  <a class="nav-link" href="../index.html">
+                    <i class="fas fa-book"></i>
+                    Function reference
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="https://github.com/pr0m1th3as/drafting">
+                    <i class="fab fa-github"></i>
+                    Source
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </nav>
+      </div>
+    </div>
+    <div class="container-xl my-4">
+      <div class="row">
+        <div class="col-md-3 col-lg-2 mb-4">
+          <nav class="guide-nav">
+<!-- guide-nav -->
+            <h6>Guide</h6>
+            <ul>
+              <li><a href="index.html">Overview</a></li>
+              <li><a href="layout.html">Package layout</a></li>
+              <li><a href="dxf.html">DXF and the classes</a></li>
+            </ul>
+            <h6>Octave</h6>
+            <ul>
+              <li><a href="primer.html" class="active">A brief Octave primer</a></li>
+            </ul>
+            <h6>Tutorials</h6>
+            <ul>
+              <li><a href="01_first_part.html">A first part</a></li>
+              <li><a href="02_outlines.html">Outlines: polylines, splines, paths and regions</a></li>
+              <li><a href="03_regions.html">Working with regions</a></li>
+              <li><a href="04_coordinate_systems.html">Coordinate systems</a></li>
+              <li><a href="05_solids_from_regions.html">Solids from regions</a></li>
+              <li><a href="06_primitives_and_booleans.html">Primitives, booleans and transforms</a></li>
+              <li><a href="07_features.html">Features: holes, pockets, fillets, chamfers and shells</a></li>
+              <li><a href="08_sections_and_projections.html">Sections and projections</a></li>
+              <li><a href="09_drawings.html">Technical drawings</a></li>
+              <li><a href="10_meshes.html">Meshes</a></li>
+              <li><a href="11_assemblies.html">Assemblies</a></li>
+              <li><a href="12_from_openscad.html">For OpenSCAD users</a></li>
+              <li><a href="13_surfaces.html">Surfaces through a grid</a></li>
+            </ul>
+<!-- /guide-nav -->
+          </nav>
+        </div>
+        <main class="col-md-9 col-lg-10">
+<h1>A brief Octave primer</h1>
+<p>The Octave the tutorials use, for readers coming from OpenSCAD or from another language.</p>
+<p>Readers who know MATLAB know nearly all of it already, and need only the last two sections.</p>
+<h2>Loading the package</h2>
+<p>A package is installed once, with Open CASCADE in place as the README sets out, and loaded in every session that uses it:</p>
+<pre class="code-in"><code>pkg install drafting
+pkg load drafting</code></pre>
+<p>Code is typed at the prompt, or saved in a script, a plain text file ending in <code>.m</code> that runs when its name is typed. Every page of this guide is one. <code>help</code> prints the full reference of any function or class:</p>
+<pre class="code-in"><code>help solid.box</code></pre>
+<h2>Names with a dot</h2>
+<p>The package keeps its functions and classes in namespaces, one for each of its parts: <code>geom</code>, <code>draw</code>, <code>solid</code>, <code>polymesh</code> and <code>model</code>. On disk a namespace is a folder whose name starts with <code>+</code>, such as <code>+geom</code>. In code it is written with a dot and no <code>+</code>: <a href="../geom.Region.html"><code>geom.Region</code></a> is a class, <a href="../solid.box.html"><code>solid.box</code></a> a function.</p>
+<pre class="code-in"><code>S = solid.box (40, 30, 10);
+class (S)</code></pre>
+<pre class="code-out"><code>ans = solid.Shape</code></pre>
+<h2>Values, not references</h2>
+<p>A method is called as a function with the object first, <code>fillet (S, ...)</code>, and <code>S.fillet (...)</code> is the same call. Either way it returns a new object and leaves the one it was given unchanged, so a change is kept only by assigning the result:</p>
+<pre class="code-in"><code>T = fillet (S, edges (S, 'Direction', [0, 0, 1]), 5);
+[numfaces(S), numfaces(T)]</code></pre>
+<pre class="code-out"><code>ans =
+
+    6   10</code></pre>
+<p><code>S</code> is still the plain block. Writing <code>S = fillet (S, ...)</code> replaces it, and that is how a part is built up, step by step.</p>
+<h2>Numbers and points</h2>
+<p>Numbers come in matrices. Commas separate the elements of a row and semicolons end the rows. A point is a row, so an outline is a matrix of one row for each corner:</p>
+<pre class="code-in"><code>P = [0, 0; 60, 0; 60, 40; 0, 40]</code></pre>
+<pre class="code-out"><code>P =
+
+    0    0
+   60    0
+   60   40
+    0   40</code></pre>
+<p>The commas are optional, so <code>[0 0]</code> is <code>[0, 0]</code>, and Octave prints a matrix without them; the guide always writes them. Indices count from 1, <code>end</code> is the last and <code>:</code> is all of them, so <code>P(end,:)</code> is the last corner:</p>
+<pre class="code-in"><code>P(end,:)</code></pre>
+<pre class="code-out"><code>ans =
+
+    0   40</code></pre>
+<p>A colon makes a range, from a start by a step to an end, and <code>linspace</code> a number of points evenly spaced:</p>
+<pre class="code-in"><code>x = 0:10:40
+linspace (0, 1, 5)</code></pre>
+<pre class="code-out"><code>x =
+
+    0   10   20   30   40
+
+ans =
+
+        0   0.2500   0.5000   0.7500   1.0000</code></pre>
+<p>An operator with a dot works element by element, as <code>.*</code>, <code>./</code> and <code>.^</code> do; without the dot, <code>*</code> is the product of matrices. A <code>'</code> turns a row into a column.</p>
+<pre class="code-in"><code>x .^ 2
+x'</code></pre>
+<pre class="code-out"><code>ans =
+
+      0    100    400    900   1600
+
+ans =
+
+    0
+   10
+   20
+   30
+   40</code></pre>
+<h2>Cell arrays</h2>
+<p>Braces make a cell array, which holds things of any kind and size side by side. A function that can give back several pieces returns them in one: a bar subtracted right across a plate leaves two regions. Braces also take a piece out.</p>
+<pre class="code-in"><code>plate = geom.Region ([0, 0; 60, 0; 60, 40; 0, 40]);
+bar = geom.Region ([-10, 15; 70, 15; 70, 25; -10, 25]);
+pieces = subtract (plate, bar);
+numel (pieces)
+pieces{1}</code></pre>
+<pre class="code-out"><code>ans = 2
+ans =
+
+  geom.Region: an outline of 4 segments, 0 holes</code></pre>
+<h2>What is shown</h2>
+<p>A line ending in a semicolon prints nothing. Without one, the result is shown under its name, or as <code>ans</code> when it has none. Several outputs come back in brackets, and <code>~</code> drops one that is not wanted:</p>
+<pre class="code-in"><code>n = numfaces (S);
+numfaces (S)
+[~, L] = bbox (S)</code></pre>
+<pre class="code-out"><code>ans = 6
+L =
+
+   40   30   10</code></pre>
+<h2>Options</h2>
+<p>Options follow the required arguments as pairs, a name in quotes and then its value. The names ignore case, so <code>'twist'</code> is <code>'Twist'</code>:</p>
+<pre class="code-in"><code>sq = geom.Region ([-10, -10; 10, -10; 10, 10; -10, 10]);
+twisted = solid.extrude (sq, 40, 'Twist', 90, 'Scale', 0.5);
+show (twisted);</code></pre>
+<figure class="shot"><img src="img/primer-1.png" alt="A brief Octave primer, picture 1"></figure>
+<h2>Angles</h2>
+<p>Every angle in the package is in degrees. Octave's <code>sind</code>, <code>cosd</code> and <code>tand</code> take degrees, where <code>sin</code>, <code>cos</code> and <code>tan</code> take radians:</p>
+<pre class="code-in"><code>sind (30)
+sin (pi / 6)</code></pre>
+<pre class="code-out"><code>ans = 0.5000
+ans = 0.5000</code></pre>
+<h2>Loops, errors and long lines</h2>
+<p>A loop closes with <code>endfor</code>, a condition with <code>endif</code>, and so on, and a plain <code>end</code> closes any of them too. <code>...</code> carries a statement on to the next line, and <code>##</code> or <code>#</code> starts a comment.</p>
+<pre class="code-in"><code>pins = solid.Shape ();
+for k = 1:4
+  pin = translate (solid.cylinder (2, 10), [10 * k, 0, 0]);
+  pins = union (pins, pin);
+endfor
+numsolids (pins)</code></pre>
+<pre class="code-out"><code>ans = 4</code></pre>
+<p>An error stops a script unless it is caught. <code>try</code> runs a block, and <code>catch</code> takes the error, whose message says what was wrong:</p>
+<pre class="code-in"><code>try
+  solid.box (10, -1, 5);
+catch err
+  disp (err.message)
+end_try_catch</code></pre>
+<pre class="code-out"><code>solid.box: DY must be a positive and finite real scalar.</code></pre>
+<h2>Small functions</h2>
+<p><code>@</code> makes a function in place, from a list of arguments and one expression. Here <code>disc</code> gives a disc of radius <code>r</code> centred at <code>x</code>, a region of two points joined by half circles, as the third column of each point asks:</p>
+<pre class="code-in"><code>disc = @(x, r) geom.Region ([x - r, 0, 1; x + r, 0, 1]);
+volume (solid.extrude (disc (0, 10), 1))</code></pre>
+<pre class="code-out"><code>ans = 314.16</code></pre>
+<h2>Spaces and brackets</h2>
+<p>Octave lets a space stand between a name and its parenthesis, and the guide writes one, <code>numel (x)</code>, everywhere but inside brackets and braces. There a space separates elements, so <code>x (2)</code> is two things, <code>x</code> and <code>(2)</code>, and the result is silently different:</p>
+<pre class="code-in"><code>x = [3, 4, 5];
+[x(2), 1]
+[x (2), 1]</code></pre>
+<pre class="code-out"><code>ans =
+
+   4   1
+
+ans =
+
+   3   4   5   2   1</code></pre>
+<p>Inside brackets, write a call or an index with no space before its parenthesis.</p>
+<h2>For MATLAB users</h2>
+<p>Octave runs most MATLAB code as it is, and the guide uses little that MATLAB lacks: <code>endfor</code>, <code>end_try_catch</code> and the other closing words, and <code>##</code> comments. The package itself runs in Octave only, since its compiled parts are built for it.</p>
+<nav class="d-flex justify-content-between my-5">
+<span></span>
+<a href="01_first_part.html">A first part &rarr;</a>
+</nav>
+
+        </main>
+      </div>
+    </div>
+  </body>
+</html>

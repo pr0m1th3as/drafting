@@ -46,6 +46,10 @@
 ## in '#: not run' is shown without being run, for what needs a person at the
 ## mouse.
 ##
+## primer.m, A brief Octave primer, is written the same way and run the same
+## way, but it is no tutorial: its page stands in a section of its own, before
+## the tutorials and outside their sequence.
+##
 ## A figure a block draws is captured when the block ends.  A shape a block
 ## shows with show (X) or X.show is drawn by Open CASCADE in a hidden viewer
 ## and captured from it, so no window opens.
@@ -75,6 +79,7 @@ function build_guide (MODE = 'build')
   for k = 2:numel (files)
     T(k) = parse (files{k});
   endfor
+  P = parse (fullfile (src, 'primer.m'));
   names = index_names (fullfile (root, 'INDEX'));
 
   ## Every page of the guide, for the sidebar
@@ -82,6 +87,8 @@ function build_guide (MODE = 'build')
                   'title', {'Overview', 'Package layout', ...
                             'DXF and the classes'}, ...
                   'group', 'Guide');
+  pages(end+1) = struct ('file', [P.base, '.html'], 'title', P.title, ...
+                         'group', 'Octave');
   for k = 1:numel (T)
     pages(end+1) = struct ('file', [T(k).base, '.html'], ...
                            'title', T(k).title, 'group', 'Tutorials');
@@ -90,7 +97,8 @@ function build_guide (MODE = 'build')
   imgdir = fullfile (out, 'img');
   if (build)
     old = [glob(fullfile (out, '[0-9][0-9]_*.html')); ...
-           glob(fullfile (out, 'index.html'))];
+           glob(fullfile (out, 'index.html')); ...
+           glob(fullfile (out, [P.base, '.html']))];
     for k = 1:numel (old)
       unlink (old{k});
     endfor
@@ -109,6 +117,9 @@ function build_guide (MODE = 'build')
   set (0, 'defaultfigurevisible', 'off');
   unwind_protect
     cd (work);
+    printf ("build_guide: %s\n", P.base);
+    ctx = struct ('base', P.base, 'imgdir', imgdir, 'build', build);
+    P.cells = run_tutorial (P.cells, ctx);
     for k = 1:numel (T)
       printf ("build_guide: %s\n", T(k).base);
       ctx = struct ('base', T(k).base, 'imgdir', imgdir, 'build', build);
@@ -123,7 +134,8 @@ function build_guide (MODE = 'build')
   end_unwind_protect
 
   if (! build)
-    printf ("build_guide: %d tutorials run, nothing written.\n", numel (T));
+    printf (["build_guide: the primer and %d tutorials run,", ...
+             " nothing written.\n"], numel (T));
     return;
   endif
 
@@ -134,13 +146,22 @@ function build_guide (MODE = 'build')
     write_page (fullfile (out, [T(k).base, '.html']), tmpl, T(k).title, ...
                 body, nav (pages, [T(k).base, '.html']));
   endfor
+  body = [cells_html(P, names), ...
+          "<nav class=\"d-flex justify-content-between my-5\">\n", ...
+          "<span></span>\n", ...
+          sprintf("<a href=\"%s.html\">%s &rarr;</a>\n", T(1).base, ...
+                  esc (T(1).title)), ...
+          "</nav>\n"];
+  write_page (fullfile (out, [P.base, '.html']), tmpl, P.title, body, ...
+              nav (pages, [P.base, '.html']));
   write_page (fullfile (out, 'index.html'), tmpl, 'Overview', ...
-              index_html (T), nav (pages, 'index.html'));
+              index_html (T, P), nav (pages, 'index.html'));
   for f = {'layout.html', 'dxf.html'}
     p = fullfile (out, f{1});
     write_text (p, set_nav (fileread (p), nav (pages, f{1})));
   endfor
-  printf ("build_guide: %d tutorials written to %s\n", numel (T), out);
+  printf ("build_guide: the primer and %d tutorials written to %s\n", ...
+          numel (T), out);
 
 endfunction
 
@@ -299,10 +320,28 @@ function [img, n] = capture (ctx, views, n)
 
 endfunction
 
-## The body of a tutorial's page
+## The body of a tutorial's page, with the tutorials before and after it
 function html = tutorial_html (T, k, names)
 
-  t = T(k);
+  html = cells_html (T(k), names);
+  html = [html, "<nav class=\"d-flex justify-content-between my-5\">\n"];
+  if (k > 1)
+    html = [html, sprintf("<a href=\"%s.html\">&larr; %s</a>\n", ...
+                          T(k-1).base, esc (T(k-1).title))];
+  else
+    html = [html, "<span></span>\n"];
+  endif
+  if (k < numel (T))
+    html = [html, sprintf("<a href=\"%s.html\">%s &rarr;</a>\n", ...
+                          T(k+1).base, esc (T(k+1).title))];
+  endif
+  html = [html, "</nav>\n"];
+
+endfunction
+
+## The title, prose, code, output and pictures of the page of the script T
+function html = cells_html (t, names)
+
   html = sprintf ("<h1>%s</h1>\n", esc (t.title));
   for c = t.cells
     if (strcmp (c.type, 'prose'))
@@ -325,30 +364,16 @@ function html = tutorial_html (T, k, names)
     endfor
   endfor
 
-  ## The tutorials before and after this one
-  html = [html, "<nav class=\"d-flex justify-content-between my-5\">\n"];
-  if (k > 1)
-    html = [html, sprintf("<a href=\"%s.html\">&larr; %s</a>\n", ...
-                          T(k-1).base, esc (T(k-1).title))];
-  else
-    html = [html, "<span></span>\n"];
-  endif
-  if (k < numel (T))
-    html = [html, sprintf("<a href=\"%s.html\">%s &rarr;</a>\n", ...
-                          T(k+1).base, esc (T(k+1).title))];
-  endif
-  html = [html, "</nav>\n"];
-
 endfunction
 
 ## The body of the guide's front page
-function html = index_html (T)
+function html = index_html (T, P)
 
   html = ["<h1>The drafting guide</h1>\n", ...
           "<p class=\"lead\">What the package is made of, how it meets DXF,", ...
-          " and tutorials that build parts and drawings step by step.  Every", ...
-          " picture is made by the code above it, and every output is what", ...
-          " that code printed.</p>\n", ...
+          " a brief Octave primer, and tutorials that build parts and", ...
+          " drawings step by step.  Every picture is made by the code", ...
+          " above it, and every output is what that code printed.</p>\n", ...
           "<h2>How the package is built</h2>\n<ul>\n", ...
           "<li><a href=\"layout.html\">Package layout</a>: the five", ...
           " namespaces, the classes, and how an object of one becomes an", ...
@@ -356,7 +381,10 @@ function html = index_html (T)
           "<li><a href=\"dxf.html\">DXF and the classes</a>: what each class", ...
           " is written as, what each entity is read as, and how frames,", ...
           " layers and versions are kept.</li>\n</ul>\n", ...
-          "<h2>Tutorials</h2>\n<ol>\n"];
+          "<h2>New to Octave?</h2>\n<ul>\n", ...
+          sprintf("<li><a href=\"%s.html\">%s</a>: %s</li>\n", P.base, ...
+                  esc (P.title), inline (esc (P.lead), {})), ...
+          "</ul>\n<h2>Tutorials</h2>\n<ol>\n"];
   for k = 1:numel (T)
     html = [html, sprintf("<li><a href=\"%s.html\">%s</a>", T(k).base, ...
                           esc (T(k).title))];
@@ -373,7 +401,7 @@ endfunction
 function html = nav (pages, file)
 
   html = '';
-  for g = {'Guide', 'Tutorials'}
+  for g = {'Guide', 'Octave', 'Tutorials'}
     p = pages(strcmp ({pages.group}, g{1}));
     if (isempty (p))
       continue;
