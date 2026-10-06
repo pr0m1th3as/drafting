@@ -2315,7 +2315,7 @@
 %!   close (f);
 %! end_unwind_protect
 
-## The PDF page is the sheet that was asked for, to within a millimetre
+## The PDF page is the sheet that was asked for, to within half a millimetre
 %!testif ; any (strcmp (graphics_toolkit (), {'qt', 'gnuplot'}))
 %! fn = [tempname(), '.pdf'];
 %! unwind_protect
@@ -2323,7 +2323,7 @@
 %!   P = print (__allentities__ (), fn, 'Paper', 'A3');
 %!   warning (ws);
 %!   assert_equal (P, [420, 297]);
-%!   assert_equal (__mediabox__ (fn), [420, 297], 1);
+%!   assert_equal (__mediabox__ (fn), [420, 297], 0.5);
 %! unwind_protect_cleanup
 %!   [~] = unlink (fn);
 %! end_unwind_protect
@@ -2335,7 +2335,7 @@
 %!   PL = geom.Polyline ([0, 0; 100, 0; 100, 150; 0, 150], 'Closed', true);
 %!   D = draw.Drawing ().polyline (PL);
 %!   print (D, fn, 'Paper', 'A4', 'Orientation', 'portrait');
-%!   assert_equal (__mediabox__ (fn), [210, 297], 1);
+%!   assert_equal (__mediabox__ (fn), [210, 297], 0.5);
 %! unwind_protect_cleanup
 %!   [~] = unlink (fn);
 %! end_unwind_protect

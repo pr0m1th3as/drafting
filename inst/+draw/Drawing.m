@@ -2851,6 +2851,9 @@ classdef Drawing
         set (ax, 'position', [(PAPER - place) ./ (2 * PAPER), place ./ PAPER]);
         set (fig, 'paperunits', 'centimeters');
         set (fig, 'papersize', PAPER / 10);
+        ## Octave snaps a size it knows to its named paper, whose page it
+        ## takes from a table rounded to 0.1 inch: A3 would print 0.9 mm short
+        set (fig, 'papertype', '<custom>');
         set (fig, 'paperposition', [0, 0, PAPER / 10]);
         set (fig, 'paperpositionmode', 'manual');
 
