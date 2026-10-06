@@ -2244,7 +2244,7 @@ endfunction
 %!   assert_equal (numel (C{1}.Holes), 1);
 %!   assert_equal (C{1}.Outline.Vertices, R.Outline.Vertices, 1e-12);
 %! unwind_protect_cleanup
-%!   unlink (fn);
+%!   [~] = unlink (fn);
 %! end_unwind_protect
 %!test  # write: a loop with a spline in it is written as its pieces
 %! R = geom.Region (geom.Spline ([-3, -2; 3, -2; 4, 2; 0, 4; -4, 2], ...
@@ -2256,7 +2256,7 @@ endfunction
 %!   assert_equal (class (C{1}), 'geom.Region');
 %!   assert_equal (isempty (C{1}.Outline.Splines{1}), false);
 %! unwind_protect_cleanup
-%!   unlink (fn);
+%!   [~] = unlink (fn);
 %! end_unwind_protect
 %!test  # write: a region on a tilted plane keeps its frame
 %! U = geom.UCS ([1, 0, 1], [0, 0, 5]);
@@ -2269,7 +2269,7 @@ endfunction
 %!   assert_equal (C{1}.UCS.Normal, U.Normal, 1e-12);
 %!   assert_equal (C{1}.UCS.XAxis, U.XAxis, 1e-12);
 %! unwind_protect_cleanup
-%!   unlink (fn);
+%!   [~] = unlink (fn);
 %! end_unwind_protect
 
 %!error<geom.Region.write: invalid number of input arguments.> ...

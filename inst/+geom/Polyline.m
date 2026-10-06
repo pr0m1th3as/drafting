@@ -667,7 +667,7 @@ endfunction
 %!   assert_equal ([C{1}.UCS.Origin; C{1}.UCS.XAxis; C{1}.UCS.Normal], ...
 %!                 [U.Origin; U.XAxis; U.Normal], 1e-12);
 %! unwind_protect_cleanup
-%!   unlink (fn);
+%!   [~] = unlink (fn);
 %! end_unwind_protect
 %!test  # write: R12 holds a polyline, and it reads back
 %! PL = geom.Polyline ([0, 0, 1; 10, 0, 0; 10, 5, 0]);
@@ -679,7 +679,7 @@ endfunction
 %!   C = geom.read (fn, 'Layer', 'P');
 %!   assert_equal (C{1}.Vertices, PL.Vertices, 1e-12);
 %! unwind_protect_cleanup
-%!   unlink (fn);
+%!   [~] = unlink (fn);
 %! end_unwind_protect
 
 %!error<geom.Polyline.write: invalid number of input arguments.> ...

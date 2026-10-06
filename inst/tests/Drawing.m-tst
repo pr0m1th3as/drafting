@@ -610,7 +610,7 @@
 %!                  L(2).plot, L(3).visible}, ...
 %!                 {2, 'HIDDEN', 0.25, false, false});
 %! unwind_protect_cleanup
-%!   unlink (fn);
+%!   [~] = unlink (fn);
 %! end_unwind_protect
 
 %!test  # a line weight is written as the nearest DXF allows
@@ -622,7 +622,7 @@
 %!   R = draw.read (fn);
 %!   assert_equal (R.Entities.lineweight, 0.35);
 %! unwind_protect_cleanup
-%!   unlink (fn);
+%!   [~] = unlink (fn);
 %! end_unwind_protect
 
 %!test  # a dimension's picture is on layer 0 and by block, as CAD has it
@@ -638,7 +638,7 @@
 %!   assert_equal (isempty (regexp (b, "\n  8\n(?!0\n)", 'once')), true);
 %!   assert_equal (isempty (regexp (b, "\n 62\n *0\n", 'once')), false);
 %! unwind_protect_cleanup
-%!   unlink (fn);
+%!   [~] = unlink (fn);
 %! end_unwind_protect
 
 %!test  # translation moves every entity and changes nothing else
@@ -1051,7 +1051,7 @@
 %!   assert_equal (! isempty (strfind (txt, '%%c25')), true);
 %!   assert_equal (! isempty (strfind (txt, '90%%d')), true);
 %! unwind_protect_cleanup
-%!   unlink (fn);
+%!   [~] = unlink (fn);
 %! end_unwind_protect
 
 %!error<draw.Drawing.diam: invalid number of input arguments.> ...
@@ -1466,7 +1466,8 @@
 %! plot (draw.Drawing (), 'LTScale', -1)
 
 
-%!test  # the sheet is the size asked for, and the scale is reported
+## The sheet is the size asked for, and the scale is reported
+%!testif ; any (strcmp (graphics_toolkit (), {'qt', 'gnuplot'}))
 %! fn = tempname ();
 %! PL = geom.Polyline ([0, 0; 200, 0; 200, 120; 0, 120], 'Closed', true);
 %! D = draw.Drawing ().polyline (PL);
@@ -1475,10 +1476,11 @@
 %!   assert_equal (P, [420, 297]);
 %!   assert_equal (S, 1);
 %! unwind_protect_cleanup
-%!   unlink ([fn, '.pdf']);
+%!   [~] = unlink ([fn, '.pdf']);
 %! end_unwind_protect
 
-%!test  # portrait swaps the sheet
+## Portrait swaps the sheet
+%!testif ; any (strcmp (graphics_toolkit (), {'qt', 'gnuplot'}))
 %! fn = tempname ();
 %! PL = geom.Polyline ([0, 0; 100, 0; 100, 100; 0, 100], 'Closed', true);
 %! D = draw.Drawing ().polyline (PL);
@@ -1486,10 +1488,11 @@
 %!   P = print (D, [fn, '.pdf'], 'Paper', 'A4', 'Orientation', 'portrait');
 %!   assert_equal (P, [210, 297]);
 %! unwind_protect_cleanup
-%!   unlink ([fn, '.pdf']);
+%!   [~] = unlink ([fn, '.pdf']);
 %! end_unwind_protect
 
-%!test  # the fitted scale comes from the preferred series
+## The fitted scale comes from the preferred series
+%!testif ; any (strcmp (graphics_toolkit (), {'qt', 'gnuplot'}))
 %! fn = tempname ();
 %! P = [0, 0; 20000, 0; 20000, 12000; 0, 12000];
 %! D = draw.Drawing ().polyline (geom.Polyline (P, 'Closed', true));
@@ -1497,10 +1500,11 @@
 %!   [~, S] = print (D, [fn, '.pdf'], 'Paper', 'A4');
 %!   assert_equal (any (S == [1, 2, 5, 10, 20, 50, 100, 200, 500]), true);
 %! unwind_protect_cleanup
-%!   unlink ([fn, '.pdf']);
+%!   [~] = unlink ([fn, '.pdf']);
 %! end_unwind_protect
 
-%!test  # an explicit scale is honoured, not refitted
+## An explicit scale is honoured, not refitted
+%!testif ; any (strcmp (graphics_toolkit (), {'qt', 'gnuplot'}))
 %! fn = tempname ();
 %! PL = geom.Polyline ([0, 0; 200, 0; 200, 120; 0, 120], 'Closed', true);
 %! D = draw.Drawing ().polyline (PL);
@@ -1508,17 +1512,18 @@
 %!   [~, S] = print (D, [fn, '.pdf'], 'Paper', 'A3', 'Scale', 5);
 %!   assert_equal (S, 5);
 %! unwind_protect_cleanup
-%!   unlink ([fn, '.pdf']);
+%!   [~] = unlink ([fn, '.pdf']);
 %! end_unwind_protect
 
-%!test  # a file is actually written
+## A file is actually written
+%!testif ; any (strcmp (graphics_toolkit (), {'qt', 'gnuplot'}))
 %! fn = tempname ();
 %! D = draw.Drawing ().circle ([0, 0], 20);
 %! unwind_protect
 %!   print (D, [fn, '.pdf']);
 %!   assert_equal (exist ([fn, '.pdf'], 'file') > 0, true);
 %! unwind_protect_cleanup
-%!   unlink ([fn, '.pdf']);
+%!   [~] = unlink ([fn, '.pdf']);
 %! end_unwind_protect
 
 %!error<draw.Drawing.print: invalid number of input arguments.> ...
@@ -1541,6 +1546,12 @@
 %! print (draw.Drawing ().circle ([0, 0], 5), 'x.pdf', 'LineWidth', -1)
 %!error<draw.Drawing.print: D is empty, so there is nothing to plot.> ...
 %! print (draw.Drawing (), 'x.pdf')
+## fltk cannot print a figure that is not shown, so print refuses it
+%!testif ; strcmp (graphics_toolkit (), 'fltk')
+%! fail ("print (draw.Drawing ().circle ([0, 0], 5), 'x.pdf')", ...
+%!       ['draw.Drawing.print: printing needs the qt or gnuplot graphics', ...
+%!        ' toolkit; run Octave as ''octave --no-gui'', or call', ...
+%!        ' graphics_toolkit \(''gnuplot''\)\.']);
 
 %!test  # a plain drawing lowers entity for entity
 %! D = draw.Drawing ().line ([0, 0], [10, 0]).circle ([5, 5], 2);
@@ -1799,7 +1810,7 @@
 %!   assert_equal (R.Entities(1).closed, true);
 %!   assert_equal (R.Entities(3).radius, 50, 1e-12);
 %! unwind_protect_cleanup
-%!   unlink (fn);
+%!   [~] = unlink (fn);
 %! end_unwind_protect
 
 %!error<draw.Drawing.entities: optional arguments must come in name-value pairs.> ...
@@ -1996,7 +2007,7 @@
 %!   fclose (fid);
 %!   assert_equal (strtrim (txt), strtrim (S));
 %! unwind_protect_cleanup
-%!   unlink (fn);
+%!   [~] = unlink (fn);
 %! end_unwind_protect
 
 %!error<draw.Drawing.tikz: optional arguments must come in name-value pairs.> ...
@@ -2304,7 +2315,8 @@
 %!   close (f);
 %! end_unwind_protect
 
-%!test  # the PDF page is the sheet that was asked for, to within a millimetre
+## The PDF page is the sheet that was asked for, to within a millimetre
+%!testif ; any (strcmp (graphics_toolkit (), {'qt', 'gnuplot'}))
 %! fn = [tempname(), '.pdf'];
 %! unwind_protect
 %!   ws = warning ('off', 'all');
@@ -2313,10 +2325,11 @@
 %!   assert_equal (P, [420, 297]);
 %!   assert_equal (__mediabox__ (fn), [420, 297], 1);
 %! unwind_protect_cleanup
-%!   unlink (fn);
+%!   [~] = unlink (fn);
 %! end_unwind_protect
 
-%!test  # portrait swaps the page in the file, not only in the return value
+## Portrait swaps the page in the file, not only in the return value
+%!testif ; any (strcmp (graphics_toolkit (), {'qt', 'gnuplot'}))
 %! fn = [tempname(), '.pdf'];
 %! unwind_protect
 %!   PL = geom.Polyline ([0, 0; 100, 0; 100, 150; 0, 150], 'Closed', true);
@@ -2324,10 +2337,11 @@
 %!   print (D, fn, 'Paper', 'A4', 'Orientation', 'portrait');
 %!   assert_equal (__mediabox__ (fn), [210, 297], 1);
 %! unwind_protect_cleanup
-%!   unlink (fn);
+%!   [~] = unlink (fn);
 %! end_unwind_protect
 
-%!test  # print leaves a layer that is not printed off paper
+## Print leaves a layer that is not printed off paper
+%!testif ; any (strcmp (graphics_toolkit (), {'qt', 'gnuplot'}))
 %! fn = [tempname(), '.png'];
 %! unwind_protect
 %!   D = draw.Drawing ().circle ([0, 0], 20).layer ('C', 'Plot', false);
@@ -2338,10 +2352,11 @@
 %!   [w, h] = __inkmm__ (fn, 150);
 %!   assert_equal ([w, h], [40, 40], 1);
 %! unwind_protect_cleanup
-%!   unlink (fn);
+%!   [~] = unlink (fn);
 %! end_unwind_protect
 
-%!test  # and a layer not printed keeps its place on the sheet
+## And a layer not printed keeps its place on the sheet
+%!testif ; any (strcmp (graphics_toolkit (), {'qt', 'gnuplot'}))
 %! fn = [tempname(), '.pdf'];
 %! unwind_protect
 %!   D = draw.Drawing ().circle ([0, 0], 20).layer ('C', 'Plot', false);
@@ -2350,10 +2365,11 @@
 %!   [~, S] = print (D, fn);
 %!   assert_equal (S > 1, true);
 %! unwind_protect_cleanup
-%!   unlink (fn);
+%!   [~] = unlink (fn);
 %! end_unwind_protect
 
-%!test  # a printed sheet carries the drawing at size, not a stray mark
+## A printed sheet carries the drawing at size, not a stray mark
+%!testif ; any (strcmp (graphics_toolkit (), {'qt', 'gnuplot'}))
 %! fn = [tempname(), '.png'];
 %! unwind_protect
 %!   ws = warning ('off', 'all');
@@ -2363,10 +2379,11 @@
 %!   [w, h] = __inkmm__ (fn, 150);
 %!   assert_equal (w > 90 && h > 60, true);
 %! unwind_protect_cleanup
-%!   unlink (fn);
+%!   [~] = unlink (fn);
 %! end_unwind_protect
 
-%!test  # a model length arrives on paper at the stated scale
+## A model length arrives on paper at the stated scale
+%!testif ; any (strcmp (graphics_toolkit (), {'qt', 'gnuplot'}))
 %! fn = [tempname(), '.png'];
 %! unwind_protect
 %!   PL = geom.Polyline ([0, 0; 100, 0; 100, 50; 0, 50], 'Closed', true);
@@ -2376,10 +2393,11 @@
 %!   assert_equal (w, 100, 1);
 %!   assert_equal (h, 50, 1);
 %! unwind_protect_cleanup
-%!   unlink (fn);
+%!   [~] = unlink (fn);
 %! end_unwind_protect
 
-%!test  # halving the scale halves the drawing on paper
+## Halving the scale halves the drawing on paper
+%!testif ; any (strcmp (graphics_toolkit (), {'qt', 'gnuplot'}))
 %! fn = [tempname(), '.png'];
 %! unwind_protect
 %!   PL = geom.Polyline ([0, 0; 100, 0; 100, 50; 0, 50], 'Closed', true);
@@ -2389,10 +2407,11 @@
 %!   assert_equal (w, 50, 1);
 %!   assert_equal (h, 25, 1);
 %! unwind_protect_cleanup
-%!   unlink (fn);
+%!   [~] = unlink (fn);
 %! end_unwind_protect
 
-%!test  # a drawing that nearly fills the sheet is not refused at a scale
+## A drawing that nearly fills the sheet is not refused at a scale
+%!testif ; any (strcmp (graphics_toolkit (), {'qt', 'gnuplot'}))
 %!      # that fits it
 %! fn = [tempname(), '.pdf'];
 %! unwind_protect
@@ -2401,20 +2420,22 @@
 %!   [P, S] = print (D, fn, 'Paper', 'A4', 'Scale', 1);
 %!   assert_equal ([P, S], [297, 210, 1]);
 %! unwind_protect_cleanup
-%!   unlink (fn);
+%!   [~] = unlink (fn);
 %! end_unwind_protect
 
-%!test  # a sheet framed to the paper's edge prints at 1:1 with no margin
+## A sheet framed to the paper's edge prints at 1:1 with no margin
+%!testif ; any (strcmp (graphics_toolkit (), {'qt', 'gnuplot'}))
 %! fn = [tempname(), '.pdf'];
 %! unwind_protect
 %!   D = draw.Drawing ().circle ([150, 110], 40);
 %!   [P, S] = print (merge (draw.titleblock ('A4'), D), fn, 'Margin', 0);
 %!   assert_equal ([P, S], [297, 210, 1]);
 %! unwind_protect_cleanup
-%!   unlink (fn);
+%!   [~] = unlink (fn);
 %! end_unwind_protect
 
-%!test  # text on the drawing does not shift the scale it is printed at
+## Text on the drawing does not shift the scale it is printed at
+%!testif ; any (strcmp (graphics_toolkit (), {'qt', 'gnuplot'}))
 %! fn = [tempname(), '.png'];
 %! unwind_protect
 %!   PL = geom.Polyline ([0, 0; 100, 0; 100, 50; 0, 50], 'Closed', true);
@@ -2424,10 +2445,11 @@
 %!   [w, h] = __inkmm__ (fn, 300);
 %!   assert_equal (w, 100, 1);
 %! unwind_protect_cleanup
-%!   unlink (fn);
+%!   [~] = unlink (fn);
 %! end_unwind_protect
 
-%!test  # a raster sheet is the paper asked for, at the resolution asked for
+## A raster sheet is the paper asked for, at the resolution asked for
+%!testif ; any (strcmp (graphics_toolkit (), {'qt', 'gnuplot'}))
 %! fn = [tempname(), '.png'];
 %! unwind_protect
 %!   PL = geom.Polyline ([0, 0; 100, 0; 100, 50; 0, 50], 'Closed', true);
@@ -2436,10 +2458,11 @@
 %!   I = imread (fn);
 %!   assert_equal ([columns(I), rows(I)] / 100 * 25.4, [420, 297], 1);
 %! unwind_protect_cleanup
-%!   unlink (fn);
+%!   [~] = unlink (fn);
 %! end_unwind_protect
 
-%!test  # the drawing sits centred on the sheet, clear of the frame
+## The drawing sits centred on the sheet, clear of the frame
+%!testif ; any (strcmp (graphics_toolkit (), {'qt', 'gnuplot'}))
 %! fn = [tempname(), '.png'];
 %! unwind_protect
 %!   PL = geom.Polyline ([0, 0; 200, 0; 200, 120; 0, 120], 'Closed', true);
@@ -2458,7 +2481,7 @@
 %!   assert_equal (pad(1), pad(2), 0.5);
 %!   assert_equal (pad(3), pad(4), 0.5);
 %! unwind_protect_cleanup
-%!   unlink (fn);
+%!   [~] = unlink (fn);
 %! end_unwind_protect
 
 %!test  # a dimension's text clears its own dimension line, below it
@@ -2496,7 +2519,7 @@
 %!   assert_equal (numel (strfind (txt, sprintf ("\n  0\nELLIPSE\n"))), 1);
 %!   assert_equal (numel (strfind (txt, sprintf ("\n  2\n*D1\n"))), 3);
 %! unwind_protect_cleanup
-%!   unlink (fn);
+%!   [~] = unlink (fn);
 %! end_unwind_protect
 %!test  # write: 'Dimensions', 'explode' writes the picture alone
 %! fn = [tempname(), '.dxf'];
@@ -2505,7 +2528,7 @@
 %!          'Dimensions', 'explode');
 %!   assert_equal (isempty (strfind (fileread (fn), "AcDbDimension")), true);
 %! unwind_protect_cleanup
-%!   unlink (fn);
+%!   [~] = unlink (fn);
 %! end_unwind_protect
 %!test  # write: 'Blocks', 'expand' copies a block in place of its inserts
 %! fn = [tempname(), '.dxf'];
@@ -2517,7 +2540,7 @@
 %!   assert_equal (isempty (strfind (txt, "AcDbBlockReference")), true);
 %!   assert_equal (numel (strfind (txt, "AcDbCircle")), 2);
 %! unwind_protect_cleanup
-%!   unlink (fn);
+%!   [~] = unlink (fn);
 %! end_unwind_protect
 %!test  # write: R12 for lines, arcs, text and dimensions
 %! fn = [tempname(), '.dxf'];
@@ -2526,7 +2549,7 @@
 %!   write (D.dim ([0, 0], [10, 0], -5), fn, 'Version', 'R12');
 %!   assert_equal (numel (strfind (fileread (fn), "AC1009")), 1);
 %! unwind_protect_cleanup
-%!   unlink (fn);
+%!   [~] = unlink (fn);
 %! end_unwind_protect
 %!test  # write: 'LTScale' reaches the header
 %! fn = [tempname(), '.dxf'];
@@ -2536,7 +2559,7 @@
 %!   assert_equal (numel (strfind (txt, sprintf ("$LTSCALE\n 40\n25.0\n"))), ...
 %!                 1);
 %! unwind_protect_cleanup
-%!   unlink (fn);
+%!   [~] = unlink (fn);
 %! end_unwind_protect
 %!error<draw.Drawing.write: invalid number of input arguments.> ...
 %! write (draw.Drawing ())

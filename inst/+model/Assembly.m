@@ -720,7 +720,7 @@ endfunction
 %!   assert_equal (numel (strfind (t, "PRODUCT('stage'")), 1);
 %!   assert_equal (numel (strfind (t, 'NEXT_ASSEMBLY_USAGE_OCCURRENCE')), 6);
 %! unwind_protect_cleanup
-%!   unlink (f);
+%!   [~] = unlink (f);
 %! end_unwind_protect
 
 ## The model of the 3MF file F, its XML
@@ -748,7 +748,7 @@ endfunction
 %!   m = 'transform="0 1 0 0 0 1 1 0 0 0 20 6"';
 %!   assert_equal (! isempty (strfind (t, m)), true);
 %! unwind_protect_cleanup
-%!   unlink (f);
+%!   [~] = unlink (f);
 %! end_unwind_protect
 
 %!test  # write: an STL of every part placed
@@ -759,7 +759,7 @@ endfunction
 %!   V = 60 * 60 * 4 + 3 * volume (solid.cylinder (2, 12));
 %!   assert_equal (volume (M), V, -1e-2);
 %! unwind_protect_cleanup
-%!   unlink (f);
+%!   [~] = unlink (f);
 %! end_unwind_protect
 
 %!test  # write: .STEP in capitals is STEP
@@ -770,7 +770,7 @@ endfunction
 %!   assert_equal (strncmp (t, 'ISO-10303-21;', 13), true);
 %!   assert_equal (numel (strfind (t, "PRODUCT('pin'")), 1);
 %! unwind_protect_cleanup
-%!   unlink (f);
+%!   [~] = unlink (f);
 %! end_unwind_protect
 
 %!test  # write: .3MF in capitals is 3MF
@@ -780,7 +780,7 @@ endfunction
 %!   A = model.read (f);
 %!   assert_equal ([numparts(A), numinstances(A)], [2, 4]);
 %! unwind_protect_cleanup
-%!   unlink (f);
+%!   [~] = unlink (f);
 %! end_unwind_protect
 
 %!test  # write: .Stl in mixed case is STL
@@ -791,7 +791,7 @@ endfunction
 %!   V = 60 * 60 * 4 + 3 * volume (solid.cylinder (2, 12));
 %!   assert_equal (volume (M), V, -1e-2);
 %! unwind_protect_cleanup
-%!   unlink (f);
+%!   [~] = unlink (f);
 %! end_unwind_protect
 
 ## A tetrahedron as a mesh, its triangles turned outwards

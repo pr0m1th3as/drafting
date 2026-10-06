@@ -109,7 +109,7 @@ endfunction
 %!   assert_equal (numfaces (S), 7);
 %!   assert_equal (isvalid (S), true);
 %! unwind_protect_cleanup
-%!   unlink (f);
+%!   [~] = unlink (f);
 %! end_unwind_protect
 
 %!test  # the extension in upper case
@@ -118,7 +118,7 @@ endfunction
 %!   write (solid.sphere (5), f);
 %!   assert_equal (volume (solid.read (f)), 4 / 3 * pi * 125, 1e-9);
 %! unwind_protect_cleanup
-%!   unlink (f);
+%!   [~] = unlink (f);
 %! end_unwind_protect
 
 %!test  # several parts come back together
@@ -128,7 +128,7 @@ endfunction
 %!   write (union (A, translate (A, [20, 0, 0])), f);
 %!   assert_equal (numsolids (solid.read (f)), 2);
 %! unwind_protect_cleanup
-%!   unlink (f);
+%!   [~] = unlink (f);
 %! end_unwind_protect
 
 %!test  # a comment before the keyword
@@ -141,7 +141,7 @@ endfunction
 %!   fclose (fid);
 %!   assert_equal (volume (solid.read (f)), 6, 1e-12);
 %! unwind_protect_cleanup
-%!   unlink (f);
+%!   [~] = unlink (f);
 %! end_unwind_protect
 
 %!test  # the colours of the solids come back
@@ -154,7 +154,7 @@ endfunction
 %!   R = solid.read (f);
 %!   assert_equal (R.Colour, U.Colour, 1e-6);
 %! unwind_protect_cleanup
-%!   unlink (f);
+%!   [~] = unlink (f);
 %! end_unwind_protect
 
 %!test  # a solid without a colour comes back bare
@@ -170,7 +170,7 @@ endfunction
 %!   R = solid.read (f);
 %!   assert_equal (R.Colour, []);
 %! unwind_protect_cleanup
-%!   unlink (f);
+%!   [~] = unlink (f);
 %! end_unwind_protect
 
 %!error<solid.read: invalid number of input arguments.> solid.read ()
@@ -189,5 +189,5 @@ endfunction
 %! unwind_protect
 %!   solid.read (f);
 %! unwind_protect_cleanup
-%!   unlink (f);
+%!   [~] = unlink (f);
 %! end_unwind_protect

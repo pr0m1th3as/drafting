@@ -277,7 +277,7 @@ endfunction
 %!   assert_equal (C{1}.UCS.Origin, U.Origin, 1e-12);
 %!   assert_equal (C{1}.UCS.XAxis, U.XAxis, 1e-12);
 %! unwind_protect_cleanup
-%!   unlink (tmpf);
+%!   [~] = unlink (tmpf);
 %! end_unwind_protect
 
 %!test  # several objects keep their classes and their order
@@ -290,7 +290,7 @@ endfunction
 %!   assert_equal (cellfun (@class, C, 'UniformOutput', false), ...
 %!                 {'geom.Polyline', 'geom.Spline', 'geom.Path'});
 %! unwind_protect_cleanup
-%!   unlink (tmpf);
+%!   [~] = unlink (tmpf);
 %! end_unwind_protect
 
 %!test  # a closed path stays a path
@@ -302,7 +302,7 @@ endfunction
 %!   assert_equal (C{1}.Closed, true);
 %!   assert_equal (length (C{1}), length (P), 1e-9);
 %! unwind_protect_cleanup
-%!   unlink (tmpf);
+%!   [~] = unlink (tmpf);
 %! end_unwind_protect
 
 %!test  # a region keeps its hole
@@ -315,7 +315,7 @@ endfunction
 %!   assert_equal (numel (C), 1);
 %!   assert_equal (numel (C{1}.Holes), 1);
 %! unwind_protect_cleanup
-%!   unlink (tmpf);
+%!   [~] = unlink (tmpf);
 %! end_unwind_protect
 
 %!test  # Layer selects, case-insensitively
@@ -324,7 +324,7 @@ endfunction
 %!   geom.write ({PL, PL, PL}, tmpf, 'Layer', {'A', 'B', 'A'});
 %!   assert_equal (numel (geom.read (tmpf, 'Layer', 'a')), 2);
 %! unwind_protect_cleanup
-%!   unlink (tmpf);
+%!   [~] = unlink (tmpf);
 %! end_unwind_protect
 
 %!test  # Type 'region' chains and nests the loops of a layer
@@ -337,7 +337,7 @@ endfunction
 %!   assert_equal (class (R), 'geom.Region');
 %!   assert_equal (numel (R.Holes), 1);
 %! unwind_protect_cleanup
-%!   unlink (tmpf);
+%!   [~] = unlink (tmpf);
 %! end_unwind_protect
 
 %!test  # Type 'path' chains reversed pieces
@@ -348,7 +348,7 @@ endfunction
 %!   assert_equal (class (P), 'geom.Path');
 %!   assert_equal (length (P), 15, 1e-9);
 %! unwind_protect_cleanup
-%!   unlink (tmpf);
+%!   [~] = unlink (tmpf);
 %! end_unwind_protect
 
 %!test  # Type 'spline' takes the one spline of a layer
@@ -359,7 +359,7 @@ endfunction
 %!   S = geom.read (tmpf, 'Type', 'spline', 'Layer', 'S');
 %!   assert_equal (S.FitPoints, SP.FitPoints, 1e-12);
 %! unwind_protect_cleanup
-%!   unlink (tmpf);
+%!   [~] = unlink (tmpf);
 %! end_unwind_protect
 
 %!warning<geom.read: skipped 1 LWPOLYLINE.> ...
@@ -368,7 +368,7 @@ endfunction
 %!                geom.Spline([0, 0; 1, 1; 2, 0])}, tmpf);
 %!   geom.read (tmpf, 'Type', 'spline');
 %! unwind_protect_cleanup
-%!   unlink (tmpf);
+%!   [~] = unlink (tmpf);
 %! end_unwind_protect
 
 %!test  # an ARC whose normal points down is mirrored into the plane facing up
@@ -383,7 +383,7 @@ endfunction
 %!   assert_equal (C{1}.UCS, geom.UCS ());
 %!   assert_equal (C{1}.Vertices, [-10, 0, -tand(22.5); 0, 10, 0], 1e-12);
 %! unwind_protect_cleanup
-%!   unlink (tmpf);
+%!   [~] = unlink (tmpf);
 %! end_unwind_protect
 
 %!warning<geom.read: skipped 1 TEXT.> ...
@@ -398,7 +398,7 @@ endfunction
 %!   C = geom.read (tmpf);
 %!   assert_equal (class (C{1}), 'geom.Path');
 %! unwind_protect_cleanup
-%!   unlink (tmpf);
+%!   [~] = unlink (tmpf);
 %! end_unwind_protect
 
 %!test  # an inch file is read in millimetres
@@ -413,7 +413,7 @@ endfunction
 %!   C = geom.read (tmpf);
 %!   assert_equal (C{1}.Vertices, [0, 0, 0; 25.4, 0, 0], 1e-12);
 %! unwind_protect_cleanup
-%!   unlink (tmpf);
+%!   [~] = unlink (tmpf);
 %! end_unwind_protect
 
 %!test  # a CIRCLE is a closed polyline of two half arcs
@@ -428,7 +428,7 @@ endfunction
 %!   assert_equal (C{1}.Closed, true);
 %!   assert_equal (C{1}.Vertices, [7, 6, 1; 3, 6, 1], 1e-12);
 %! unwind_protect_cleanup
-%!   unlink (tmpf);
+%!   [~] = unlink (tmpf);
 %! end_unwind_protect
 
 %!test  # a file another application wrote reads
@@ -453,7 +453,7 @@ endfunction
 %!   C = geom.read (tmpf);
 %!   assert_equal (class (C{1}), 'geom.Polyline');
 %! unwind_protect_cleanup
-%!   unlink (tmpf);
+%!   [~] = unlink (tmpf);
 %! end_unwind_protect
 
 %!test  # an empty file section gives an empty row cell
@@ -463,7 +463,7 @@ endfunction
 %! unwind_protect
 %!   assert_equal (geom.read (tmpf), cell (1, 0));
 %! unwind_protect_cleanup
-%!   unlink (tmpf);
+%!   [~] = unlink (tmpf);
 %! end_unwind_protect
 
 %!error<geom.read: invalid number of input arguments.> geom.read ()
@@ -483,7 +483,7 @@ endfunction
 %! unwind_protect
 %!   geom.read (fn, 'Type', 'region');
 %! unwind_protect_cleanup
-%!   unlink (fn);
+%!   [~] = unlink (fn);
 %! end_unwind_protect
 %!error<geom.read: no spline found in layer: 'X'> ...
 %! fn = [tempname(), '.dxf'];
@@ -491,7 +491,7 @@ endfunction
 %! unwind_protect
 %!   geom.read (fn, 'Type', 'spline', 'Layer', 'X');
 %! unwind_protect_cleanup
-%!   unlink (fn);
+%!   [~] = unlink (fn);
 %! end_unwind_protect
 %!error<geom.read: more than one polyline found in layer: 'PLATES'> ...
 %! fn = [tempname(), '.dxf'];
@@ -500,7 +500,7 @@ endfunction
 %! unwind_protect
 %!   geom.read (fn, 'Type', 'polyline');
 %! unwind_protect_cleanup
-%!   unlink (fn);
+%!   [~] = unlink (fn);
 %! end_unwind_protect
 %!error<geom.read: polylines found in more than one layer; choose one with 'Layer': 'A', 'B'.> ...
 %! fn = [tempname(), '.dxf'];
@@ -509,7 +509,7 @@ endfunction
 %! unwind_protect
 %!   geom.read (fn, 'Type', 'polyline');
 %! unwind_protect_cleanup
-%!   unlink (fn);
+%!   [~] = unlink (fn);
 %! end_unwind_protect
 %!error<geom.read: '.*' is a binary DXF; only ASCII DXF is read.> ...
 %! fn = [tempname(), '.dxf'];
@@ -519,5 +519,5 @@ endfunction
 %! unwind_protect
 %!   geom.read (fn);
 %! unwind_protect_cleanup
-%!   unlink (fn);
+%!   [~] = unlink (fn);
 %! end_unwind_protect

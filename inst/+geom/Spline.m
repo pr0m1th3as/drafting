@@ -1200,7 +1200,7 @@ endfunction
 %!   assert_equal (C{1}.ControlPoints, SP.ControlPoints, 1e-9);
 %!   assert_equal (C{1}.UCS.Normal, U.Normal, 1e-12);
 %! unwind_protect_cleanup
-%!   unlink (fn);
+%!   [~] = unlink (fn);
 %! end_unwind_protect
 %!test  # write: a rational spline keeps its weights
 %! SP = geom.Spline.ellipse (10, 4);
@@ -1211,7 +1211,7 @@ endfunction
 %!   assert_equal (C{1}.Weights, SP.Weights, 1e-12);
 %!   assert_equal (C{1}.Knots, SP.Knots, 1e-12);
 %! unwind_protect_cleanup
-%!   unlink (fn);
+%!   [~] = unlink (fn);
 %! end_unwind_protect
 
 %!error<geom.Spline.write: invalid number of input arguments.> ...

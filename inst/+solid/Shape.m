@@ -2771,7 +2771,7 @@ endfunction
 %!   assert_equal (isempty (strfind (txt, "'GNU Octave drafting package'")), ...
 %!                 false);
 %! unwind_protect_cleanup
-%!   unlink (f);
+%!   [~] = unlink (f);
 %! end_unwind_protect
 
 %!test  # STEP carries a solid's colour
@@ -2782,7 +2782,7 @@ endfunction
 %!   write (S, f);
 %!   assert_equal (isempty (strfind (fileread (f), 'COLOUR_RGB')), false);
 %! unwind_protect_cleanup
-%!   unlink (f);
+%!   [~] = unlink (f);
 %! end_unwind_protect
 
 %!test  # the product is named after the file
@@ -2793,7 +2793,7 @@ endfunction
 %!   txt = fileread (f);
 %!   assert_equal (isempty (strfind (txt, ["PRODUCT('", base])), false);
 %! unwind_protect_cleanup
-%!   unlink (f);
+%!   [~] = unlink (f);
 %! end_unwind_protect
 
 %!test  # STL: a box is twelve triangles
@@ -2805,7 +2805,7 @@ endfunction
 %!   assert_equal (min (V), [0, 0, 0]);
 %!   assert_equal (max (V), [10, 20, 30]);
 %! unwind_protect_cleanup
-%!   unlink (f);
+%!   [~] = unlink (f);
 %! end_unwind_protect
 
 %!test  # facets stay within the tolerance
@@ -2826,7 +2826,7 @@ endfunction
 %!   assert_equal (max (gap) <= 0.05 + 1e-5, true);
 %!   assert_equal (max (gap) > 0.01, true);
 %! unwind_protect_cleanup
-%!   unlink (f);
+%!   [~] = unlink (f);
 %! end_unwind_protect
 
 %!test  # a finer tolerance gives more facets
@@ -2837,8 +2837,8 @@ endfunction
 %!   write (solid.sphere (20), f2, 'Tolerance', 0.01);
 %!   assert_equal (rows (stlvertices (f2)) > rows (stlvertices (f1)), true);
 %! unwind_protect_cleanup
-%!   unlink (f1);
-%!   unlink (f2);
+%!   [~] = unlink (f1);
+%!   [~] = unlink (f2);
 %! end_unwind_protect
 
 %!test  # OBJ: the mesh of the solid, closed
@@ -2849,7 +2849,7 @@ endfunction
 %!   assert_equal (isclosed (M), true);
 %!   assert_equal (volume (M), 6000, -1e-12);
 %! unwind_protect_cleanup
-%!   unlink (f);
+%!   [~] = unlink (f);
 %! end_unwind_protect
 
 %!test  # PLY: the mesh of the solid, closed
@@ -2860,7 +2860,7 @@ endfunction
 %!   assert_equal (isclosed (M), true);
 %!   assert_equal (volume (M), 6000, -1e-12);
 %! unwind_protect_cleanup
-%!   unlink (f);
+%!   [~] = unlink (f);
 %! end_unwind_protect
 
 %!test  # PLY: the triangles in the solid's colour
@@ -2872,7 +2872,7 @@ endfunction
 %!   M = polymesh.read (f);
 %!   assert_equal (M.FaceColour, repmat ([0.2, 0.4, 0.6], 12, 1), 1e-9);
 %! unwind_protect_cleanup
-%!   unlink (f);
+%!   [~] = unlink (f);
 %! end_unwind_protect
 
 %!testif ; ! isempty (file_in_path (getenv ('PATH'), 'unzip')) || ! isempty (file_in_path (getenv ('PATH'), 'unzip.exe'))
@@ -2888,7 +2888,7 @@ endfunction
 %!   assert_equal (numel (strfind (t, '<triangle ')), 12);
 %!   assert_equal (! isempty (strfind (t, 'displaycolor="#336699"')), true);
 %! unwind_protect_cleanup
-%!   unlink (f);
+%!   [~] = unlink (f);
 %!   confirm_recursive_rmdir (false, 'local');
 %!   rmdir (d, 's');
 %! end_unwind_protect

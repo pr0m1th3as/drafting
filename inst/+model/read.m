@@ -80,7 +80,7 @@ endfunction
 %!    write (A, f);
 %!    R = model.read (f);
 %!  unwind_protect_cleanup
-%!    unlink (f);
+%!    [~] = unlink (f);
 %!  end_unwind_protect
 %!endfunction
 
@@ -119,7 +119,7 @@ endfunction
 %!   assert_equal ([numparts(R), numinstances(R)], [1, 1]);
 %!   assert_equal (volume (shape (R)), 6, -1e-12);
 %! unwind_protect_cleanup
-%!   unlink (f);
+%!   [~] = unlink (f);
 %! end_unwind_protect
 
 ## A 3MF package of the model MODEL, zipped, its file NAME of the text TEXT
@@ -163,7 +163,7 @@ endfunction
 %!   assert_equal ({R.Instances.name}, {'tet', 'tet:2'});
 %!   assert_equal (R.Instances(2).placement == A.Instances(2).placement, true);
 %! unwind_protect_cleanup
-%!   unlink (f);
+%!   [~] = unlink (f);
 %! end_unwind_protect
 
 %!testif ; ! isempty (file_in_path (getenv ('PATH'), 'zip')) || ! isempty (file_in_path (getenv ('PATH'), 'zip.exe'))
@@ -187,7 +187,7 @@ endfunction
 %!   assert_equal ({R.Parts.name}, {'tet', 'tet (placed)'});
 %!   assert_equal (max (R.Parts(2).item.Vertices), [12, 2, 2]);
 %! unwind_protect_cleanup
-%!   unlink (f);
+%!   [~] = unlink (f);
 %! end_unwind_protect
 
 %!testif ; ! isempty (file_in_path (getenv ('PATH'), 'zip')) || ! isempty (file_in_path (getenv ('PATH'), 'zip.exe'))
@@ -208,7 +208,7 @@ endfunction
 %!   R = model.read (f);
 %!   assert_equal ({R.Parts.name}, {'object3', 'a', 'a_2'});
 %! unwind_protect_cleanup
-%!   unlink (f);
+%!   [~] = unlink (f);
 %! end_unwind_protect
 
 %!error<model.read: invalid number of input arguments.> model.read ()

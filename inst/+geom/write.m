@@ -93,7 +93,7 @@ endfunction
 %!   assert_equal (numel (strfind (txt, sprintf ("\n 62\n3\n"))), 1);
 %!   assert_equal (numel (strfind (txt, sprintf ("\n  6\nCENTER\n"))), 2);
 %! unwind_protect_cleanup
-%!   unlink (tmpf);
+%!   [~] = unlink (tmpf);
 %! end_unwind_protect
 
 %!test  # a path and a region are each bound by a group
@@ -103,7 +103,7 @@ endfunction
 %!   geom.write ({P, R}, tmpf);
 %!   assert_equal (numel (strfind (fileread (tmpf), "AcDbGroup")), 2);
 %! unwind_protect_cleanup
-%!   unlink (tmpf);
+%!   [~] = unlink (tmpf);
 %! end_unwind_protect
 
 %!test  # Fill hatches every region
@@ -112,7 +112,7 @@ endfunction
 %!   geom.write ({R, R}, tmpf, 'Fill', true);
 %!   assert_equal (numel (strfind (fileread (tmpf), "AcDbHatch")), 2);
 %! unwind_protect_cleanup
-%!   unlink (tmpf);
+%!   [~] = unlink (tmpf);
 %! end_unwind_protect
 
 %!test  # an empty cell writes a readable file
@@ -120,7 +120,7 @@ endfunction
 %!   geom.write ({}, tmpf);
 %!   assert_equal (geom.read (tmpf), cell (1, 0));
 %! unwind_protect_cleanup
-%!   unlink (tmpf);
+%!   [~] = unlink (tmpf);
 %! end_unwind_protect
 
 %!test  # R12 for polylines
@@ -128,7 +128,7 @@ endfunction
 %!   geom.write ({geom.Polyline([0, 0; 10, 0])}, tmpf, 'Version', 'R12');
 %!   assert_equal (numel (strfind (fileread (tmpf), "AC1009")), 1);
 %! unwind_protect_cleanup
-%!   unlink (tmpf);
+%!   [~] = unlink (tmpf);
 %! end_unwind_protect
 
 %!error<geom.write: invalid number of input arguments.> geom.write ({})

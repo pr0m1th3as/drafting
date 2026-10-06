@@ -1732,7 +1732,7 @@ endfunction
 %!   assert_equal (C{1}.Vertices, P.Vertices, 1e-9);
 %!   assert_equal (length (C{1}), length (P), 1e-9);
 %! unwind_protect_cleanup
-%!   unlink (fn);
+%!   [~] = unlink (fn);
 %! end_unwind_protect
 %!test  # write: a closed path in a frame of its own comes back in it
 %! U = geom.UCS ([0, 1, 0], [0, 5, 0]);
@@ -1745,7 +1745,7 @@ endfunction
 %!   assert_equal (C{1}.UCS.Origin, U.Origin, 1e-12);
 %!   assert_equal (C{1}.Vertices, P.Vertices, 1e-9);
 %! unwind_protect_cleanup
-%!   unlink (fn);
+%!   [~] = unlink (fn);
 %! end_unwind_protect
 
 %!error<geom.Path.write: invalid number of input arguments.> ...

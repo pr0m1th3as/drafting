@@ -495,7 +495,7 @@ endfunction
 %!   assert_equal (R.Vertices(R.Faces',:), M.Vertices(M.Faces',:));
 %!   assert_equal (R.FaceColour, M.FaceColour, 0.5 / 255);
 %! unwind_protect_cleanup
-%!   unlink (f);
+%!   [~] = unlink (f);
 %! end_unwind_protect
 
 %!testif ; ! isempty (file_in_path (getenv ('PATH'), 'zip')) || ! isempty (file_in_path (getenv ('PATH'), 'zip.exe'))
@@ -514,7 +514,7 @@ endfunction
 %!   assert_equal (numfaces (M), 8);
 %!   assert_equal ([min(M.Vertices); max(M.Vertices)], [0, 0, 5; 10, 1, 6]);
 %! unwind_protect_cleanup
-%!   unlink (f);
+%!   [~] = unlink (f);
 %! end_unwind_protect
 
 %!testif ; ! isempty (file_in_path (getenv ('PATH'), 'zip')) || ! isempty (file_in_path (getenv ('PATH'), 'zip.exe'))
@@ -527,7 +527,7 @@ endfunction
 %!   M = polymesh.read (f);
 %!   assert_equal (max (M.Vertices), [10, 10, 10]);
 %! unwind_protect_cleanup
-%!   unlink (f);
+%!   [~] = unlink (f);
 %! end_unwind_protect
 
 %!testif ; ! isempty (file_in_path (getenv ('PATH'), 'zip')) || ! isempty (file_in_path (getenv ('PATH'), 'zip.exe'))
@@ -547,7 +547,7 @@ endfunction
 %!   assert_equal (sortrows (M.FaceColour), ...
 %!                 [0, 0, 1; 1, 0, 0; 1, 0, 0; 1, 0, 0]);
 %! unwind_protect_cleanup
-%!   unlink (f);
+%!   [~] = unlink (f);
 %! end_unwind_protect
 
 %!testif ; ! isempty (file_in_path (getenv ('PATH'), 'zip')) || ! isempty (file_in_path (getenv ('PATH'), 'zip.exe'))
@@ -567,7 +567,7 @@ endfunction
 %!   M = polymesh.read (f);
 %!   assert_equal (numfaces (M), 4);
 %! unwind_protect_cleanup
-%!   unlink (f);
+%!   [~] = unlink (f);
 %! end_unwind_protect
 
 %!error<polymesh.read: invalid number of input arguments.> polymesh.read ()
@@ -684,5 +684,5 @@ endfunction
 %!   end_try_catch
 %!   assert_equal (msg, "polymesh.read: FILE is not a readable 3MF file.");
 %! unwind_protect_cleanup
-%!   unlink (f);
+%!   [~] = unlink (f);
 %! end_unwind_protect

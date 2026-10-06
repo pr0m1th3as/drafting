@@ -139,7 +139,7 @@ endfunction
 %!   write (D, fn);
 %!   assert_equal (! isempty (strfind (fileread (fn), '%%c25')), true);
 %! unwind_protect_cleanup
-%!   unlink (fn);
+%!   [~] = unlink (fn);
 %! end_unwind_protect
 
 %!error<draw.symbol: invalid number of input arguments.> ...

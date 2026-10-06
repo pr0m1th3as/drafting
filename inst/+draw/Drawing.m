@@ -2665,6 +2665,12 @@ classdef Drawing
     ## the sheet size actually used, in millimetres, and the scale denominator,
     ## which is worth having when the scale was fitted rather than given.
     ##
+    ## Printing needs the @qcode{qt} or @qcode{gnuplot} graphics toolkit.
+    ## @qcode{fltk}, which @code{octave-cli} uses on a desktop, cannot print
+    ## a figure that is not shown, so there @code{print} is an error; run
+    ## Octave as @code{octave --no-gui}, or call
+    ## @code{graphics_toolkit ('gnuplot')} first.
+    ##
     ## @subheading The scale is chosen from the preferred series
     ##
     ## When @qcode{'Scale'} is not given, the denominator is the smallest of
@@ -2766,6 +2772,14 @@ classdef Drawing
       usable = PAPER - 2 * opt.Margin;
       if (any (usable <= 0))
         error ("draw.Drawing.print: Margin leaves no room on the sheet.");
+      endif
+
+      ## fltk cannot print a figure that is not shown
+      if (! any (strcmp (graphics_toolkit (), {'qt', 'gnuplot'})))
+        error (strcat ("draw.Drawing.print: printing needs the qt or", ...
+                       " gnuplot graphics toolkit; run Octave as", ...
+                       " 'octave --no-gui', or call", ...
+                       " graphics_toolkit ('gnuplot')."));
       endif
 
       ## The extents to place are the ones draw.Drawing.plot settles on, margin

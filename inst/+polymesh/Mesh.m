@@ -1102,7 +1102,7 @@ endfunction
 %!   v = '<vertex x="0.1" y="0.2" z="0.3"/>';
 %!   assert_equal (! isempty (strfind (t, v)), true);
 %! unwind_protect_cleanup
-%!   unlink (f);
+%!   [~] = unlink (f);
 %! end_unwind_protect
 
 %!testif ; ! isempty (file_in_path (getenv ('PATH'), 'unzip')) || ! isempty (file_in_path (getenv ('PATH'), 'unzip.exe'))
@@ -1117,7 +1117,7 @@ endfunction
 %!   assert_equal (! isempty (strfind (t, 'displaycolor="#336699"')), true);
 %!   assert_equal (numel (strfind (t, 'pid="1" p1=')), 4);
 %! unwind_protect_cleanup
-%!   unlink (f);
+%!   [~] = unlink (f);
 %! end_unwind_protect
 
 %!test  # write: STL has no colours

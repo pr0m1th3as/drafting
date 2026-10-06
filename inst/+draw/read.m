@@ -91,7 +91,7 @@ endfunction
 %!                                     'point'});
 %!   assert_equal (R.Entities(4).angle, 30, 1e-12);
 %! unwind_protect_cleanup
-%!   unlink (tmpf);
+%!   [~] = unlink (tmpf);
 %! end_unwind_protect
 
 %!test  # layer, line type and colour come back with each entity
@@ -109,7 +109,7 @@ endfunction
 %!   assert_equal ({R.Layer, R.Linetype, R.Colour, R.LineWeight}, ...
 %!                 {'0', 'byLayer', 256, 'byLayer'});
 %! unwind_protect_cleanup
-%!   unlink (tmpf);
+%!   [~] = unlink (tmpf);
 %! end_unwind_protect
 
 %!test  # a polyline keeps its bulges
@@ -121,7 +121,7 @@ endfunction
 %!   assert_equal (R.Entities.pts, PL.Vertices(:,1:2), 1e-12);
 %!   assert_equal (R.Entities.bulge, [0, 1, 0, 0], 1e-12);
 %! unwind_protect_cleanup
-%!   unlink (tmpf);
+%!   [~] = unlink (tmpf);
 %! end_unwind_protect
 
 %!test  # an ellipse comes back as an ellipse
@@ -132,7 +132,7 @@ endfunction
 %!   assert_equal (R.Entities.radius, [10, 4], 1e-12);
 %!   assert_equal (R.Entities.angle, 30, 1e-12);
 %! unwind_protect_cleanup
-%!   unlink (tmpf);
+%!   [~] = unlink (tmpf);
 %! end_unwind_protect
 
 %!test  # a dimension comes back as the dimension it was
@@ -145,7 +145,7 @@ endfunction
 %!   assert_equal (R.Entities.offset, -15, 1e-12);
 %!   assert_equal (R.Entities.direction, 'horizontal');
 %! unwind_protect_cleanup
-%!   unlink (tmpf);
+%!   [~] = unlink (tmpf);
 %! end_unwind_protect
 
 %!test  # each dimension family returns through its own method
@@ -158,7 +158,7 @@ endfunction
 %!   assert_equal ({R.Entities.type}, {'diam', 'radius', 'angdim', ...
 %!                                     'ordinate'});
 %! unwind_protect_cleanup
-%!   unlink (tmpf);
+%!   [~] = unlink (tmpf);
 %! end_unwind_protect
 
 %!test  # a block and its inserts come back
@@ -171,7 +171,7 @@ endfunction
 %!   assert_equal ([R.Entities.angle, R.Entities.scale], [30, 2], 1e-12);
 %!   assert_equal (numentities (R.expand ()), 2);
 %! unwind_protect_cleanup
-%!   unlink (tmpf);
+%!   [~] = unlink (tmpf);
 %! end_unwind_protect
 
 %!test  # a hatch, a region and a path come back as themselves
@@ -186,7 +186,7 @@ endfunction
 %!   assert_equal ({R.Entities(1).pattern, R.Entities(1).angle, ...
 %!                  R.Entities(1).spacing}, {'ANSI37', 15, 2}, 1e-12);
 %! unwind_protect_cleanup
-%!   unlink (tmpf);
+%!   [~] = unlink (tmpf);
 %! end_unwind_protect
 
 %!test  # Greek text survives the code page
@@ -195,7 +195,7 @@ endfunction
 %!   R = draw.read (tmpf);
 %!   assert_equal (R.Entities.text, 'Κλίμακα 1:2');
 %! unwind_protect_cleanup
-%!   unlink (tmpf);
+%!   [~] = unlink (tmpf);
 %! end_unwind_protect
 
 %!test  # an ARC whose normal points down is mirrored into the plane facing up
@@ -210,7 +210,7 @@ endfunction
 %!   assert_equal (R.Entities.pts, [-5, 0], 1e-12);
 %!   assert_equal (R.Entities.angles, [90, 180], 1e-12);
 %! unwind_protect_cleanup
-%!   unlink (tmpf);
+%!   [~] = unlink (tmpf);
 %! end_unwind_protect
 
 %!test  # the anonymous blocks a real file places are kept, and the layout
@@ -282,7 +282,7 @@ endfunction
 %!   assert_equal (R.Entities.pts, [1, 2; 10, 2; 1, 12], 1e-12);
 %!   assert_equal (R.Entities.radius, 5, 1e-12);
 %! unwind_protect_cleanup
-%!   unlink (tmpf);
+%!   [~] = unlink (tmpf);
 %! end_unwind_protect
 
 %!test  # and its explement too, which its arc point tells apart
@@ -291,7 +291,7 @@ endfunction
 %!   R = draw.read (tmpf);
 %!   assert_equal (R.Entities.text, '270%%d');
 %! unwind_protect_cleanup
-%!   unlink (tmpf);
+%!   [~] = unlink (tmpf);
 %! end_unwind_protect
 
 %!test  # an x ordinate comes back with its datum, feature and leader
@@ -301,7 +301,7 @@ endfunction
 %!   assert_equal (R.Entities.direction, 'x');
 %!   assert_equal (R.Entities.pts, [1, 2; 20, 15; 20, -10], 1e-12);
 %! unwind_protect_cleanup
-%!   unlink (tmpf);
+%!   [~] = unlink (tmpf);
 %! end_unwind_protect
 
 %!test  # and a y ordinate as one
@@ -310,7 +310,7 @@ endfunction
 %!   R = draw.read (tmpf);
 %!   assert_equal (R.Entities.direction, 'y');
 %! unwind_protect_cleanup
-%!   unlink (tmpf);
+%!   [~] = unlink (tmpf);
 %! end_unwind_protect
 
 %!warning<draw.read: skipped 2 3DFACE.> ...
@@ -325,7 +325,7 @@ endfunction
 %!   R = draw.read (tmpf);
 %!   assert_equal (numentities (R), 1);
 %! unwind_protect_cleanup
-%!   unlink (tmpf);
+%!   [~] = unlink (tmpf);
 %! end_unwind_protect
 
 ## The drawing in a file whose layer table makes HIDDEN yellow and dashed
@@ -341,7 +341,7 @@ endfunction
 %!  unwind_protect
 %!    D = draw.read (f);
 %!  unwind_protect_cleanup
-%!    unlink (f);
+%!    [~] = unlink (f);
 %!  end_unwind_protect
 %!endfunction
 
@@ -395,7 +395,7 @@ endfunction
 %! unwind_protect
 %!   draw.read (fn);
 %! unwind_protect_cleanup
-%!   unlink (fn);
+%!   [~] = unlink (fn);
 %! end_unwind_protect
 %!error<draw.read: '.*' is malformed; line 3 is not a group code.> ...
 %! fn = [tempname(), '.dxf'];
@@ -405,5 +405,5 @@ endfunction
 %! unwind_protect
 %!   draw.read (fn);
 %! unwind_protect_cleanup
-%!   unlink (fn);
+%!   [~] = unlink (fn);
 %! end_unwind_protect
