@@ -229,12 +229,93 @@ classdef Viewer < handle
 
     endfunction
 
+    ## The picking behind pick.  CLICKS, for tests and the guide, replaces
+    ## the mouse: a row of pixels per click, then NaN for the Enter key or
+    ## Inf for Escape, Enter when neither ends it; empty is the mouse.
+    function varargout = __pick__ (this, KIND, CLICKS)
+
+      ## Input validation
+      if (! ischar (KIND) || ! any (strcmp (KIND, {'edge', 'face', 'any'})))
+        error ("model.Viewer.pick: KIND must be 'edge', 'face' or 'any'.");
+      endif
+      ismesh = isa (state (this).mesh, 'polymesh.Mesh');
+      if (ismesh && ! strcmp (KIND, 'any'))
+        error ("model.Viewer.pick: a mesh has only points to pick.");
+      endif
+      if (! isopen (this) || isempty (this.Shape))
+        error ("model.Viewer.pick: the viewer is showing no shape.");
+      endif
+
+      ## Lines left from an earlier exchange are stale
+      st = state (this);
+      while (ischar (fgetl (st.out)))
+      endwhile
+      fclear (st.out);
+
+      send (this, ["pick " KIND]);
+      finished = false;
+      unwind_protect
+        if (isempty (CLICKS))
+          [R, r] = replies (this, Inf);
+        else
+          for k = 1:rows (CLICKS)
+            if (any (isnan (CLICKS(k,:)) | isinf (CLICKS(k,:))))
+              break;
+            endif
+            send (this, sprintf ("click %d %d", round (CLICKS(k,:))));
+            receive (this, 10);
+          endfor
+          if (! isempty (CLICKS) && any (isinf (CLICKS(k,:))))
+            send (this, "cancel");
+          else
+            send (this, "enter");
+          endif
+          [R, r] = replies (this, 10);
+        endif
+        finished = true;
+      unwind_protect_cleanup
+        if (! finished && isopen (this))
+          send (this, "cancel");
+        endif
+      end_unwind_protect
+      if (strcmp (r, 'closed'))
+        error ("model.Viewer.pick: the window was closed during the pick.");
+      endif
+      if (ismesh)
+        [varargout{1:2}] = meshpoints (R);
+        return;
+      endif
+      [E, F] = items (R);
+
+      ## The code that selects them again
+      S = this.Shape;
+      ECODE = '';
+      FCODE = '';
+      if (! isempty (E))
+        ECODE = model.Viewer.__query__ (S, 'edge', E, st.name);
+      endif
+      if (! isempty (F))
+        FCODE = model.Viewer.__query__ (S, 'face', F, st.name);
+      endif
+
+      switch (KIND)
+        case 'edge'
+          varargout = {E, ECODE};
+        case 'face'
+          varargout = {F, FCODE};
+        otherwise
+          varargout = {E, F, ECODE, FCODE};
+      endswitch
+
+    endfunction
+
     ## The UCS picking behind pickucs.  CLICKS, for tests, replaces the mouse:
     ## a row of pixels per click, NaN for the Enter key and Inf for Escape;
-    ## empty is the mouse.  SHOWN is the prompts shown, in order.  Each
+    ## empty is the mouse.  SHOWN is the prompts shown, in order, and CODE the
+    ## expression that makes U.  Each
     ## prompt opens with what the click before it took, so that a click that
     ## took something unintended shows at once.
-    function [U, SHOWN] = __pickucs__ (this, MODE, CLICKS)
+    function [U, SHOWN, CODE] = __pickucs__ (this, MODE, CLICKS)
 
       st = state (this);
       while (ischar (fgetl (st.out)))
@@ -330,8 +411,8 @@ classdef Viewer < handle
                                                    c + 0), x, ...
                                                    'UniformOutput', false), ...
                                          ", "));
-      printf ("U = geom.UCS (%s, %s, %s);\n", v (U.Normal), v (U.Origin), ...
-              v (U.Origin + U.XAxis));
+      CODE = sprintf ("geom.UCS (%s, %s, %s)", v (U.Normal), v (U.Origin), ...
+                      v (U.Origin + U.XAxis));
 
     endfunction
 
@@ -414,58 +495,37 @@ classdef Viewer < handle
 
     endfunction
 
-    ## The query that finds the edges or faces IDX of S, and how many it finds
-    function [Q, N] = __query__ (S, KIND, IDX, NAME)
+    ## The code that selects exactly the items IDX of KIND, edge or face, of
+    ## the shape S held in the variable NAME: one query by what they share
+    ## where it finds them alone, else one query for each, joined, and their
+    ## indices only where an item cannot be told apart by any query
+    function Q = __query__ (S, KIND, IDX, NAME)
 
+      IDX = unique (IDX(:)');
       if (strcmp (KIND, 'edge'))
         info = __occt__ ('edges', 'model.Viewer.pick', S.Data);
-        [type, dir, box] = info{1:3};
-        args = {};
-        if (all (strcmp (type(IDX), type{IDX(1)})))
-          args(end+1:end+2) = {'Type', type{IDX(1)}};
-        endif
-        if (alike (dir(IDX,:)))
-          args(end+1:end+2) = {'Direction', dir(IDX(1),:)};
-        endif
       else
         info = __occt__ ('faces', 'model.Viewer.pick', S.Data);
-        [type, normal, axis, box] = info{:};
-        args = {};
-        if (all (strcmp (type(IDX), type{IDX(1)})))
-          args(end+1:end+2) = {'Type', type{IDX(1)}};
-        endif
-        n = normal(IDX,:);
-        a = axis(IDX,:);
-        if (! any (isnan (n(:))) && all (n * n(1,:)' >= 1 - 1e-9))
-          args(end+1:end+2) = {'Normal', n(1,:)};
-        elseif (alike (a))
-          args(end+1:end+2) = {'Axis', a(1,:)};
+      endif
+      Q = itemquery (KIND, info, IDX, 1000, ' ');
+      if (! isequal (chosen (S, Q), IDX))
+        parts = cell (1, numel (IDX));
+        for k = 1:numel (IDX)
+          for digits = [1000, 1e6]
+            parts{k} = itemquery (KIND, info, IDX(k), digits, '');
+            if (isequal (chosen (S, parts{k}), IDX(k)))
+              break;
+            endif
+          endfor
+        endfor
+        Q = sprintf ("[%s]", strjoin (parts, ", "));
+        if (! isequal (chosen (S, Q), IDX))
+          Q = sprintf ("[%s]", strjoin (arrayfun (@num2str, IDX, ...
+                                                  'UniformOutput', false), ...
+                                        ", "));
         endif
       endif
-      ## The box round all of them, widened to whole thousandths
-      b = [min(box(IDX,1:3), [], 1), max(box(IDX,4:6), [], 1)];
-      b = [floor(b(1:3) * 1000), ceil(b(4:6) * 1000)] / 1000;
-      args(end+1:end+2) = {'Within', b};
-
-      if (strcmp (KIND, 'edge'))
-        N = numel (edges (S, args{:}));
-        Q = sprintf ("edges (%s", NAME);
-      else
-        N = numel (faces (S, args{:}));
-        Q = sprintf ("faces (%s", NAME);
-      endif
-      for k = 1:2:numel (args)
-        v = args{k+1};
-        if (ischar (v))
-          v = sprintf ("'%s'", v);
-        else
-          v(abs (v) < 1e-12) = 0;
-          v = arrayfun (@(x) sprintf ("%.10g", x), v, 'UniformOutput', false);
-          v = sprintf ("[%s]", strjoin (v, ", "));
-        endif
-        Q = sprintf ("%s, '%s', %s", Q, args{k}, v);
-      endfor
-      Q = [Q ")"];
+      Q = strrep (Q, '__shape__', NAME);
 
     endfunction
 
@@ -626,8 +686,9 @@ classdef Viewer < handle
 
     ## -*- texinfo -*-
     ## @deftypefn  {model.Viewer} {[@var{E}, @var{F}] =} pick (@var{V})
-    ## @deftypefnx {model.Viewer} {@var{E} =} pick (@var{V}, @qcode{'edge'})
-    ## @deftypefnx {model.Viewer} {@var{F} =} pick (@var{V}, @qcode{'face'})
+    ## @deftypefnx {model.Viewer} {[@var{E}, @var{F}, @var{ECODE}, @var{FCODE}] =} pick (@var{V})
+    ## @deftypefnx {model.Viewer} {[@var{E}, @var{CODE}] =} pick (@var{V}, @qcode{'edge'})
+    ## @deftypefnx {model.Viewer} {[@var{F}, @var{CODE}] =} pick (@var{V}, @qcode{'face'})
     ## @deftypefnx {model.Viewer} {[@var{P}, @var{F}] =} pick (@var{V})
     ##
     ## Pick edges and faces of a solid, or points on a mesh, with the mouse.
@@ -641,20 +702,27 @@ classdef Viewer < handle
     ## it lets it go; the shape can still be turned between clicks.
     ## @kbd{Enter} finishes and @kbd{Escape} cancels, returning nothing.  With
     ## @qcode{'edge'} or @qcode{'face'} only that kind can be picked, and its
-    ## indices are the one output.
+    ## indices are the first output.
     ##
     ## Indices belong to the shape they were picked on, and a script that holds
     ## them breaks as soon as an earlier step adds a feature.  So @code{pick}
-    ## also prints, for each kind picked, the query that finds the same items
-    ## by kind, direction and position, and says whether it finds exactly
-    ## those.  Paste the query into the script instead of the numbers:
+    ## also returns, as a character vector, the code that selects the same
+    ## items by kind, direction and position: @var{CODE} for one kind, and
+    ## @var{ECODE} and @var{FCODE} for edges and faces picked together, empty
+    ## where none was picked.  The code selects exactly the items picked: one
+    ## query where what they share finds them alone, else one query for each,
+    ## joined, and their indices only where an item cannot be told apart from
+    ## the others by any query.  It names the shape by the variable the viewer
+    ## shows, and @code{eval (@var{CODE})} gives the indices again.  Put it in
+    ## the script in place of the numbers:
     ##
     ## @example
     ## @group
-    ## E = pick (V, 'edge');
-    ## @print{} edges (part, 'Type', 'line', 'Direction', [0, 0, 1], ...
-    ## @print{}        'Within', [0, 0, 0, 80, 40, 12])
-    ## @print{}   finds exactly the 4 edges picked
+    ## ## Four upright edges picked on a block 80 by 40 by 12
+    ## [E, CODE] = pick (V, 'edge');
+    ## ## CODE holds the query for the script
+    ## E = edges (part, 'Type', 'line', 'Direction', [0, 0, 1], ...
+    ##            'Within', [0, 0, 0, 80, 40, 12]);
     ## part = fillet (part, E, 3);
     ## @end group
     ## @end example
@@ -674,68 +742,14 @@ classdef Viewer < handle
     ## @end deftypefn
     function varargout = pick (this, KIND = 'any')
 
-      ## Input validation
-      if (! ischar (KIND) || ! any (strcmp (KIND, {'edge', 'face', 'any'})))
-        error ("model.Viewer.pick: KIND must be 'edge', 'face' or 'any'.");
-      endif
-      ismesh = isa (state (this).mesh, 'polymesh.Mesh');
-      if (ismesh && ! strcmp (KIND, 'any'))
-        error ("model.Viewer.pick: a mesh has only points to pick.");
-      endif
-      if (! isopen (this) || isempty (this.Shape))
-        error ("model.Viewer.pick: the viewer is showing no shape.");
-      endif
-
-      ## Lines left from an earlier exchange are stale
-      st = state (this);
-      while (ischar (fgetl (st.out)))
-      endwhile
-      fclear (st.out);
-
-      send (this, ["pick " KIND]);
-      finished = false;
-      unwind_protect
-        [R, r] = replies (this, Inf);
-        finished = true;
-      unwind_protect_cleanup
-        if (! finished && isopen (this))
-          send (this, "cancel");
-        endif
-      end_unwind_protect
-      if (strcmp (r, 'closed'))
-        error ("model.Viewer.pick: the window was closed during the pick.");
-      endif
-      if (ismesh)
-        [varargout{1:2}] = meshpoints (R);
-        return;
-      endif
-      [E, F] = items (R);
-
-      ## The queries that find them again
-      S = this.Shape;
-      if (! isempty (E))
-        [Q, N] = model.Viewer.__query__ (S, 'edge', E, st.name);
-        report (Q, N, numel (E), 'edge');
-      endif
-      if (! isempty (F))
-        [Q, N] = model.Viewer.__query__ (S, 'face', F, st.name);
-        report (Q, N, numel (F), 'face');
-      endif
-
-      switch (KIND)
-        case 'edge'
-          varargout = {E};
-        case 'face'
-          varargout = {F};
-        otherwise
-          varargout = {E, F};
-      endswitch
+      [varargout{1:max (nargout, 1)}] = __pick__ (this, KIND, []);
 
     endfunction
 
     ## -*- texinfo -*-
     ## @deftypefn  {model.Viewer} {@var{U} =} pickucs (@var{V})
     ## @deftypefnx {model.Viewer} {@var{U} =} pickucs (@var{V}, @var{MODE})
+    ## @deftypefnx {model.Viewer} {[@var{U}, @var{CODE}] =} pickucs (@dots{})
     ##
     ## Pick a user coordinate system with the mouse.
     ##
@@ -767,20 +781,25 @@ classdef Viewer < handle
     ## it was clicked.  The shape can be
     ## turned between clicks, and @kbd{Escape} cancels with an error.
     ##
-    ## A pick depends on the shape it was made on, so @code{pickucs} prints the
-    ## line that makes the same UCS from coordinates, for the script:
+    ## A pick depends on the shape it was made on, so
+    ## @code{[@var{U}, @var{CODE}] = pickucs (@dots{})} also returns
+    ## @var{CODE}, the expression that makes the same UCS from coordinates, as
+    ## a character vector to put in the script in place of the pick.
+    ## @code{eval (@var{CODE})} gives the UCS again, to the ten significant
+    ## digits @var{CODE} carries.
     ##
     ## @example
     ## @group
-    ## U = pickucs (V);
-    ## @print{} U = geom.UCS ([0, 0, 1], [20, 20, 12], [21, 20, 12]);
-    ## R.UCS = U;
+    ## [U, CODE] = pickucs (V);
+    ## CODE
+    ## @result{} CODE = geom.UCS ([0, 0, 1], [20, 20, 12], [21, 20, 12])
+    ## R.UCS = geom.UCS ([0, 0, 1], [20, 20, 12], [21, 20, 12]);
     ## @end group
     ## @end example
     ##
     ## @seealso{geom.UCS, model.Viewer.pick}
     ## @end deftypefn
-    function U = pickucs (this, MODE = 'face')
+    function [U, CODE] = pickucs (this, MODE = 'face')
 
       ## Input validation
       if (! ischar (MODE) || ! any (strcmp (MODE, {'face', 'points'})))
@@ -790,7 +809,7 @@ classdef Viewer < handle
         error ("model.Viewer.pickucs: the viewer is showing no shape.");
       endif
 
-      U = __pickucs__ (this, MODE, []);
+      [U, ~, CODE] = __pickucs__ (this, MODE, []);
 
     endfunction
 
@@ -1043,16 +1062,60 @@ function TF = alike (D)
 
 endfunction
 
-## Print a query and whether it finds exactly what was picked
-function report (Q, N, n, kind)
+## The query for the items IDX of KIND by what they share: their kind, a
+## direction or normal or axis they share, and the box round them, widened
+## to whole parts in DIGITS of a millimetre.  SP stands between the name of
+## the query and its parenthesis, none for a query inside brackets.
+function Q = itemquery (KIND, info, IDX, DIGITS, SP)
 
-  printf ("%s\n", Q);
-  if (N == n)
-    printf ("  finds exactly the %d %s%s picked\n", n, kind, ...
-            repmat ('s', 1, n != 1));
+  if (strcmp (KIND, 'edge'))
+    [type, dir, box] = info{1:3};
+    args = {};
+    if (all (strcmp (type(IDX), type{IDX(1)})))
+      args(end+1:end+2) = {'Type', type{IDX(1)}};
+    endif
+    if (alike (dir(IDX,:)))
+      args(end+1:end+2) = {'Direction', dir(IDX(1),:)};
+    endif
   else
-    printf ("  finds %d %ss, among them the %d picked\n", N, kind, n);
+    [type, normal, axis, box] = info{:};
+    args = {};
+    if (all (strcmp (type(IDX), type{IDX(1)})))
+      args(end+1:end+2) = {'Type', type{IDX(1)}};
+    endif
+    n = normal(IDX,:);
+    a = axis(IDX,:);
+    if (! any (isnan (n(:))) && all (n * n(1,:)' >= 1 - 1e-9))
+      args(end+1:end+2) = {'Normal', n(1,:)};
+    elseif (alike (a))
+      args(end+1:end+2) = {'Axis', a(1,:)};
+    endif
   endif
+  b = [min(box(IDX,1:3), [], 1), max(box(IDX,4:6), [], 1)];
+  b = [floor(b(1:3) * DIGITS), ceil(b(4:6) * DIGITS)] / DIGITS;
+  args(end+1:end+2) = {'Within', b};
+
+  Q = sprintf ("%ss%s(__shape__", KIND, SP);
+  for k = 1:2:numel (args)
+    v = args{k+1};
+    if (ischar (v))
+      v = sprintf ("'%s'", v);
+    else
+      v(abs (v) < 1e-12) = 0;
+      v = arrayfun (@(x) sprintf ("%.10g", x), v, 'UniformOutput', false);
+      v = sprintf ("[%s]", strjoin (v, ", "));
+    endif
+    Q = sprintf ("%s, '%s', %s", Q, args{k}, v);
+  endfor
+  Q = [Q ")"];
+
+endfunction
+
+## The indices the code Q selects on the shape S, run as written
+function I = chosen (__shape__, Q)
+
+  I = eval (Q);
+  I = sort (I(:)');
 
 endfunction
 
@@ -1182,25 +1245,35 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!test  # the query for four upright edges
+%!test  # four upright edges share one query
 %! B = solid.box (10, 20, 30);
-%! [Q, N] = model.Viewer.__query__ (B, 'edge', edges (B, 'Direction', ...
-%!                                                    [0, 0, 1]), 'part');
-%! assert_equal (Q, strcat ("edges (part, 'Type', 'line', 'Direction',", ...
-%!                          " [0, 0, 1], 'Within', [0, 0, 0, 10, 20, 30])"));
-%! assert_equal (N, 4);
+%! Q = model.Viewer.__query__ (B, 'edge', edges (B, 'Direction', ...
+%!                                               [0, 0, 1]), 'part');
+%! assert_equal (Q, ["edges (part, 'Type', 'line', 'Direction',", ...
+%!                   " [0, 0, 1], 'Within', [0, 0, 0, 10, 20, 30])"]);
 
-%!test  # a query that finds more than was picked
+%!test  # the top face of a block
 %! B = solid.box (10, 20, 30);
-%! [Q, N] = model.Viewer.__query__ (B, 'face', faces (B, 'Normal', ...
-%!                                                    [0, 0, 1]), 'B');
-%! assert_equal (Q, strcat ("faces (B, 'Type', 'plane', 'Normal',", ...
-%!                          " [0, 0, 1], 'Within', [0, 0, 30, 10, 20, 30])"));
-%! assert_equal (N, 1);
+%! Q = model.Viewer.__query__ (B, 'face', faces (B, 'Normal', ...
+%!                                               [0, 0, 1]), 'B');
+%! assert_equal (Q, ["faces (B, 'Type', 'plane', 'Normal',", ...
+%!                   " [0, 0, 1], 'Within', [0, 0, 30, 10, 20, 30])"]);
+%!test  # every face of a cylinder, by the box round them alone
 %! C = solid.cylinder (4, 12);
-%! [Q, N] = model.Viewer.__query__ (C, 'face', 1:3, 'C');
+%! Q = model.Viewer.__query__ (C, 'face', 1:3, 'C');
 %! assert_equal (Q, "faces (C, 'Within', [-4, -4, 0, 4, 4, 12])");
-%! assert_equal (N, 3);
+%!test  # two top edges one query would overshoot get one query each
+%! B = solid.box (80, 40, 12);
+%! E = [edges(B, 'Direction', [1, 0, 0], 'Within', [0, 0, 12, 80, 0, 12]), ...
+%!      edges(B, 'Direction', [0, 1, 0], 'Within', [80, 0, 12, 80, 40, 12])];
+%! Q = model.Viewer.__query__ (B, 'edge', E, 'B');
+%! assert_equal (sort (eval (Q)), sort (E));
+%!test  # the code joins one query for each
+%! B = solid.box (80, 40, 12);
+%! E = [edges(B, 'Direction', [1, 0, 0], 'Within', [0, 0, 12, 80, 0, 12]), ...
+%!      edges(B, 'Direction', [0, 1, 0], 'Within', [80, 0, 12, 80, 40, 12])];
+%! Q = model.Viewer.__query__ (B, 'edge', E, 'B');
+%! assert_equal (strncmp (Q, "[edges(B, ", 10), true);
 
 %!testif ; ! isempty (getenv ('DISPLAY'))
 %! ## The window is titled with the name, before it opens and after
@@ -1291,15 +1364,41 @@ endfunction
 %! end_unwind_protect
 
 %!testif ; ! isempty (getenv ('DISPLAY'))
-%! ## Three corners, Enter keeping the first, and the line it prints
+%! ## Three corners, Enter keeping the first: the code of the UCS picked
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
 %!   V.Shape = solid.box (80, 40, 12);
 %!   px = @(p) V.__project__ (p);
 %!   C = [px([0, 0, 12]); px([80, 0, 12]); px([0, 40, 12]); NaN, NaN];
-%!   out = evalc ("U = V.__pickucs__ ('points', C);");
-%!   assert_equal (strtrim (out), ...
-%!                 "U = geom.UCS ([0, 0, 1], [0, 0, 12], [1, 0, 12]);");
+%!   [~, ~, CODE] = V.__pickucs__ ('points', C);
+%!   assert_equal (CODE, "geom.UCS ([0, 0, 1], [0, 0, 12], [1, 0, 12])");
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; ! isempty (getenv ('DISPLAY'))
+%! ## The code makes the UCS picked on a sloping face again
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Shape = solid.wedge (60, 40, 30, 10);
+%!   px = @(p) V.__project__ (p);
+%!   C = [px([35, 20, 15]); px([60, 0, 0]); px([60, 40, 0]); NaN, NaN];
+%!   [U, ~, CODE] = V.__pickucs__ ('face', C);
+%!   W = eval (CODE);
+%!   assert_equal ([W.Normal, W.Origin, W.XAxis], ...
+%!                 [U.Normal, U.Origin, U.XAxis], 1e-9);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; ! isempty (getenv ('DISPLAY'))
+%! ## A pick prints nothing
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Shape = solid.box (80, 40, 12);
+%!   px = @(p) V.__project__ (p);
+%!   C = [px([0, 0, 12]); px([80, 0, 12]); px([0, 40, 12]); NaN, NaN];
+%!   assert_equal (evalc ("U = V.__pickucs__ ('points', C);"), "");
 %! unwind_protect_cleanup
 %!   close (V);
 %! end_unwind_protect
@@ -1503,6 +1602,41 @@ endfunction
 %!error<model.Viewer: Name must be a valid variable name.>
 %! V = model.Viewer ();
 %! V.Name = '1part';
+%!testif ; ! isempty (getenv ('DISPLAY'))
+%! ## An edge clicked, then Enter: the code that selects it
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Shape = solid.box (80, 40, 12);
+%!   C = [V.__project__([40, 0, 12]); NaN, NaN];
+%!   [~, CODE] = V.__pick__ ('edge', C);
+%!   assert_equal (CODE, ["edges (S, 'Type', 'line', 'Direction',", ...
+%!                        " [1, 0, 0], 'Within', [0, 0, 12, 80, 0, 12])"]);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; ! isempty (getenv ('DISPLAY'))
+%! ## A pick of edges prints nothing
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Shape = solid.box (80, 40, 12);
+%!   C = [V.__project__([40, 0, 12]); NaN, NaN];
+%!   assert_equal (evalc ("E = V.__pick__ ('edge', C);"), "");
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; ! isempty (getenv ('DISPLAY'))
+%! ## Escape picks nothing
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Shape = solid.box (80, 40, 12);
+%!   E = V.__pick__ ('edge', [V.__project__([40, 0, 12]); Inf, Inf]);
+%!   assert_equal (isempty (E), true);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
 %!error<model.Viewer.pick: KIND must be 'edge', 'face' or 'any'.>
 %! pick (model.Viewer (), 'vertex')
 %!error<model.Viewer.pick: the viewer is showing no shape.>

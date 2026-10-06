@@ -44,7 +44,8 @@
 ## page.  Every other line is code, and the code between two runs of prose is
 ## one block, run in one workspace for the whole tutorial.  A code line ending
 ## in '#: not run' is shown without being run, for what needs a person at the
-## mouse.
+## mouse, and one ending in '#: hidden' is run without being shown, for the
+## clicks the build makes in its place.
 ##
 ## primer.m, A brief Octave primer, is written the same way and run the same
 ## way, but it is no tutorial: its page stands in a section of its own, before
@@ -348,9 +349,12 @@ function html = cells_html (t, names)
       html = [html, markdown(c.lines, names)];
       continue;
     endif
-    shown = regexprep (c.lines, '\s*#: not run\s*$', '');
-    html = [html, sprintf("<pre class=\"code-in\"><code>%s</code></pre>\n", ...
-                          esc (strjoin (shown, "\n")))];
+    shown = c.lines(cellfun (@isempty, regexp (c.lines, '#: hidden\s*$')));
+    shown = regexprep (shown, '\s*#: not run\s*$', '');
+    if (! isempty (shown))
+      code = esc (strjoin (shown, "\n"));
+      html = [html, "<pre class=\"code-in\"><code>", code, "</code></pre>\n"];
+    endif
     o = regexprep (c.out, '^\n+|\s+$', '');
     if (! isempty (o))
       html = [html, sprintf("<pre class=\"code-out\"><code>%s</code></pre>\n", ...
