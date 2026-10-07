@@ -2,7 +2,7 @@
 # name: cache
 # type: cell
 # rows: 3
-# columns: 231
+# columns: 233
 # name: <cell-element>
 # type: sq_string
 # elements: 1
@@ -7152,10 +7152,11 @@ model.Viewer.pick
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1895
+# length: 2398
 model.Viewer: [E, F] = pick (V)
-model.Viewer: E = pick (V, 'edge')
-model.Viewer: F = pick (V, 'face')
+model.Viewer: [E, F, ECODE, FCODE] = pick (V)
+model.Viewer: [E, CODE] = pick (V, 'edge')
+model.Viewer: [F, CODE] = pick (V, 'face')
 model.Viewer: [P, F] = pick (V)
 Pick edges and faces of a solid, or points on a mesh, with the mouse.
 
@@ -7168,18 +7169,25 @@ selected edge thick and a selected face filled, and a second click on
 it lets it go; the shape can still be turned between clicks.
 Enter finishes and Escape cancels, returning nothing. With
 'edge' or 'face' only that kind can be picked, and its
-indices are the one output.
+indices are the first output.
 
 Indices belong to the shape they were picked on, and a script that holds
 them breaks as soon as an earlier step adds a feature. So pick
-also prints, for each kind picked, the query that finds the same items
-by kind, direction and position, and says whether it finds exactly
-those. Paste the query into the script instead of the numbers:
+also returns, as a character vector, the code that selects the same
+items by kind, direction and position: CODE for one kind, and
+ECODE and FCODE for edges and faces picked together, empty
+where none was picked. The code selects exactly the items picked: one
+query where what they share finds them alone, else one query for each,
+joined, and their indices only where an item cannot be told apart from
+the others by any query. It names the shape by the variable the viewer
+shows, and eval (CODE) gives the indices again. Put it in
+the script in place of the numbers:
 
-E = pick (V, 'edge');
-edges (part, 'Type', 'line', 'Direction', [0, 0, 1], ...
-'Within', [0, 0, 0, 80, 40, 12])
-finds exactly the 4 edges picked
+## Four upright edges picked on a block 80 by 40 by 12
+[E, CODE] = pick (V, 'edge');
+## CODE holds the query for the script
+E = edges (part, 'Type', 'line', 'Direction', [0, 0, 1], ...
+'Within', [0, 0, 0, 80, 40, 12]);
 part = fillet (part, E, 3);
 
 When the viewer shows a polymesh.Mesh, [P, F]
@@ -7217,9 +7225,10 @@ model.Viewer.pickucs
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1803
+# length: 2070
 model.Viewer: U = pickucs (V)
 model.Viewer: U = pickucs (V, MODE)
+model.Viewer: [U, CODE] = pickucs (...)
 Pick a user coordinate system with the mouse.
 
 U = pickucs (V) returns the geom.UCS you
@@ -7250,12 +7259,17 @@ middle of one of its sides when the click is near, or else lies where
 it was clicked. The shape can be
 turned between clicks, and Escape cancels with an error.
 
-A pick depends on the shape it was made on, so pickucs prints the
-line that makes the same UCS from coordinates, for the script:
+A pick depends on the shape it was made on, so
+[U, CODE] = pickucs (...) also returns
+CODE, the expression that makes the same UCS from coordinates, as
+a character vector to put in the script in place of the pick.
+eval (CODE) gives the UCS again, to the ten significant
+digits CODE carries.
 
-U = pickucs (V);
-U = geom.UCS ([0, 0, 1], [20, 20, 12], [21, 20, 12]);
-R.UCS = U;
+[U, CODE] = pickucs (V);
+CODE
+=> CODE = geom.UCS ([0, 0, 1], [20, 20, 12], [21, 20, 12])
+R.UCS = geom.UCS ([0, 0, 1], [20, 20, 12], [21, 20, 12]);
 
 See also:
 geom.UCS,
@@ -7267,6 +7281,62 @@ model.Viewer.pick
 # elements: 1
 # length: 45
 Pick a user coordinate system with the mouse.
+
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 17
+model.Viewer.view
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 1300
+model.Viewer: view (V, AZ, EL)
+model.Viewer: [AZ, EL] = view (V)
+Set or query the direction the viewer looks from.
+
+view (V, AZ, EL) turns the view to look at the
+shape from azimuth AZ and elevation EL, in degrees, and fits
+the shape to the window. The angles are those Octave's view
+takes for a plot: AZ turns anticlockwise about z, seen from
+above, starting from the negative y axis, and EL rises from
+the x-y plane, from -90 looking straight up to 90 looking
+straight down. The z axis points up the window; looking
+straight down or up, the y axis does, turned by AZ. The
+mouse still turns the view afterwards.
+
+[AZ, EL] = view (V) returns the angles the
+view looks from now, however it got there, AZ from -180 to 180,
+so that a view found with the mouse can be kept in a script. A turn
+about the line of sight, which the mouse can give, is not part of them.
+
+The keys of the window give four of these views: 0 is
+view (V, 45, 35.26), near enough, the isometric view the
+window opens with, 1 is view (V, 0, 0), 2 is
+view (V, 0, 90) and 3 is
+view (V, 90, 0).
+
+## A shallow part looks deeper than it is from the isometric view;
+## look from higher up
+part = solid.box (80, 40, 4);
+V = show (part);
+view (V, 30, 60);
+## Keep a view found with the mouse
+[az, el] = view (V);
+
+See also:
+solid.Shape.show
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 49
+Set or query the direction the viewer looks from.
 
 
 
@@ -8134,7 +8204,7 @@ solid.Shape
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 2062
+# length: 2169
 drafting: solid.Shape
 A solid in millimetres, modelled through Open CASCADE.
 
@@ -8145,26 +8215,37 @@ the functions of the solid namespace create, what the boolean
 operators combine, and what its write method saves as STEP for
 exchange or STL for printing.
 
-Shapes are made by solid.box, solid.cylinder,
-solid.cone, solid.sphere and solid.torus, from
-regions by solid.extrude, solid.revolve, solid.loft,
-solid.sweep and solid.helix, and from files by
-solid.read, and combined by three methods, each taking any number
-of shapes:
+Primitives are made by
+
+solid.box
+solid.cylinder
+solid.cone
+solid.sphere
+solid.ellipsoid
+solid.torus
+solid.wedge
+
+and solids from +geom objects by
+
+solid.extrude
+solid.revolve
+solid.loft
+solid.sweep
+solid.helix
+
+A solid is made from a closed triangle mesh by solid.polyhedron,
+and from a grid of points by solid.surface, which fits a surface
+through the grid and thickens it. hull wraps shapes and points in
+their convex hull, and solid.read loads solids from a STEP file.
+
+Finally, shapes can be combined by the three boolean CAD operations, each
+taking any number of shapes:
 
 Method Result
 union the material of any of them
 subtract the material of the first that is in none of
 the others
 intersect the material common to all of them
-
-hull wraps shapes and points in their convex hull.
-
-plate = solid.box (80, 40, 12);
-bore = translate (solid.cylinder (4, 12), [20, 20, 0]);
-part = subtract (plate, bore);
-volume (part)
-=> 3.7797e+04
 
 Features are worked on a shape by methods: hole drills plain,
 counterbored, countersunk and tapping holes, pocket cuts a region
@@ -8241,7 +8322,7 @@ solid.Shape.Shape
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 417
+# length: 746
 solid.Shape: S = solid.Shape ()
 solid.Shape: S = solid.Shape (DATA)
 Make a shape.
@@ -8254,6 +8335,18 @@ a shape in Open CASCADE's binary format. This is how the functions of
 the solid namespace return what Open CASCADE computed, and it is
 not for direct use: bytes that do not begin with that format's signature
 are refused.
+
+The empty shape is where a shape built up in a loop starts: it adds
+nothing to a union, so the first pass needs no case of its own.
+
+## A stair of four steps, gathered from nothing
+S = solid.Shape ();
+for k = 1:4
+step = solid.box (40, 10, 5 * k);
+S = union (S, translate (step, [0, 10 * (k - 1), 0]));
+endfor
+numsolids (S)
+=> 1
 
 
 # name: <cell-element>
@@ -8274,7 +8367,7 @@ solid.Shape.area
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 444
+# length: 597
 solid.Shape: A = area (S)
 The surface area of a shape in square millimetres.
 
@@ -8283,6 +8376,12 @@ A flat face is measured to a relative error of about 1e-9, whatever its
 edges. A curved face is measured as Open CASCADE integrates it: exactly
 for a cylinder, a cone, a sphere or a torus, to about 1e-4 for a face
 swept from a spline. The empty shape has area zero.
+
+It is what a coating, a plating or a coat of paint is reckoned by.
+
+## A sphere of radius 10, whose area is 4 pi r^2
+area (solid.sphere (10))
+=> 1256.6
 
 See also:
 solid.Shape.volume
@@ -8306,7 +8405,7 @@ solid.Shape.bbox
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 691
+# length: 767
 solid.Shape: B = bbox (S)
 solid.Shape: [B, L] = bbox (S)
 Axis-aligned extents of a shape.
@@ -8322,6 +8421,10 @@ spheres it is tight; on a torus or a spline surface it may exceed the
 true extent by up to 1e-7 millimetres, the precision Open CASCADE
 computes it to there. The empty shape has no extent and returns an
 empty B and L.
+
+[B, L] = bbox (solid.cylinder (4, 10))
+=> B = -4 -4 0 4 4 10
+=> L = 8 8 10
 
 See also:
 solid.Shape.centroid,
@@ -8346,14 +8449,25 @@ solid.Shape.centroid
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 356
+# length: 788
 solid.Shape: C = centroid (S)
+solid.Shape: C = centroid (S, 'RelTol', TOL)
 The centre of volume of a shape, as a 1-by-3 vector in millimetres.
 
 For a part of uniform density this is its centre of mass, computed as
-the volume is. The empty shape has no centroid and returns an empty
-C, and a shape that encloses no volume returns NaN in every
-coordinate.
+the volume is, 'RelTol' included. The empty shape has no
+centroid and returns an empty C, and a shape that encloses no
+volume returns NaN in every coordinate.
+
+The centre takes far longer to integrate than the volume: a second or
+more on a sphere, a cone or a torus, and a minute or more on the
+spline surfaces of a shape made by solid.surface, where a looser
+'RelTol' saves little.
+
+## An L-shaped bracket balances off its corner
+L = union (solid.box (30, 10, 5), solid.box (5, 10, 20));
+centroid (L)
+=> 10.8333 5.0000 5.8333
 
 See also:
 solid.Shape.volume,
@@ -8378,7 +8492,7 @@ solid.Shape.chamfer
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1288
+# length: 1507
 solid.Shape: S = chamfer (S, E, D)
 solid.Shape: S = chamfer (S, E, [D1, D2], F)
 solid.Shape: S = chamfer (S, E, D, F, 'Angle', A)
@@ -8409,6 +8523,12 @@ A. Along the other face it reaches D * tand
 A chamfer too large for the faces beside an edge cannot be built and
 raises an error, as does an edge that cannot be chamfered at all.
 
+## The top rim of a plate bevelled 1 x 45, and 2 x 30
+S = solid.box (40, 30, 10);
+F = faces (S, 'Normal', [0, 0, 1]);
+A = chamfer (S, edges (S, 'Face', F), 1);
+B = chamfer (S, edges (S, 'Face', F), 2, F, 'Angle', 30);
+
 See also:
 solid.Shape.edges,
 solid.Shape.fillet
@@ -8432,7 +8552,7 @@ solid.Shape.copy
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 640
+# length: 807
 solid.Shape: C = copy (S, D)
 Copies of a shape, united.
 
@@ -8445,6 +8565,12 @@ kept side by side, separate solids of the one shape, with no boolean
 to compute; only copies that overlap or touch are fused, so a hundred
 pins standing apart cost little more than one. This is OpenSCAD's
 for loop of translate.
+
+## Four pins on the corners of a square, one shape of four solids
+P = copy (solid.cylinder (2, 10), ...
+[0, 0, 0; 30, 0, 0; 0, 30, 0; 30, 30, 0]);
+numsolids (P)
+=> 4
 
 See also:
 solid.Shape.rectarray,
@@ -8537,7 +8663,7 @@ solid.Shape.faces
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1297
+# length: 1524
 solid.Shape: F = faces (S)
 solid.Shape: F = faces (S, Name, Value, ...)
 Choose faces of a shape, to open when hollowing it or to inspect.
@@ -8571,6 +8697,12 @@ face is chosen when it lies wholly inside, to within 1e-6 millimetres.
 
 The empty shape has no faces.
 
+## The bore of a block, its edges chamfered 1 x 45
+S = subtract (solid.box (40, 30, 10), ...
+translate (solid.cylinder (5, 10), [20, 15, 0]));
+bore = faces (S, 'Type', 'cylinder');
+S = chamfer (S, edges (S, 'Face', bore), 1);
+
 See also:
 solid.Shape.edges,
 solid.Shape.shell
@@ -8594,7 +8726,7 @@ solid.Shape.fillet
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 785
+# length: 939
 solid.Shape: S = fillet (S, E, R)
 Round edges of a shape to a radius.
 
@@ -8612,6 +8744,12 @@ rounds the whole top rim.
 
 A radius too large for the faces beside an edge cannot be built and
 raises an error, as does an edge that cannot be rounded at all.
+
+## A block with its four upright edges rounded to 5
+S = solid.box (40, 30, 10);
+S = fillet (S, edges (S, 'Direction', [0, 0, 1]), 5);
+numfaces (S)
+=> 10
 
 See also:
 solid.Shape.edges,
@@ -8761,7 +8899,7 @@ solid.Shape.intersect
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 359
+# length: 924
 solid.Shape: C = intersect (A, B, ...)
 The intersection of shapes, the material common to all of them.
 
@@ -8769,6 +8907,20 @@ C = intersect (A, B, ...) keeps only what
 lies inside every shape given. Shapes that do not all meet, and an
 empty shape among them, give the empty shape. The intersection of a
 single shape is that shape.
+
+Intersecting with a box trims a shape to the box, and intersecting two
+parts tells whether they collide: the volume of their intersection is
+the volume of the interference, and parts that stay apart give the
+empty shape. Each solid of the result takes the colour of the first
+coloured solid it came from.
+
+## A shaft through a gear, and the same shaft moved clear of it
+gear = solid.cylinder (20, 5);
+shaft = translate (solid.cylinder (4, 30), [0, 0, -10]);
+volume (intersect (gear, shaft))
+=> 251.33
+isempty (intersect (gear, translate (shaft, [30, 0, 0])))
+=> 1
 
 See also:
 solid.Shape.union,
@@ -8793,9 +8945,23 @@ solid.Shape.isempty
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 80
+# length: 630
 solid.Shape: TF = isempty (S)
 True for the empty shape, which holds no material.
+
+TF = isempty (S) is true for the shape
+solid.Shape () returns and for the result of a boolean that
+leaves no material, such as the intersection of shapes that do not
+meet. A boolean returns the empty shape rather than raising an error,
+so a script tests for it here. It has no volume, area, faces or
+extent, and solid.Shape.write refuses it. For an array of
+shapes, TF is true when the array has no elements.
+
+A = solid.box (10, 10, 10);
+isempty (intersect (A, translate (A, [20, 0, 0])))
+=> 1
+isempty (intersect (A, translate (A, [5, 0, 0])))
+=> 0
 
 
 # name: <cell-element>
@@ -8816,7 +8982,7 @@ solid.Shape.isvalid
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 450
+# length: 620
 solid.Shape: TF = isvalid (S)
 True if a shape passes Open CASCADE's validity check.
 
@@ -8826,6 +8992,13 @@ made by the solid namespace should pass; a failure means that an
 operation went wrong, usually a boolean between faces that nearly but
 not quite coincide, and the shape should not be written or drawn. The
 empty shape is valid.
+
+A test of a part can assert it after the booleans that made it.
+
+S = subtract (solid.box (20, 20, 20), ...
+translate (solid.sphere (8), [10, 10, 20]));
+isvalid (S)
+=> 1
 
 
 # name: <cell-element>
@@ -8846,7 +9019,7 @@ solid.Shape.mirror
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 425
+# length: 649
 solid.Shape: S = mirror (S, N)
 solid.Shape: S = mirror (S, N, P)
 Reflect a shape in a plane.
@@ -8856,6 +9029,14 @@ the nonzero 3-element normal N. mirror (S, [1, 0,
 0]) reflects in the yz plane. A reflection turns a right-handed
 part into its left-handed twin; the result is a valid solid of the same
 volume.
+
+The solids keep their colours.
+
+## An L-shaped bracket and its mirror image, joined into one part
+L = union (solid.box (30, 10, 5), solid.box (5, 10, 20));
+S = union (L, mirror (L, [1, 0, 0]));
+bbox (S)
+=> -30 0 0 30 10 20
 
 See also:
 solid.Shape.translate,
@@ -8881,13 +9062,18 @@ solid.Shape.numedges
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 343
+# length: 423
 solid.Shape: N = numedges (S)
 The number of edges of a shape, each counted once.
 
 An edge shared by two faces is one edge. A box has twelve. A cylinder
 has three: its two circles and the seam where its curved face closes on
 itself, which bounds that face but is not a feature of the part.
+
+numedges (solid.box (10, 20, 30))
+=> 12
+numedges (solid.cylinder (5, 10))
+=> 3
 
 See also:
 solid.Shape.numsolids,
@@ -8912,11 +9098,20 @@ solid.Shape.numfaces
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 186
+# length: 448
 solid.Shape: N = numfaces (S)
 The number of faces of a shape.
 
 A box has six. A cylinder has three, its curved side being one face.
+
+It is a quick check that a feature did what was meant: a bore adds one
+face, and a fillet one for each edge it rounds.
+
+## Six flat faces and the bore
+S = subtract (solid.box (40, 30, 10), ...
+translate (solid.cylinder (5, 10), [20, 15, 0]));
+numfaces (S)
+=> 7
 
 See also:
 solid.Shape.numsolids,
@@ -8941,12 +9136,17 @@ solid.Shape.numsolids
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 213
+# length: 336
 solid.Shape: N = numsolids (S)
 The number of separate solids in a shape.
 
 A boolean can leave more than one: cutting a bar across its whole
 section leaves two.
+
+bar = solid.box (60, 10, 10);
+cut = translate (solid.box (2, 20, 20), [29, -5, -5]);
+numsolids (subtract (bar, cut))
+=> 2
 
 See also:
 solid.Shape.numfaces,
@@ -9231,7 +9431,7 @@ solid.Shape.rotate
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 396
+# length: 747
 solid.Shape: S = rotate (S, ANGLE, AXIS)
 solid.Shape: S = rotate (S, ANGLE, AXIS, P)
 Rotate a shape about an axis.
@@ -9240,6 +9440,18 @@ ANGLE is in degrees and turns the shape anticlockwise when seen
 from the tip of AXIS looking back, the right-hand rule.
 AXIS is a nonzero 3-element direction, and P a point on the
 axis, the origin by default.
+
+To turn a shape in place, give its own centroid as P. The
+solids keep their colours.
+
+## A pin standing along z, laid down along x
+[~, L] = bbox (rotate (solid.cylinder (2, 20), 90, [0, 1, 0]))
+=> L = 20 4 4
+
+## A block turned a quarter about its own centre
+S = solid.box (20, 10, 5);
+bbox (rotate (S, 90, [0, 0, 1], centroid (S)))
+=> 5 -5 0 15 15 5
 
 See also:
 solid.Shape.translate,
@@ -9265,7 +9477,7 @@ solid.Shape.scale
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 324
+# length: 630
 solid.Shape: S = scale (S, F)
 solid.Shape: S = scale (S, F, P)
 Scale a shape uniformly about a point.
@@ -9274,10 +9486,20 @@ Every length is multiplied by the positive factor F, so the volume
 grows by its cube. P, the origin by default, is the point that
 stays where it is.
 
+To bring a shape to a size, each axis on its own if need be, use
+solid.Shape.resize. The solids keep their colours.
+
+## A ball doubled about its own centre, eight times the volume
+S = translate (solid.sphere (5), [20, 0, 0]);
+T = scale (S, 2, [20, 0, 0]);
+volume (T) / volume (S)
+=> 8
+
 See also:
 solid.Shape.translate,
 solid.Shape.rotate,
-solid.Shape.mirror
+solid.Shape.mirror,
+solid.Shape.resize
 
 
 # name: <cell-element>
@@ -9474,7 +9696,7 @@ solid.Shape.subtract
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 589
+# length: 928
 solid.Shape: C = subtract (A, B, ...)
 The difference of shapes, the material of the first in none of the
 others.
@@ -9487,6 +9709,17 @@ an order of magnitude faster than a hundred calls of one hole each.
 
 Removing empty shapes, or nothing, leaves A, and removing
 anything from the empty shape leaves the empty shape.
+
+The result takes its colours from A; the shapes taken away give
+none, as solid.Shape.Colour describes.
+
+## A plate drilled with twelve holes in one call
+plate = solid.box (100, 60, 8);
+[x, y] = meshgrid (10:16:90, [15, 45]);
+P = [x(:), y(:), zeros(numel (x), 1)];
+S = subtract (plate, copy (solid.cylinder (3, 8), P));
+numfaces (S)
+=> 18
 
 See also:
 solid.Shape.union,
@@ -9556,11 +9789,19 @@ solid.Shape.translate
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 173
+# length: 397
 solid.Shape: S = translate (S, V)
 Move a shape by the vector V.
 
 V is a 3-element vector in millimetres.
+
+Like every method, it returns a new shape and leaves S as it was,
+so one part can be placed many times. The solids keep their colours.
+
+A = solid.box (10, 10, 10);
+B = translate (A, [0, 0, 10]);
+bbox (B)
+=> 0 0 10 10 10 20
 
 See also:
 solid.Shape.rotate,
@@ -9586,7 +9827,7 @@ solid.Shape.union
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 534
+# length: 806
 solid.Shape: C = union (A, B, ...)
 The union of shapes, the material of any of them.
 
@@ -9597,6 +9838,15 @@ end up in one plane and edges that end up on one line are merged, so
 the union of two blocks that share a face reads as one block of six
 faces. Empty shapes add nothing, and the union of a single shape is
 that shape.
+
+Each solid of the result takes the colour of the first coloured solid
+it came from, as solid.Shape.Colour describes.
+
+## Two blocks side by side become one block
+A = solid.box (10, 10, 10);
+B = translate (solid.box (10, 10, 10), [10, 0, 0]);
+numfaces (union (A, B))
+=> 6
 
 See also:
 solid.Shape.subtract,
@@ -9621,12 +9871,29 @@ solid.Shape.volume
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 255
+# length: 1003
 solid.Shape: V = volume (S)
+solid.Shape: V = volume (S, 'RelTol', TOL)
 The volume of a shape in cubic millimetres.
 
-The volume is computed from the exact surfaces, not from facets, to a
-relative error of about 1e-9. The empty shape has volume zero.
+The volume is computed from the exact surfaces, not from facets, by an
+integration that aims at a relative error of TOL on every face,
+1e-9 unless 'RelTol' sets it. TOL must be positive and
+no larger than 1e-3. The empty shape has volume zero.
+
+Multiplied by a density it gives the mass of a part. Most shapes take
+milliseconds. The spline surfaces of a shape made by
+solid.surface take seconds, and there a 'RelTol' of 1e-6
+is about three times faster, at an error of up to about 1e-7 on spline
+faces. TOL is a target, not a guarantee: on the hardest faces the
+integration may stop short of it.
+
+## The mass in grams of a steel block with a bore, steel weighing
+## 7.85e-3 grams per cubic millimetre
+S = subtract (solid.box (80, 40, 12), ...
+translate (solid.cylinder (4, 12), [20, 20, 0]));
+mass = volume (S) * 7.85e-3
+=> mass = 296.70
 
 See also:
 solid.Shape.area,
@@ -9651,7 +9918,7 @@ solid.Shape.write
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1233
+# length: 1548
 solid.Shape: write (S, FILE)
 solid.Shape: write (S, FILE, 'Tolerance', TOL)
 Write a solid to a STEP, STL, OBJ, PLY or 3MF file.
@@ -9678,6 +9945,15 @@ surface. It is 0.01 by default, well below what a printer resolves; a
 larger value gives a smaller file. No facet spans more than 20 degrees
 of a curved surface, whatever TOL. A STEP file is exact and takes
 no tolerance.
+
+The empty shape has nothing to write and is refused, and so is a
+folder that does not exist.
+
+## Exact for a CAD program, and a coarser mesh for a slicer
+S = subtract (solid.box (40, 30, 10), ...
+translate (solid.cylinder (5, 10), [20, 15, 0]));
+write (S, 'block.step');
+write (S, 'block.stl', 'Tolerance', 0.05);
 
 See also:
 solid.read,
@@ -10281,6 +10557,75 @@ geom.UCS
 # elements: 1
 # length: 9
 A sphere.
+
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 13
+solid.surface
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 1992
+drafting: S = solid.surface (X, Y, Z, H)
+A solid made of a smooth surface through a grid of points.
+
+S = solid.surface (X, Y, Z, H) fits an
+exact B-spline surface through the grid of points X, Y and
+Z, passing within 0.001 mm of every point, and returns the
+solid.Shape that surface makes thickened square to itself.
+X, Y and Z are real matrices of one size, at least 2 by
+2, holding the coordinates of the points in rows and columns, as
+meshgrid makes them. The grid stays the input and what comes out is
+smooth, where solid.polyhedron on the same grid gives facets.
+
+The normal of the surface is the step from one column of the grid to the
+next crossed with the step from one row to the next. For a grid made by
+meshgrid, whose columns step along x and rows along y,
+it points up, along +z. Transposing X, Y and Z
+turns it round.
+
+H is the thickness in millimetres and which way it goes, as
+solid.extrude takes it:
+
+a positive scalar
+along the normal, the surface the face of the solid against it;
+a negative scalar
+against the normal, the same thickness the other way;
+[H1, H2], both positive
+to both sides of the surface, H1 along the normal and H2
+against it, so [0.5, 0.5] is a thickness of 1 centred on it.
+
+The grid must be open: neighbouring points must not coincide, and neither
+its first and last rows nor its first and last columns may meet, closing
+the surface on itself.
+
+A surface thickened by more than the radius it curves with folds over
+itself. That is refused, naming the side of the surface and its tightest
+radius there. A point the grid comes to, such as the tip of
+sind (hypot (X, Y)) at the origin, is rounded off by the
+fit at a radius set by the spacing of the grid, and limits the thickness
+the same way. The edges of the solid run square to the surface.
+
+## A ripple 20 across, made a skin 1 thick centred on it
+[x, y] = meshgrid (-10:0.5:10);
+S = solid.surface (x, y, cosd (72 * hypot (x, y)), [0.5, 0.5]);
+
+See also:
+solid.polyhedron,
+solid.extrude,
+solid.Shape
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 58
+A solid made of a smooth surface through a grid of points.
 
 
 
