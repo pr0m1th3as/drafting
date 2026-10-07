@@ -853,16 +853,17 @@ faceinfo (const TopoDS_Shape& s)
   return Cell (ovl (type, normal, axis, box));
 }
 
-// The volume and centre of volume of S, integrated adaptively to a relative
-// error of 1e-9 on every face.  The default integration, of fixed order, errs
-// by up to a part in a thousand on spline faces.  The adaptive one computes
-// the centre only when asked to.  Should it fail, the default is taken.
+// The volume of S, and its centre of volume when CG is true, integrated
+// adaptively to a relative error of EPS on every face.  The default
+// integration, of fixed order, errs by up to a part in a thousand on spline
+// faces.  The centre costs most of the time, so it is computed only when
+// asked for.  Should the adaptive integration fail, the default is taken.
 static GProp_GProps
-volumeprops (const TopoDS_Shape& s)
+volumeprops (const TopoDS_Shape& s, bool cg, double eps)
 {
   GProp_GProps p;
-  if (BRepGProp::VolumePropertiesGK (s, p, 1e-9, Standard_False,
-                                     Standard_True, Standard_True) < 0)
+  if (BRepGProp::VolumePropertiesGK (s, p, eps, Standard_False,
+                                     Standard_True, cg) < 0)
   {
     p = GProp_GProps ();
     BRepGProp::VolumeProperties (s, p);
@@ -3699,7 +3700,8 @@ function directly. \n\
     // Queries
     else if (cmd == "volume")
     {
-      out = volumeprops (toshape (args(2), caller)).Mass ();
+      out = volumeprops (toshape (args(2), caller), false,
+                         args(3).double_value ()).Mass ();
     }
     else if (cmd == "area")
     {
@@ -3707,7 +3709,8 @@ function directly. \n\
     }
     else if (cmd == "centroid")
     {
-      const GProp_GProps p = volumeprops (toshape (args(2), caller));
+      const GProp_GProps p = volumeprops (toshape (args(2), caller), true,
+                                          args(3).double_value ());
       RowVector c (3, octave_NaN);
       if (p.Mass () > 0)
       {

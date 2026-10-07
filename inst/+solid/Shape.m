@@ -813,16 +813,22 @@ classdef Shape
   methods (Access = public)
 
     ## -*- texinfo -*-
-    ## @deftypefn {solid.Shape} {@var{V} =} volume (@var{S})
+    ## @deftypefn  {solid.Shape} {@var{V} =} volume (@var{S})
+    ## @deftypefnx {solid.Shape} {@var{V} =} volume (@var{S}, @qcode{'RelTol'}, @var{TOL})
     ##
     ## The volume of a shape in cubic millimetres.
     ##
-    ## The volume is computed from the exact surfaces, not from facets, to a
-    ## relative error of about 1e-9.  The empty shape has volume zero.
+    ## The volume is computed from the exact surfaces, not from facets, by an
+    ## integration that aims at a relative error of @var{TOL} on every face,
+    ## 1e-9 unless @qcode{'RelTol'} sets it.  @var{TOL} must be positive and
+    ## no larger than 1e-3.  The empty shape has volume zero.
     ##
-    ## Multiplied by a density it gives the mass of a part.  The integration
-    ## holds its error on every face, so on the spline surfaces of a shape
-    ## made by @code{solid.surface} it can take seconds or more.
+    ## Multiplied by a density it gives the mass of a part.  Most shapes take
+    ## milliseconds.  The spline surfaces of a shape made by
+    ## @code{solid.surface} take seconds, and there a @qcode{'RelTol'} of 1e-6
+    ## is about three times faster, at an error of up to about 1e-7 on spline
+    ## faces.  @var{TOL} is a target, not a guarantee: on the hardest faces the
+    ## integration may stop short of it.
     ##
     ## @example
     ## @group
@@ -837,12 +843,16 @@ classdef Shape
     ##
     ## @seealso{solid.Shape.area, solid.Shape.centroid}
     ## @end deftypefn
-    function V = volume (this)
+    function V = volume (this, varargin)
 
+      [errmsg, TOL] = reltol (varargin);
+      if (! isempty (errmsg))
+        error ("solid.Shape.volume: %s", errmsg);
+      endif
       if (isempty (this.Data))
         V = 0;
       else
-        V = occt ('solid.Shape.volume', 'volume', this.Data);
+        V = occt ('solid.Shape.volume', 'volume', this.Data, TOL);
       endif
 
     endfunction
@@ -881,14 +891,20 @@ classdef Shape
     endfunction
 
     ## -*- texinfo -*-
-    ## @deftypefn {solid.Shape} {@var{C} =} centroid (@var{S})
+    ## @deftypefn  {solid.Shape} {@var{C} =} centroid (@var{S})
+    ## @deftypefnx {solid.Shape} {@var{C} =} centroid (@var{S}, @qcode{'RelTol'}, @var{TOL})
     ##
     ## The centre of volume of a shape, as a 1-by-3 vector in millimetres.
     ##
     ## For a part of uniform density this is its centre of mass, computed as
-    ## the volume is.  The empty shape has no centroid and returns an empty
-    ## @var{C}, and a shape that encloses no volume returns @code{NaN} in every
-    ## coordinate.
+    ## the volume is, @qcode{'RelTol'} included.  The empty shape has no
+    ## centroid and returns an empty @var{C}, and a shape that encloses no
+    ## volume returns @code{NaN} in every coordinate.
+    ##
+    ## The centre takes far longer to integrate than the volume: a second or
+    ## more on a sphere, a cone or a torus, and a minute or more on the
+    ## spline surfaces of a shape made by @code{solid.surface}, where a looser
+    ## @qcode{'RelTol'} saves little.
     ##
     ## @example
     ## @group
@@ -901,12 +917,16 @@ classdef Shape
     ##
     ## @seealso{solid.Shape.volume, solid.Shape.bbox}
     ## @end deftypefn
-    function C = centroid (this)
+    function C = centroid (this, varargin)
 
+      [errmsg, TOL] = reltol (varargin);
+      if (! isempty (errmsg))
+        error ("solid.Shape.centroid: %s", errmsg);
+      endif
       if (isempty (this.Data))
         C = [];
       else
-        C = occt ('solid.Shape.centroid', 'centroid', this.Data);
+        C = occt ('solid.Shape.centroid', 'centroid', this.Data, TOL);
       endif
 
     endfunction
@@ -2607,6 +2627,23 @@ function [errmsg, opt] = options (args, opt)
 
 endfunction
 
+## The relative error the volume integration aims at, from the Name/Value
+## pairs ARGS, 1e-9 when not given.  Returns an error message body, empty when
+## ARGS is valid.
+function [errmsg, TOL] = reltol (ARGS)
+
+  [errmsg, opt] = options (ARGS, struct ('RelTol', 1e-9));
+  TOL = opt.RelTol;
+  if (isempty (errmsg) && (! isnumeric (TOL) || ! isreal (TOL)
+                           || ! isscalar (TOL) || ! (TOL > 0)
+                           || ! (TOL <= 1e-3)))
+    errmsg = "RelTol must be a positive real scalar no larger than 1e-3.";
+  elseif (isempty (errmsg))
+    TOL = double (TOL);
+  endif
+
+endfunction
+
 ## Validate a Type filter, one name or a cell array of names from KINDS, and
 ## return it as a cell array.  Returns an error message body, empty when it
 ## is valid.
@@ -2834,6 +2871,38 @@ endfunction
 %! assert_equal (volume (S), 6 * A, -1e-9);
 %! assert_equal (centroid (S)(3), 3, 1e-9);
 %! assert_equal (area (S), 2 * A + 6 * (260 + length (H)), -1e-5);
+%!test  # a looser RelTol holds on a spline face
+%! C = resize (solid.cylinder (5, 10), [20, 0, 0], 'Uniform', false);
+%! assert_equal (volume (C, 'RelTol', 1e-6), 500 * pi, -1e-6);
+%!test  # RelTol on the centroid, its name in any case
+%! assert_equal (centroid (solid.box (10, 20, 30), 'reltol', 1e-3), ...
+%!               [5, 10, 15], 1e-9);
+%!test  # the empty shape takes RelTol too
+%! assert_equal (volume (solid.Shape (), 'RelTol', 1e-6), 0);
+%!error<solid.Shape.volume: Name/Value arguments must come in pairs.> ...
+%! volume (solid.box (1, 1, 1), 'RelTol')
+%!error<solid.Shape.volume: option names must be character vectors.> ...
+%! volume (solid.box (1, 1, 1), 1, 1e-6)
+%!error<solid.Shape.volume: unknown option 'AbsTol'.> ...
+%! volume (solid.box (1, 1, 1), 'AbsTol', 1e-6)
+%!error<solid.Shape.volume: RelTol must be a positive real scalar no larger than 1e-3.> ...
+%! volume (solid.box (1, 1, 1), 'RelTol', 0)
+%!error<solid.Shape.volume: RelTol must be a positive real scalar no larger than 1e-3.> ...
+%! volume (solid.box (1, 1, 1), 'RelTol', 2e-3)
+%!error<solid.Shape.volume: RelTol must be a positive real scalar no larger than 1e-3.> ...
+%! volume (solid.box (1, 1, 1), 'RelTol', [1e-6, 1e-6])
+%!error<solid.Shape.volume: RelTol must be a positive real scalar no larger than 1e-3.> ...
+%! volume (solid.box (1, 1, 1), 'RelTol', {1e-6})
+%!error<solid.Shape.volume: RelTol must be a positive real scalar no larger than 1e-3.> ...
+%! volume (solid.Shape (), 'RelTol', NaN)
+%!error<solid.Shape.centroid: Name/Value arguments must come in pairs.> ...
+%! centroid (solid.box (1, 1, 1), 'RelTol')
+%!error<solid.Shape.centroid: option names must be character vectors.> ...
+%! centroid (solid.box (1, 1, 1), 1, 1e-6)
+%!error<solid.Shape.centroid: unknown option 'AbsTol'.> ...
+%! centroid (solid.box (1, 1, 1), 'AbsTol', 1e-6)
+%!error<solid.Shape.centroid: RelTol must be a positive real scalar no larger than 1e-3.> ...
+%! centroid (solid.box (1, 1, 1), 'RelTol', 1i)
 
 %!test  # the box of a cylinder is tight
 %! assert_equal (bbox (solid.cylinder (4, 12)), [-4, -4, 0, 4, 4, 12], 1e-9);
