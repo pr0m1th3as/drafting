@@ -814,6 +814,85 @@ classdef Viewer < handle
     endfunction
 
     ## -*- texinfo -*-
+    ## @deftypefn  {model.Viewer} {} view (@var{V}, @var{AZ}, @var{EL})
+    ## @deftypefnx {model.Viewer} {[@var{AZ}, @var{EL}] =} view (@var{V})
+    ##
+    ## Set or query the direction the viewer looks from.
+    ##
+    ## @code{view (@var{V}, @var{AZ}, @var{EL})} turns the view to look at the
+    ## shape from azimuth @var{AZ} and elevation @var{EL}, in degrees, and fits
+    ## the shape to the window.  The angles are those Octave's @code{view}
+    ## takes for a plot: @var{AZ} turns anticlockwise about @math{z}, seen from
+    ## above, starting from the negative @math{y} axis, and @var{EL} rises from
+    ## the @math{x}-@math{y} plane, from -90 looking straight up to 90 looking
+    ## straight down.  The @math{z} axis points up the window; looking
+    ## straight down or up, the @math{y} axis does, turned by @var{AZ}.  The
+    ## mouse still turns the view afterwards.
+    ##
+    ## @code{[@var{AZ}, @var{EL}] = view (@var{V})} returns the angles the
+    ## view looks from now, however it got there, @var{AZ} from -180 to 180,
+    ## so that a view found with the mouse can be kept in a script.  A turn
+    ## about the line of sight, which the mouse can give, is not part of them.
+    ##
+    ## The keys of the window give four of these views: @kbd{0} is
+    ## @code{view (@var{V}, 45, 35.26)}, near enough, the isometric view the
+    ## window opens with, @kbd{1} is @code{view (@var{V}, 0, 0)}, @kbd{2} is
+    ## @code{view (@var{V}, 0, 90)} and @kbd{3} is
+    ## @code{view (@var{V}, 90, 0)}.
+    ##
+    ## @example
+    ## @group
+    ## ## A shallow part looks deeper than it is from the isometric view;
+    ## ## look from higher up
+    ## part = solid.box (80, 40, 4);
+    ## V = show (part);
+    ## view (V, 30, 60);
+    ## ## Keep a view found with the mouse
+    ## [az, el] = view (V);
+    ## @end group
+    ## @end example
+    ##
+    ## @seealso{solid.Shape.show}
+    ## @end deftypefn
+    function varargout = view (this, varargin)
+
+      ## Input validation
+      if (! any (numel (varargin) == [0, 2]))
+        error ("model.Viewer.view: invalid number of input arguments.");
+      endif
+      if (numel (varargin) == 2)
+        if (nargout > 0)
+          error ("model.Viewer.view: invalid number of output arguments.");
+        endif
+        [AZ, EL] = varargin{:};
+        if (! isnumeric (AZ) || ! isreal (AZ) || ! isscalar (AZ)
+            || ! isfinite (AZ))
+          error ("model.Viewer.view: AZ must be a finite real scalar.");
+        endif
+        if (! isnumeric (EL) || ! isreal (EL) || ! isscalar (EL)
+            || ! (EL >= -90 && EL <= 90))
+          error (strcat ("model.Viewer.view: EL must be a real scalar in", ...
+                         " the range [-90, 90] degrees."));
+        endif
+      endif
+      if (! isopen (this))
+        error ("model.Viewer.view: the viewer's window is not open.");
+      endif
+
+      if (numel (varargin) == 2)
+        send (this, sprintf ("view %.17g %.17g", double (AZ), double (EL)));
+        receive (this, 10);
+      else
+        send (this, "getview");
+        r = strsplit (receive (this, 10));
+        ## Rounded to 1e-9 degrees, so that angles set read back as given
+        A = round (str2double (r(2:3)) * 1e9) / 1e9 + 0;
+        varargout = {A(1), A(2)};
+      endif
+
+    endfunction
+
+    ## -*- texinfo -*-
     ## @deftypefn {model.Viewer} {} close (@var{V})
     ##
     ## Close the viewer's window.
@@ -1162,6 +1241,108 @@ endfunction
 %! unwind_protect_cleanup
 %!   close (V);
 %! end_unwind_protect
+
+%!testif ; ! isempty (getenv ('DISPLAY'))
+%! ## The window opens on the isometric view
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Shape = solid.box (10, 20, 30);
+%!   [az, el] = view (V);
+%!   assert_equal ([az, el], [45, atand(1 / sqrt (2))], 1e-8);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; ! isempty (getenv ('DISPLAY'))
+%! ## A view set reads back as given
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Shape = solid.box (10, 20, 30);
+%!   view (V, 30, 60);
+%!   [az, el] = view (V);
+%!   assert_equal ([az, el], [30, 60]);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; ! isempty (getenv ('DISPLAY'))
+%! ## Straight down, the azimuth is kept
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Shape = solid.box (10, 20, 30);
+%!   view (V, 30, 90);
+%!   [az, el] = view (V);
+%!   assert_equal ([az, el], [30, 90]);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; ! isempty (getenv ('DISPLAY'))
+%! ## The azimuth reads back from -180 to 180
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Shape = solid.box (10, 20, 30);
+%!   view (V, 200, -20);
+%!   [az, el] = view (V);
+%!   assert_equal ([az, el], [-160, -20]);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; ! isempty (getenv ('DISPLAY'))
+%! ## Seen from above, x runs right and y up the window
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Shape = solid.box (10, 20, 30);
+%!   view (V, 0, 90);
+%!   O = V.__project__ ([0, 0, 30]);
+%!   X = V.__project__ ([10, 0, 30]);
+%!   Y = V.__project__ ([0, 20, 30]);
+%!   assert_equal ([X(1) > O(1), Y(2) < O(2)], [true, true]);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; ! isempty (getenv ('DISPLAY'))
+%! ## Seen from the front, z runs up the window
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Shape = solid.box (10, 20, 30);
+%!   view (V, 0, 0);
+%!   O = V.__project__ ([0, 0, 0]);
+%!   Z = V.__project__ ([0, 0, 30]);
+%!   assert_equal (Z(2) < O(2), true);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; ! isempty (getenv ('DISPLAY'))
+%! ## and looks along y
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Shape = solid.box (10, 20, 30);
+%!   view (V, 0, 0);
+%!   assert_equal (V.__project__ ([5, 20, 10]), V.__project__ ([5, 0, 10]));
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!error<model.Viewer.view: invalid number of input arguments.> ...
+%! view (model.Viewer ('Hidden', true), 30)
+%!error<model.Viewer.view: invalid number of output arguments.> ...
+%! A = view (model.Viewer ('Hidden', true), 30, 60);
+%!error<model.Viewer.view: AZ must be a finite real scalar.> ...
+%! view (model.Viewer ('Hidden', true), Inf, 60)
+%!error<model.Viewer.view: AZ must be a finite real scalar.> ...
+%! view (model.Viewer ('Hidden', true), [30, 40], 60)
+%!error<model.Viewer.view: EL must be a real scalar in the range \[-90, 90\] degrees.> ...
+%! view (model.Viewer ('Hidden', true), 30, 91)
+%!error<model.Viewer.view: EL must be a real scalar in the range \[-90, 90\] degrees.> ...
+%! view (model.Viewer ('Hidden', true), 30, NaN)
+%!error<model.Viewer.view: EL must be a real scalar in the range \[-90, 90\] degrees.> ...
+%! view (model.Viewer ('Hidden', true), 30, 'a')
+%!error<model.Viewer.view: the viewer's window is not open.> ...
+%! view (model.Viewer ('Hidden', true))
 
 %!testif ; ! isempty (getenv ('DISPLAY'))
 %! ## A pixel picks the face and the edge the queries name

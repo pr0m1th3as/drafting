@@ -77,6 +77,10 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 //   drag PX PY QX QY
 //                  the left button pressed at one pixel and released at the
 //                  other, which turns the view; replies "dragged"
+//   view AZ EL     looks from azimuth AZ and elevation EL in degrees, as
+//                  Octave's view takes them, and fits the shape to the
+//                  window; replies "viewed"
+//   getview        replies "view AZ EL", the angles the view looks from
 //   dump FILE      writes the view to an image file (PPM); replies "dumped"
 //   close          closes the window
 //
@@ -619,6 +623,22 @@ public:
       FlushViewEvents (m_context, m_view, Standard_True);
       reply ("dragged");
     }
+    else if (cmd == "view")
+    {
+      double az, el;
+      in >> az >> el;
+      setview (az, el);
+      reply ("viewed");
+    }
+    else if (cmd == "getview")
+    {
+      double az, el;
+      getview (az, el);
+      ostringstream o;
+      o.precision (17);
+      o << "view " << az << " " << el;
+      reply (o.str ());
+    }
     else if (cmd == "dump")
     {
       string file;
@@ -1110,6 +1130,56 @@ private:
     m_view->SetProj (o);
     m_view->FitAll (0.05, Standard_False);
     m_hascentre = false;
+  }
+
+  // Look from azimuth AZ and elevation EL in degrees, as Octave's view takes
+  // them: AZ from the negative y axis, anticlockwise seen from above, and EL
+  // up from the x-y plane.  Up is z; looking straight down or up it is the y
+  // axis turned by AZ, as in Octave.
+  void setview (double az, double el)
+  {
+    const double a = az * M_PI / 180;
+    const double e = el * M_PI / 180;
+    const gp_Dir eye (std::sin (a) * std::cos (e), -std::cos (a) * std::cos (e),
+                      std::sin (e));
+    gp_Dir up (0, 0, 1);
+    if (std::abs (std::cos (e)) < 1e-9)
+    {
+      up = gp_Dir (-std::sin (a), std::cos (a), 0);
+      if (el < 0)
+      {
+        up.Reverse ();
+      }
+    }
+    Handle (Graphic3d_Camera) cam = m_view->Camera ();
+    const gp_Pnt c = cam->Center ();
+    cam->SetEyeAndCenter (c.Translated (gp_Vec (eye) * cam->Distance ()), c);
+    cam->SetUp (up);
+    cam->OrthogonalizeUp ();
+    m_view->FitAll (0.05, Standard_False);
+    m_hascentre = false;
+  }
+
+  // The azimuth and elevation the view looks from, in degrees, as setview
+  // takes them.  Looking straight down or up the azimuth is read from the
+  // up direction; any turn about the line of sight is not part of either.
+  void getview (double& az, double& el)
+  {
+    Handle (Graphic3d_Camera) cam = m_view->Camera ();
+    const gp_Dir d = cam->Direction ().Reversed ();
+    el = std::asin (std::max (-1.0, std::min (1.0, d.Z ())));
+    if (std::hypot (d.X (), d.Y ()) < 1e-9)
+    {
+      const gp_Dir u = cam->Up ();
+      az = d.Z () > 0 ? std::atan2 (-u.X (), u.Y ())
+                      : std::atan2 (u.X (), -u.Y ());
+    }
+    else
+    {
+      az = std::atan2 (d.X (), -d.Y ());
+    }
+    az *= 180 / M_PI;
+    el *= 180 / M_PI;
   }
 
   // The point of the shape at the pixel PX, PY made the centre the view

@@ -63,7 +63,14 @@ f = circshift (e, -1);
 F = [F; e, f, f + m * n; e, f + m * n, e + m * n];
 facets = solid.polyhedron (polymesh.Mesh (V, F));
 numfaces (facets)
-show (facets);
+
+## A viewer opens on the isometric view, from 35 degrees above the ground,
+## and from that low a part this shallow looks deeper than it is. `show`
+## returns the viewer, and `view` turns it to look from higher up, taking
+## the azimuth and the elevation in degrees as `view` does for a plot.
+
+win = show (facets);
+view (win, 30, 60);
 
 ## Every triangle is a face of its own, flat, and the ripple is only as round
 ## as the grid is fine.
@@ -79,7 +86,8 @@ show (facets);
 
 S = solid.surface (x, y, Z, [0.5, 0.5]);
 numfaces (S)
-show (S);
+win = show (S);
+view (win, 30, 60);
 
 ## Six faces: the ripple on top, the ripple below and the four sides. A cut
 ## through the middle shows the difference plainly: the facets give an
@@ -115,7 +123,8 @@ end_try_catch
 ## A thinner skin on that side fits:
 
 T = solid.surface (x, y, Z, 0.6);
-show (T);
+win = show (T);
+view (win, 30, 60);
 
 ## A grid that comes to a point is rounded off there by the fit, tightly.
 ## The sine of the distance rises from the centre like a cone, so the ripple
