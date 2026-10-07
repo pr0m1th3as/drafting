@@ -85,6 +85,10 @@ endfunction
 %! R = section (S, geom.UCS ([0, 0, 1], [0, 0, 3]));
 %! assert_equal (__area__ (R{1}.Outline), 128 * pi, -1e-8);
 
+%!test  # its volume is 4/3 pi a b c
+%! S = solid.ellipsoid (20, 10, 5);
+%! assert_equal (volume (S), 4 / 3 * pi * 20 * 10 * 5, -1e-12);
+
 %!test  # laid in a UCS, the semi-axes on its axes
 %! U = geom.UCS ([1, 0, 0], [5, 0, 0]);
 %! S = solid.ellipsoid (4, 3, 2, U);
