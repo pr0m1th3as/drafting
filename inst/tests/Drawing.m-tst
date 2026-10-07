@@ -1762,7 +1762,7 @@
 %! assert_equal (any (hypot (M(:,1) - 30, M(:,2) - 20) < 10 - 1e-9), false);
 %!test  # a hatch with a hole draws both loops
 %! R = geom.Region ([0, 0; 60, 0; 60, 40; 0, 40], {[20, 20, 1; 40, 20, 1]});
-%! E = entities (draw.Drawing ().hatch (R), 'hatch', 'boundary');
+%! [E, ~] = entities (draw.Drawing ().hatch (R), 'hatch', 'boundary');
 %! assert_equal ({E.type}, {'POLYLINE', 'POLYLINE'});
 %! assert_equal ([E.closed], [true, true]);
 %!test  # a spline lowers to one polyline from its start to its end
