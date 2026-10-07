@@ -2948,6 +2948,10 @@ endfunction
 %! assert_equal (numel (faces (B)), 6);
 %! assert_equal (numel (faces (B, 'Type', 'plane')), 6);
 %! assert_equal (numel (faces (B, 'Normal', [1, 1, 0])), 0);
+%!test  # option names ignore case
+%! B = solid.box (10, 20, 30);
+%! assert_equal (faces (B, 'normal', [0, 0, 1]), ...
+%!               faces (B, 'Normal', [0, 0, 1]));
 
 %!test  # faces by type, axis and box
 %! C = solid.cylinder (4, 12);
@@ -3014,6 +3018,12 @@ endfunction
 %! ## The chamfer face meets the top at 30 degrees
 %! assert_equal (numel (faces (S, 'Normal', [0, -sind(30), cosd(30)])), 1);
 %! assert_equal (isvalid (S), true);
+%!test  # option names ignore case
+%! B = solid.box (10, 20, 30);
+%! F = faces (B, 'Normal', [0, 0, 1]);
+%! E = edges (B, 'Face', F, 'Direction', [1, 0, 0]);
+%! S = chamfer (B, E, 2, F, 'angle', 30);
+%! assert_equal (volume (S), 6000 - 2 * (2 * 2 * tand (30) / 2) * 10, 1e-9);
 
 %!test  # an edge not on the face is refused
 %! B = solid.box (10, 20, 30);
@@ -3047,6 +3057,9 @@ endfunction
 %! S = shell (B, [], 1, 'Outward', true);
 %! assert_equal (volume (S), 12 * 22 * 32 - 6000, 1e-9);
 %! assert_equal (isvalid (S), true);
+%!test  # option names ignore case
+%! S = shell (solid.box (10, 20, 30), [], 1, 'outward', true);
+%! assert_equal (volume (S), 12 * 22 * 32 - 6000, 1e-9);
 
 %!test  # a floor of its own thickness
 %! B = solid.box (10, 20, 30);
@@ -3080,6 +3093,9 @@ endfunction
 %! S = hole (B, [20, 20, 12], 8, 5, 'Tip', 118);
 %! assert_equal (volume (S), 38400 - 16 * pi * (5 + 4 / tand (59) / 3), 1e-9);
 %! assert_equal (isvalid (S), true);
+%!test  # option names ignore case
+%! S = hole (solid.box (80, 40, 12), [20, 20, 12], 8, 5, 'tip', 118);
+%! assert_equal (volume (S), 38400 - 16 * pi * (5 + 4 / tand (59) / 3), 1e-9);
 
 %!test  # into a sloping face, clean all round
 %! R = geom.Region ([0, 0; 80, 0; 80, 20; 0, 40]);
@@ -3141,6 +3157,14 @@ endfunction
 %! R = geom.Region ([30, 15; 50, 15; 50, 25; 30, 25]);
 %! R.UCS = geom.UCS ([0, 0, 1], [0, 0, 12]);
 %! S = pocket (solid.box (80, 40, 12), R, 4, 'Taper', 10);
+%! d = 4 * tand (10);
+%! A2 = (20 - 2 * d) * (10 - 2 * d);
+%! Am = (20 - d) * (10 - d);
+%! assert_equal (volume (S), 38400 - 4 / 6 * (200 + A2 + 4 * Am), 1e-9);
+%!test  # option names ignore case
+%! R = geom.Region ([30, 15; 50, 15; 50, 25; 30, 25]);
+%! R.UCS = geom.UCS ([0, 0, 1], [0, 0, 12]);
+%! S = pocket (solid.box (80, 40, 12), R, 4, 'taper', 10);
 %! d = 4 * tand (10);
 %! A2 = (20 - 2 * d) * (10 - 2 * d);
 %! Am = (20 - d) * (10 - d);
@@ -3968,6 +3992,10 @@ endfunction
 %! assert_equal (bbox (Z), [-12, -1, -1, 12, 1, 1], 1e-12);
 %! G = polararray (translate (solid.box (10, 2, 2), [15, -1, 0]), 2, 90, ...
 %!                 [0, 0, 1], [0, 0, 0], 'Rotate', false);
+%! assert_equal (bbox (G), [-5, -1, 0, 25, 21, 2], 1e-12);
+%!test  # option names ignore case
+%! G = polararray (translate (solid.box (10, 2, 2), [15, -1, 0]), 2, 90, ...
+%!                 [0, 0, 1], [0, 0, 0], 'rotate', false);
 %! assert_equal (bbox (G), [-5, -1, 0, 25, 21, 2], 1e-12);
 
 %!error<solid.Shape.resize: invalid number of input arguments.> ...
