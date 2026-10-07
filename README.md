@@ -55,7 +55,7 @@ back is set out in the guide's
 
 ## Tutorials
 
-The [guide](https://pr0m1th3as.github.io/drafting/guide/) has thirteen tutorials
+The [guide](https://pr0m1th3as.github.io/drafting/guide/) has fifteen tutorials
 that build parts and drawings step by step. Every output and every picture on
 them is made by the code above it. New to Octave? Start with
 [A brief Octave primer](https://pr0m1th3as.github.io/drafting/guide/primer.html),
@@ -87,6 +87,10 @@ the Octave the tutorials use.
     OpenSCAD's words in the package's, and a classic model rebuilt.
 13. [Surfaces through a grid](https://pr0m1th3as.github.io/drafting/guide/13_surfaces.html):
     a ripple from `meshgrid`, as facets and as an exact surface made a solid.
+14. [Parts as functions](https://pr0m1th3as.github.io/drafting/guide/14_parts_as_functions.html):
+    a bracket in a file of its own, made in any size.
+15. [Testing parts](https://pr0m1th3as.github.io/drafting/guide/15_testing_parts.html):
+    `%!test` blocks that check a part's volume and fit, run with `test`.
 
 The scripts the pages are built from are in [`docs/guide/src`](docs/guide/src).
 

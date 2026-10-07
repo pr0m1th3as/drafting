@@ -71,6 +71,8 @@
               <li><a href="11_assemblies.html">Assemblies</a></li>
               <li><a href="12_from_openscad.html">For OpenSCAD users</a></li>
               <li><a href="13_surfaces.html" class="active">Surfaces through a grid</a></li>
+              <li><a href="14_parts_as_functions.html">Parts as functions</a></li>
+              <li><a href="15_testing_parts.html">Testing parts</a></li>
             </ul>
 <!-- /guide-nav -->
           </nav>
@@ -135,11 +137,7 @@ ans =
 <h2>Which side</h2>
 <p>The normal of the surface is the step from one column of the grid to the next crossed with the step from one row to the next. For a grid from <code>meshgrid</code> that is <i>x</i> then <i>y</i>, so the normal points up. A positive thickness grows along the normal, the surface the bottom of the solid, a negative one against it, and two, <code>[H1, H2]</code>, lie along the normal and against it.</p>
 <p>A surface cannot be thickened by more than the radius it curves with, or it folds over itself. The crests and troughs of this ripple curve with a radius of 0.63 mm, so a centred skin of 1, reaching 0.5 each way, fits, but the whole millimetre on one side does not, and that is refused:</p>
-<pre class="code-in"><code>try
-  solid.surface (x, y, Z, 1);
-catch err
-  disp (err.message)
-end_try_catch</code></pre>
+<pre class="code-in"><code>solid.surface (x, y, Z, 1);</code></pre>
 <pre class="code-out"><code>solid.surface: the surface curves more tightly than the thickness along its normal allows; its tightest radius on that side is 0.632.</code></pre>
 <p>A thinner skin on that side fits:</p>
 <pre class="code-in"><code>T = solid.surface (x, y, Z, 0.6);
@@ -147,11 +145,7 @@ win = show (T);
 view (win, 30, 60);</code></pre>
 <figure class="shot"><img src="img/13_surfaces-3.png" alt="Surfaces through a grid, picture 3"></figure>
 <p>A grid that comes to a point is rounded off there by the fit, tightly. The sine of the distance rises from the centre like a cone, so the ripple made with <code>sind</code> instead of <code>cosd</code> takes no skin of 1 even centred:</p>
-<pre class="code-in"><code>try
-  solid.surface (x, y, sind (72 * hypot (x, y)), [0.5, 0.5]);
-catch err
-  disp (err.message)
-end_try_catch</code></pre>
+<pre class="code-in"><code>solid.surface (x, y, sind (72 * hypot (x, y)), [0.5, 0.5]);</code></pre>
 <pre class="code-out"><code>solid.surface: the surface curves more tightly than the thickness along its normal allows; its tightest radius on that side is 0.115.</code></pre>
 <h2>To the printer</h2>
 <p>The solid is written like any other: STEP keeps the exact surface for another CAD program, and STL is meshed from it for a slicer, as finely as the tolerance asks.</p>
@@ -159,6 +153,7 @@ end_try_catch</code></pre>
 write (S, 'ripple.stl');</code></pre>
 <nav class="d-flex justify-content-between my-5">
 <a href="12_from_openscad.html">&larr; For OpenSCAD users</a>
+<a href="14_parts_as_functions.html">Parts as functions &rarr;</a>
 </nav>
 
         </main>

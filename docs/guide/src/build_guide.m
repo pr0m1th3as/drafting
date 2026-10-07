@@ -45,7 +45,12 @@
 ## one block, run in one workspace for the whole tutorial.  A code line ending
 ## in '#: not run' is shown without being run, for what needs a person at the
 ## mouse, and one ending in '#: hidden' is run without being shown, for the
-## clicks the build makes in its place.
+## clicks the build makes in its place.  A statement whose last line ends in
+## '#: error' must raise an error, and its message is shown as the output;
+## the build stops if it raises none.  The lines between '#: file NAME' and
+## '#: end' are a file: shown under its name, as they stand, '##' lines
+## included, and written to NAME in the tutorial's folder, not run, so that
+## the code after it can call the function the file holds.
 ##
 ## primer.m, A brief Octave primer, is written the same way and run the same
 ## way, but it is no tutorial: its page stands in a section of its own, before
@@ -178,9 +183,25 @@ function T = parse (file)
   T.base = base;
   T.title = strtrim (L{first}(6:end));
 
-  cells = struct ('type', {}, 'lines', {}, 'line', {});
+  cells = struct ('type', {}, 'lines', {}, 'line', {}, 'name', {});
+  infile = false;
   for k = first+1:numel (L)
     s = L{k};
+    if (infile)
+      if (strcmp (strtrim (s), '#: end'))
+        infile = false;
+      else
+        cells(end).lines{end+1} = s;
+      endif
+      continue;
+    endif
+    t = regexp (s, '^#: file\s+(\S+)\s*$', 'tokens', 'once');
+    if (! isempty (t))
+      cells(end+1) = struct ('type', 'file', 'lines', {{}}, 'line', k, ...
+                             'name', t{1});
+      infile = true;
+      continue;
+    endif
     if (! isempty (regexp (s, '^##( |$)', 'once')))
       type = 'prose';
       s = regexprep (s, '^## ?', '');
@@ -190,10 +211,14 @@ function T = parse (file)
       type = 'code';
     endif
     if (isempty (cells) || ! strcmp (cells(end).type, type))
-      cells(end+1) = struct ('type', type, 'lines', {{}}, 'line', k);
+      cells(end+1) = struct ('type', type, 'lines', {{}}, 'line', k, ...
+                             'name', '');
     endif
     cells(end).lines{end+1} = s;
   endfor
+  if (infile)
+    error ("build_guide: %s has a '#: file' with no '#: end'.", file);
+  endif
 
   ## Blank lines around a block are not part of it
   keep = true (1, numel (cells));
@@ -230,22 +255,73 @@ function __cells__ = run_tutorial (__cells__, __ctx__)
   for __k__ = 1:numel (__cells__)
     __cells__(__k__).out = '';
     __cells__(__k__).img = {};
+    if (strcmp (__cells__(__k__).type, 'file'))
+      write_text (__cells__(__k__).name, ...
+                  [strjoin(__cells__(__k__).lines, "\n"), "\n"]);
+      [~, __f__] = fileparts (__cells__(__k__).name);
+      clear ('-f', __f__);
+      rehash ();
+      continue;
+    endif
     if (! strcmp (__cells__(__k__).type, 'code'))
       continue;
     endif
     __run__ = __cells__(__k__).lines;
     __run__ = __run__(cellfun (@isempty, regexp (__run__, '#: not run\s*$')));
-    __run__ = strjoin (__run__, "\n");
-    __views__ = arm_viewers (__run__);
-    try
-      __cells__(__k__).out = evalc (__run__);
-    catch __err__
-      disarm_viewers (__views__);
-      error ("build_guide: %s, the block at line %d: %s", __ctx__.base, ...
-             __cells__(__k__).line, __err__.message);
-    end_try_catch
+    __views__ = arm_viewers (strjoin (__run__, "\n"));
+    __segs__ = error_runs (__run__);
+    __out__ = '';
+    for __j__ = 1:numel (__segs__)
+      __msg__ = '';
+      try
+        __out__ = [__out__, evalc(__segs__(__j__).code)];
+      catch __err__
+        __msg__ = __err__.message;
+      end_try_catch
+      if (__segs__(__j__).error && isempty (__msg__))
+        __msg__ = "a statement marked '#: error' raised none";
+      elseif (__segs__(__j__).error)
+        __out__ = [__out__, __msg__, "\n"];
+        continue;
+      endif
+      if (! isempty (__msg__))
+        disarm_viewers (__views__);
+        error ("build_guide: %s, the block at line %d: %s", __ctx__.base, ...
+               __cells__(__k__).line, __msg__);
+      endif
+    endfor
+    __cells__(__k__).out = __out__;
     [__cells__(__k__).img, __n__] = capture (__ctx__, __views__, __n__);
   endfor
+
+endfunction
+
+## The lines of a block cut into runs to evaluate in turn: the statements
+## marked '#: error', each with the lines continued into it, and the code
+## between them
+function S = error_runs (L)
+
+  S = struct ('code', {}, 'error', {});
+  cur = {};
+  for k = 1:numel (L)
+    if (isempty (regexp (L{k}, '#: error\s*$', 'once')))
+      cur{end+1} = L{k};
+      continue;
+    endif
+    j = numel (cur);
+    while (j > 0 && ! isempty (regexp (cur{j}, '\.\.\.\s*$', 'once')))
+      j--;
+    endwhile
+    if (j > 0)
+      S(end+1) = struct ('code', strjoin (cur(1:j), "\n"), 'error', false);
+    endif
+    S(end+1) = struct ('code', strjoin ([cur(j+1:end), L(k)], "\n"), ...
+                       'error', true);
+    cur = {};
+  endfor
+  if (! isempty (cur))
+    S(end+1) = struct ('code', strjoin (cur, "\n"), 'error', false);
+  endif
 
 endfunction
 
@@ -349,8 +425,15 @@ function html = cells_html (t, names)
       html = [html, markdown(c.lines, names)];
       continue;
     endif
+    if (strcmp (c.type, 'file'))
+      html = [html, sprintf(["<figure class=\"code-file\"><figcaption>", ...
+                             "%s</figcaption>\n<pre class=\"code-in\">", ...
+                             "<code>%s</code></pre></figure>\n"], ...
+                            esc (c.name), esc (strjoin (c.lines, "\n")))];
+      continue;
+    endif
     shown = c.lines(cellfun (@isempty, regexp (c.lines, '#: hidden\s*$')));
-    shown = regexprep (shown, '\s*#: not run\s*$', '');
+    shown = regexprep (shown, '\s*#: (not run|error)\s*$', '');
     if (! isempty (shown))
       code = esc (strjoin (shown, "\n"));
       html = [html, "<pre class=\"code-in\"><code>", code, "</code></pre>\n"];

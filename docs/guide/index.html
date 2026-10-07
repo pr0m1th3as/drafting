@@ -71,6 +71,8 @@
               <li><a href="11_assemblies.html">Assemblies</a></li>
               <li><a href="12_from_openscad.html">For OpenSCAD users</a></li>
               <li><a href="13_surfaces.html">Surfaces through a grid</a></li>
+              <li><a href="14_parts_as_functions.html">Parts as functions</a></li>
+              <li><a href="15_testing_parts.html">Testing parts</a></li>
             </ul>
 <!-- /guide-nav -->
           </nav>
@@ -102,6 +104,8 @@
 <li><a href="11_assemblies.html">Assemblies</a>: A product is named parts placed together, a part defined once however often it is used. This tutorial builds a fixture, stacks it, adds a part that exists only as a mesh, and saves the whole for a CAD program and a slicer.</li>
 <li><a href="12_from_openscad.html">For OpenSCAD users</a>: OpenSCAD's modelling words, nearly all of them, have a counterpart here, in Octave and with exact geometry. This page maps one to the other and rebuilds a classic OpenSCAD model.</li>
 <li><a href="13_surfaces.html">Surfaces through a grid</a>: A shape written as rows and columns of points, as <code>meshgrid</code> makes them, is how many OpenSCAD users build what has no primitive: a ripple, a landscape, a lid that swells. This tutorial makes one such surface twice, first as facets with <code>solid.polyhedron</code>, then as an exact surface with <code>solid.surface</code>, and gives it a thickness so it can be printed.</li>
+<li><a href="14_parts_as_functions.html">Parts as functions</a>: A part wanted again in other sizes is, in OpenSCAD, a <code>module</code> with parameters. In Octave it is a function: a file of its own, named after the part, that takes the dimensions and returns the solid. Any script then calls it like any other function, and the next tutorial gives it tests.</li>
+<li><a href="15_testing_parts.html">Testing parts</a>: A part written as code can be checked by code. Octave keeps the tests of a function in the function's own file, in blocks after its code, and <code>test</code> runs them. This package is tested that way, and a part is too: its volume is the one intended, it fits the parts around it, and a size that cannot be made is refused.</li>
 </ol>
 
         </main>

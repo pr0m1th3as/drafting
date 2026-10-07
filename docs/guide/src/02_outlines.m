@@ -126,19 +126,12 @@ plot (draw.Drawing ().region (R));
 ## A region is checked when it is made, and one that cannot be a solid's face
 ## is refused with the reason. A hole that reaches past the outline:
 
-try
-  geom.Region ([0, 0; 60, 0; 60, 40; 0, 40], {[50, 20, 1; 70, 20, 1]});
-catch err
-  disp (err.message);
-end_try_catch
+geom.Region ([0, 0; 60, 0; 60, 40; 0, 40], ...
+             {[50, 20, 1; 70, 20, 1]});  #: error
 
 ## and an outline that crosses itself:
 
-try
-  geom.Region ([0, 0; 40, 30; 40, 0; 0, 30]);
-catch err
-  disp (err.message);
-end_try_catch
+geom.Region ([0, 0; 40, 30; 40, 0; 0, 30]);  #: error
 
 ## The direction an outline is drawn in does not matter. A region keeps its
 ## outline anticlockwise and its holes clockwise, whichever way they were

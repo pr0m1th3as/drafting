@@ -63,6 +63,21 @@ pre.code-in {
   border: 1px solid var(--rule);
 }
 
+figure.code-file {
+  margin: 1rem 0;
+}
+
+figure.code-file figcaption {
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 0.85em;
+  color: #495057;
+  margin-bottom: 0.25rem;
+}
+
+figure.code-file pre {
+  margin-bottom: 0;
+}
+
 pre.code-out {
   background: var(--out-bg);
   border: 1px solid var(--rule);

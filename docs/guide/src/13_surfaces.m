@@ -114,11 +114,7 @@ cut{1}
 ## radius of 0.63 mm, so a centred skin of 1, reaching 0.5 each way, fits, but
 ## the whole millimetre on one side does not, and that is refused:
 
-try
-  solid.surface (x, y, Z, 1);
-catch err
-  disp (err.message)
-end_try_catch
+solid.surface (x, y, Z, 1);  #: error
 
 ## A thinner skin on that side fits:
 
@@ -130,11 +126,7 @@ view (win, 30, 60);
 ## The sine of the distance rises from the centre like a cone, so the ripple
 ## made with `sind` instead of `cosd` takes no skin of 1 even centred:
 
-try
-  solid.surface (x, y, sind (72 * hypot (x, y)), [0.5, 0.5]);
-catch err
-  disp (err.message)
-end_try_catch
+solid.surface (x, y, sind (72 * hypot (x, y)), [0.5, 0.5]);  #: error
 
 ## ## To the printer
 ##

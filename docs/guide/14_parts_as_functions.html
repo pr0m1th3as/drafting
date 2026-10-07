@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Parts as functions - drafting guide</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" integrity="sha512-1ycn6IcaQQ40/MKBW2W4Rhis/DbILU74C1vSrLJxCq57o941Ym01SwNsOMqvEBFlcgUa6xLiPY/NS5R+E6ztJQ==" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/css/bootstrap.min.css" integrity="sha384-KyZXEAg3QhqLMpG8r+8fhAXLRk2vvoC2f3B09zVXn8CA5QIVfZOJ3BCsw2P0p/We" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-U1DAWAznBHeqEIlVSCgzq+c9gqGAJn5c/t99JyeKa9xxaYpSvHU5awsuZVVFIhvj" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="guide.css">
+  </head>
+  <body>
+    <div class="bg-dark">
+      <div class="container-xl">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+          <div class="container-fluid">
+            <a class="navbar-brand" href="index.html">
+              <img src="../assets/drafting.png" alt="drafting" class="d-inline-block align-top" width="25" height="25">
+              drafting guide
+            </a>
+            <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+              <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+              <ul class="navbar-nav">
+                <li class="nav-item">
+                  <a class="nav-link" href="../index.html">
+                    <i class="fas fa-book"></i>
+                    Function reference
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="https://github.com/pr0m1th3as/drafting">
+                    <i class="fab fa-github"></i>
+                    Source
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </nav>
+      </div>
+    </div>
+    <div class="container-xl my-4">
+      <div class="row">
+        <div class="col-md-3 col-lg-2 mb-4">
+          <nav class="guide-nav">
+<!-- guide-nav -->
+            <h6>Guide</h6>
+            <ul>
+              <li><a href="index.html">Overview</a></li>
+              <li><a href="layout.html">Package layout</a></li>
+              <li><a href="dxf.html">DXF and the classes</a></li>
+            </ul>
+            <h6>Octave</h6>
+            <ul>
+              <li><a href="primer.html">A brief Octave primer</a></li>
+            </ul>
+            <h6>Tutorials</h6>
+            <ul>
+              <li><a href="01_first_part.html">A first part</a></li>
+              <li><a href="02_outlines.html">Outlines: polylines, splines, paths and regions</a></li>
+              <li><a href="03_regions.html">Working with regions</a></li>
+              <li><a href="04_coordinate_systems.html">Coordinate systems</a></li>
+              <li><a href="05_solids_from_regions.html">Solids from regions</a></li>
+              <li><a href="06_primitives_and_booleans.html">Primitives, booleans and transforms</a></li>
+              <li><a href="07_features.html">Features: holes, pockets, fillets, chamfers and shells</a></li>
+              <li><a href="08_sections_and_projections.html">Sections and projections</a></li>
+              <li><a href="09_drawings.html">Technical drawings</a></li>
+              <li><a href="10_meshes.html">Meshes</a></li>
+              <li><a href="11_assemblies.html">Assemblies</a></li>
+              <li><a href="12_from_openscad.html">For OpenSCAD users</a></li>
+              <li><a href="13_surfaces.html">Surfaces through a grid</a></li>
+              <li><a href="14_parts_as_functions.html" class="active">Parts as functions</a></li>
+              <li><a href="15_testing_parts.html">Testing parts</a></li>
+            </ul>
+<!-- /guide-nav -->
+          </nav>
+        </div>
+        <main class="col-md-9 col-lg-10">
+<h1>Parts as functions</h1>
+<p>A part wanted again in other sizes is, in OpenSCAD, a <code>module</code> with parameters. In Octave it is a function: a file of its own, named after the part, that takes the dimensions and returns the solid. Any script then calls it like any other function, and the next tutorial gives it tests.</p>
+<h2>A bracket in a file</h2>
+<p>An angle bracket: a base plate with clearance holes for M6 screws and an upright wall, its width and its number of holes chosen by the caller. Saved as <code>bracket.m</code> in the current folder, or in any folder on Octave's path, it is the function <code>bracket</code>.</p>
+<figure class="code-file"><figcaption>bracket.m</figcaption>
+<pre class="code-in"><code>function B = bracket (W, N = 2)
+  ## B = bracket (W, N): an angle bracket W millimetres wide, its base and
+  ## wall 6 thick and 40 deep, with N holes for M6 screws through the base,
+  ## spaced evenly along it, 2 unless N is given.
+  if (! (isscalar (N) &amp;&amp; N == fix (N) &amp;&amp; N &gt;= 1))
+    error ("bracket: N must be a positive whole number.");
+  endif
+  if (W / N &lt; 12)
+    error ("bracket: %d holes do not fit in a width of %g mm.", N, W);
+  endif
+  base = solid.box (W, 40, 6);
+  wall = solid.box (W, 6, 40);
+  B = union (base, wall);
+  x = W * ((1:N)' - 0.5) / N;
+  P = [x, 23 * ones(N, 1), 6 * ones(N, 1)];
+  B = hole (B, P, 6.6, Inf);
+endfunction</code></pre></figure>
+<p>The first line names the output, the function and its arguments, and <code>N = 2</code> makes the number of holes optional. The comments under it are its help, which <code>help bracket</code> prints. The two checks refuse a size that makes no sense before any geometry is built. Everything else is the same code a script would hold, with <code>W</code> and <code>N</code> where the numbers were.</p>
+<h2>Calling it</h2>
+<p>Each call builds a new bracket from its arguments. With the default, two holes, seen from the open side of the bracket with <code>view</code>, which the surfaces tutorial introduced:</p>
+<pre class="code-in"><code>small = bracket (60);
+win = show (small);
+view (win, 150, 35);</code></pre>
+<figure class="shot"><img src="img/14_parts_as_functions-1.png" alt="Parts as functions, picture 1"></figure>
+<p>Twice as wide, with four:</p>
+<pre class="code-in"><code>large = bracket (120, 4);
+win = show (large);
+view (win, 150, 35);</code></pre>
+<figure class="shot"><img src="img/14_parts_as_functions-2.png" alt="Parts as functions, picture 2"></figure>
+<p>A size the function refuses stops with its own message, which names what is wrong:</p>
+<pre class="code-in"><code>bracket (60, 6);</code></pre>
+<pre class="code-out"><code>bracket: 6 holes do not fit in a width of 60 mm.</code></pre>
+<h2>Building on it</h2>
+<p>The bracket is now a building block like <a href="../solid.box.html"><code>solid.box</code></a>. A board 18 thick resting on two of them, screwed through their bases from below, the walls to go against a wall of the room:</p>
+<pre class="code-in"><code>left = bracket (40, 1);
+right = translate (left, [160, 0, 0]);
+board = translate (solid.box (200, 34, 18), [0, 6, 6]);
+shelf = union (left, right, board);
+win = show (shelf);
+view (win, 150, 35);</code></pre>
+<figure class="shot"><img src="img/14_parts_as_functions-3.png" alt="Parts as functions, picture 3"></figure>
+<h2>Where to keep it</h2>
+<p>Octave finds a function when its file is in the current folder or in a folder on its path. Keep your parts in a folder of their own and add it once, in a script or in the file <code>~/.octaverc</code>, which Octave runs at start:</p>
+<pre class="code-in"><code>addpath ('~/parts');</code></pre>
+<p>Then <code>bracket</code> works from anywhere, and a part made of other parts calls them as <code>shelf</code> was made of brackets above.</p>
+<nav class="d-flex justify-content-between my-5">
+<a href="13_surfaces.html">&larr; Surfaces through a grid</a>
+<a href="15_testing_parts.html">Testing parts &rarr;</a>
+</nav>
+
+        </main>
+      </div>
+    </div>
+  </body>
+</html>
