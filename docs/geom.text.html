@@ -357,6 +357,7 @@
 					<li><a href="solid.ellipsoid.html" class="text-decoration-none font-monospace"><small>solid.ellipsoid</small></a></li>
 					<li><a href="solid.torus.html" class="text-decoration-none font-monospace"><small>solid.torus</small></a></li>
 					<li><a href="solid.polyhedron.html" class="text-decoration-none font-monospace"><small>solid.polyhedron</small></a></li>
+					<li><a href="solid.surface.html" class="text-decoration-none font-monospace"><small>solid.surface</small></a></li>
 					<li><a href="solid.extrude.html" class="text-decoration-none font-monospace"><small>solid.extrude</small></a></li>
 					<li><a href="solid.revolve.html" class="text-decoration-none font-monospace"><small>solid.revolve</small></a></li>
 					<li><a href="solid.loft.html" class="text-decoration-none font-monospace"><small>solid.loft</small></a></li>
@@ -432,6 +433,14 @@
 <dd> Which part lies on the origin upwards: <code>'baseline'</code>, the default,
  the line the letters stand on, or <code>'bottom'</code>, <code>'center'</code> or
  <code>'top'</code> of the box round the ink.</dd>
+<dt> <code>'Box'</code></dt>
+<dd> The largest size <code>[<var>W</var>, <var>H</var>]</code> in millimetres the ink may
+ take, descenders included.  The text is scaled evenly until it touches a
+ side; a size of 0 leaves that direction free, so <code>[40, 0]</code> makes the
+ text 40 wide.  With <code>'Height'</code> given as well, <code>'Box'</code> only
+ shrinks the text, and only when it would not fit at that height.  It sets
+ the size alone: <code>'HAlign'</code>, <code>'VAlign'</code> and <code>'UCS'</code>
+ still place the text.</dd>
 <dt> <code>'UCS'</code></dt>
 <dd> The <code>geom.UCS</code> the text is laid in, the world <em class="math">xy</em> plane by
  default.</dd>
@@ -454,7 +463,7 @@
   <a href="geom.Region.html#geom_Region_offset">geom.Region.offset</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/be1130e/inst/+geom/text.m">geom.text</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/fff062e/inst/+geom/text.m">geom.text</a>
 </p>
 </div>
 

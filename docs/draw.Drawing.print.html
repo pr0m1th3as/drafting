@@ -367,6 +367,12 @@
  the sheet size actually used, in millimetres, and the scale denominator,
  which is worth having when the scale was fitted rather than given.
 </p>
+<p> Printing needs the <code>qt</code> or <code>gnuplot</code> graphics toolkit.
+ <code>fltk</code>, which <code>octave-cli</code> uses on a desktop, cannot print
+ a figure that is not shown, so there <code>print</code> is an error; run
+ Octave as <code>octave --no-gui</code>, or call
+ <code>graphics_toolkit ('gnuplot')</code> first.
+</p>
 <a name="The-scale-is-chosen-from-the-preferred-series"></a>
 <h3 class="subheading">The scale is chosen from the preferred series</h3>
 
@@ -402,7 +408,7 @@
   <a href="draw.Drawing.write.html">draw.Drawing.write</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/be1130e/inst/+draw/Drawing.m#L2467">draw.Drawing</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/fff062e/inst/+draw/Drawing.m#L2498">draw.Drawing</a>
 </p>
 </div>
         <div class="card rounded my-4">
@@ -459,19 +465,7 @@ scale = 1</pre>
  D = draw.Drawing ().polyline (PL);
  fn = fullfile (tempdir (), 'plate5.pdf');
  [paper, scale] = print (D, fn, 'Paper', 'A5')</pre>
-                <pre style="overflow-x: auto; white-space: pre; padding: 0.6rem 0.8rem; margin: 0.3rem 0 0.8rem 0; border: 1px solid #e2e2e2; border-left: 4px solid #b7b7b7; border-radius: 4px; background-color: #fafafa;">warning: print: given the current "paperposition" and "papersize" properties, the figure is too large and will be cropped to fit on the output page.
-warning: called from
-    __print_parse_opts__ at line 519 column 7
-    print at line 439 column 3
-    print at line 2848 column 9
-    __eval_demo__ at line 84 column 9
-    __demo_notebook__ at line 43 column 3
-    __build_demos__ at line 79 column 7
-    method_texi2html at line 87 column 5
-    classdef_texi2html at line 456 column 9
-    package_texi2html at line 344 column 11
-
-paper =
+                <pre style="overflow-x: auto; white-space: pre; padding: 0.6rem 0.8rem; margin: 0.3rem 0 0.8rem 0; border: 1px solid #e2e2e2; border-left: 4px solid #b7b7b7; border-radius: 4px; background-color: #fafafa;">paper =
 
    210   148
 

@@ -357,6 +357,7 @@
 					<li><a href="solid.ellipsoid.html" class="text-decoration-none font-monospace"><small>solid.ellipsoid</small></a></li>
 					<li><a href="solid.torus.html" class="text-decoration-none font-monospace"><small>solid.torus</small></a></li>
 					<li><a href="solid.polyhedron.html" class="text-decoration-none font-monospace"><small>solid.polyhedron</small></a></li>
+					<li><a href="solid.surface.html" class="text-decoration-none font-monospace"><small>solid.surface</small></a></li>
 					<li><a href="solid.extrude.html" class="text-decoration-none font-monospace"><small>solid.extrude</small></a></li>
 					<li><a href="solid.revolve.html" class="text-decoration-none font-monospace"><small>solid.revolve</small></a></li>
 					<li><a href="solid.loft.html" class="text-decoration-none font-monospace"><small>solid.loft</small></a></li>
@@ -441,12 +442,12 @@
 <p> The viewer needs a display to run.  It runs on Linux.
 </p>
 <p> <strong>See also: </strong>
-  <a href="solid.Shape.html#solid_Shape_show">solid.Shape.show</a>, 
+  <a href="solid.Shape.show.html">solid.Shape.show</a>, 
   <a href="polymesh.Mesh.html#polymesh_Mesh_show">polymesh.Mesh.show</a>, 
   <a href="model.Viewer.html#model_Viewer_pick">model.Viewer.pick</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/be1130e/inst/+model/Viewer.m">model.Viewer</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/fff062e/inst/+model/Viewer.m">model.Viewer</a>
 </p>
 </div>
         <p class="lead my-3">The <code>model.Viewer</code> class contains the following properties:</p>
@@ -573,8 +574,9 @@ Pick edges and faces of a solid, or points on a mesh, with the mouse.
           <div class="collapse multi-collapse" id="model_Viewer_pick">
             <div class="border-bottom py-2">
 <p class="h5 fs"><code>model.Viewer: [<var>E</var>, <var>F</var>] = <b>pick</b> (<var>V</var>)</code></p>
-<p class="h5 fs"><code>model.Viewer: <var>E</var> = <b>pick</b> (<var>V</var>, <code>'edge'</code>)</code></p>
-<p class="h5 fs"><code>model.Viewer: <var>F</var> = <b>pick</b> (<var>V</var>, <code>'face'</code>)</code></p>
+<p class="h5 fs"><code>model.Viewer: [<var>E</var>, <var>F</var>, <var>ECODE</var>, <var>FCODE</var>] = <b>pick</b> (<var>V</var>)</code></p>
+<p class="h5 fs"><code>model.Viewer: [<var>E</var>, <var>CODE</var>] = <b>pick</b> (<var>V</var>, <code>'edge'</code>)</code></p>
+<p class="h5 fs"><code>model.Viewer: [<var>F</var>, <var>CODE</var>] = <b>pick</b> (<var>V</var>, <code>'face'</code>)</code></p>
 <p class="h5 fs fs-last"><code>model.Viewer: [<var>P</var>, <var>F</var>] = <b>pick</b> (<var>V</var>)</code></p>
 <p> </p>
 <p> <code>[<var>E</var>, <var>F</var>] = pick (<var>V</var>)</code> waits while you click edges
@@ -586,18 +588,25 @@ Pick edges and faces of a solid, or points on a mesh, with the mouse.
  it lets it go; the shape can still be turned between clicks.
  <code>Enter</code> finishes and <code>Escape</code> cancels, returning nothing.  With
  <code>'edge'</code> or <code>'face'</code> only that kind can be picked, and its
- indices are the one output.
+ indices are the first output.
 </p>
 <p> Indices belong to the shape they were picked on, and a script that holds
  them breaks as soon as an earlier step adds a feature.  So <code>pick</code>
- also prints, for each kind picked, the query that finds the same items
- by kind, direction and position, and says whether it finds exactly
- those.  Paste the query into the script instead of the numbers:
+ also returns, as a character vector, the code that selects the same
+ items by kind, direction and position: <var>CODE</var> for one kind, and
+ <var>ECODE</var> and <var>FCODE</var> for edges and faces picked together, empty
+ where none was picked.  The code selects exactly the items picked: one
+ query where what they share finds them alone, else one query for each,
+ joined, and their indices only where an item cannot be told apart from
+ the others by any query.  It names the shape by the variable the viewer
+ shows, and <code>eval (<var>CODE</var>)</code> gives the indices again.  Put it in
+ the script in place of the numbers:
 </p>
-<table><tr><td>&nbsp;</td><td><pre class="example"> E = pick (V, 'edge');
-  edges (part, 'Type', 'line', 'Direction', [0, 0, 1], ...
-         'Within', [0, 0, 0, 80, 40, 12])
-    finds exactly the 4 edges picked
+<table><tr><td>&nbsp;</td><td><pre class="example"> ## Four upright edges picked on a block 80 by 40 by 12
+ [E, CODE] = pick (V, 'edge');
+ ## CODE holds the query for the script
+ E = edges (part, 'Type', 'line', 'Direction', [0, 0, 1], ...
+            'Within', [0, 0, 0, 80, 40, 12]);
  part = fillet (part, E, 3);
 </pre></td></tr></table>
 
@@ -613,9 +622,9 @@ Pick edges and faces of a solid, or points on a mesh, with the mouse.
  and <code>'face'</code> are refused.
 </p>
 <p> <strong>See also: </strong>
-  <a href="solid.Shape.html#solid_Shape_edges">solid.Shape.edges</a>, 
-  <a href="solid.Shape.html#solid_Shape_faces">solid.Shape.faces</a>, 
-  <a href="solid.Shape.html#solid_Shape_show">solid.Shape.show</a>
+  <a href="solid.Shape.edges.html">solid.Shape.edges</a>, 
+  <a href="solid.Shape.faces.html">solid.Shape.faces</a>, 
+  <a href="solid.Shape.show.html">solid.Shape.show</a>
 </p>
 
 
@@ -642,7 +651,8 @@ Pick a user coordinate system with the mouse.
           <div class="collapse multi-collapse" id="model_Viewer_pickucs">
             <div class="border-bottom py-2">
 <p class="h5 fs"><code>model.Viewer: <var>U</var> = <b>pickucs</b> (<var>V</var>)</code></p>
-<p class="h5 fs fs-last"><code>model.Viewer: <var>U</var> = <b>pickucs</b> (<var>V</var>, <var>MODE</var>)</code></p>
+<p class="h5 fs"><code>model.Viewer: <var>U</var> = <b>pickucs</b> (<var>V</var>, <var>MODE</var>)</code></p>
+<p class="h5 fs fs-last"><code>model.Viewer: [<var>U</var>, <var>CODE</var>] = <b>pickucs</b> (&hellip;)</code></p>
 <p> </p>
 <p> <code><var>U</var> = pickucs (<var>V</var>)</code> returns the <code>geom.UCS</code> you
  pick on the shape in the viewer&rsquo;s window, in two steps, each prompted at
@@ -672,17 +682,82 @@ Pick a user coordinate system with the mouse.
  it was clicked.  The shape can be
  turned between clicks, and <code>Escape</code> cancels with an error.
 </p>
-<p> A pick depends on the shape it was made on, so <code>pickucs</code> prints the
- line that makes the same UCS from coordinates, for the script:
+<p> A pick depends on the shape it was made on, so
+ <code>[<var>U</var>, <var>CODE</var>] = pickucs (&hellip;)</code> also returns
+ <var>CODE</var>, the expression that makes the same UCS from coordinates, as
+ a character vector to put in the script in place of the pick.
+ <code>eval (<var>CODE</var>)</code> gives the UCS again, to the ten significant
+ digits <var>CODE</var> carries.
 </p>
-<table><tr><td>&nbsp;</td><td><pre class="example"> U = pickucs (V);
-  U = geom.UCS ([0, 0, 1], [20, 20, 12], [21, 20, 12]);
- R.UCS = U;
+<table><tr><td>&nbsp;</td><td><pre class="example"> [U, CODE] = pickucs (V);
+ CODE
+ &rArr; CODE = geom.UCS ([0, 0, 1], [20, 20, 12], [21, 20, 12])
+ R.UCS = geom.UCS ([0, 0, 1], [20, 20, 12], [21, 20, 12]);
 </pre></td></tr></table>
 
 <p> <strong>See also: </strong>
   <a href="geom.UCS.html">geom.UCS</a>, 
   <a href="model.Viewer.html#model_Viewer_pick">model.Viewer.pick</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#model_Viewer_view"
+              aria-expanded="false" aria-controls="model_Viewer_view">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>view</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Set or query the direction the viewer looks from.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="model_Viewer_view">
+            <div class="border-bottom py-2">
+<p class="h5 fs"><code>model.Viewer: <b>view</b> (<var>V</var>, <var>AZ</var>, <var>EL</var>)</code></p>
+<p class="h5 fs fs-last"><code>model.Viewer: [<var>AZ</var>, <var>EL</var>] = <b>view</b> (<var>V</var>)</code></p>
+<p> </p>
+<p> <code>view (<var>V</var>, <var>AZ</var>, <var>EL</var>)</code> turns the view to look at the
+ shape from azimuth <var>AZ</var> and elevation <var>EL</var>, in degrees, and fits
+ the shape to the window.  The angles are those Octave&rsquo;s <code>view</code>
+ takes for a plot: <var>AZ</var> turns anticlockwise about <em class="math">z</em>, seen from
+ above, starting from the negative <em class="math">y</em> axis, and <var>EL</var> rises from
+ the <em class="math">x</em>-<em class="math">y</em> plane, from -90 looking straight up to 90 looking
+ straight down.  The <em class="math">z</em> axis points up the window; looking
+ straight down or up, the <em class="math">y</em> axis does, turned by <var>AZ</var>.  The
+ mouse still turns the view afterwards.
+</p>
+<p> <code>[<var>AZ</var>, <var>EL</var>] = view (<var>V</var>)</code> returns the angles the
+ view looks from now, however it got there, <var>AZ</var> from -180 to 180,
+ so that a view found with the mouse can be kept in a script.  A turn
+ about the line of sight, which the mouse can give, is not part of them.
+</p>
+<p> The keys of the window give four of these views: <code>0</code> is
+ <code>view (<var>V</var>, 45, 35.26)</code>, near enough, the isometric view the
+ window opens with, <code>1</code> is <code>view (<var>V</var>, 0, 0)</code>, <code>2</code> is
+ <code>view (<var>V</var>, 0, 90)</code> and <code>3</code> is
+ <code>view (<var>V</var>, 90, 0)</code>.
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example"> ## A shallow part looks deeper than it is from the isometric view;
+ ## look from higher up
+ part = solid.box (80, 40, 4);
+ V = show (part);
+ view (V, 30, 60);
+ ## Keep a view found with the mouse
+ [az, el] = view (V);
+</pre></td></tr></table>
+
+<p> <strong>See also: </strong>
+  <a href="solid.Shape.show.html">solid.Shape.show</a>
 </p>
 
 
