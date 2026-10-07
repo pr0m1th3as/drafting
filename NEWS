@@ -1,88 +1,51 @@
-Summary of important user-visible changes for drafting 0.2.0:
+Summary of important user-visible changes for drafting 0.2.1:
 -------------------------------------------------------------------
 
- This release makes the package an alternative to OpenSCAD written in Octave:
- exact solids through Open CASCADE, meshes, assemblies and a viewer, built on
- new geometry classes.  Drawings gain a layer table, and DXF is read and
- written by compiled code.  It breaks code written for 0.1.0; see below.
+ ** New function `solid.surface (X, Y, Z, H)`: a solid made of an exact
+    smooth surface through a grid of points, as `meshgrid` makes them,
+    thickened by `H`; a thickness the surface curves too tightly for is
+    refused.
 
- ** New geometry classes, each lying in a coordinate system of its own,
-    `geom.UCS`: `geom.Polyline`, `geom.Spline`, `geom.Path` and
-    `geom.Region`.  Regions combine, offset, fillet, chamfer, hull, resize,
-    mirror and repeat, with arcs kept exact, and Open CASCADE checks them on
-    their exact curves; `geom.text` gives letters as regions.
+ ** `model.Viewer.pick` and `pickucs` print nothing after a pick; the code
+    for a script is returned instead, as in `[E, CODE] = pick (V, 'edge')`
+    and `[U, CODE] = pickucs (V)`, and run with `eval (CODE)`.
 
- ** `solid.Shape`, exact solids: seven primitives; solids made from regions
-    by `solid.extrude`, `revolve`, `loft`, `sweep` and `helix`; booleans,
-    transforms, hulls and arrays; holes, pockets, fillets, chamfers and
-    shells on edges and faces chosen by `edges` and `faces`; `section` and
-    `projection`, which give regions.  STEP is read and written, and STL,
-    OBJ, PLY and 3MF written.
+ ** `model.Viewer.view (V, AZ, EL)` turns a viewer to look from an azimuth
+    and an elevation, as `view` does for a plot; `[AZ, EL] = view (V)`
+    returns the current ones.
 
- ** `polymesh.Mesh` and `polymesh.read`: STL, OBJ, PLY and 3MF with their
-    colours, cut into regions by `section` and fitted back to lines and
-    arcs by `geom.Region.fit`; `solid.polyhedron` takes a closed mesh into
-    booleans.
+ ** `solid.Shape.volume` is far faster: milliseconds for most shapes and
+    seconds, not a minute, for a shape made by `solid.surface`.  `volume`
+    and `centroid` take `'RelTol'`, the relative error aimed at, 1e-9 by
+    default.
 
- ** `model.Assembly` and `model.read`: named parts placed in coordinate
-    systems, and sub-assemblies, written to STEP and 3MF with their
-    structure, names and colours.
+ ** `geom.text` takes `'Box'`, a size the text is scaled to fit, descenders
+    included.
 
- ** `model.Viewer`, and `show` on a solid, a mesh or an assembly: Open
-    CASCADE's own window, where edges, faces, points and coordinate systems
-    are picked with the mouse.  It turns about the centre of the view, or a
-    point double-clicked.
+ ** Option names are matched without regard to case in every function, and
+    an unknown one is named in the error.
 
- ** DXF is read and written by compiled code: R2000 by default, R12 for
-    lines and arcs, and any ASCII file from R12 to R2018 read.  `geom.read`
-    and `geom.write` exchange geom objects with their coordinate systems, and
-    `'Type'` builds a region or a path from loose lines and arcs.
-    `draw.read` returns dimensions, blocks, hatches and the layer table.
+ ** `draw.Drawing.tikz` draws an ellipse as a TikZ ellipse instead of a
+    polyline.
 
- ** `draw.Drawing` keeps a layer table, set with the new method `layer`:
-    colour, line type, the new line weight, visibility and printing.  An
-    entity takes them from its layer unless set otherwise, and `plot`,
-    `print`, `tikz` and DXF all honour them.  Blocks take the layer and
-    properties of the insert placing them, as in CAD.
-
- ** `draw.Drawing` gains `spline`, `path`, `region` and `ordinate`.
-    `draw.titleblock` prints to ISO 5457, and `print` takes `'Margin', 0`
-    to print such a sheet at 1:1.
-
- ** The guide at https://pr0m1th3as.github.io/drafting/guide/ sets out how
-    the package fits together and how it meets DXF, with twelve tutorials.
-
- ** Open CASCADE 7.8 or later, with its visualization libraries, and X11
-    are needed at build time.
+ ** The guide gains a brief Octave primer, tutorials on surfaces through a
+    grid (13), parts as functions (14) and testing parts (15), and picking
+    with the mouse in tutorials 4 and 10.
 
  ** Bug fixes:
-    - An angular dimension was written to DXF with its points out of place,
-      so another program showed a different angle.
-    - An arc, circle or polyline facing down the z axis was read mirrored.
-    - `print` measured the figure rather than the drawing: a drawing that
-      fits could be refused, text printed up to 1.5% small, and a raster
-      sheet came back cropped.
-    - `merge` dropped the blocks of every drawing after the first.
-    - A drawing's display listed ten kinds of entity only, and read
-      "1 layers".
+    - `model.Viewer.pick` returned code that could select more than was
+      picked, such as all four top edges of a block for two of them.
+    - `geom.Region.fit` broke a fillet between straight sides into short
+      pieces of the wrong radius; it now fits one arc.
+    - `draw.Drawing.print` wrote A3 PDF pages 0.9 mm short, with a warning
+      that the figure would be cropped.
+    - `draw.Drawing.print` under fltk failed with `unlink: operation
+      failed`; it now raises an error naming the remedy.
+    - `draw.Drawing.plot`, `print` and `tikz` gave needless warnings about
+      ellipses and hatch fills.
 
 
 Backwards incompatible improvements:
 
- ** The `dxf` namespace and `draw.fromentities` are removed: read with
-    `geom.read` and `draw.read`, write with the `write` method of the object,
-    or `geom.write` for several geom objects.
-
- ** `stl.write` is removed: write a solid or a mesh with its `write` method.
-
- ** DXF is written as R2000; `'Version', 'R12'` writes R12 for lines and
-    arcs.
-
- ** `draw.Drawing.polyline` takes a `geom.Polyline`, and `hatch` a
-    `geom.Region`, in place of vertex matrices.
-
- ** `draw.Drawing.Linetype` defaults to `'byLayer'`, and `layers` lists every
-    layer of the drawing's table.  `draw.titleblock` draws on the layers
-    `FRAME`, `TITLE` and `SHEET`.
-
- ** `draw.Drawing.entities` is hidden, and `expand` leaves no blocks.
+ ** `draw.Drawing.entities` returns an ellipse as an `ELLIPSE` record
+    (centre, semi-axes, rotation) instead of a closed polyline.
