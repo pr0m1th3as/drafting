@@ -16,8 +16,9 @@ millimetres.
   OpenSCAD's 2-D shapes do, their arcs kept exact; text as outlines.
 - **Solids:** primitives, and extrusions, revolutions, lofts, sweeps and
   helices of regions; booleans; holes, pockets, fillets, chamfers and shells
-  on edges and faces chosen by what they are; sections and projections that
-  are regions again; STEP in and out.
+  on edges and faces chosen by what they are; tapped holes and ISO metric
+  threads, internal and external; sections and projections that are regions
+  again; STEP in and out.
 - **Meshes:** STL, OBJ, PLY and 3MF read and written with their colours, cut
   into regions and fitted back to lines and arcs, and taken into booleans.
 - **Assemblies:** named parts placed together, written to STEP and 3MF with
@@ -53,9 +54,18 @@ table, dimensions, hatches and blocks. What each class becomes in a file and
 back is set out in the guide's
 [DXF and the classes](https://pr0m1th3as.github.io/drafting/guide/dxf.html).
 
+## Standards
+
+Where the package follows a standard, the guide's Standards pages set out
+which edition, where each number comes from and how it is computed, and what
+the package decides where the standard leaves the choice open. The first,
+[Threads and tapped holes](https://pr0m1th3as.github.io/drafting/guide/standards_threads.html),
+covers ISO 261, ISO 68-1, ISO 965-1 and ISO 2306, each read in the Indian
+Standard that adopts it unchanged and that anyone can download free.
+
 ## Tutorials
 
-The [guide](https://pr0m1th3as.github.io/drafting/guide/) has fifteen tutorials
+The [guide](https://pr0m1th3as.github.io/drafting/guide/) has sixteen tutorials
 that build parts and drawings step by step. Every output and every picture on
 them is made by the code above it. New to Octave? Start with
 [A brief Octave primer](https://pr0m1th3as.github.io/drafting/guide/primer.html),
@@ -91,6 +101,8 @@ the Octave the tutorials use.
     a bracket in a file of its own, made in any size.
 15. [Testing parts](https://pr0m1th3as.github.io/drafting/guide/15_testing_parts.html):
     `%!test` blocks that check a part's volume and fit, run with `test`.
+16. [Holes and threads](https://pr0m1th3as.github.io/drafting/guide/16_holes_and_threads.html):
+    tapped holes and a threaded rod, and a bolt circle on a picked face.
 
 The scripts the pages are built from are in [`docs/guide/src`](docs/guide/src).
 
