@@ -15,17 +15,34 @@ concurrency:
 
 jobs:
   # As the Octave Packages index tests a release: the Octave image with the
-  # build packages DESCRIPTION lists installed first; latest is Ubuntu 26.04
+  # build packages DESCRIPTION lists installed first; latest is Ubuntu 26.04.
+  # With occt set, Open CASCADE is that version, built by octave-ci, in place
+  # of Ubuntu's.
   test:
-    name: Linux, Octave ${{ matrix.version }}
+    name: >-
+      Linux, Octave ${{ matrix.version }}${{ matrix.occt
+      && format(', Open CASCADE {0}', matrix.occt) || '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
-        version: ['11.1.0', 'latest']
+        include:
+          - version: '11.1.0'
+          - version: 'latest'
+          - version: '11.1.0'
+            occt: '8.0.1'
+          - version: '11.3.0'
+            occt: '8.0.1'
     steps:
       - uses: actions/checkout@v7
+
+      - name: Fetch Open CASCADE
+        id: occt
+        if: matrix.occt
+        uses: pr0m1th3as/octave-ci/occt@v1
+        with:
+          version: ${{ matrix.occt }}
 
       - name: Build the package archive
         id: archive
@@ -42,6 +59,7 @@ jobs:
         env:
           VERSION: ${{ matrix.version }}
           NAME: ${{ steps.archive.outputs.name }}
+          ARCHIVE: ${{ steps.occt.outputs.archive }}
           PACKAGES: >-
             libocct-foundation-dev libocct-modeling-data-dev
             libocct-modeling-algorithms-dev libocct-data-exchange-dev
@@ -51,7 +69,13 @@ jobs:
           code="printf ('Octave %s\\n', version ()); "
           code+="pkg ('install', '-local', '/work/package.tar.gz'); "
           code+="pkg ('load', '$NAME'); pkg ('test', '$NAME');"
-          docker run --rm --volume "$PWD:/work" --workdir /work \
+          occt=()
+          if [ -n "$ARCHIVE" ]; then
+            occt=(--volume "$(dirname "$ARCHIVE"):/occt"
+                  --env OCCT="$(basename "$ARCHIVE")")
+            PACKAGES=libx11-dev
+          fi
+          docker run --rm --volume "$PWD:/work" --workdir /work "${occt[@]}" \
             --env PACKAGES --env CODE="$code" \
             "ghcr.io/gnu-octave/octave:$VERSION" bash -c '
               set -euo pipefail
@@ -62,7 +86,14 @@ jobs:
               $S apt-get update -qq
               $S env DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC \
                 apt-get install --yes -qq $PACKAGES > /dev/null
-              dpkg-query -W libocct-foundation-dev
+              if [ -n "${OCCT:-}" ]; then
+                $S tar -C / -xzf "/occt/$OCCT"
+                $S ldconfig
+                export OCCT_INC=/usr/local/include/opencascade
+                grep "define OCC_VERSION_COMPLETE" "$OCCT_INC/Standard_Version.hxx"
+              else
+                dpkg-query -W libocct-foundation-dev
+              fi
               octave-cli --norc --no-history --eval "$CODE"
             ' 2>&1 | tee test.log
 
@@ -107,7 +138,9 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: test-logs-linux-${{ matrix.version }}
+          name: >-
+            test-logs-linux-${{ matrix.version }}${{ matrix.occt
+            && format('-occt-{0}', matrix.occt) || '' }}
           path: test-logs/
           if-no-files-found: ignore
           retention-days: 14
