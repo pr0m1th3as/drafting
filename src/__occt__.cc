@@ -112,8 +112,14 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <Geom2d_BSplineCurve.hxx>
 #include <Geom2d_Line.hxx>
 #include <Geom2dAPI_InterCurveCurve.hxx>
+#include <Standard_Version.hxx>
+#if OCC_VERSION_MAJOR >= 8
+#include <GC_MakeArcOfCircle2d.hxx>
+#include <GC_MakeSegment2d.hxx>
+#else
 #include <GCE2d_MakeArcOfCircle.hxx>
 #include <GCE2d_MakeSegment.hxx>
+#endif
 #include <GeomAPI.hxx>
 #include <BndLib_Add2dCurve.hxx>
 #include <Bnd_Box2d.hxx>
@@ -132,7 +138,6 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <STEPControl_Reader.hxx>
 #include <STEPControl_Writer.hxx>
 #include <Standard_Failure.hxx>
-#include <Standard_Version.hxx>
 #include <TCollection_HAsciiString.hxx>
 #include <TopExp.hxx>
 #include <TopExp_Explorer.hxx>
@@ -176,6 +181,15 @@ failurekind (const Standard_Failure& e)
   return e.DynamicType ()->Name ();
 #endif
 }
+
+// The makers of 2-D segments and arcs, which Open CASCADE 8.0 renamed
+#if OCC_VERSION_MAJOR >= 8
+using MakeSegment2d = GC_MakeSegment2d;
+using MakeArcOfCircle2d = GC_MakeArcOfCircle2d;
+#else
+using MakeSegment2d = GCE2d_MakeSegment;
+using MakeArcOfCircle2d = GCE2d_MakeArcOfCircle;
+#endif
 
 // The collections of shapes, named here since Open CASCADE 8.0 deprecates
 // the names it gave them
@@ -472,11 +486,11 @@ pieces (const octave_value& p, const Matrix& f, int loop, vector<piece>& out)
     }
     else if (octave::math::isnan (m(i,0)))
     {
-      c.push_back (GCE2d_MakeSegment (a, b).Value ());
+      c.push_back (MakeSegment2d (a, b).Value ());
     }
     else
     {
-      c.push_back (GCE2d_MakeArcOfCircle (a, inplane (m, i, f), b).Value ());
+      c.push_back (MakeArcOfCircle2d (a, inplane (m, i, f), b).Value ());
     }
     for (const Handle (Geom2d_Curve)& k : c)
     {
