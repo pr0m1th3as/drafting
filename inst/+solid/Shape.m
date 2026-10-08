@@ -1663,18 +1663,68 @@ classdef Shape
     ## material that its axis passes through first cuts that material as
     ## well.  All the holes are cut in one operation.
     ##
-    ## @var{D} may instead name an ISO metric coarse thread, such as
-    ## @qcode{'M6'} or @qcode{'M2.5'}, from M1 to M64: the hole is then drilled
-    ## at the tapping size for that thread, its nominal diameter less its
-    ## pitch, so @qcode{'M6'} drills 5 millimetres.  The thread itself is not
-    ## modelled.
+    ## @var{P} may instead be a @code{geom.UCS}, such as @code{geom.UCS
+    ## (@var{V})} picks off a face in the viewer: the hole starts at its origin
+    ## and runs against its normal, which points out of the part, so its
+    ## normal sets the direction.  With @qcode{'At'}, a hole is drilled at
+    ## every point given in the plane of the UCS instead, which places a bolt
+    ## circle or a row of holes on a face in one call.
+    ##
+    ## @subheading Tapping holes
+    ##
+    ## @var{D} may instead name an ISO metric thread from M1 to M64 with a
+    ## diameter and pitch of ISO 261: a coarse thread by its diameter, as
+    ## @qcode{'M6'}, a fine one with its pitch, as @qcode{'M10x1.25'}.  The
+    ## hole is then drilled for tapping that thread by hand, and the thread
+    ## itself is cut by @code{solid.Shape.thread}.  The drill is the one ISO
+    ## 2306:1972 lists for the thread in its tables 1 and 2, so @qcode{'M6'}
+    ## drills 5 millimetres and @qcode{'M8'} 6.8; for a thread it does not
+    ## list, M60 and M64 among them, it is the rule ISO 2306 states, the
+    ## nominal diameter less the pitch.
+    ##
+    ## Every drill lies in the 6H tolerance band of the thread's minor
+    ## diameter, from @math{D_1}, the nominal diameter less @math{1.0825 P},
+    ## up by the tolerance of ISO 965-1:1998, 13.3.2, table 3, so a drawing
+    ## that states 6H is met.  At a pitch of 0.25 and 0.2, where ISO 965-1
+    ## has no grade 6, the band is the coarsest grade it has, 5 and 4.  Tough
+    ## materials take a larger drill than soft ones, and @qcode{'Material'}
+    ## and @qcode{'Engagement'} choose another drill inside the band.  A drill
+    ## chosen so is the ISO 2306 drill or one of the sizes of the twist drills
+    ## in RUKO's catalogue, chapter 1.01 @cite{Twist drills} (2014): DIN 338
+    ## type N, HSS ground, article 214, 0.3 to 20 millimetres, pages 54 to
+    ## 56; DIN 345 type N, HSS, article 204, 10 to 60 millimetres, pages 78
+    ## and 79.
     ##
     ## Name/Value pairs shape the hole:
     ##
     ## @table @asis
     ## @item @qcode{'Direction'}
     ## The nonzero 3-element direction the holes run in from their points,
-    ## @code{[0, 0, -1]} by default.
+    ## @code{[0, 0, -1]} by default.  It cannot be given when @var{P} is a
+    ## @code{geom.UCS}.
+    ##
+    ## @item @qcode{'At'}
+    ## An @math{N}-by-2 matrix of points in the plane of the @code{geom.UCS}
+    ## @var{P}, one hole at each, all against its normal; the UCS origin alone
+    ## by default.  It applies only when @var{P} is a @code{geom.UCS}.
+    ##
+    ## @item @qcode{'Material'}
+    ## The material tapped, for a named thread.  A tough one,
+    ## @qcode{'stainless'} or @qcode{'nickel'}, takes the largest drill inside
+    ## the band, and @qcode{'steel'}, @qcode{'aluminium'}, @qcode{'brass'},
+    ## @qcode{'castiron'} and @qcode{'plastic'} keep the ISO 2306 drill.  The
+    ## tough ones are those OSG's chart @cite{Tap Drill Size and Pitch
+    ## Diameter Limit}, volume 3 (2024), names hard or tough: stainless
+    ## steel, nickel steel, Monel, cast steel and drop forgings.
+    ##
+    ## @item @qcode{'Engagement'}
+    ## The thread engagement for a named thread, as a percentage of the full
+    ## thread in ISO's terms, 100 drilling at @math{D_1}: the diameter asked
+    ## is the nominal diameter less @math{1.0825 P} times the percentage over
+    ## 100, and the drill is the one nearest it inside the band.  A
+    ## percentage that falls outside the band is an error naming the thread
+    ## and the band, from 78.2 to 100 for M6.  It cannot be given with
+    ## @qcode{'Material'}.
     ##
     ## @item @qcode{'Counterbore'}
     ## @code{[@var{CD}, @var{CDEPTH}]}: a flat-bottomed bore of diameter
@@ -1706,7 +1756,17 @@ classdef Shape
     ## @end group
     ## @end example
     ##
-    ## @seealso{solid.Shape.subtract, solid.cylinder}
+    ## @example
+    ## @group
+    ## ## Four holes tapped M5 in stainless steel on a bolt circle of 30
+    ## S = solid.cylinder (25, 10);
+    ## U = geom.UCS ([0, 0, 1], [0, 0, 10]);
+    ## XY = 15 * [1, 0; 0, 1; -1, 0; 0, -1];
+    ## S = hole (S, U, 'M5', 8, 'At', XY, 'Material', 'stainless');
+    ## @end group
+    ## @end example
+    ##
+    ## @seealso{solid.Shape.thread, solid.Shape.subtract, solid.cylinder}
     ## @end deftypefn
     function this = hole (this, P, D, DEPTH, varargin)
 
@@ -1714,33 +1774,40 @@ classdef Shape
       if (nargin < 4)
         error ("solid.Shape.hole: invalid number of input arguments.");
       endif
-      if (! isnumeric (P) || ! isreal (P) || ! ismatrix (P)
-          || columns (P) != 3 || rows (P) < 1 || ! all (isfinite (P(:))))
-        error (strcat ("solid.Shape.hole: P must be an M-by-3 real matrix", ...
-                       " of finite values."));
+      [errmsg, opt] = options (varargin, struct ('Direction', [], ...
+                                                 'At', [], ...
+                                                 'Counterbore', [], ...
+                                                 'Countersink', [], ...
+                                                 'Tip', [], ...
+                                                 'Material', [], ...
+                                                 'Engagement', []));
+      if (isempty (errmsg))
+        [errmsg, P, opt.Direction] = placement (P, opt.Direction, opt.At);
+      endif
+      if (! isempty (errmsg))
+        error ("solid.Shape.hole: %s", errmsg);
       endif
       if (ischar (D))
-        D = tapdrill (D);
+        [errmsg, t] = threadspec (D);
+        if (isempty (errmsg))
+          [errmsg, D] = tapdrill (t, opt.Material, opt.Engagement);
+        endif
+        if (! isempty (errmsg))
+          error ("solid.Shape.hole: %s", errmsg);
+        endif
+      elseif (! isempty (opt.Material) || ! isempty (opt.Engagement))
+        error (strcat ("solid.Shape.hole: Material and Engagement apply", ...
+                       " only to a named thread."));
       endif
       if (! isempty (solid.__checkpos__ (D, 'D')))
         error (strcat ("solid.Shape.hole: D must be a positive and finite", ...
-                       " real scalar or an ISO metric coarse thread such", ...
-                       " as 'M6'."));
+                       " real scalar or the name of an ISO metric thread", ...
+                       " such as 'M6' or 'M10x1.25'."));
       endif
       if (! isnumeric (DEPTH) || ! isreal (DEPTH) || ! isscalar (DEPTH)
           || ! (DEPTH > 0))
         error (strcat ("solid.Shape.hole: DEPTH must be positive, or Inf", ...
                        " for a through hole."));
-      endif
-      [errmsg, opt] = options (varargin, struct ('Direction', [0, 0, -1], ...
-                                                 'Counterbore', [], ...
-                                                 'Countersink', [], ...
-                                                 'Tip', []));
-      if (isempty (errmsg))
-        errmsg = checkvec (opt.Direction, 'Direction', true);
-      endif
-      if (! isempty (errmsg))
-        error ("solid.Shape.hole: %s", errmsg);
       endif
       cb = opt.Counterbore;
       if (! isempty (cb) && (! isnumeric (cb) || ! isreal (cb)
@@ -1819,19 +1886,170 @@ classdef Shape
       endif
 
       ## Turned onto the direction and placed at every point
-      v = double (opt.Direction(:)') / norm (opt.Direction);
-      k = cross ([0, 0, 1], v);
-      if (norm (k) > 1e-12)
-        T = cellfun (@(t) rotate (t, atan2d (norm (k), v(3)), k), T, ...
-                     'UniformOutput', false);
-      elseif (v(3) < 0)
-        T = cellfun (@(t) rotate (t, 180, [1, 0, 0]), T, ...
-                     'UniformOutput', false);
-      endif
+      T = aim (T, opt.Direction);
       tools = cell (1, rows (P) * numel (T));
       for i = 1:rows (P)
         for j = 1:numel (T)
           tools{(i - 1) * numel (T) + j} = translate (T{j}, P(i,:));
+        endfor
+      endfor
+      this = subtract (this, tools{:});
+
+    endfunction
+
+    ## -*- texinfo -*-
+    ## @deftypefn  {solid.Shape} {@var{S} =} thread (@var{S}, @var{P}, @var{NAME}, @var{DEPTH})
+    ## @deftypefnx {solid.Shape} {@var{S} =} thread (@dots{}, @var{Name}, @var{Value}, @dots{})
+    ##
+    ## Cut screw threads into a shape.
+    ##
+    ## @code{@var{S} = thread (@var{S}, @var{P}, @var{NAME}, @var{DEPTH})} cuts
+    ## the ISO metric thread @var{NAME} at every row of the @math{M}-by-3
+    ## matrix @var{P}, each along an axis starting at its point and running
+    ## down the @math{z} axis, @var{DEPTH} millimetres deep.  @var{NAME} is
+    ## named as for @code{solid.Shape.hole}: a coarse thread by its diameter,
+    ## as @qcode{'M6'}, a fine one with its pitch, as @qcode{'M10x1.25'}, from
+    ## M1 to M64 with a diameter and pitch of ISO 261.  @var{P} and
+    ## @var{DEPTH} are those of @code{solid.Shape.hole}, so a thread is placed
+    ## as its tapping hole is: @var{DEPTH} is the usable length of thread,
+    ## the full profile reaching it, and a blind tapped hole is drilled deeper
+    ## than it is threaded.  An @code{Inf} @var{DEPTH} threads right through,
+    ## and no thread runs more than a pitch past the far side of the part.
+    ##
+    ## What the axis meets decides the thread.  Where it runs through a bore
+    ## between the thread's minor diameter @math{D_1 = D - 1.0825 P} and its
+    ## nominal diameter, the thread is internal and is cut from the bore as
+    ## drilled, so its crest stands where the drill left it: a hole drilled
+    ## with @code{solid.Shape.hole} for steel or for stainless steel models
+    ## the engagement each gives.  Where it runs into a solid cylinder from
+    ## halfway between the pitch diameter @math{d - 0.6495 P} and the nominal
+    ## diameter up to the nominal diameter, 5.675 to 6 for M6, the thread is
+    ## external and is cut from the cylinder as turned.  A cylinder at the
+    ## nominal diameter, which is how a rod is designed, is first turned down
+    ## over the threaded length to the largest major diameter of tolerance
+    ## class 6g, as a machinist turns a blank before threading it: the
+    ## nominal diameter plus the fundamental deviation of position g,
+    ## @math{-(15 + 11 P)} micrometres, of ISO 965-1:1998, 13.1, rounded as
+    ## its table 1 is, to the R 40 series of ISO 3 and then to a whole
+    ## number.  M6 is turned to 5.974.  A blank of another diameter is turned
+    ## in the design.  An axis that meets neither is an error naming the
+    ## thread and the point, and so is an internal thread deeper than its
+    ## bore.
+    ##
+    ## The profile is the basic profile of ISO 68-1, its 60 degree flanks
+    ## swept round the axis by @code{solid.helix}: an internal thread's root
+    ## is flat at the nominal diameter, an external thread's flat at
+    ## @math{D_1}.  The thread is right-handed, and starts a pitch before the
+    ## point so that it runs out of the surface clean.
+    ##
+    ## Name/Value pairs place the threads as for @code{solid.Shape.hole}:
+    ##
+    ## @table @asis
+    ## @item @qcode{'Direction'}
+    ## The nonzero 3-element direction the axes run in from their points,
+    ## @code{[0, 0, -1]} by default.  It cannot be given when @var{P} is a
+    ## @code{geom.UCS}.
+    ##
+    ## @item @qcode{'At'}
+    ## An @math{N}-by-2 matrix of points in the plane of the @code{geom.UCS}
+    ## @var{P}, one thread at each, all against its normal; the UCS origin
+    ## alone by default.  It applies only when @var{P} is a @code{geom.UCS}.
+    ## @end table
+    ##
+    ## Threading the empty shape leaves it empty.
+    ##
+    ## @example
+    ## @group
+    ## ## A block tapped M6 12 deep, its hole drilled 15 deep
+    ## S = solid.box (20, 20, 20);
+    ## S = hole (S, [10, 10, 20], 'M6', 15);
+    ## S = thread (S, [10, 10, 20], 'M6', 12);
+    ## @end group
+    ## @end example
+    ##
+    ## @example
+    ## @group
+    ## ## A rod of 10 threaded M10 for 15 from its end
+    ## S = solid.cylinder (5, 40);
+    ## S = thread (S, [0, 0, 40], 'M10', 15);
+    ## @end group
+    ## @end example
+    ##
+    ## @seealso{solid.Shape.hole, solid.helix}
+    ## @end deftypefn
+    function this = thread (this, P, NAME, DEPTH, varargin)
+
+      ## Input validation
+      if (nargin < 4)
+        error ("solid.Shape.thread: invalid number of input arguments.");
+      endif
+      [errmsg, opt] = options (varargin, struct ('Direction', [], 'At', []));
+      if (isempty (errmsg))
+        [errmsg, P, opt.Direction] = placement (P, opt.Direction, opt.At);
+      endif
+      if (isempty (errmsg))
+        if (! ischar (NAME))
+          errmsg = strcat ("NAME must be the name of an ISO metric thread", ...
+                           " such as 'M6' or 'M10x1.25'.");
+        else
+          [errmsg, t] = threadspec (NAME);
+        endif
+      endif
+      if (! isempty (errmsg))
+        error ("solid.Shape.thread: %s", errmsg);
+      endif
+      if (! isnumeric (DEPTH) || ! isreal (DEPTH) || ! isscalar (DEPTH)
+          || ! (DEPTH > 0))
+        error (strcat ("solid.Shape.thread: DEPTH must be positive, or Inf", ...
+                       " to thread right through."));
+      endif
+
+      if (isempty (this.Data))
+        return;
+      endif
+
+      ## The diameters the axis may meet, and the tools that cut each thread,
+      ## made along the z axis and turned onto the direction.  A thread runs
+      ## at most a pitch past the far side of the part, however deep asked.
+      d = t.d;
+      p = t.P;
+      D1 = d - 1.25 * sqrt (3) / 2 * p;
+      d0 = d - 3 * sqrt (3) / 16 * p;
+      v = double (opt.Direction(:)') / norm (opt.Direction);
+      B = bbox (this);
+      [X, Y, Z] = ndgrid (B([1, 4]), B([2, 5]), B([3, 6]));
+      C = [X(:), Y(:), Z(:)];
+      tol = 1e-6;
+      tools = {};
+      for i = 1:rows (P)
+        far = max ((C - P(i,:)) * v');
+        L = max (min (DEPTH, far + p), p);
+        [kind, r] = axisring (this, P(i,:), v, min (L / 2, p));
+        if (strcmp (kind, 'bore') && 2 * r >= D1 - tol && 2 * r < d - tol)
+          ## The cutter fills the bore, so the bore must reach the full depth
+          ## or the thread would drill it deeper
+          z = min (L, far) - min (min (L, far) / 2, p);
+          [kind, rend] = axisring (this, P(i,:), v, z);
+          if (! strcmp (kind, 'bore') || abs (rend - r) > tol)
+            error (strcat ("solid.Shape.thread: %s at (%s): the bore is", ...
+                           " shallower than the thread."), ...
+                   t.name, pointstr (P(i,:)));
+          endif
+          T = {cutter(p, r, d / 2, true, L)};
+        elseif (strcmp (kind, 'rod') && 2 * r >= d0 - tol && 2 * r <= d + tol)
+          if (2 * r > d - tol)
+            r = (d + gdeviation (p) / 1000) / 2;
+          endif
+          T = {cutter(p, D1 / 2, r, false, L)};
+        else
+          error (strcat ("solid.Shape.thread: %s at (%s): the axis meets", ...
+                         " neither a bore from %.3f up to %g nor a", ...
+                         " cylinder from %.3f to %g."), t.name, ...
+                 pointstr (P(i,:)), D1, d, d0, d);
+        endif
+        T = aim (T, v);
+        for j = 1:numel (T)
+          tools{end+1} = translate (T{j}, P(i,:));
         endfor
       endfor
       this = subtract (this, tools{:});
@@ -2708,21 +2926,380 @@ function TF = inside (BOX, W)
 
 endfunction
 
-## The tapping drill for an ISO metric coarse thread, its nominal diameter
-## less its pitch (ISO 261); NaN for a name that is not one
-function D = tapdrill (name)
+## The points and the direction a hole or a thread takes from P, an M-by-3
+## matrix of points or a geom.UCS, and from the Direction and At given, each
+## empty when not.  Returns an error message body, empty when they fit.
+function [errmsg, P, DIR] = placement (P, DIR, AT)
 
-  d = [1, 1.2, 1.6, 2, 2.5, 3, 4, 5, 6, 8, 10, 12, 14, 16, 20, 24, 30, 36, ...
-       42, 48, 56, 64];
-  p = [0.25, 0.25, 0.35, 0.4, 0.45, 0.5, 0.7, 0.8, 1, 1.25, 1.5, 1.75, 2, ...
-       2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6];
-  D = NaN;
-  if (isrow (name) && numel (name) > 1 && name(1) == 'M')
-    k = find (d == str2double (name(2:end)));
-    if (! isempty (k))
-      D = d(k) - p(k);
+  errmsg = '';
+  if (isa (P, 'geom.UCS') && isscalar (P))
+    if (! isempty (DIR))
+      errmsg = strcat ("Direction cannot be given when P is a geom.UCS,", ...
+                       " whose normal sets it.");
+      return;
+    endif
+    if (isempty (AT))
+      AT = [0, 0];
+    elseif (! isnumeric (AT) || ! isreal (AT) || ! ismatrix (AT)
+            || columns (AT) != 2 || rows (AT) < 1 || ! all (isfinite (AT(:))))
+      errmsg = "At must be an N-by-2 real matrix of finite values.";
+      return;
+    endif
+    DIR = -P.Normal;
+    P = toworld (P, double (AT));
+  else
+    if (! isnumeric (P) || ! isreal (P) || ! ismatrix (P)
+        || columns (P) != 3 || rows (P) < 1 || ! all (isfinite (P(:))))
+      errmsg = strcat ("P must be an M-by-3 real matrix of finite values", ...
+                       " or a geom.UCS.");
+      return;
+    endif
+    if (! isempty (AT))
+      errmsg = "At applies only when P is a geom.UCS.";
+      return;
+    endif
+    if (isempty (DIR))
+      DIR = [0, 0, -1];
+    else
+      errmsg = checkvec (DIR, 'Direction', true);
+    endif
+    P = double (P);
+  endif
+
+endfunction
+
+## The tools T, made along the z axis, turned so that it runs along V
+function T = aim (T, V)
+
+  v = double (V(:)') / norm (V);
+  k = cross ([0, 0, 1], v);
+  if (norm (k) > 1e-12)
+    T = cellfun (@(t) rotate (t, atan2d (norm (k), v(3)), k), T, ...
+                 'UniformOutput', false);
+  elseif (v(3) < 0)
+    T = cellfun (@(t) rotate (t, 180, [1, 0, 0]), T, 'UniformOutput', false);
+  endif
+
+endfunction
+
+## The ISO 261 thread NAME as a struct of its name, its nominal diameter d,
+## its pitch P and whether the pitch is the coarse one.  Returns an error
+## message body, empty when NAME names one.
+function [errmsg, t] = threadspec (NAME)
+
+  errmsg = '';
+  t = [];
+  tok = {};
+  if (isrow (NAME))
+    tok = regexp (NAME, '^M(\d+(?:\.\d+)?)(?:x(\d+(?:\.\d+)?))?$', ...
+                  'tokens', 'once');
+  endif
+  if (isempty (tok))
+    errmsg = sprintf ("'%s' is not the name of an ISO metric thread.", NAME);
+    return;
+  endif
+  if (numel (tok) < 2)
+    tok{2} = '';
+  endif
+  d = str2double (tok{1});
+  [coarse, fine] = isothreads (d);
+  if (isempty (coarse))
+    errmsg = sprintf ("'%s' is not an ISO 261 thread.", NAME);
+  elseif (isempty (tok{2}) && isnan (coarse))
+    errmsg = sprintf (strcat ("'%s' has no coarse pitch, so its name must", ...
+                              " give the pitch."), NAME);
+  elseif (isempty (tok{2}))
+    t = struct ('name', NAME, 'd', d, 'P', coarse, 'coarse', true);
+  else
+    p = str2double (tok{2});
+    if (p == coarse)
+      t = struct ('name', NAME, 'd', d, 'P', p, 'coarse', true);
+    elseif (any (fine == p))
+      t = struct ('name', NAME, 'd', d, 'P', p, 'coarse', false);
+    else
+      errmsg = sprintf ("'%s' is not an ISO 261 thread.", NAME);
     endif
   endif
+
+endfunction
+
+## The pitches ISO 261:1998, table 2, gives the nominal diameter D, from M1
+## to M64: its coarse pitch, NaN where it has none, and its fine pitches;
+## both empty for a diameter the table does not list
+function [coarse, fine] = isothreads (D)
+
+  T = {1, 0.25, 0.2; 1.1, 0.25, 0.2; 1.2, 0.25, 0.2; 1.4, 0.3, 0.2;
+       1.6, 0.35, 0.2; 1.8, 0.35, 0.2; 2, 0.4, 0.25; 2.2, 0.45, 0.25;
+       2.5, 0.45, 0.35; 3, 0.5, 0.35; 3.5, 0.6, 0.35; 4, 0.7, 0.5;
+       4.5, 0.75, 0.5; 5, 0.8, 0.5; 5.5, NaN, 0.5; 6, 1, 0.75; 7, 1, 0.75;
+       8, 1.25, [1, 0.75]; 9, 1.25, [1, 0.75]; 10, 1.5, [1.25, 1, 0.75];
+       11, 1.5, [1, 0.75]; 12, 1.75, [1.5, 1.25, 1];
+       14, 2, [1.5, 1.25, 1]; 15, NaN, [1.5, 1]; 16, 2, [1.5, 1];
+       17, NaN, [1.5, 1]; 18, 2.5, [2, 1.5, 1]; 20, 2.5, [2, 1.5, 1];
+       22, 2.5, [2, 1.5, 1]; 24, 3, [2, 1.5, 1]; 25, NaN, [2, 1.5, 1];
+       26, NaN, 1.5; 27, 3, [2, 1.5, 1]; 28, NaN, [2, 1.5, 1];
+       30, 3.5, [3, 2, 1.5, 1]; 32, NaN, [2, 1.5]; 33, 3.5, [3, 2, 1.5];
+       35, NaN, 1.5; 36, 4, [3, 2, 1.5]; 38, NaN, 1.5; 39, 4, [3, 2, 1.5];
+       40, NaN, [3, 2, 1.5]; 42, 4.5, [4, 3, 2, 1.5];
+       45, 4.5, [4, 3, 2, 1.5]; 48, 5, [4, 3, 2, 1.5];
+       50, NaN, [3, 2, 1.5]; 52, 5, [4, 3, 2, 1.5];
+       55, NaN, [4, 3, 2, 1.5]; 56, 5.5, [4, 3, 2, 1.5];
+       58, NaN, [4, 3, 2, 1.5]; 60, 5.5, [4, 3, 2, 1.5];
+       62, NaN, [4, 3, 2, 1.5]; 64, 6, [4, 3, 2, 1.5]};
+  k = find ([T{:,1}] == D);
+  coarse = [];
+  fine = [];
+  if (! isempty (k))
+    coarse = T{k,2};
+    fine = T{k,3};
+  endif
+
+endfunction
+
+## The drill for tapping the thread T by hand: the one ISO 2306 gives, or
+## within the 6H band of the minor diameter the one MATERIAL or ENGAGEMENT,
+## each empty when not given, chooses.  Returns an error message body,
+## empty when they are valid.
+function [errmsg, D] = tapdrill (T, MATERIAL, ENGAGEMENT)
+
+  errmsg = '';
+  [lo, hi] = minorband (T);
+  D = iso2306 (T);
+  C = [drillsizes(), D];
+  C = C(C >= lo - 1e-9 & C <= hi + 1e-9);
+  if (! isempty (MATERIAL) && ! isempty (ENGAGEMENT))
+    errmsg = "Material and Engagement cannot both be given.";
+  elseif (! isempty (MATERIAL))
+    if (! ischar (MATERIAL) || ! isrow (MATERIAL))
+      errmsg = "Material must be a character vector.";
+      return;
+    endif
+    switch (lower (MATERIAL))
+      case {'stainless', 'nickel'}
+        D = max (C);
+      case {'steel', 'aluminium', 'brass', 'castiron', 'plastic'}
+      otherwise
+        errmsg = sprintf ("unknown material '%s'.", MATERIAL);
+    endswitch
+  elseif (! isempty (ENGAGEMENT))
+    if (! isnumeric (ENGAGEMENT) || ! isreal (ENGAGEMENT)
+        || ! isscalar (ENGAGEMENT) || ! isfinite (ENGAGEMENT))
+      errmsg = "Engagement must be a real and finite scalar.";
+      return;
+    endif
+    h = 1.25 * sqrt (3) / 2 * T.P;
+    e0 = (T.d - hi) / h * 100;
+    if (ENGAGEMENT > 100 + 1e-9 || ENGAGEMENT < e0 - 1e-9)
+      errmsg = sprintf ("%s: engagement must lie between %.1f and 100 %%.", ...
+                        T.name, e0);
+      return;
+    endif
+    [~, k] = min (abs (C - (T.d - h * ENGAGEMENT / 100)));
+    D = C(k);
+  endif
+
+endfunction
+
+## The drill ISO 2306:1972 gives for the thread T in its table 1, coarse, and
+## table 2, fine; for a thread it does not list, the rule it states, the
+## nominal diameter less the pitch
+function D = iso2306 (T)
+
+  D = T.d - T.P;
+  if (T.coarse)
+    C = [1, 0.75; 1.1, 0.85; 1.2, 0.95; 1.4, 1.1; 1.6, 1.25; 1.8, 1.45;
+         2, 1.6; 2.2, 1.75; 2.5, 2.05; 3, 2.5; 3.5, 2.9; 4, 3.3; 4.5, 3.7;
+         5, 4.2; 6, 5; 7, 6; 8, 6.8; 9, 7.8; 10, 8.5; 11, 9.5; 12, 10.2;
+         14, 12; 16, 14; 18, 15.5; 20, 17.5; 22, 19.5; 24, 21; 27, 24;
+         30, 26.5; 33, 29.5; 36, 32; 39, 35; 42, 37.5; 45, 40.5; 48, 43;
+         52, 47; 56, 50.5];
+    k = find (C(:,1) == T.d);
+    if (! isempty (k))
+      D = C(k,2);
+    endif
+  else
+    ## Each fine pitch with the nominal diameters listed for it, and the
+    ## amount every one of their drills is less than the nominal diameter
+    F = {0.35, [2.5, 3, 3.5], 0.35;
+         0.5, [4, 4.5, 5, 5.5], 0.5;
+         0.75, [6, 7, 8, 9, 10, 11], 0.8;
+         1, [8, 9, 10, 11, 12, 14, 15, 16, 17, 18, 20, 22, 24, 25, 27, ...
+             28, 30], 1;
+         1.25, [10, 12, 14], 1.2;
+         1.5, [12, 14, 15, 16, 17, 18, 20, 22, 24, 25, 26, 27, 28, 30, ...
+               32, 33, 35, 36, 38, 39, 40, 42, 45, 48, 50, 52], 1.5;
+         2, [18, 20, 22, 24, 25, 27, 28, 30, 32, 33, 36, 39, 40, 42, 45, ...
+             48, 50, 52], 2;
+         3, [30, 33, 36, 39, 40, 42, 45, 48, 50, 52], 3;
+         4, [42, 45, 48, 52], 4};
+    k = find ([F{:,1}] == T.P);
+    if (! isempty (k) && any (F{k,2} == T.d))
+      D = T.d - F{k,3};
+    endif
+  endif
+
+endfunction
+
+## The diameters of the twist drills in RUKO's catalogue, chapter 1.01
+## Twist drills (2014): DIN 338 type N, HSS ground, article 214, pages 54
+## to 56, and DIN 345 type N, HSS, article 204, pages 78 and 79
+function D = drillsizes ()
+
+  q = [1.25, 1.75, 2.25, 2.75, 3.25, 3.75, 4.25, 4.75, 5.25, 5.75, 6.25, ...
+       6.75, 7.25, 7.75, 8.25, 8.75, 9.25, 9.75];
+  D = unique ([(3:130) / 10, q, (27:40) / 2, (41:100) / 2, 51:60]);
+
+endfunction
+
+## The 6H band of the minor diameter of the thread T, from D1 to D1 plus
+## the tolerance TD1, in millimetres
+function [lo, hi] = minorband (T)
+
+  lo = T.d - 1.25 * sqrt (3) / 2 * T.P;
+  hi = lo + minortol (T.P) / 1000;
+
+endfunction
+
+## The tolerance TD1 of the minor diameter of an internal thread of pitch P,
+## in micrometres, grade 6 or, at the pitches 0.25 and 0.2 where ISO
+## 965-1:1998 has no grade 6, grades 5 and 4: the formulae of 13.3.2 rounded
+## as table 3 is, with the values of table 3 the rounding does not reach
+function T = minortol (P)
+
+  if (P < 1)
+    T6 = 433 * P - 190 * P ^ 1.22;
+  else
+    T6 = 230 * P ^ 0.7;
+  endif
+  if (P == 0.2)
+    T = r40 (0.63 * T6);
+  elseif (P == 0.25)
+    T = 56;
+  else
+    X = [0.5, 140; 1, 236; 2.5, 450];
+    k = find (X(:,1) == P);
+    if (isempty (k))
+      T = r40 (T6);
+    else
+      T = X(k,2);
+    endif
+  endif
+
+endfunction
+
+## The fundamental deviation es of position g for an external thread of
+## pitch P, in micrometres: -(15 + 11 P) of ISO 965-1:1998, 13.1, rounded as
+## table 1 is, with its one value the rounding does not reach
+function es = gdeviation (P)
+
+  if (P == 0.75)
+    es = -22;
+  else
+    es = -r40 (15 + 11 * P);
+  endif
+
+endfunction
+
+## X rounded as ISO 965-1 rounds its tables: to the nearest value of the
+## R 40 series of preferred numbers (ISO 3), then to a whole number.  A half
+## goes to the even number, which is how the tables round it.
+function v = r40 (X)
+
+  R = [100, 106, 112, 118, 125, 132, 140, 150, 160, 170, 180, 190, 200, ...
+       212, 224, 236, 250, 265, 280, 300, 315, 335, 355, 375, 400, 425, ...
+       450, 475, 500, 530, 560, 600, 630, 670, 710, 750, 800, 850, 900, 950];
+  S = [R / 100, R / 10, R, R * 10];
+  [~, k] = min (abs (S - X));
+  v = S(k);
+  if (mod (v, 1) == 0.5)
+    v = 2 * round (v / 2);
+  else
+    v = round (v);
+  endif
+
+endfunction
+
+## The smallest circle about the axis at P along V in the section of S a
+## distance Z along it: KIND is 'bore' when it bounds a hole of the section,
+## 'rod' when it is the outline of the material round the axis, and empty,
+## with R Inf, when no circle about the axis bounds the section there
+function [kind, R] = axisring (S, P, V, Z)
+
+  kind = '';
+  R = Inf;
+  regions = section (S, geom.UCS (V, P + Z * V));
+  for i = 1:numel (regions)
+    loops = [{regions{i}.Outline}, regions{i}.Holes];
+    for j = 1:numel (loops)
+      r = ring (loops{j});
+      if (r < R)
+        R = r;
+        if (j == 1)
+          kind = 'rod';
+        else
+          kind = 'bore';
+        endif
+      endif
+    endfor
+  endfor
+
+endfunction
+
+## The radius of the closed path L when it is a circle about the origin of
+## its plane, made of arcs alone; Inf when it is not
+function r = ring (L)
+
+  r = Inf;
+  M = L.Midpoints;
+  if (any (! cellfun (@isempty, L.Splines)) || any (isnan (M(:,1))))
+    return;
+  endif
+  Q = [L.Vertices; M];
+  q = sqrt (sum (Q .^ 2, 2));
+  if (max (q) - min (q) < 1e-6)
+    r = mean (q);
+  endif
+
+endfunction
+
+## The point P written for a message, as 10, 10, 20
+function s = pointstr (P)
+
+  s = strjoin (arrayfun (@(x) sprintf ('%g', x), P, 'UniformOutput', false), ...
+               ', ');
+
+endfunction
+
+## The cutter of a thread of pitch P, along the z axis from a pitch before
+## the origin until the thread's full profile reaches L: the groove of the
+## basic profile swept round the axis, fused with the cylinder of the bore
+## or the sleeve outside the crest it is cut from, since Open CASCADE cuts
+## the fused tool reliably where it can fail on the bare groove.  For an
+## INTERNAL thread the bore has the radius INNER and the root, flat P/8
+## wide, lies at OUTER; for an external one the root, flat P/4 wide, lies at
+## INNER and the crest at OUTER.
+function G = cutter (P, INNER, OUTER, INTERNAL, L)
+
+  c = tand (30);
+  e = P / 20;
+  if (INTERNAL)
+    r = INNER - e;
+    w = P / 8 + 2 * (OUTER - r) * c;
+    Q = [r, -w/2; OUTER, -P/16; OUTER, P/16; r, w/2];
+    B = solid.cylinder (INNER, L + P);
+  else
+    r = OUTER + e;
+    w = P / 4 + 2 * (r - INNER) * c;
+    Q = [INNER, -P/8; r, -w/2; r, w/2; INNER, P/8];
+    B = subtract (solid.cylinder (OUTER + 2 * e, L + P), ...
+                  solid.cylinder (OUTER, L + P));
+  endif
+  ## The groove ends where its width at the bore or the crest reaches L
+  w = P / 8 * (1 + ! INTERNAL) + 2 * (OUTER - INNER) * c;
+  R = geom.Region (Q);
+  R.UCS = geom.UCS ([0, -1, 0], [0, 0, 0]);
+  G = translate (union (solid.helix (R, P, (L + P - w / 2) / P), B), ...
+                 [0, 0, -P]);
 
 endfunction
 
@@ -3133,6 +3710,113 @@ endfunction
 
 %!test  # drilling the empty shape
 %! assert_equal (isempty (hole (solid.Shape (), [0, 0, 0], 5, Inf)), true);
+
+%!test  # the coarse M8 drill of ISO 2306
+%! S = hole (solid.box (80, 40, 12), [40, 20, 12], 'M8', Inf);
+%! assert_equal (volume (S), 38400 - 3.4 ^ 2 * pi * 12, 1e-9);
+
+%!test  # a fine thread named with its pitch
+%! S = hole (solid.box (80, 40, 12), [40, 20, 12], 'M10x1.25', Inf);
+%! assert_equal (volume (S), 38400 - 4.4 ^ 2 * pi * 12, 1e-9);
+
+%!test  # M64 is not in ISO 2306, so its rule, nominal less pitch
+%! S = hole (solid.box (80, 80, 10), [40, 40, 10], 'M64', Inf);
+%! assert_equal (volume (S), 64000 - 29 ^ 2 * pi * 10, 1e-9);
+
+%!test  # the fine M1x0.2 is not in ISO 2306 either
+%! S = hole (solid.box (10, 10, 2), [5, 5, 2], 'M1x0.2', Inf);
+%! assert_equal (volume (S), 200 - 0.4 ^ 2 * pi * 2, 1e-9);
+
+%!test  # stainless takes the largest drill in the 6H band of M8
+%! S = hole (solid.box (80, 40, 12), [40, 20, 12], 'M8', Inf, ...
+%!           'Material', 'stainless');
+%! assert_equal (volume (S), 38400 - 3.45 ^ 2 * pi * 12, 1e-9);
+
+%!test  # nickel steel takes the largest drill in the 6H band of M12
+%! S = hole (solid.box (80, 40, 12), [40, 20, 12], 'M12', Inf, ...
+%!           'Material', 'nickel');
+%! assert_equal (volume (S), 38400 - 5.2 ^ 2 * pi * 12, 1e-9);
+
+%!test  # steel keeps the ISO 2306 drill
+%! S = hole (solid.box (80, 40, 12), [40, 20, 12], 'M8', Inf, ...
+%!           'Material', 'Steel');
+%! assert_equal (volume (S), 38400 - 3.4 ^ 2 * pi * 12, 1e-9);
+
+%!test  # M1 in stainless: no catalogue drill lies in its 5H band
+%! S = hole (solid.box (10, 10, 2), [5, 5, 2], 'M1', Inf, ...
+%!           'Material', 'stainless');
+%! assert_equal (volume (S), 200 - 0.375 ^ 2 * pi * 2, 1e-9);
+
+%!test  # 80 % engagement of M6 asks 5.134, and 5.1 is the nearest drill
+%! S = hole (solid.box (80, 40, 12), [40, 20, 12], 'M6', Inf, ...
+%!           'Engagement', 80);
+%! assert_equal (volume (S), 38400 - 2.55 ^ 2 * pi * 12, 1e-9);
+
+%!test  # full engagement of M6 asks D1, and 5 is the nearest in the band
+%! S = hole (solid.box (80, 40, 12), [40, 20, 12], 'M6', Inf, ...
+%!           'Engagement', 100);
+%! assert_equal (volume (S), 38400 - 2.5 ^ 2 * pi * 12, 1e-9);
+
+%!test  # on a UCS, at its origin and against its normal
+%! S = hole (solid.box (80, 40, 12), geom.UCS ([0, 0, 1], [40, 20, 12]), ...
+%!           8, 5);
+%! assert_equal (volume (S), 38400 - 16 * pi * 5, 1e-9);
+%! assert_equal (bbox (subtract (solid.box (80, 40, 12), S)), ...
+%!               [36, 16, 7, 44, 24, 12], 1e-9);
+
+%!test  # on a UCS at points in its plane
+%! U = geom.UCS ([1, 0, 0], [80, 20, 6]);
+%! S = hole (solid.box (80, 40, 12), U, 4, 10, 'At', [-10, 0; 10, 0]);
+%! assert_equal (bbox (subtract (solid.box (80, 40, 12), S)), ...
+%!               [70, 8, 4, 80, 32, 8], 1e-9);
+
+%!test  # an internal thread through a plate cuts the basic profile
+%! S = hole (solid.box (20, 20, 6), [10, 10, 6], 'M6', Inf);
+%! T = thread (S, [10, 10, 6], 'M6', Inf);
+%! a = 2.5;
+%! b = 3;
+%! c = tand (30);
+%! M = (b ^ 2 - a ^ 2) / 16 + 2 * c * (b * (b ^ 2 - a ^ 2) / 2 ...
+%!                                     - (b ^ 3 - a ^ 3) / 3);
+%! assert_equal (volume (S) - volume (T), 6 * 2 * pi * M, -1e-4);
+%! assert_equal (isvalid (T), true);
+
+%!test  # a blind thread reaches DEPTH and its root the nominal diameter
+%! S = hole (solid.box (20, 20, 20), [10, 10, 20], 'M6', 15);
+%! G = subtract (S, thread (S, [10, 10, 20], 'M6', 12));
+%! assert_equal (bbox (G), [7, 7, 8, 13, 13, 20], 1e-3);
+
+%!test  # an external thread on a rod below nominal is cut as turned
+%! S = solid.cylinder (4.95, 20);
+%! T = thread (S, [0, 0, 20], 'M10', Inf);
+%! a = (10 - 1.25 * sqrt (3) / 2 * 1.5) / 2;
+%! b = 4.95;
+%! c = tand (30);
+%! M = 1.5 / 4 * (b ^ 2 - a ^ 2) / 2 + 2 * c * ((b ^ 3 - a ^ 3) / 3 ...
+%!                                           - a * (b ^ 2 - a ^ 2) / 2);
+%! assert_equal (volume (S) - volume (T), 20 * 2 * pi * M / 1.5, -1e-4);
+%! assert_equal (isvalid (T), true);
+
+%!test  # a rod at nominal is turned to the top of 6g first
+%! T = thread (solid.cylinder (5, 20), [0, 0, 20], 'M10', Inf);
+%! assert_equal (bbox (T)([1, 2, 4, 5]), 4.984 * [-1, -1, 1, 1], 1e-5);
+
+%!test  # only the threaded length is turned down
+%! T = thread (solid.cylinder (5, 40), [0, 0, 40], 'M10', 15);
+%! assert_equal (bbox (T), [-5, -5, 0, 5, 5, 40], 1e-6);
+%! C = intersect (T, translate (solid.box (12, 12, 20), [-6, -6, 0]));
+%! assert_equal (volume (C), 500 * pi, -1e-9);
+
+%!test  # two threads on a UCS cut twice what one cuts
+%! U = geom.UCS ([0, 0, 1], [20, 10, 4]);
+%! S = hole (solid.box (40, 20, 4), U, 'M5', Inf, 'At', [-10, 0; 10, 0]);
+%! one = volume (S) - volume (thread (S, [10, 10, 4], 'M5', Inf));
+%! two = volume (S) - volume (thread (S, U, 'M5', Inf, 'At', [-10, 0; 10, 0]));
+%! assert_equal (two, 2 * one, -1e-3);
+
+%!test  # threading the empty shape
+%! assert_equal (isempty (thread (solid.Shape (), [0, 0, 0], 'M6', 5)), ...
+%!               true);
 
 %!test  # a rectangle 4 deep in the top of a plate
 %! R = geom.Region ([30, 15; 50, 15; 50, 25; 30, 25]);
@@ -3689,16 +4373,49 @@ endfunction
 %! shell (solid.Shape (), [], 1)
 %!error<solid.Shape.hole: invalid number of input arguments.> ...
 %! hole (solid.Shape (), [0, 0, 0], 5)
-%!error<solid.Shape.hole: P must be an M-by-3 real matrix of finite values.> ...
+%!error<solid.Shape.hole: P must be an M-by-3 real matrix of finite values or a geom.UCS.> ...
 %! hole (solid.Shape (), [0, 0], 5, 1)
-%!error<solid.Shape.hole: P must be an M-by-3 real matrix of finite values.> ...
+%!error<solid.Shape.hole: P must be an M-by-3 real matrix of finite values or a geom.UCS.> ...
 %! hole (solid.Shape (), [0, 0, NaN], 5, 1)
-%!error<solid.Shape.hole: D must be a positive and finite real scalar or an ISO metric coarse thread such as 'M6'.> ...
+%!error<solid.Shape.hole: Direction cannot be given when P is a geom.UCS, whose normal sets it.> ...
+%! hole (solid.Shape (), geom.UCS (), 5, 1, 'Direction', [0, 0, 1])
+%!error<solid.Shape.hole: At must be an N-by-2 real matrix of finite values.> ...
+%! hole (solid.Shape (), geom.UCS (), 5, 1, 'At', [1, 2, 3])
+%!error<solid.Shape.hole: At must be an N-by-2 real matrix of finite values.> ...
+%! hole (solid.Shape (), geom.UCS (), 5, 1, 'At', [1, NaN])
+%!error<solid.Shape.hole: At applies only when P is a geom.UCS.> ...
+%! hole (solid.Shape (), [0, 0, 0], 5, 1, 'At', [1, 2])
+%!error<solid.Shape.hole: D must be a positive and finite real scalar or the name of an ISO metric thread such as 'M6' or 'M10x1.25'.> ...
 %! hole (solid.Shape (), [0, 0, 0], -5, 1)
-%!error<solid.Shape.hole: D must be a positive and finite real scalar or an ISO metric coarse thread such as 'M6'.> ...
-%! hole (solid.Shape (), [0, 0, 0], 'M7', 1)
-%!error<solid.Shape.hole: D must be a positive and finite real scalar or an ISO metric coarse thread such as 'M6'.> ...
+%!error<solid.Shape.hole: Material and Engagement apply only to a named thread.> ...
+%! hole (solid.Shape (), [0, 0, 0], 5, 1, 'Material', 'steel')
+%!error<solid.Shape.hole: Material and Engagement apply only to a named thread.> ...
+%! hole (solid.Shape (), [0, 0, 0], 5, 1, 'Engagement', 90)
+%!error<solid.Shape.hole: 'm6' is not the name of an ISO metric thread.> ...
 %! hole (solid.Shape (), [0, 0, 0], 'm6', 1)
+%!error<solid.Shape.hole: 'M6x' is not the name of an ISO metric thread.> ...
+%! hole (solid.Shape (), [0, 0, 0], 'M6x', 1)
+%!error<solid.Shape.hole: 'M7.5' is not an ISO 261 thread.> ...
+%! hole (solid.Shape (), [0, 0, 0], 'M7.5', 1)
+%!error<solid.Shape.hole: 'M10x2' is not an ISO 261 thread.> ...
+%! hole (solid.Shape (), [0, 0, 0], 'M10x2', 1)
+%!error<solid.Shape.hole: 'M15' has no coarse pitch, so its name must give the pitch.> ...
+%! hole (solid.Shape (), [0, 0, 0], 'M15', 1)
+%!error<solid.Shape.hole: Material and Engagement cannot both be given.> ...
+%! hole (solid.Shape (), [0, 0, 0], 'M6', 1, 'Material', 'steel', ...
+%!       'Engagement', 90)
+%!error<solid.Shape.hole: Material must be a character vector.> ...
+%! hole (solid.Shape (), [0, 0, 0], 'M6', 1, 'Material', 1)
+%!error<solid.Shape.hole: unknown material 'wood'.> ...
+%! hole (solid.Shape (), [0, 0, 0], 'M6', 1, 'Material', 'wood')
+%!error<solid.Shape.hole: Engagement must be a real and finite scalar.> ...
+%! hole (solid.Shape (), [0, 0, 0], 'M6', 1, 'Engagement', [80, 90])
+%!error<solid.Shape.hole: Engagement must be a real and finite scalar.> ...
+%! hole (solid.Shape (), [0, 0, 0], 'M6', 1, 'Engagement', Inf)
+%!error<solid.Shape.hole: M6: engagement must lie between 78.2 and 100 %.> ...
+%! hole (solid.Shape (), [0, 0, 0], 'M6', 1, 'Engagement', 75)
+%!error<solid.Shape.hole: M6: engagement must lie between 78.2 and 100 %.> ...
+%! hole (solid.Shape (), [0, 0, 0], 'M6', 1, 'Engagement', 101)
 %!error<solid.Shape.hole: DEPTH must be positive, or Inf for a through hole.> ...
 %! hole (solid.Shape (), [0, 0, 0], 5, 0)
 %!error<solid.Shape.hole: DEPTH must be positive, or Inf for a through hole.> ...
@@ -3726,6 +4443,32 @@ endfunction
 %! hole (solid.Shape (), [0, 0, 0], 5, 10, 'Tip', 0)
 %!error<solid.Shape.hole: Tip applies to blind holes only.> ...
 %! hole (solid.Shape (), [0, 0, 0], 5, Inf, 'Tip', 118)
+%!error<solid.Shape.thread: invalid number of input arguments.> ...
+%! thread (solid.Shape (), [0, 0, 0], 'M6')
+%!error<solid.Shape.thread: P must be an M-by-3 real matrix of finite values or a geom.UCS.> ...
+%! thread (solid.Shape (), [0, 0], 'M6', 1)
+%!error<solid.Shape.thread: Direction cannot be given when P is a geom.UCS, whose normal sets it.> ...
+%! thread (solid.Shape (), geom.UCS (), 'M6', 1, 'Direction', [0, 0, 1])
+%!error<solid.Shape.thread: At applies only when P is a geom.UCS.> ...
+%! thread (solid.Shape (), [0, 0, 0], 'M6', 1, 'At', [1, 2])
+%!error<solid.Shape.thread: unknown option 'Tip'.> ...
+%! thread (solid.Shape (), [0, 0, 0], 'M6', 1, 'Tip', 118)
+%!error<solid.Shape.thread: NAME must be the name of an ISO metric thread such as 'M6' or 'M10x1.25'.> ...
+%! thread (solid.Shape (), [0, 0, 0], 6, 1)
+%!error<solid.Shape.thread: 'M7.5' is not an ISO 261 thread.> ...
+%! thread (solid.Shape (), [0, 0, 0], 'M7.5', 1)
+%!error<solid.Shape.thread: DEPTH must be positive, or Inf to thread right through.> ...
+%! thread (solid.Shape (), [0, 0, 0], 'M6', 0)
+%!error<solid.Shape.thread: M6 at \(10, 10, 20\): the axis meets neither a bore from 4.917 up to 6 nor a cylinder from 5.675 to 6.> ...
+%! thread (solid.box (20, 20, 20), [10, 10, 20], 'M6', 5)
+%!error<solid.Shape.thread: M6 at \(10, 10, 20\): the axis meets neither a bore from 4.917 up to 6 nor a cylinder from 5.675 to 6.> ...
+%! thread (hole (solid.box (20, 20, 20), [10, 10, 20], 6.5, 10), ...
+%!         [10, 10, 20], 'M6', 5)
+%!error<solid.Shape.thread: M6 at \(0, 0, 20\): the axis meets neither a bore from 4.917 up to 6 nor a cylinder from 5.675 to 6.> ...
+%! thread (solid.cylinder (2.75, 20), [0, 0, 20], 'M6', 5)
+%!error<solid.Shape.thread: M6 at \(10, 10, 20\): the bore is shallower than the thread.> ...
+%! thread (hole (solid.box (20, 20, 20), [10, 10, 20], 'M6', 8), ...
+%!         [10, 10, 20], 'M6', 12)
 %!error<solid.Shape.pocket: invalid number of input arguments.> ...
 %! pocket (solid.Shape (), geom.Region ([0, 0; 1, 0; 1, 1]))
 %!error<solid.Shape.pocket: R must be a geom.Region object.> ...
