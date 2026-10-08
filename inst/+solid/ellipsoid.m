@@ -78,9 +78,12 @@ endfunction
 
 ## A volume of an ellipsoid takes Open CASCADE seconds, so the tests measure
 ## its cuts, ellipses whose areas are known
-%!test
+%!xtest  # Open CASCADE 8.0.1 gives xmin -19.8263: OCCT issue 1604
 %! S = solid.ellipsoid (20, 10, 5);
 %! assert_equal (bbox (S), [-20, -10, -5, 20, 10, 5], 1e-6);
+
+%!test
+%! S = solid.ellipsoid (20, 10, 5);
 %! assert_equal (isvalid (S), true);
 %! R = section (S, geom.UCS ([0, 0, 1], [0, 0, 3]));
 %! assert_equal (__area__ (R{1}.Outline), 128 * pi, -1e-8);
