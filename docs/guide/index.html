@@ -73,6 +73,7 @@
               <li><a href="13_surfaces.html">Surfaces through a grid</a></li>
               <li><a href="14_parts_as_functions.html">Parts as functions</a></li>
               <li><a href="15_testing_parts.html">Testing parts</a></li>
+              <li><a href="16_holes_and_threads.html">Holes and threads</a></li>
             </ul>
 <!-- /guide-nav -->
           </nav>
@@ -106,6 +107,7 @@
 <li><a href="13_surfaces.html">Surfaces through a grid</a>: A shape written as rows and columns of points, as <code>meshgrid</code> makes them, is how many OpenSCAD users build what has no primitive: a ripple, a landscape, a lid that swells. This tutorial makes one such surface twice, first as facets with <code>solid.polyhedron</code>, then as an exact surface with <code>solid.surface</code>, and gives it a thickness so it can be printed.</li>
 <li><a href="14_parts_as_functions.html">Parts as functions</a>: A part wanted again in other sizes is, in OpenSCAD, a <code>module</code> with parameters. In Octave it is a function: a file of its own, named after the part, that takes the dimensions and returns the solid. Any script then calls it like any other function, and the next tutorial gives it tests.</li>
 <li><a href="15_testing_parts.html">Testing parts</a>: A part written as code can be checked by code. Octave keeps the tests of a function in the function's own file, in blocks after its code, and <code>test</code> runs them. This package is tested that way, and a part is too: its volume is the one intended, it fits the parts around it, and a size that cannot be made is refused.</li>
+<li><a href="16_holes_and_threads.html">Holes and threads</a>: A tapped hole is made in two steps, as in the workshop: <code>hole</code> drills it for the tap, and <code>thread</code> cuts the thread. The same <code>thread</code> cuts the thread of a rod, turned down first as a machinist turns a blank. Then a bolt circle is placed on a face picked in the viewer.</li>
 </ol>
 
         </main>

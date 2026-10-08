@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Holes and threads - drafting guide</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" integrity="sha512-1ycn6IcaQQ40/MKBW2W4Rhis/DbILU74C1vSrLJxCq57o941Ym01SwNsOMqvEBFlcgUa6xLiPY/NS5R+E6ztJQ==" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/css/bootstrap.min.css" integrity="sha384-KyZXEAg3QhqLMpG8r+8fhAXLRk2vvoC2f3B09zVXn8CA5QIVfZOJ3BCsw2P0p/We" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-U1DAWAznBHeqEIlVSCgzq+c9gqGAJn5c/t99JyeKa9xxaYpSvHU5awsuZVVFIhvj" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="guide.css">
+  </head>
+  <body>
+    <div class="bg-dark">
+      <div class="container-xl">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+          <div class="container-fluid">
+            <a class="navbar-brand" href="index.html">
+              <img src="../assets/drafting.png" alt="drafting" class="d-inline-block align-top" width="25" height="25">
+              drafting guide
+            </a>
+            <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+              <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+              <ul class="navbar-nav">
+                <li class="nav-item">
+                  <a class="nav-link" href="../index.html">
+                    <i class="fas fa-book"></i>
+                    Function reference
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="https://github.com/pr0m1th3as/drafting">
+                    <i class="fab fa-github"></i>
+                    Source
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </nav>
+      </div>
+    </div>
+    <div class="container-xl my-4">
+      <div class="row">
+        <div class="col-md-3 col-lg-2 mb-4">
+          <nav class="guide-nav">
+<!-- guide-nav -->
+            <h6>Guide</h6>
+            <ul>
+              <li><a href="index.html">Overview</a></li>
+              <li><a href="layout.html">Package layout</a></li>
+              <li><a href="dxf.html">DXF and the classes</a></li>
+            </ul>
+            <h6>Octave</h6>
+            <ul>
+              <li><a href="primer.html">A brief Octave primer</a></li>
+            </ul>
+            <h6>Tutorials</h6>
+            <ul>
+              <li><a href="01_first_part.html">A first part</a></li>
+              <li><a href="02_outlines.html">Outlines: polylines, splines, paths and regions</a></li>
+              <li><a href="03_regions.html">Working with regions</a></li>
+              <li><a href="04_coordinate_systems.html">Coordinate systems</a></li>
+              <li><a href="05_solids_from_regions.html">Solids from regions</a></li>
+              <li><a href="06_primitives_and_booleans.html">Primitives, booleans and transforms</a></li>
+              <li><a href="07_features.html">Features: holes, pockets, fillets, chamfers and shells</a></li>
+              <li><a href="08_sections_and_projections.html">Sections and projections</a></li>
+              <li><a href="09_drawings.html">Technical drawings</a></li>
+              <li><a href="10_meshes.html">Meshes</a></li>
+              <li><a href="11_assemblies.html">Assemblies</a></li>
+              <li><a href="12_from_openscad.html">For OpenSCAD users</a></li>
+              <li><a href="13_surfaces.html">Surfaces through a grid</a></li>
+              <li><a href="14_parts_as_functions.html">Parts as functions</a></li>
+              <li><a href="15_testing_parts.html">Testing parts</a></li>
+              <li><a href="16_holes_and_threads.html" class="active">Holes and threads</a></li>
+            </ul>
+<!-- /guide-nav -->
+          </nav>
+        </div>
+        <main class="col-md-9 col-lg-10">
+<h1>Holes and threads</h1>
+<p>A tapped hole is made in two steps, as in the workshop: <code>hole</code> drills it for the tap, and <code>thread</code> cuts the thread. The same <code>thread</code> cuts the thread of a rod, turned down first as a machinist turns a blank. Then a bolt circle is placed on a face picked in the viewer.</p>
+<h2>Tapping holes</h2>
+<p>Naming a thread drills the hole for tapping it by hand. A coarse thread is named by its diameter, <code>'M6'</code>, a fine one with its pitch, <code>'M10x1.25'</code>, from M1 to M64. The drill is the one ISO 2306 lists: 5 for M6, 6.8 for M8, 8.8 for M10x1.25.</p>
+<pre class="code-in"><code>block = solid.box (60, 30, 20);
+block = hole (block, [15, 15, 20], 'M6', 16);
+block = hole (block, [45, 15, 20], 'M10x1.25', 16);</code></pre>
+<p>Every drill stays inside the 6H band of the thread's minor diameter, so a drawing that states 6H is met whatever the material. A tough material takes a larger drill and less engagement than a soft one: <code>'Material', 'stainless'</code> takes the largest drill in the band, 6.9 for M8 against 6.8 in steel. <code>'Engagement'</code> asks for the engagement as a percentage, 100 drilling at the minor diameter, and the drill is the one nearest it in the band. A percentage the band cannot give is refused, with the band it allows.</p>
+<pre class="code-in"><code>nut = solid.cylinder (8, 8);
+nut = hole (nut, [0, 0, 8], 'M8', Inf, 'Material', 'stainless');
+hole (nut, [0, 0, 8], 'M6', Inf, 'Engagement', 60);</code></pre>
+<pre class="code-out"><code>solid.Shape.hole: M6: engagement must lie between 78.2 and 100 %.</code></pre>
+<h2>Internal threads</h2>
+<p><code>thread</code> takes the point and depth <code>hole</code> took. The holes are drilled 16 deep, and a thread deeper than its bore would drill the bore deeper, so it is refused.</p>
+<pre class="code-in"><code>thread (block, [15, 15, 20], 'M6', 18);</code></pre>
+<pre class="code-out"><code>solid.Shape.thread: M6 at (15, 15, 20): the bore is shallower than the thread.</code></pre>
+<p>Threaded 12, the tap has room at the bottom. The thread is the basic profile of ISO 68-1, its crest left where the drill left it.</p>
+<pre class="code-in"><code>block = thread (block, [15, 15, 20], 'M6', 12);
+block = thread (block, [45, 15, 20], 'M10x1.25', 12);</code></pre>
+<p>Cut in half along the axes, the block shows both threads.</p>
+<pre class="code-in"><code>half = subtract (block, solid.box (60, 15, 20));
+show (half);</code></pre>
+<figure class="shot"><img src="img/16_holes_and_threads-1.png" alt="Holes and threads, picture 1"></figure>
+<h2>External threads</h2>
+<p>Where the axis runs into a solid cylinder, the thread is external. A rod is designed at its nominal diameter, 10 for M10, and a machinist turns it down a little before threading it. <code>thread</code> does the same over the threaded length: to the top of tolerance class 6g, 9.968 for M10, so the thread fits every standard nut. The rod below keeps its full diameter where it is not threaded.</p>
+<pre class="code-in"><code>rod = solid.cylinder (5, 40);
+rod = thread (rod, [0, 0, 40], 'M10', 15);
+show (rod);</code></pre>
+<figure class="shot"><img src="img/16_holes_and_threads-2.png" alt="Holes and threads, picture 2"></figure>
+<p>A rod turned to another diameter in the design, between 9.513 and 10 for M10, is threaded as it is. A cylinder outside that range, or a bore outside its own, is refused with the diameters the thread takes.</p>
+<pre class="code-in"><code>thread (solid.cylinder (4.5, 40), [0, 0, 40], 'M10', 15);</code></pre>
+<pre class="code-out"><code>solid.Shape.thread: M10 at (0, 0, 40): the axis meets neither a bore from 8.376 up to 10 nor a cylinder from 9.513 to 10.</code></pre>
+<h2>A bolt circle on a picked face</h2>
+<p>A flange 80 square with a bore of 40 through it takes six M8 screws on a circle of 60.</p>
+<pre class="code-in"><code>flange = solid.box (80, 80, 12);
+flange = hole (flange, [40, 40, 12], 40, Inf);</code></pre>
+<p><code>pickucs</code> picks the top face as the sheet: the face, then the corner where the origin goes, then the corner its <i>x</i> axis runs towards, and Enter. The build clicks at those points, as in the tutorial on coordinate systems.</p>
+<pre class="code-in"><code>V = show (flange);
+[U, CODE] = pickucs (V)</code></pre>
+<pre class="code-out"><code>U =
+
+  geom.UCS: origin [0, 0, 12], x axis [1, 0, 0], normal [0, 0, 1]
+
+CODE = geom.UCS ([0, 0, 1], [0, 0, 12], [1, 0, 12])</code></pre>
+<figure class="shot"><img src="img/16_holes_and_threads-3.png" alt="Holes and threads, picture 3"></figure>
+<p><code>CODE</code> goes in the script in place of the pick.</p>
+<pre class="code-in"><code>U = geom.UCS ([0, 0, 1], [0, 0, 12], [1, 0, 12]);</code></pre>
+<p>With a UCS in place of the point, <code>hole</code> and <code>thread</code> work against its normal, into the part, and <code>'At'</code> gives the points in the face's own coordinates: one call drills the circle, and one threads it.</p>
+<pre class="code-in"><code>a = (0:60:300)';
+XY = [40 + 30 * cosd(a), 40 + 30 * sind(a)];
+flange = hole (flange, U, 'M8', Inf, 'At', XY);
+flange = thread (flange, U, 'M8', Inf, 'At', XY);
+show (flange);</code></pre>
+<figure class="shot"><img src="img/16_holes_and_threads-4.png" alt="Holes and threads, picture 4"></figure>
+<nav class="d-flex justify-content-between my-5">
+<a href="15_testing_parts.html">&larr; Testing parts</a>
+</nav>
+
+        </main>
+      </div>
+    </div>
+  </body>
+</html>
