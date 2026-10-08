@@ -73,7 +73,9 @@ jobs:
           if [ -n "$ARCHIVE" ]; then
             occt=(--volume "$(dirname "$ARCHIVE"):/occt"
                   --env OCCT="$(basename "$ARCHIVE")")
-            PACKAGES=libx11-dev
+            # Ubuntu's Open CASCADE packages would bring fontconfig and a
+            # font, which geom.text needs
+            PACKAGES="libx11-dev fontconfig fonts-dejavu-core"
           fi
           docker run --rm --volume "$PWD:/work" --workdir /work "${occt[@]}" \
             --env PACKAGES --env CODE="$code" \
