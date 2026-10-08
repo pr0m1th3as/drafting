@@ -139,10 +139,14 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <TopExp_Explorer.hxx>
 #include <SelectMgr_ViewerSelector.hxx>
 #include <Standard_Failure.hxx>
+#include <Standard_Version.hxx>
 #include <StdSelect_BRepOwner.hxx>
 #include <TopExp.hxx>
-#include <TopTools_IndexedDataMapOfShapeListOfShape.hxx>
-#include <TopTools_IndexedMapOfShape.hxx>
+#include <NCollection_IndexedDataMap.hxx>
+#include <NCollection_List.hxx>
+#include <NCollection_IndexedMap.hxx>
+#include <NCollection_Vec2.hxx>
+#include <TopTools_ShapeMapHasher.hxx>
 #include <TopoDS.hxx>
 #include <TopoDS_Edge.hxx>
 #include <TopoDS_Face.hxx>
@@ -160,6 +164,24 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 
 using namespace std;
 
+// The message of an Open CASCADE exception, which 8.0 made a std::exception
+static const char *
+failure (const Standard_Failure& e)
+{
+#if OCC_VERSION_MAJOR >= 8
+  return e.what ();
+#else
+  return e.GetMessageString ();
+#endif
+}
+
+// The collections of shapes, named here since Open CASCADE 8.0 deprecates
+// the names it gave them
+using ShapeList = NCollection_List<TopoDS_Shape>;
+using ShapeMap = NCollection_IndexedMap<TopoDS_Shape, TopTools_ShapeMapHasher>;
+using ShapeListMap = NCollection_IndexedDataMap<TopoDS_Shape, ShapeList,
+                                                TopTools_ShapeMapHasher>;
+
 static void
 reply (const string& line)
 {
@@ -175,20 +197,20 @@ class seamfilter : public SelectMgr_Filter
 {
 public:
 
-  seamfilter (const TopTools_IndexedMapOfShape& edges, const set<int>& skip,
-              const TopTools_IndexedMapOfShape& vertices,
+  seamfilter (const ShapeMap& edges, const set<int>& skip,
+              const ShapeMap& vertices,
               const set<int>& vskip)
     : m_edges (edges), m_skip (skip), m_vertices (vertices), m_vskip (vskip)
   { }
 
-  Standard_Boolean IsOk (const Handle (SelectMgr_EntityOwner)& owner)
+  bool IsOk (const Handle (SelectMgr_EntityOwner)& owner)
     const override
   {
     Handle (StdSelect_BRepOwner) o = Handle (StdSelect_BRepOwner)::DownCast
                                        (owner);
     if (o.IsNull () || ! o->HasShape ())
     {
-      return Standard_True;
+      return true;
     }
     const TopoDS_Shape& s = o->Shape ();
     if (s.ShapeType () == TopAbs_EDGE)
@@ -199,14 +221,14 @@ public:
     {
       return m_vskip.count (m_vertices.FindIndex (s)) == 0;
     }
-    return Standard_True;
+    return true;
   }
 
 private:
 
-  const TopTools_IndexedMapOfShape& m_edges;
+  const ShapeMap& m_edges;
   const set<int>& m_skip;
-  const TopTools_IndexedMapOfShape& m_vertices;
+  const ShapeMap& m_vertices;
   const set<int>& m_vskip;
 };
 
@@ -230,7 +252,7 @@ public:
 
   void Compute (const Handle (PrsMgr_PresentationManager)& mgr,
                 const Handle (Prs3d_Presentation)& prs,
-                const Standard_Integer mode) override
+                const int mode) override
   {
     if (! mesh || mode != AIS_Shaded)
     {
@@ -290,7 +312,7 @@ public:
   }
 
   void ComputeSelection (const Handle (SelectMgr_Selection)& sel,
-                         const Standard_Integer mode) override
+                         const int mode) override
   {
     if (mode != AIS_Shape::SelectionMode (TopAbs_FACE))
     {
@@ -312,7 +334,7 @@ public:
                                    StdSelect_BRepSelectionTool::
                                    GetStandardPriority (f, TopAbs_FACE));
       sel->Add (new Select3D_SensitiveTriangulation (owner, tri, loc,
-                                                     Standard_True));
+                                                     true));
     }
   }
 };
@@ -342,7 +364,7 @@ public:
     // than about the middle of the part, which stays where it was; or about
     // the point a double click chose
     SetRotationMode (AIS_RotationMode_CameraAt);
-    SetShowRotateCenter (Standard_True);
+    SetShowRotateCenter (true);
 
     // The world axes in a corner, turning with the view, clear of the
     // prompts at the lower left
@@ -350,7 +372,7 @@ public:
                              V3d_ZBUFFER);
     if (hidden)
     {
-      m_window->SetVirtual (Standard_True);
+      m_window->SetVirtual (true);
     }
     else
     {
@@ -368,9 +390,9 @@ public:
     // Draw sharp and tangent edges over the shading, but not the seams where
     // a curved face closes on itself
     const Handle (Prs3d_Drawer)& dr = m_context->DefaultDrawer ();
-    dr->SetFaceBoundaryDraw (Standard_True);
+    dr->SetFaceBoundaryDraw (true);
     dr->SetFaceBoundaryUpperContinuity (GeomAbs_G1);
-    m_context->SetAutomaticHilight (Standard_True);
+    m_context->SetAutomaticHilight (true);
 
     // What a pick holds stays drawn in a strong colour, edges thick and faces
     // filled, so that a click visibly took; what lies under the pointer keeps
@@ -419,7 +441,7 @@ public:
       XNextEvent (d, &e);
       m_window->ProcessMessage (*this, e);
     }
-    FlushViewEvents (m_context, m_view, Standard_True);
+    FlushViewEvents (m_context, m_view, true);
   }
 
   void command (const string& line, const string& data)
@@ -542,7 +564,7 @@ public:
     {
       for (const Handle (AIS_Point)& m : m_marks)
       {
-        m_context->Remove (m, Standard_False);
+        m_context->Remove (m, false);
       }
       m_marks.clear ();
     }
@@ -550,7 +572,7 @@ public:
     {
       double x, y, z;
       in >> x >> y >> z;
-      Standard_Integer px, py;
+      int px, py;
       m_view->Convert (x, y, z, px, py);
       reply ("point " + to_string (px) + " " + to_string (py));
     }
@@ -560,13 +582,13 @@ public:
       int px, py;
       in >> kind >> px >> py;
       activate (kindcode (kind));
-      m_context->MoveTo (px, py, m_view, Standard_False);
+      m_context->MoveTo (px, py, m_view, false);
       string r = "none";
       if (m_context->HasDetected ())
       {
         r = describe (m_context->DetectedOwner ());
       }
-      m_context->ClearDetected (Standard_False);
+      m_context->ClearDetected (false);
       activate (m_pick);
       reply (r.empty () ? "none" : r);
     }
@@ -585,7 +607,7 @@ public:
       }
       else
       {
-        m_context->MoveTo (px, py, m_view, Standard_False);
+        m_context->MoveTo (px, py, m_view, false);
         m_context->SelectDetected (AIS_SelectionScheme_XOR);
         reply ("selected " + to_string (m_context->NbSelected ()));
       }
@@ -612,15 +634,15 @@ public:
       int px, py, qx, qy;
       in >> px >> py >> qx >> qy;
       const Aspect_VKeyFlags none = Aspect_VKeyFlags_NONE;
-      PressMouseButton (Graphic3d_Vec2i (px, py), Aspect_VKeyMouse_LeftButton,
-                        none, false);
-      FlushViewEvents (m_context, m_view, Standard_True);
-      UpdateMousePosition (Graphic3d_Vec2i (qx, qy),
+      PressMouseButton (NCollection_Vec2<int> (px, py),
+                        Aspect_VKeyMouse_LeftButton, none, false);
+      FlushViewEvents (m_context, m_view, true);
+      UpdateMousePosition (NCollection_Vec2<int> (qx, qy),
                            Aspect_VKeyMouse_LeftButton, none, false);
-      FlushViewEvents (m_context, m_view, Standard_True);
-      ReleaseMouseButton (Graphic3d_Vec2i (qx, qy),
+      FlushViewEvents (m_context, m_view, true);
+      ReleaseMouseButton (NCollection_Vec2<int> (qx, qy),
                           Aspect_VKeyMouse_LeftButton, none, false);
-      FlushViewEvents (m_context, m_view, Standard_True);
+      FlushViewEvents (m_context, m_view, true);
       reply ("dragged");
     }
     else if (cmd == "view")
@@ -670,13 +692,13 @@ public:
       m_quit = true;
     }
     m_view->Invalidate ();
-    FlushViewEvents (m_context, m_view, Standard_True);
+    FlushViewEvents (m_context, m_view, true);
   }
 
   void ProcessExpose () override
   {
     m_view->Invalidate ();
-    FlushViewEvents (m_context, m_view, Standard_True);
+    FlushViewEvents (m_context, m_view, true);
   }
 
   void ProcessConfigure (bool resized) override
@@ -686,7 +708,7 @@ public:
       m_view->MustBeResized ();
     }
     m_view->Invalidate ();
-    FlushViewEvents (m_context, m_view, Standard_True);
+    FlushViewEvents (m_context, m_view, true);
   }
 
   void ProcessClose () override
@@ -720,7 +742,7 @@ public:
         }
         break;
       case Aspect_VKey_F:
-        m_view->FitAll (0.05, Standard_False);
+        m_view->FitAll (0.05, false);
         m_hascentre = false;
         break;
       case Aspect_VKey_C:
@@ -764,7 +786,7 @@ public:
 protected:
 
   // A double click outside a pick chooses the centre the view turns about
-  bool UpdateMouseClick (const Graphic3d_Vec2i& p, Aspect_VKeyMouse b,
+  bool UpdateMouseClick (const NCollection_Vec2<int>& p, Aspect_VKeyMouse b,
                          Aspect_VKeyFlags m, bool dbl) override
   {
     if (dbl && b == Aspect_VKeyMouse_LeftButton && m_pick == 0 && m_one == 0)
@@ -793,7 +815,7 @@ protected:
     if ((m_one != 0 || (m_pick != 0 && m_mesh))
         && ! myGL.Selection.Points.IsEmpty ())
     {
-      const Graphic3d_Vec2i p = myGL.Selection.Points.Last ();
+      const NCollection_Vec2<int> p = myGL.Selection.Points.Last ();
       myGL.Selection.Points.Clear ();
       if (m_one != 0)
       {
@@ -820,7 +842,7 @@ private:
     const uint32_t *f = reinterpret_cast<const uint32_t *>
                           (data.data () + 24 * nv);
     Handle (Poly_Triangulation) tri
-      = new Poly_Triangulation (3 * nf, nf, Standard_False, Standard_True);
+      = new Poly_Triangulation (3 * nf, nf, false, true);
     for (size_t t = 0; t < nf; t++)
     {
       gp_Pnt c[3];
@@ -928,7 +950,7 @@ private:
     }
     dress (ps);
     ps->SetToUpdate ();
-    m_context->Redisplay (ps, Standard_False);
+    m_context->Redisplay (ps, false);
   }
 
   // The corners of the triangle of a mesh that the last detection found
@@ -945,7 +967,7 @@ private:
   // with the index of the triangle and its normal, and marked
   void meshadd (int px, int py)
   {
-    m_context->MoveTo (px, py, m_view, Standard_False);
+    m_context->MoveTo (px, py, m_view, false);
     gp_Pnt c[3];
     if (m_context->HasDetected () && facet (c))
     {
@@ -961,7 +983,7 @@ private:
         mark (hit);
       }
     }
-    m_context->ClearDetected (Standard_False);
+    m_context->ClearDetected (false);
   }
 
   // A pickone on a mesh: the triangle at the pixel PX, PY, as its normal and
@@ -975,7 +997,7 @@ private:
       return;
     }
     const gp_Pnt hit = m_context->MainSelector ()->PickedPoint (1);
-    m_context->ClearDetected (Standard_False);
+    m_context->ClearDetected (false);
     if (m_one == 2)
     {
       gp_Vec n = gp_Vec (c[0], c[1]).Crossed (gp_Vec (c[0], c[2]));
@@ -990,7 +1012,7 @@ private:
     }
     auto near = [&] (const gp_Pnt& p)
     {
-      Standard_Integer qx, qy;
+      int qx, qy;
       m_view->Convert (p.X (), p.Y (), p.Z (), qx, qy);
       return std::hypot (qx - px, qy - py);
     };
@@ -1028,7 +1050,7 @@ private:
   // nothing when the click found nothing
   void onepick (int px, int py)
   {
-    m_context->MoveTo (px, py, m_view, Standard_False);
+    m_context->MoveTo (px, py, m_view, false);
     if (! m_context->HasDetected ())
     {
       return;
@@ -1082,12 +1104,12 @@ private:
       r = "point";
       mark (p);
       r += num (p) + " " + snap;
-      m_context->ClearDetected (Standard_False);
+      m_context->ClearDetected (false);
       reply (r);
       endone ("");
       return;
     }
-    m_context->ClearDetected (Standard_False);
+    m_context->ClearDetected (false);
     reply (r + num (p));
     endone ("");
   }
@@ -1116,7 +1138,7 @@ private:
     m->SetMarker (Aspect_TOM_BALL);
     m->SetColor (Quantity_Color (1.0, 0.35, 0.0, Quantity_TOC_sRGB));
     m->SetZLayer (Graphic3d_ZLayerId_Topmost);
-    m_context->Display (m, 0, -1, Standard_False);
+    m_context->Display (m, 0, -1, false);
     m_marks.push_back (m);
   }
 
@@ -1128,7 +1150,7 @@ private:
   void turn (V3d_TypeOfOrientation o)
   {
     m_view->SetProj (o);
-    m_view->FitAll (0.05, Standard_False);
+    m_view->FitAll (0.05, false);
     m_hascentre = false;
   }
 
@@ -1156,7 +1178,7 @@ private:
     cam->SetEyeAndCenter (c.Translated (gp_Vec (eye) * cam->Distance ()), c);
     cam->SetUp (up);
     cam->OrthogonalizeUp ();
-    m_view->FitAll (0.05, Standard_False);
+    m_view->FitAll (0.05, false);
     m_hascentre = false;
   }
 
@@ -1190,8 +1212,8 @@ private:
   {
     activate (2);
     gp_Pnt p;
-    m_hascentre = PickPoint (p, m_context, m_view, Graphic3d_Vec2i (px, py),
-                             false);
+    m_hascentre = PickPoint (p, m_context, m_view,
+                             NCollection_Vec2<int> (px, py), false);
     activate (m_pick);
     if (m_hascentre)
     {
@@ -1218,7 +1240,7 @@ private:
     m_skip.clear ();
     TopExp::MapShapes (s, TopAbs_EDGE, m_edges);
     TopExp::MapShapes (s, TopAbs_FACE, m_faces);
-    TopTools_IndexedDataMapOfShapeListOfShape anc;
+    ShapeListMap anc;
     TopExp::MapShapesAndAncestors (s, TopAbs_EDGE, TopAbs_FACE, anc);
     for (int i = 1; i <= m_edges.Extent (); i++)
     {
@@ -1243,7 +1265,7 @@ private:
     m_vertices.Clear ();
     m_vskip.clear ();
     TopExp::MapShapes (s, TopAbs_VERTEX, m_vertices);
-    TopTools_IndexedDataMapOfShapeListOfShape vanc;
+    ShapeListMap vanc;
     TopExp::MapShapesAndAncestors (s, TopAbs_VERTEX, TopAbs_EDGE, vanc);
     for (int i = 1; i <= m_vertices.Extent (); i++)
     {
@@ -1269,7 +1291,7 @@ private:
     const bool first = m_shape.IsNull ();
     if (! first)
     {
-      m_context->Remove (m_shape, Standard_False);
+      m_context->Remove (m_shape, false);
       m_shape.Nullify ();
     }
     if (s.IsNull ())
@@ -1285,15 +1307,15 @@ private:
       Bnd_Box b;
       BRepBndLib::Add (s, b);
       const double size = sqrt (b.SquareExtent ());
-      BRepMesh_IncrementalMesh (s, 1e-3 * size, Standard_False, 0.25,
-                                Standard_True);
+      BRepMesh_IncrementalMesh (s, 1e-3 * size, false, 0.25,
+                                true);
     }
 
     Handle (pickshape) ps = new pickshape (s);
     ps->mesh = mesh;
     if (mesh)
     {
-      ps->Attributes ()->SetAutoTriangulation (Standard_False);
+      ps->Attributes ()->SetAutoTriangulation (false);
       dress (ps);
     }
     m_shape = ps;
@@ -1301,7 +1323,7 @@ private:
     m_shape->SetMaterial (Graphic3d_NameOfMaterial_Plastified);
     if (! mesh && ! m_solidcolours.empty ())
     {
-      TopTools_IndexedMapOfShape solids;
+      ShapeMap solids;
       TopExp::MapShapes (s, TopAbs_SOLID, solids);
       for (const auto& c : m_solidcolours)
       {
@@ -1315,11 +1337,11 @@ private:
     // not, then left with nothing active until a pick asks for something
     m_context->Display (m_shape, AIS_Shaded,
                         AIS_Shape::SelectionMode (TopAbs_FACE),
-                        Standard_False);
+                        false);
     activate (m_pick);
     if (first)
     {
-      m_view->FitAll (0.05, Standard_False);
+      m_view->FitAll (0.05, false);
       m_hascentre = false;
     }
   }
@@ -1401,7 +1423,7 @@ private:
       m_points.clear ();
       for (const Handle (AIS_Point)& m : m_marks)
       {
-        m_context->Remove (m, Standard_False);
+        m_context->Remove (m, false);
       }
       m_marks.clear ();
     }
@@ -1418,7 +1440,7 @@ private:
       }
     }
     reply (accept ? "done" : "cancel");
-    m_context->ClearSelected (Standard_False);
+    m_context->ClearSelected (false);
     m_pick = 0;
     activate (0);
     label ("");
@@ -1428,7 +1450,7 @@ private:
   {
     if (! m_label.IsNull ())
     {
-      m_context->Remove (m_label, Standard_False);
+      m_context->Remove (m_label, false);
       m_label.Nullify ();
     }
     if (text.empty ())
@@ -1441,9 +1463,9 @@ private:
     m_label->SetHeight (16);
     m_label->SetTransformPersistence
       (new Graphic3d_TransformPers (Graphic3d_TMF_2d, Aspect_TOTP_LEFT_LOWER,
-                                    Graphic3d_Vec2i (20, 20)));
+                                    NCollection_Vec2<int> (20, 20)));
     m_label->SetZLayer (Graphic3d_ZLayerId_TopOSD);
-    m_context->Display (m_label, 0, -1, Standard_False);
+    m_context->Display (m_label, 0, -1, false);
   }
 
   Handle (Aspect_DisplayConnection) m_display;
@@ -1453,9 +1475,9 @@ private:
   Handle (V3d_View) m_view;
   Handle (AIS_Shape) m_shape;
   Handle (AIS_TextLabel) m_label;
-  TopTools_IndexedMapOfShape m_edges;
-  TopTools_IndexedMapOfShape m_faces;
-  TopTools_IndexedMapOfShape m_vertices;
+  ShapeMap m_edges;
+  ShapeMap m_faces;
+  ShapeMap m_vertices;
   set<int> m_skip;
   set<int> m_vskip;
   vector<Handle (AIS_Point)> m_marks;
@@ -1493,7 +1515,7 @@ main (int argc, char **argv)
   }
   catch (const Standard_Failure& e)
   {
-    reply (string ("error ") + e.GetMessageString ());
+    reply (string ("error ") + failure (e));
     return 1;
   }
   reply ("ready");
@@ -1561,7 +1583,7 @@ main (int argc, char **argv)
       }
       catch (const Standard_Failure& e)
       {
-        reply (string ("error ") + e.GetMessageString ());
+        reply (string ("error ") + failure (e));
       }
       if (v->done ())
       {

@@ -37,14 +37,15 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <TopLoc_Location.hxx>
 #include <TDF_Tool.hxx>
 #include <BRepBuilderAPI_MakeShape.hxx>
-#include <TopTools_DataMapOfShapeInteger.hxx>
+#include <NCollection_DataMap.hxx>
 #include <Quantity_Color.hxx>
 #include <XCAFDoc_ShapeTool.hxx>
 #include <XCAFDoc_DocumentTool.hxx>
 #include <XCAFDoc_ColorTool.hxx>
 #include <XCAFApp_Application.hxx>
 #include <TDocStd_Document.hxx>
-#include <TDF_LabelSequence.hxx>
+#include <NCollection_Sequence.hxx>
+#include <TDF_Label.hxx>
 #include <TDataStd_Name.hxx>
 #include <STEPCAFControl_Writer.hxx>
 #include <STEPCAFControl_Reader.hxx>
@@ -106,7 +107,7 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <GeomAPI_PointsToBSplineSurface.hxx>
 #include <GeomLProp_SLProps.hxx>
 #include <Precision.hxx>
-#include <TColgp_Array2OfPnt.hxx>
+#include <NCollection_Array2.hxx>
 #include <GeomLib_IsPlanarSurface.hxx>
 #include <Geom2d_BSplineCurve.hxx>
 #include <Geom2d_Line.hxx>
@@ -117,26 +118,28 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <BndLib_Add2dCurve.hxx>
 #include <Bnd_Box2d.hxx>
 #include <IntRes2d_IntersectionSegment.hxx>
-#include <TColgp_Array1OfPnt2d.hxx>
+#include <gp_Pnt2d.hxx>
 #include <gp_Pln.hxx>
 #include <Geom_CylindricalSurface.hxx>
 #include <Geom_Plane.hxx>
 #include <GProp_GProps.hxx>
 #include <Interface_Static.hxx>
-#include <TColStd_Array1OfInteger.hxx>
-#include <TColStd_Array1OfReal.hxx>
-#include <TColgp_Array1OfPnt.hxx>
+#include <NCollection_Array1.hxx>
+#include <gp_Pnt.hxx>
 #include <Message.hxx>
 #include <Message_Messenger.hxx>
 #include <Poly_Triangulation.hxx>
 #include <STEPControl_Reader.hxx>
 #include <STEPControl_Writer.hxx>
 #include <Standard_Failure.hxx>
+#include <Standard_Version.hxx>
 #include <TCollection_HAsciiString.hxx>
 #include <TopExp.hxx>
 #include <TopExp_Explorer.hxx>
-#include <TopTools_IndexedDataMapOfShapeListOfShape.hxx>
-#include <TopTools_IndexedMapOfShape.hxx>
+#include <NCollection_IndexedDataMap.hxx>
+#include <NCollection_List.hxx>
+#include <NCollection_IndexedMap.hxx>
+#include <TopTools_ShapeMapHasher.hxx>
 #include <TopoDS.hxx>
 #include <TopoDS_Compound.hxx>
 #include <TopoDS_Iterator.hxx>
@@ -151,6 +154,35 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <gp_Trsf.hxx>
 
 using namespace std;
+
+// The message and the type of an Open CASCADE exception, which 8.0 made a
+// std::exception
+static const char *
+failure (const Standard_Failure& e)
+{
+#if OCC_VERSION_MAJOR >= 8
+  return e.what ();
+#else
+  return e.GetMessageString ();
+#endif
+}
+
+static const char *
+failurekind (const Standard_Failure& e)
+{
+#if OCC_VERSION_MAJOR >= 8
+  return e.ExceptionType ();
+#else
+  return e.DynamicType ()->Name ();
+#endif
+}
+
+// The collections of shapes, named here since Open CASCADE 8.0 deprecates
+// the names it gave them
+using ShapeList = NCollection_List<TopoDS_Shape>;
+using ShapeMap = NCollection_IndexedMap<TopoDS_Shape, TopTools_ShapeMapHasher>;
+using ShapeListMap = NCollection_IndexedDataMap<TopoDS_Shape, ShapeList,
+                                                TopTools_ShapeMapHasher>;
 
 // Every shape crosses into Octave as the bytes of OCCT's binary format, which
 // begin with this signature.  Bytes without it never reach the reader.
@@ -179,7 +211,7 @@ count (const TopoDS_Shape& s, TopAbs_ShapeEnum type)
   {
     return 0;
   }
-  TopTools_IndexedMapOfShape map;
+  ShapeMap map;
   TopExp::MapShapes (s, type, map);
   return map.Extent ();
 }
@@ -225,7 +257,7 @@ todata (const TopoDS_Shape& s)
     return octave_value (uint8NDArray (dim_vector (0, 0)));
   }
   ostringstream os;
-  BinTools::Write (s, os, Standard_False, Standard_False,
+  BinTools::Write (s, os, false, false,
                    BinTools_FormatVersion_CURRENT);
   const string bytes = os.str ();
   uint8NDArray a (dim_vector (1, bytes.size ()));
@@ -261,15 +293,15 @@ bspline (const octave_scalar_map& s)
   const ColumnVector t = s.contents ("knots").column_vector_value ();
   const ColumnVector m = s.contents ("mults").column_vector_value ();
   const int degree = s.contents ("degree").int_value ();
-  TColgp_Array1OfPnt poles (1, p.rows ());
-  TColStd_Array1OfReal weights (1, p.rows ());
+  NCollection_Array1<gp_Pnt> poles (1, p.rows ());
+  NCollection_Array1<double> weights (1, p.rows ());
   for (octave_idx_type i = 0; i < p.rows (); i++)
   {
     poles.SetValue (i + 1, gp_Pnt (p(i,0), p(i,1), p(i,2)));
     weights.SetValue (i + 1, w(i));
   }
-  TColStd_Array1OfReal knots (1, t.numel ());
-  TColStd_Array1OfInteger mults (1, t.numel ());
+  NCollection_Array1<double> knots (1, t.numel ());
+  NCollection_Array1<int> mults (1, t.numel ());
   for (octave_idx_type i = 0; i < t.numel (); i++)
   {
     knots.SetValue (i + 1, t(i));
@@ -357,7 +389,7 @@ toregion (const octave_value& v)
 static TopoDS_Face
 planarface (const region& r)
 {
-  BRepBuilderAPI_MakeFace f (r.outer, Standard_True);
+  BRepBuilderAPI_MakeFace f (r.outer, true);
   for (const TopoDS_Wire& h : r.holes)
   {
     f.Add (h);
@@ -412,15 +444,15 @@ pieces (const octave_value& p, const Matrix& f, int loop, vector<piece>& out)
       const ColumnVector w = q.contents ("weights").column_vector_value ();
       const ColumnVector t = q.contents ("knots").column_vector_value ();
       const ColumnVector mu = q.contents ("mults").column_vector_value ();
-      TColgp_Array1OfPnt2d poles (1, pl.rows ());
-      TColStd_Array1OfReal weights (1, pl.rows ());
+      NCollection_Array1<gp_Pnt2d> poles (1, pl.rows ());
+      NCollection_Array1<double> weights (1, pl.rows ());
       for (octave_idx_type k = 0; k < pl.rows (); k++)
       {
         poles.SetValue (k + 1, inplane (pl, k, f));
         weights.SetValue (k + 1, w(k));
       }
-      TColStd_Array1OfReal knots (1, t.numel ());
-      TColStd_Array1OfInteger mults (1, t.numel ());
+      NCollection_Array1<double> knots (1, t.numel ());
+      NCollection_Array1<int> mults (1, t.numel ());
       for (octave_idx_type k = 0; k < t.numel (); k++)
       {
         knots.SetValue (k + 1, t(k));
@@ -626,7 +658,7 @@ loopcheck (const Cell& L, const Matrix& f)
     for (int k = 0; k < n; k++)
     {
       face[k] = BRepBuilderAPI_MakeFace (gp_Pln (gp::XOY ()), wire[k].Wire (),
-                                         Standard_True).Face ();
+                                         true).Face ();
     }
     for (int j = 0; j < n; j++)
     {
@@ -670,12 +702,12 @@ cutall (const TopoDS_Shape& s, const vector<TopoDS_Shape>& tools,
 // The sub-shapes of one kind picked by 1-based indices into the map of all of
 // them, which is the order in which the queries report them.  The indices have
 // been checked against the count by the caller.
-static TopTools_ListOfShape
+static ShapeList
 picked (const TopoDS_Shape& s, TopAbs_ShapeEnum type, const NDArray& idx)
 {
-  TopTools_IndexedMapOfShape map;
+  ShapeMap map;
   TopExp::MapShapes (s, type, map);
-  TopTools_ListOfShape list;
+  ShapeList list;
   for (octave_idx_type i = 0; i < idx.numel (); i++)
   {
     list.Append (map (static_cast<int> (idx(i))));
@@ -688,7 +720,7 @@ static void
 boxrow (const TopoDS_Shape& s, Matrix& m, octave_idx_type i)
 {
   Bnd_Box b;
-  BRepBndLib::AddOptimal (s, b, Standard_False, Standard_False);
+  BRepBndLib::AddOptimal (s, b, false, false);
   double x0, y0, z0, x1, y1, z1;
   b.Get (x0, y0, z0, x1, y1, z1);
   m(i,0) = x0;
@@ -714,11 +746,11 @@ dirrow (const gp_Dir& d, Matrix& m, octave_idx_type i)
 static Cell
 edgeinfo (const TopoDS_Shape& s)
 {
-  TopTools_IndexedMapOfShape map;
+  ShapeMap map;
   TopExp::MapShapes (s, TopAbs_EDGE, map);
-  TopTools_IndexedDataMapOfShapeListOfShape faces;
+  ShapeListMap faces;
   TopExp::MapShapesAndAncestors (s, TopAbs_EDGE, TopAbs_FACE, faces);
-  TopTools_IndexedMapOfShape fmap;
+  ShapeMap fmap;
   TopExp::MapShapes (s, TopAbs_FACE, fmap);
   const octave_idx_type n = map.Extent ();
   Cell type (n, 1);
@@ -728,7 +760,7 @@ edgeinfo (const TopoDS_Shape& s)
   boolNDArray seam (dim_vector (n, 1), false);
   for (octave_idx_type i = 0; i < n; i++)
   {
-    const TopoDS_Edge e = TopoDS::Edge (map (i + 1));
+    const TopoDS_Edge e = TopoDS::Edge (map.FindKey (static_cast<int> (i + 1)));
     boxrow (e, box, i);
     if (BRep_Tool::Degenerated (e))
     {
@@ -795,7 +827,7 @@ edgeinfo (const TopoDS_Shape& s)
 static Cell
 faceinfo (const TopoDS_Shape& s)
 {
-  TopTools_IndexedMapOfShape map;
+  ShapeMap map;
   TopExp::MapShapes (s, TopAbs_FACE, map);
   const octave_idx_type n = map.Extent ();
   Cell type (n, 1);
@@ -804,7 +836,7 @@ faceinfo (const TopoDS_Shape& s)
   Matrix box (n, 6);
   for (octave_idx_type i = 0; i < n; i++)
   {
-    const TopoDS_Face f = TopoDS::Face (map (i + 1));
+    const TopoDS_Face f = TopoDS::Face (map.FindKey (static_cast<int> (i + 1)));
     boxrow (f, box, i);
     const BRepAdaptor_Surface a (f);
     switch (a.GetType ())
@@ -862,8 +894,8 @@ static GProp_GProps
 volumeprops (const TopoDS_Shape& s, bool cg, double eps)
 {
   GProp_GProps p;
-  if (BRepGProp::VolumePropertiesGK (s, p, eps, Standard_False,
-                                     Standard_True, cg) < 0)
+  if (BRepGProp::VolumePropertiesGK (s, p, eps, false,
+                                     true, cg) < 0)
   {
     p = GProp_GProps ();
     BRepGProp::VolumeProperties (s, p);
@@ -882,7 +914,7 @@ area (const TopoDS_Shape& s)
   for (TopExp_Explorer x (s, TopAbs_FACE); x.More (); x.Next ())
   {
     const TopoDS_Face f = TopoDS::Face (x.Current ());
-    const BRepAdaptor_Surface g (f, Standard_False);
+    const BRepAdaptor_Surface g (f, false);
     if (g.GetType () == GeomAbs_Plane)
     {
       BRepPrimAPI_MakePrism prism (f, gp_Vec (g.Plane ().Axis ().Direction ()));
@@ -933,8 +965,8 @@ sectionpiece (const char *type, const Matrix& points)
 static void
 sectionedge (const TopoDS_Edge& e, vector<octave_value>& out)
 {
-  const gp_Pnt p0 = BRep_Tool::Pnt (TopExp::FirstVertex (e, Standard_True));
-  const gp_Pnt p1 = BRep_Tool::Pnt (TopExp::LastVertex (e, Standard_True));
+  const gp_Pnt p0 = BRep_Tool::Pnt (TopExp::FirstVertex (e, true));
+  const gp_Pnt p1 = BRep_Tool::Pnt (TopExp::LastVertex (e, true));
   double a, b;
   const Handle (Geom_Curve) c = BRep_Tool::Curve (e, a, b);
   const bool rev = (e.Orientation () == TopAbs_REVERSED);
@@ -1223,7 +1255,7 @@ polyhedron (const Matrix& V, const Matrix& F, bool merge, const string& caller)
       bb.Add (w, a < b ? it->second
                        : TopoDS::Edge (it->second.Reversed ()));
     }
-    w.Closed (Standard_True);
+    w.Closed (true);
     const gp_Pnt a (V(T[t][0],0), V(T[t][0],1), V(T[t][0],2));
     const gp_Pnt b (V(T[t][1],0), V(T[t][1],1), V(T[t][1],2));
     const gp_Pnt c (V(T[t][2],0), V(T[t][2],1), V(T[t][2],2));
@@ -1245,7 +1277,7 @@ polyhedron (const Matrix& V, const Matrix& F, bool merge, const string& caller)
   vector<Bnd_Box> boxes;
   for (int p = 0; p < np; p++)
   {
-    shells[p].Closed (Standard_True);
+    shells[p].Closed (true);
     if (vol[p] > 0)
     {
       TopoDS_Solid so;
@@ -1318,7 +1350,7 @@ polyhedron (const Matrix& V, const Matrix& F, bool merge, const string& caller)
   }
   else
   {
-    TopTools_ListOfShape objects, tools;
+    ShapeList objects, tools;
     objects.Append (solids[0]);
     for (size_t i = 1; i < solids.size (); i++)
     {
@@ -1337,8 +1369,8 @@ polyhedron (const Matrix& V, const Matrix& F, bool merge, const string& caller)
   }
   if (merge)
   {
-    ShapeUpgrade_UnifySameDomain u (s, Standard_True, Standard_True,
-                                    Standard_False);
+    ShapeUpgrade_UnifySameDomain u (s, true, true,
+                                    false);
     u.Build ();
     s = u.Shape ();
   }
@@ -1360,7 +1392,7 @@ gridsurface (const Matrix& X, const Matrix& Y, const Matrix& Z, double h1,
 {
   const octave_idx_type m = X.rows ();
   const octave_idx_type n = X.columns ();
-  TColgp_Array2OfPnt P (1, n, 1, m);
+  NCollection_Array2<gp_Pnt> P (1, n, 1, m);
   for (octave_idx_type j = 0; j < n; j++)
   {
     for (octave_idx_type i = 0; i < m; i++)
@@ -1447,7 +1479,7 @@ gridsurface (const Matrix& X, const Matrix& Y, const Matrix& Z, double h1,
 static TopoDS_Shape
 transform (const TopoDS_Shape& s, const gp_Trsf& t)
 {
-  return BRepBuilderAPI_Transform (s, t, Standard_True).Shape ();
+  return BRepBuilderAPI_Transform (s, t, true).Shape ();
 }
 
 // The transformation into the frame F, rows origin, x axis, y axis and
@@ -1487,8 +1519,8 @@ chamferwire (const TopoDS_Wire& w, const TopoDS_Face& f, double d)
   {
     ed g;
     g.e = x.Current ();
-    g.a = BRep_Tool::Pnt (TopExp::FirstVertex (g.e, Standard_True));
-    g.b = BRep_Tool::Pnt (TopExp::LastVertex (g.e, Standard_True));
+    g.a = BRep_Tool::Pnt (TopExp::FirstVertex (g.e, true));
+    g.b = BRep_Tool::Pnt (TopExp::LastVertex (g.e, true));
     const BRepAdaptor_Curve c (g.e);
     g.line = (c.GetType () == GeomAbs_Line);
     if (c.GetType () == GeomAbs_Circle && std::abs (c.Circle ().Radius () - d)
@@ -1629,13 +1661,13 @@ withoutinternal (const TopoDS_Face& f)
 {
   BRep_Builder b;
   TopoDS_Face g = TopoDS::Face (f.EmptyCopied ());
-  for (TopoDS_Iterator w (f, Standard_False, Standard_False); w.More ();
+  for (TopoDS_Iterator w (f, false, false); w.More ();
        w.Next ())
   {
     TopoDS_Wire nw;
     b.MakeWire (nw);
     int n = 0;
-    for (TopoDS_Iterator e (w.Value (), Standard_False, Standard_False);
+    for (TopoDS_Iterator e (w.Value (), false, false);
          e.More (); e.Next ())
     {
       const TopAbs_Orientation o = e.Value ().Orientation ();
@@ -1648,7 +1680,7 @@ withoutinternal (const TopoDS_Face& f)
     if (n > 0)
     {
       nw.Orientation (w.Value ().Orientation ());
-      nw.Closed (Standard_True);
+      nw.Closed (true);
       b.Add (g, nw);
     }
   }
@@ -1800,8 +1832,8 @@ joinstraight (const TopoDS_Face& f, double tol)
     {
       const TopoDS_Edge e = x.Current ();
       E.push_back (e);
-      P.push_back (BRep_Tool::Pnt (TopExp::FirstVertex (e, Standard_True)));
-      Q.push_back (BRep_Tool::Pnt (TopExp::LastVertex (e, Standard_True)));
+      P.push_back (BRep_Tool::Pnt (TopExp::FirstVertex (e, true)));
+      Q.push_back (BRep_Tool::Pnt (TopExp::LastVertex (e, true)));
       S.push_back (straight (e, tol));
       L.push_back (BRepAdaptor_Curve (e).GetType () == GeomAbs_Line);
     }
@@ -1927,7 +1959,7 @@ projection (const TopoDS_Shape& s, const string& caller)
   // told right where a face is seen edge on; one lying along those taken is
   // left out, as the turns of a coil seen along its axis are
   const double tol = 1e-5 * size;
-  TopTools_ListOfShape tools;
+  ShapeList tools;
   vector<pair<Bnd_Box, TopoDS_Edge>> taken;
   for (const TopoDS_Shape& c : {h.VCompound (), h.OutLineVCompound (),
                                 h.Rg1LineVCompound (), h.RgNLineVCompound (),
@@ -1964,7 +1996,7 @@ projection (const TopoDS_Shape& s, const string& caller)
   const TopoDS_Face plane
     = BRepBuilderAPI_MakeFace (gp_Pln (gp::XOY ()), x0 - r, x1 + r,
                                y0 - r, y1 + r).Face ();
-  TopTools_ListOfShape objects;
+  ShapeList objects;
   objects.Append (plane);
   BRepAlgoAPI_Splitter sp;
   sp.SetArguments (objects);
@@ -2010,8 +2042,8 @@ projection (const TopoDS_Shape& s, const string& caller)
   {
     return Cell (1, 0);
   }
-  ShapeUpgrade_UnifySameDomain u (kept, Standard_True, Standard_True,
-                                  Standard_False);
+  ShapeUpgrade_UnifySameDomain u (kept, true, true,
+                                  false);
   u.Build ();
   TopoDS_Compound c;
   b.MakeCompound (c);
@@ -2032,10 +2064,10 @@ projection (const TopoDS_Shape& s, const string& caller)
 }
 
 // The solids of S, in the order a map of them gives
-static TopTools_IndexedMapOfShape
+static ShapeMap
 solidsof (const TopoDS_Shape& s)
 {
-  TopTools_IndexedMapOfShape m;
+  ShapeMap m;
   TopExp::MapShapes (s, TopAbs_SOLID, m);
   return m;
 }
@@ -2051,7 +2083,7 @@ static origins
 lineage (BRepBuilderAPI_MakeShape& op, const vector<TopoDS_Shape>& sources,
          const TopoDS_Shape& r)
 {
-  TopTools_DataMapOfShapeInteger owner;
+  NCollection_DataMap<TopoDS_Shape, int, TopTools_ShapeMapHasher> owner;
   auto claim = [&owner] (const TopoDS_Shape& f, int k)
   {
     if (f.ShapeType () == TopAbs_FACE
@@ -2064,7 +2096,7 @@ lineage (BRepBuilderAPI_MakeShape& op, const vector<TopoDS_Shape>& sources,
   int k = 0;
   for (const TopoDS_Shape& src : sources)
   {
-    const TopTools_IndexedMapOfShape solids = solidsof (src);
+    const ShapeMap solids = solidsof (src);
     for (int i = 1; i <= solids.Extent (); i++)
     {
       k++;
@@ -2089,7 +2121,7 @@ lineage (BRepBuilderAPI_MakeShape& op, const vector<TopoDS_Shape>& sources,
       }
     }
   }
-  const TopTools_IndexedMapOfShape rs = solidsof (r);
+  const ShapeMap rs = solidsof (r);
   origins L (rs.Extent ());
   for (int i = 1; i <= rs.Extent (); i++)
   {
@@ -2109,8 +2141,8 @@ lineage (BRepBuilderAPI_MakeShape& op, const vector<TopoDS_Shape>& sources,
 static origins
 overlap (const TopoDS_Shape& s, const TopoDS_Shape& r)
 {
-  const TopTools_IndexedMapOfShape from = solidsof (s);
-  const TopTools_IndexedMapOfShape rs = solidsof (r);
+  const ShapeMap from = solidsof (s);
+  const ShapeMap rs = solidsof (r);
   origins L (rs.Extent ());
   for (int i = 1; i <= rs.Extent (); i++)
   {
@@ -2191,7 +2223,7 @@ cutall (const TopoDS_Shape& s, const vector<TopoDS_Shape>& tools,
   {
     return s;
   }
-  TopTools_ListOfShape objects, list;
+  ShapeList objects, list;
   objects.Append (s);
   for (const TopoDS_Shape& t : tools)
   {
@@ -2212,7 +2244,7 @@ pipe (const TopoDS_Wire& spine, const TopoDS_Wire& w, bool frenet,
   BRepOffsetAPI_MakePipeShell op (spine);
   if (frenet)
   {
-    op.SetMode (Standard_True);
+    op.SetMode (true);
   }
   else
   {
@@ -2260,7 +2292,7 @@ planarize (const TopoDS_Shape& s)
   for (TopExp_Explorer x (s, TopAbs_FACE); x.More (); x.Next ())
   {
     const TopoDS_Face& f = TopoDS::Face (x.Current ());
-    const BRepAdaptor_Surface a (f, Standard_False);
+    const BRepAdaptor_Surface a (f, false);
     if (a.GetType () != GeomAbs_BSplineSurface
         && a.GetType () != GeomAbs_BezierSurface)
     {
@@ -2282,7 +2314,7 @@ planarize (const TopoDS_Shape& s)
     {
       p = gp_Pln (p.Location (), p.Axis ().Direction ().Reversed ());
     }
-    BRepBuilderAPI_MakeFace mf (p, BRepTools::OuterWire (f), Standard_True);
+    BRepBuilderAPI_MakeFace mf (p, BRepTools::OuterWire (f), true);
     for (TopExp_Explorer w (f, TopAbs_WIRE); w.More (); w.Next ())
     {
       if (! w.Current ().IsSame (BRepTools::OuterWire (f)))
@@ -2306,7 +2338,7 @@ planarize (const TopoDS_Shape& s)
 static TopoDS_Shape
 ruled (const TopoDS_Wire& a, const TopoDS_Wire& b, const string& caller)
 {
-  BRepOffsetAPI_ThruSections op (Standard_True, Standard_True);
+  BRepOffsetAPI_ThruSections op (true, true);
   op.AddWire (a);
   op.AddWire (b);
   op.Build ();
@@ -2374,7 +2406,7 @@ static void
 colourpart (const xdedoc& d, const TDF_Label& l, const TopoDS_Shape& s,
             const Matrix& colours)
 {
-  TopTools_IndexedMapOfShape solids;
+  ShapeMap solids;
   TopExp::MapShapes (s, TopAbs_SOLID, solids);
   for (int i = 1; i <= solids.Extent () && i <= colours.rows (); i++)
   {
@@ -2396,8 +2428,8 @@ writedoc (const xdedoc& d, const string& file, const string& name,
           const string& caller)
 {
   STEPCAFControl_Writer w;
-  w.SetColorMode (Standard_True);
-  w.SetNameMode (Standard_True);
+  w.SetColorMode (true);
+  w.SetNameMode (true);
   Interface_Static::SetCVal ("write.step.unit", "MM");
   if (! w.Transfer (d.doc, STEPControl_AsIs))
   {
@@ -2424,7 +2456,7 @@ writestep (const TopoDS_Shape& s, const string& file, const string& name,
            const Matrix& colours, const string& caller)
 {
   xdedoc d;
-  const TDF_Label top = d.shapes ()->AddShape (s, Standard_False);
+  const TDF_Label top = d.shapes ()->AddShape (s, false);
   TDataStd_Name::Set (top, TCollection_ExtendedString (name.c_str (), true));
   colourpart (d, top, s, colours);
   writedoc (d, file, name, caller);
@@ -2474,7 +2506,7 @@ writeassembly (const string& file, const Cell& names, const Cell& data,
     if (! data(i).isempty ())
     {
       const TopoDS_Shape s = toshape (data(i), caller);
-      label[i] = d.shapes ()->AddShape (s, Standard_False);
+      label[i] = d.shapes ()->AddShape (s, false);
       colourpart (d, label[i], s, colours(i).matrix_value ());
     }
     else
@@ -2516,17 +2548,17 @@ static Cell
 tessellation (const TopoDS_Shape& s, double tol, double angle,
               const string& caller)
 {
-  BRepMesh_IncrementalMesh mesh (s, tol, Standard_False, angle,
-                                 Standard_True);
+  BRepMesh_IncrementalMesh mesh (s, tol, false, angle,
+                                 true);
   if (! mesh.IsDone ())
   {
     error ("%s: Open CASCADE could not triangulate the shape.",
            caller.c_str ());
   }
   // Each face with the solid it bounds, the faces of no solid last
-  const TopTools_IndexedMapOfShape solids = solidsof (s);
+  const ShapeMap solids = solidsof (s);
   vector<std::pair<TopoDS_Shape, int>> faces;
-  TopTools_IndexedMapOfShape seen;
+  ShapeMap seen;
   for (int k = 1; k <= solids.Extent (); k++)
   {
     for (TopExp_Explorer x (solids (k), TopAbs_FACE); x.More (); x.Next ())
@@ -2605,8 +2637,8 @@ static Matrix
 surfacepoints (const TopoDS_Shape& s, double tol, double angle,
                const string& caller)
 {
-  BRepMesh_IncrementalMesh mesh (s, tol, Standard_False, angle,
-                                 Standard_True);
+  BRepMesh_IncrementalMesh mesh (s, tol, false, angle,
+                                 true);
   if (! mesh.IsDone ())
   {
     error ("%s: Open CASCADE could not triangulate the shape.",
@@ -2673,8 +2705,8 @@ readstep (const string& file, const string& caller)
 {
   xdedoc d;
   STEPCAFControl_Reader r;
-  r.SetColorMode (Standard_True);
-  r.SetNameMode (Standard_True);
+  r.SetColorMode (true);
+  r.SetNameMode (true);
   Interface_Static::SetCVal ("xstep.cascade.unit", "MM");
   if (r.ReadFile (file.c_str ()) != IFSelect_RetDone)
   {
@@ -2685,7 +2717,7 @@ readstep (const string& file, const string& caller)
   {
     error ("%s: '%s' holds no shape.", caller.c_str (), file.c_str ());
   }
-  TDF_LabelSequence roots;
+  NCollection_Sequence<TDF_Label> roots;
   d.shapes ()->GetFreeShapes (roots);
   TopoDS_Shape s;
   if (roots.Length () == 1)
@@ -2707,7 +2739,7 @@ readstep (const string& file, const string& caller)
   {
     error ("%s: '%s' holds no shape.", caller.c_str (), file.c_str ());
   }
-  TopTools_IndexedMapOfShape solids;
+  ShapeMap solids;
   TopExp::MapShapes (s, TopAbs_SOLID, solids);
   Matrix C (solids.Extent (), 3, octave_NaN);
   bool any = false;
@@ -2767,8 +2799,8 @@ readassembly (const string& file, const string& name, const string& caller)
 {
   xdedoc d;
   STEPCAFControl_Reader r;
-  r.SetColorMode (Standard_True);
-  r.SetNameMode (Standard_True);
+  r.SetColorMode (true);
+  r.SetNameMode (true);
   Interface_Static::SetCVal ("xstep.cascade.unit", "MM");
   if (r.ReadFile (file.c_str ()) != IFSelect_RetDone)
   {
@@ -2794,7 +2826,7 @@ readassembly (const string& file, const string& name, const string& caller)
     string nm = labelname (l);
     if (XCAFDoc_ShapeTool::IsAssembly (l))
     {
-      TDF_LabelSequence comps;
+      NCollection_Sequence<TDF_Label> comps;
       XCAFDoc_ShapeTool::GetComponents (l, comps);
       Matrix C (comps.Length (), 13);
       Cell inst (1, comps.Length ());
@@ -2821,7 +2853,7 @@ readassembly (const string& file, const string& name, const string& caller)
     else
     {
       const TopoDS_Shape s = XCAFDoc_ShapeTool::GetShape (l);
-      const TopTools_IndexedMapOfShape solids = solidsof (s);
+      const ShapeMap solids = solidsof (s);
       Matrix C (solids.Extent (), 3, octave_NaN);
       bool any = false;
       for (int i = 1; i <= solids.Extent (); i++)
@@ -2848,7 +2880,7 @@ readassembly (const string& file, const string& name, const string& caller)
     seen[entry.ToCString ()] = k;
     return k;
   };
-  TDF_LabelSequence roots;
+  NCollection_Sequence<TDF_Label> roots;
   d.shapes ()->GetFreeShapes (roots);
   if (roots.Length () == 0)
   {
@@ -3017,7 +3049,7 @@ function directly. \n\
       }
       else
       {
-        TopTools_ListOfShape sides;
+        ShapeList sides;
         if (h1 > 0)
         {
           sides.Append (taperedside (r, h1, a1, caller));
@@ -3035,7 +3067,7 @@ function directly. \n\
         }
         else
         {
-          TopTools_ListOfShape objects, tools;
+          ShapeList objects, tools;
           objects.Append (sides.First ());
           tools.Append (sides.Last ());
           BRepAlgoAPI_Fuse op;
@@ -3072,7 +3104,7 @@ function directly. \n\
       // The outlines lofted, less each hole lofted through its sections
       auto loft = [&] (std::function<TopoDS_Wire (const region&)> pick)
       {
-        BRepOffsetAPI_ThruSections op (Standard_True, ruled);
+        BRepOffsetAPI_ThruSections op (true, ruled);
         for (const region& r : rs)
         {
           op.AddWire (pick (r));
@@ -3144,7 +3176,7 @@ function directly. \n\
     else if (cmd == "fillet" || cmd == "chamfer")
     {
       const TopoDS_Shape s = toshape (args(2), caller);
-      const TopTools_ListOfShape edges
+      const ShapeList edges
         = picked (s, TopAbs_EDGE, args(3).array_value ());
       const double size = args(4).array_value ()(0);
       TopoDS_Shape r;
@@ -3173,7 +3205,7 @@ function directly. \n\
         {
           // D is set back along the face given, and the chamfer meets that
           // face at the angle given
-          TopTools_IndexedMapOfShape fmap;
+          ShapeMap fmap;
           TopExp::MapShapes (s, TopAbs_FACE, fmap);
           const TopoDS_Face f = TopoDS::Face
                                   (fmap (static_cast<int> (args(5)
@@ -3187,7 +3219,7 @@ function directly. \n\
         else if (d.numel () == 2)
         {
           // D1 is set back along the face given, D2 along the other
-          TopTools_IndexedMapOfShape fmap;
+          ShapeMap fmap;
           TopExp::MapShapes (s, TopAbs_FACE, fmap);
           const TopoDS_Face f = TopoDS::Face
                                   (fmap (static_cast<int> (args(5)
@@ -3218,7 +3250,7 @@ function directly. \n\
     else if (cmd == "shell")
     {
       const TopoDS_Shape s = toshape (args(2), caller);
-      const TopTools_ListOfShape open
+      const ShapeList open
         = picked (s, TopAbs_FACE, args(3).array_value ());
       // The walls grow inwards, or outwards when asked, each the default
       // thickness unless given one of its own
@@ -3226,8 +3258,8 @@ function directly. \n\
       const double sign = outward ? 1 : -1;
       const double t = args(4).double_value ();
       BRepOffset_MakeOffset op;
-      op.Initialize (s, sign * t, 1e-6, BRepOffset_Skin, Standard_False,
-                     Standard_False, GeomAbs_Intersection);
+      op.Initialize (s, sign * t, 1e-6, BRepOffset_Skin, false,
+                     false, GeomAbs_Intersection);
       for (const TopoDS_Shape& f : open)
       {
         op.AddFace (TopoDS::Face (f));
@@ -3236,7 +3268,7 @@ function directly. \n\
       {
         const NDArray fi = args(6).array_value ();
         const NDArray ft = args(7).array_value ();
-        const TopTools_ListOfShape thick = picked (s, TopAbs_FACE, fi);
+        const ShapeList thick = picked (s, TopAbs_FACE, fi);
         octave_idx_type k = 0;
         for (const TopoDS_Shape& f : thick)
         {
@@ -3261,7 +3293,7 @@ function directly. \n\
             r.Reverse ();
           }
           BRepAlgoAPI_Cut cut;
-          TopTools_ListOfShape objects, tools;
+          ShapeList objects, tools;
           objects.Append (outward ? r : s);
           tools.Append (outward ? s : r);
           cut.SetArguments (objects);
@@ -3297,7 +3329,7 @@ function directly. \n\
     // the first shape with the union of the tools, so it goes pairwise.
     else if (cmd == "fuse" || cmd == "cut")
     {
-      TopTools_ListOfShape objects, tools;
+      ShapeList objects, tools;
       vector<TopoDS_Shape> sources;
       for (int i = 2; i < args.length (); i++)
       {
@@ -3331,7 +3363,7 @@ function directly. \n\
       for (int i = 3; i < args.length () && count (s, TopAbs_FACE) > 0; i++)
       {
         const TopoDS_Shape t = toshape (args(i), caller);
-        TopTools_ListOfShape objects, tools;
+        ShapeList objects, tools;
         objects.Append (s);
         tools.Append (t);
         BRepAlgoAPI_Common op;
@@ -3402,7 +3434,7 @@ function directly. \n\
       g.SetTranslationPart (gp_XYZ (p.X () * (1 - f(0)), p.Y () * (1 - f(1)),
                                     p.Z () * (1 - f(2))));
       BRepBuilderAPI_GTransform gt (toshape (args(2), caller), g,
-                                    Standard_True);
+                                    true);
       if (! gt.IsDone ())
       {
         error ("%s: Open CASCADE could not scale the shape.",
@@ -3508,13 +3540,13 @@ function directly. \n\
             big = A.back ();
           }
         }
-        TopTools_ListOfShape pos, neg;
+        ShapeList pos, neg;
         for (size_t i = 0; i < W.size (); i++)
         {
           const bool fill = (A[i] > 0) == (big > 0);
           const TopoDS_Wire w = (A[i] > 0) ? W[i]
                                            : TopoDS::Wire (W[i].Reversed ());
-          BRepBuilderAPI_MakeFace mf (w, Standard_True);
+          BRepBuilderAPI_MakeFace mf (w, true);
           if (mf.IsDone ())
           {
             (fill ? pos : neg).Append (mf.Face ());
@@ -3529,7 +3561,7 @@ function directly. \n\
           TopoDS_Shape u = pos.First ();
           if (pos.Extent () > 1)
           {
-            TopTools_ListOfShape first, rest = pos;
+            ShapeList first, rest = pos;
             first.Append (rest.First ());
             rest.RemoveFirst ();
             BRepAlgoAPI_Fuse b;
@@ -3539,7 +3571,7 @@ function directly. \n\
           }
           if (! neg.IsEmpty ())
           {
-            TopTools_ListOfShape first;
+            ShapeList first;
             first.Append (u);
             BRepAlgoAPI_Cut b;
             b.SetArguments (first);
@@ -3574,7 +3606,7 @@ function directly. \n\
       TopoDS_Shape c = f[0];
       if (f.size () > 1)
       {
-        TopTools_ListOfShape first, rest;
+        ShapeList first, rest;
         first.Append (f[0]);
         for (size_t i = 1; i < f.size (); i++)
         {
@@ -3649,7 +3681,7 @@ function directly. \n\
         // other way, as a hole does, is cut out
         const bool fill = wirearea (w) > 0;
         BRepBuilderAPI_MakeFace mf (fill ? w : TopoDS::Wire (w.Reversed ()),
-                                    Standard_True);
+                                    true);
         if (mf.IsDone ())
         {
           (fill ? pos : neg).push_back (mf.Face ());
@@ -3661,7 +3693,7 @@ function directly. \n\
         c = pos[0];
         if (pos.size () > 1)
         {
-          TopTools_ListOfShape first, rest;
+          ShapeList first, rest;
           first.Append (pos[0]);
           for (size_t i = 1; i < pos.size (); i++)
           {
@@ -3674,7 +3706,7 @@ function directly. \n\
         }
         if (! neg.empty ())
         {
-          TopTools_ListOfShape first, rest;
+          ShapeList first, rest;
           first.Append (c);
           for (const TopoDS_Face& g : neg)
           {
@@ -3724,8 +3756,8 @@ function directly. \n\
     else if (cmd == "bbox")
     {
       Bnd_Box b;
-      BRepBndLib::AddOptimal (toshape (args(2), caller), b, Standard_False,
-                              Standard_False);
+      BRepBndLib::AddOptimal (toshape (args(2), caller), b, false,
+                              false);
       double x0, y0, z0, x1, y1, z1;
       b.Get (x0, y0, z0, x1, y1, z1);
       RowVector r (6);
@@ -3812,14 +3844,14 @@ function directly. \n\
   }
   catch (const Standard_Failure& e)
   {
-    const char *msg = e.GetMessageString ();
+    const char *msg = failure (e);
     if (msg != nullptr && *msg != '\0')
     {
       error ("%s: Open CASCADE failed: %s (%s).", caller.c_str (), msg,
-             e.DynamicType ()->Name ());
+             failurekind (e));
     }
     error ("%s: Open CASCADE failed (%s).", caller.c_str (),
-           e.DynamicType ()->Name ());
+           failurekind (e));
   }
 
   return ovl (out);

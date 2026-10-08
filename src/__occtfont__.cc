@@ -35,10 +35,22 @@
 #include <StdPrs_BRepFont.hxx>
 #include <StdPrs_BRepTextBuilder.hxx>
 #include <Standard_Failure.hxx>
+#include <Standard_Version.hxx>
 #include <TopoDS_Shape.hxx>
 #include <gp_Trsf.hxx>
 
 using std::string;
+
+// The message of an Open CASCADE exception, which 8.0 made a std::exception
+static const char *
+failure (const Standard_Failure& e)
+{
+#if OCC_VERSION_MAJOR >= 8
+  return e.what ();
+#else
+  return e.GetMessageString ();
+#endif
+}
 
 // The box round S: left, bottom, right and top
 static void
@@ -90,7 +102,7 @@ Undocumented internal function.\n\
       error ("%s: the font '%s' is not installed.", caller.c_str (),
              name.c_str ());
     }
-    font->SetCompositeCurveMode (Standard_True);
+    font->SetCompositeCurveMode (true);
     StdPrs_BRepTextBuilder builder;
 
     // A capital H gives the scale and the baseline
@@ -106,12 +118,12 @@ Undocumented internal function.\n\
     gp_Trsf t, u;
     t.SetTranslation (gp_Vec (0, -hy0, 0));
     u.SetScale (gp_Pnt (0, 0, 0), height / (hy1 - hy0));
-    s = BRepBuilderAPI_Transform (s, u * t, Standard_True).Shape ();
+    s = BRepBuilderAPI_Transform (s, u * t, true).Shape ();
   }
   catch (const Standard_Failure& e)
   {
     error ("%s: Open CASCADE could not build the text: %s", caller.c_str (),
-           e.GetMessageString ());
+           failure (e));
   }
 
   RowVector box (4, 0.0);
@@ -124,7 +136,7 @@ Undocumented internal function.\n\
     {
       extent (s, box(0), box(1), box(2), box(3));
       std::ostringstream os;
-      BinTools::Write (s, os, Standard_False, Standard_False,
+      BinTools::Write (s, os, false, false,
                        BinTools_FormatVersion_CURRENT);
       const string bytes = os.str ();
       data = uint8NDArray (dim_vector (1, bytes.size ()));
