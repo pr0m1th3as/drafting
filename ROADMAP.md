@@ -6,8 +6,11 @@ indicative. Anything here may be reordered by what turns out to be needed.
 
 Version 0.2.0 made the package an alternative to OpenSCAD: exact solids,
 meshes, assemblies and a viewer, built on the outline classes of `+geom`, with
-DXF read and written by compiled code and a layer table in every drawing. How
-it fits together, and what each class becomes in a DXF file, is set out in the
+DXF read and written by compiled code and a layer table in every drawing.
+Version 0.2.1 added solids made of an exact surface through a grid of points.
+Holes tapped and threaded to the ISO standards are built for the next
+release. How it fits together, what each class becomes in a DXF file, and
+how each standard is applied, is set out in the
 [guide](https://pr0m1th3as.github.io/drafting/guide/).
 
 The geometry half of the package is strong. The drafting half, the part that
@@ -50,37 +53,6 @@ These apply to all the work below and are not restated in it.
   backend, the DXF writer included. A backend that silently ignores an entity
   type produces a plausible and incomplete figure, which is worse than an
   error.
-
-## Surfaces through a grid (0.2.1)
-
-A shape written as a grid of points, rows and columns as `meshgrid` makes
-them, is how many OpenSCAD users think, and it suits Octave. The grid stays
-the input; what comes out is exact and smooth, where `solid.polyhedron` on the
-same grid gives facets.
-
-`S = solid.surface (X, Y, Z, H)` has Open CASCADE fit an exact B-spline
-surface through the grid (`GeomAPI_PointsToBSplineSurface`) and returns the
-solid that surface makes thickened along its normals
-(`BRepOffsetAPI_MakeThickSolid`). It always returns a solid: a bare face is
-no `solid.Shape`, which holds the boundary of solids.
-
-**The normal** is the step from one column to the next crossed with the step
-from one row to the next. For a `meshgrid` grid that is x then y, so the
-normal points up, +z. Transposing `X`, `Y` and `Z` turns it round.
-
-**Thickness** `H` is taken exactly as `solid.extrude` takes its height: a
-positive scalar along the normal, a negative one against it, `[H1, H2]`, both
-positive, to both sides, `H1` along the normal and `H2` against it.
-`[0.5, 0.5]` is a skin of 1 centred on the surface.
-
-**Curvature.** Thickening folds over itself wherever the surface curves
-tighter than the material reaching that side: the thickness along the
-normal on that side, the thickness against it on the other. That is checked on the fitted surface before Open CASCADE is asked,
-and refused with an error naming the side.
-
-**Shown** on a tutorial page of the guide: a rippled surface from `meshgrid`,
-built once with `solid.polyhedron` and once with `solid.surface`, and the
-one-sided thickness the curvature check refuses.
 
 ## The language of a technical drawing (0.3.0)
 
@@ -166,7 +138,10 @@ from: a revolved profile its diameters and lengths, a hole its size and its
 position from a datum. The drawing dimensions those, which is what a machinist
 working by hand needs. A turned part is drawn as one view about its centre
 line, diameters taken from the profile and lengths from a face; a milled part
-carries ordinate dimensions from its datum corner. A solid read from a STEP
+carries ordinate dimensions from its datum corner. A thread records its
+name, pitch, major and minor diameters and depth as `thread` cuts it, and
+its callout and the cosmetic thread of ISO 6410 are drawn from that record,
+never from a second look at the thread data. A solid read from a STEP
 file records no intent, so it gets the geometric annotation only.
 
 **Order.** Views need the sheet of 0.4.0, with a viewport that can be clipped
@@ -218,4 +193,5 @@ on both the viewer, written for X11, needs a window of the platform's own.
 | A solid-modelling kernel of our own | decades of work that Open CASCADE already holds; the package binds it instead |
 | Parametric constraint solving | genuinely valuable and genuinely a research project: degree-of-freedom analysis, conditioning, and useful diagnostics for under- and over-constrained sketches. Its own package if ever |
 | GD&T as PMI in STEP AP242 | a maker turns PMI back into a drawing and charges for it; tolerances go on the drawing, sent as PDF and DXF beside the STEP model |
+| Forming taps | the drawing states the thread, not how it is made; a hole for a forming tap is drilled by its diameter |
 | `minkowski` and `multmatrix` | rounding a shape is `fillet` and the offsets, a Minkowski sum of exact solids has no counterpart in Open CASCADE, and a part is placed by a `geom.UCS`, which never shears it |
