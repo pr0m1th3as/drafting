@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Threads and tapped holes - drafting guide</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" integrity="sha512-1ycn6IcaQQ40/MKBW2W4Rhis/DbILU74C1vSrLJxCq57o941Ym01SwNsOMqvEBFlcgUa6xLiPY/NS5R+E6ztJQ==" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/css/bootstrap.min.css" integrity="sha384-KyZXEAg3QhqLMpG8r+8fhAXLRk2vvoC2f3B09zVXn8CA5QIVfZOJ3BCsw2P0p/We" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-U1DAWAznBHeqEIlVSCgzq+c9gqGAJn5c/t99JyeKa9xxaYpSvHU5awsuZVVFIhvj" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="guide.css">
+  </head>
+  <body>
+    <div class="bg-dark">
+      <div class="container-xl">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+          <div class="container-fluid">
+            <a class="navbar-brand" href="index.html">
+              <img src="../assets/drafting.png" alt="drafting" class="d-inline-block align-top" width="25" height="25">
+              drafting guide
+            </a>
+            <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+              <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+              <ul class="navbar-nav">
+                <li class="nav-item">
+                  <a class="nav-link" href="../index.html">
+                    <i class="fas fa-book"></i>
+                    Function reference
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="https://github.com/pr0m1th3as/drafting">
+                    <i class="fab fa-github"></i>
+                    Source
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </nav>
+      </div>
+    </div>
+    <div class="container-xl my-4">
+      <div class="row">
+        <div class="col-md-3 col-lg-2 mb-4">
+          <nav class="guide-nav">
+<!-- guide-nav -->
+            <h6>Guide</h6>
+            <ul>
+              <li><a href="index.html">Overview</a></li>
+              <li><a href="layout.html">Package layout</a></li>
+              <li><a href="dxf.html">DXF and the classes</a></li>
+            </ul>
+            <h6>Octave</h6>
+            <ul>
+              <li><a href="primer.html">A brief Octave primer</a></li>
+            </ul>
+            <h6>Standards</h6>
+            <ul>
+              <li><a href="standards_threads.html" class="active">Threads and tapped holes</a></li>
+            </ul>
+            <h6>Tutorials</h6>
+            <ul>
+              <li><a href="01_first_part.html">A first part</a></li>
+              <li><a href="02_outlines.html">Outlines: polylines, splines, paths and regions</a></li>
+              <li><a href="03_regions.html">Working with regions</a></li>
+              <li><a href="04_coordinate_systems.html">Coordinate systems</a></li>
+              <li><a href="05_solids_from_regions.html">Solids from regions</a></li>
+              <li><a href="06_primitives_and_booleans.html">Primitives, booleans and transforms</a></li>
+              <li><a href="07_features.html">Features: holes, pockets, fillets, chamfers and shells</a></li>
+              <li><a href="08_sections_and_projections.html">Sections and projections</a></li>
+              <li><a href="09_drawings.html">Technical drawings</a></li>
+              <li><a href="10_meshes.html">Meshes</a></li>
+              <li><a href="11_assemblies.html">Assemblies</a></li>
+              <li><a href="12_from_openscad.html">For OpenSCAD users</a></li>
+              <li><a href="13_surfaces.html">Surfaces through a grid</a></li>
+              <li><a href="14_parts_as_functions.html">Parts as functions</a></li>
+              <li><a href="15_testing_parts.html">Testing parts</a></li>
+              <li><a href="16_holes_and_threads.html">Holes and threads</a></li>
+            </ul>
+<!-- /guide-nav -->
+          </nav>
+        </div>
+        <main class="col-md-9 col-lg-10">
+
+<h1>Threads and tapped holes</h1>
+<p class="lead">The standards behind <code>solid.Shape.hole</code> with a
+thread name and <code>solid.Shape.thread</code>: where each number comes
+from, how it is computed, and what the package decides where a standard
+leaves the choice open.</p>
+
+<h2 id="sources">The sources</h2>
+
+<p>Every number is read from a published standard or from a maker's
+catalogue, never from memory or from another library. The ISO standards
+were read in the Indian Standards that adopt them without change, which the
+Bureau of Indian Standards publishes free, so any value here can be checked
+without buying the standard.</p>
+
+<table class="guide">
+  <tr><th>Source</th><th>What it gives</th><th>Read in</th></tr>
+  <tr><td>ISO 261:1998</td><td>The diameters and pitches, M1 to M64, in its
+  table 2.</td><td>IS 4218 (Part 2):2001</td></tr>
+  <tr><td>ISO 68-1:1998</td><td>The basic profile, in its figure 1.</td>
+  <td>IS 4218 (Part 1):2001</td></tr>
+  <tr><td>ISO 965-1:1998</td><td>The tolerance of the minor diameter (13.3.2,
+  table 3), the deviation of position g (13.1, table 1), and how its tables
+  are rounded (13).</td><td>IS 14962 (Part 1):2001</td></tr>
+  <tr><td>ISO 2306:1972</td><td>The tapping drills, in its tables 1 and
+  2.</td><td>IS 10952:1984</td></tr>
+  <tr><td>ISO 3:1973</td><td>The R 40 series of preferred numbers.</td>
+  <td>IS 1076 (Part 1):1985</td></tr>
+  <tr><td>RUKO, chapter 1.01 <i>Twist drills</i> (2014)</td><td>The drill
+  sizes a maker sells: DIN 338 type N, HSS ground, article 214, 0.3 to 20
+  millimetres, pages 54 to 56; DIN 345 type N, HSS, article 204, 10 to 60
+  millimetres, pages 78 and 79.</td><td>The maker's catalogue</td></tr>
+  <tr><td>OSG, <i>Tap Drill Size and Pitch Diameter Limit</i>, volume 3
+  (2024)</td><td>Which materials are tough.</td><td>The maker's
+  chart</td></tr>
+</table>
+
+<h2 id="names">Naming a thread</h2>
+
+<p>A thread is named as a drawing names it: <code>'M6'</code> for a coarse
+thread, by its nominal diameter, and <code>'M10x1.25'</code> for a fine one,
+with its pitch. The diameters and pitches are those of ISO 261, table 2,
+from M1 to M64. All three columns of the table are taken, and so are the
+pitches it prints in parentheses, which it asks to be avoided as far as
+possible: the choice is the designer's. A diameter with no coarse pitch,
+such as M15, is named with its pitch, <code>'M15x1.5'</code>.</p>
+
+<h2 id="profile">The basic profile</h2>
+
+<p>ISO 68-1 builds the thread on a triangle of height <i>H</i> = 0.866 025
+<i>P</i>, its flanks at 60 degrees. From it:</p>
+
+<ul>
+  <li><i>D</i><sub>1</sub> = <i>d</i> &minus; 1.082 532 <i>P</i>, the minor
+  diameter of the internal thread, twice 5<i>H</i>/8 below the nominal
+  diameter <i>d</i>;</li>
+  <li><i>d</i><sub>2</sub> = <i>d</i> &minus; 0.649 519 <i>P</i>, the pitch
+  diameter, twice 3<i>H</i>/8 below it;</li>
+  <li>the crest of the external thread is flat, <i>P</i>/8 wide, at the
+  nominal diameter, and the crest of the internal thread flat, <i>P</i>/4
+  wide, at <i>D</i><sub>1</sub>.</li>
+</ul>
+
+<p><code>thread</code> cuts this profile as it stands: an internal thread's
+root is flat at the nominal diameter, and an external thread's root flat at
+<i>D</i><sub>1</sub>.</p>
+
+<h2 id="band">The 6H band</h2>
+
+<p>Every tapping drill lies in the 6H band of the minor diameter, from
+<i>D</i><sub>1</sub> up by the tolerance <i>T</i><sub>D1</sub> of grade 6, so
+a drawing that states 6H is met. ISO 965-1, 13.3.2, gives it in
+micrometres:</p>
+
+<ul>
+  <li>for a pitch from 0.2 to 0.8, <i>T</i><sub>D1</sub>(6) = 433 <i>P</i>
+  &minus; 190 <i>P</i><sup>1.22</sup>;</li>
+  <li>for a pitch of 1 and coarser, <i>T</i><sub>D1</sub>(6) = 230
+  <i>P</i><sup>0.7</sup>.</li>
+</ul>
+
+<p>Its clause 13 says the tables hold these values rounded to the nearest
+number of the R 40 series of preferred numbers, then to a whole number,
+and that "in order to reproduce a smooth progression, these rules of
+rounding off have not always been used". The package rounds the same way.
+Where the R 40 number ends in a half, the table takes the even whole
+number, 26.5 becoming 26 and 31.5 becoming 32, and so does the package.
+That reproduces table 3 at every pitch ISO 261 uses but three, where the
+package takes the table's value: 140 micrometres at a pitch of 0.5, 236 at
+1 and 450 at 2.5.</p>
+
+<p>Table 3 has no grade 6 at the pitches 0.25 and 0.2, so there the band is
+the coarsest grade it has: grade 5 at 0.25, 56 micrometres from the table,
+and grade 4 at 0.2, 0.63 <i>T</i><sub>D1</sub>(6) rounded, 38.</p>
+
+<h2 id="drill">The tapping drill</h2>
+
+<p>Without options the drill is the one ISO 2306 lists, in table 1 for a
+coarse thread and in table 2 for a fine one: 5 for M6, 6.8 for M8, 8.8 for
+M10x1.25. For a thread it does not list, M60, M64 and many fine threads
+among them, the drill is the rule ISO 2306 states in its scope, the
+nominal diameter less the pitch: 58 for M64. Every drill ISO 2306 lists
+lies inside its band, and so does the nominal diameter less the pitch of
+every one of the 162 threads ISO 261 gives from M1 to M64.</p>
+
+<table class="guide">
+  <tr><th>Thread</th><th>6H band</th><th>ISO 2306 drill</th></tr>
+  <tr><td>M6</td><td>4.917 to 5.153</td><td>5.0</td></tr>
+  <tr><td>M8</td><td>6.647 to 6.912</td><td>6.8</td></tr>
+</table>
+
+<h2 id="material">Material and engagement</h2>
+
+<p>A tough material takes a larger drill, and so less thread, than a soft
+one. Tap makers give this as a percentage of full thread for each
+material, and OSG's chart asks 55 to 70 % in tough materials. In the
+makers' terms the 6H band of M6 lies between 65 and 83 %, so most of the
+holes the chart asks for would make a thread that is no longer 6H. The
+package keeps the band: <code>'Material'</code> naming a tough material,
+<code>'stainless'</code> or <code>'nickel'</code>, takes the largest drill
+inside the band, and every other material keeps the ISO 2306 drill. The
+tough materials are those OSG's chart names hard or tough: stainless steel,
+nickel steel, Monel, cast steel and drop forgings.</p>
+
+<p><code>'Engagement'</code> asks for the engagement itself, in ISO's terms
+rather than the makers': 100 % drills at <i>D</i><sub>1</sub>, and the
+diameter asked is <i>d</i> &minus; 1.0825 <i>P</i> times the percentage
+over 100. The makers count 100 % as 1.299 <i>P</i> off the diameter, so the
+same percentage is a different hole in the two. A percentage outside the
+band is refused, with the band it allows: 78.2 to 100 % for M6, 80.4 to
+100 % for M8.</p>
+
+<p>A drill chosen by <code>'Material'</code> or <code>'Engagement'</code> is
+the ISO 2306 drill or one of the sizes in RUKO's catalogue: every 0.1
+millimetre from 0.3 to 13, the quarters from 1.25 to 9.75, every 0.5 to 50
+and every millimetre to 60. Where the catalogue has no size inside a band,
+as for M1, the ISO 2306 drill stands.</p>
+
+<table class="guide">
+  <tr><th>Thread</th><th>Stainless</th><th>100 % engagement</th></tr>
+  <tr><td>M6</td><td>5.1</td><td>5.0</td></tr>
+  <tr><td>M8</td><td>6.9</td><td>6.7</td></tr>
+</table>
+
+<h2 id="external">External threads and the turned blank</h2>
+
+<p>A thread is external where its axis runs into a solid cylinder from
+halfway between the pitch diameter and the nominal diameter up to the
+nominal diameter: 5.675 to 6 for M6. A cylinder at the nominal diameter,
+which is how a rod is designed, is first turned down over the threaded
+length, as a machinist turns a blank, to the largest major diameter of
+tolerance class 6g: the nominal diameter plus the fundamental deviation of
+position g. ISO 965-1, 13.1, gives it as &minus;(15 + 11 <i>P</i>)
+micrometres. Rounded as above, that reproduces its table 1 at every pitch
+but 0.75, where the table gives 22 and the rounding 24, and the package
+takes 22.</p>
+
+<table class="guide">
+  <tr><th>Thread</th><th>Pitch</th><th>Turned to</th></tr>
+  <tr><td>M6</td><td>1</td><td>5.974</td></tr>
+  <tr><td>M8</td><td>1.25</td><td>7.972</td></tr>
+  <tr><td>M10</td><td>1.5</td><td>9.968</td></tr>
+</table>
+
+<p>A cylinder below the nominal diameter is threaded as it is, its crest
+where the lathe left it, as an internal thread's crest stands where the
+drill left it.</p>
+
+<h2 id="cutting">How the thread is cut</h2>
+
+<p>The groove of the profile is swept round the axis by
+<code>solid.helix</code>, right-handed. It starts a pitch before the point,
+so that the thread runs out of the surface clean, and ends where its full
+profile reaches the depth; a thread right through runs a pitch past the far
+side of the part. Open CASCADE does not always cut the bare groove from a
+bored part, and can leave the part as it was without an error, so the
+groove is first joined to the cylinder of the bore, or to a sleeve outside
+the crest of a rod, and that tool is cut instead. The surfaces are splines
+fitted to the helix, so a thread's volume agrees with the area of its
+profile swept round the axis to about one part in ten thousand.</p>
+
+<h2 id="not-done">What is not done</h2>
+
+<ul>
+  <li><b>Forming taps:</b> the drawing states the thread, not how it is
+  made, and a hole for a forming tap is drilled by its diameter.</li>
+  <li><b>Left-hand and multi-start threads</b>, and inch threads.</li>
+  <li><b>Tolerances of the thread itself:</b> the thread is cut at the basic
+  profile. Only the tapping hole keeps to the 6H band, and only the turned
+  blank to 6g.</li>
+  <li><b>A rounded root:</b> the flat of the basic profile is cut.</li>
+  <li><b>Threading a hole twice:</b> its bore is no longer a circle, and the
+  second thread is refused.</li>
+  <li><b>The cosmetic thread</b> of ISO 6410 on a drawing, which comes with
+  the drawings of solids.</li>
+</ul>
+
+<h2 id="editions">Editions</h2>
+
+<p>These are the editions read. ISO 965-1 has been revised since 1998: a
+fourth edition in 2013, amended in 2021, and a fifth in April 2026. The
+amendment of 2021 leaves the deviations, the tolerances and the rounding as
+they were. The texts of 2013 and 2026 were not read, and DIN's notes on its
+edition of 2026 list a revision of the calculation formulae, so the package
+follows the 1998 edition until the 2026 one has been read. Later editions
+of the other standards were not compared.</p>
+
+        </main>
+      </div>
+    </div>
+  </body>
+</html>
