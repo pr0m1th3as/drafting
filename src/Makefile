@@ -3,9 +3,34 @@
 MKOCTFILE ?= mkoctfile
 
 # Open CASCADE 7.8 or later, its visualization libraries and X11 are
-# required.  Set OCCT_INC or X11_INC to use other locations.
-OCCT_INC ?= /usr/include/opencascade
-X11_INC ?= /usr/include
+# required.  They are looked for where distributions and source builds put
+# them; set OCCT_INC, OCCT_LIB, X11_INC or X11_LIB to use other locations.
+OCCT_DIRS = /usr/local/include/opencascade /usr/local/include/OpenCASCADE \
+            /usr/include/opencascade
+X11_DIRS = /usr/include /usr/local/include
+ifndef OCCT_INC
+OCCT_INC := $(patsubst %/Standard_Version.hxx,%,$(firstword \
+              $(wildcard $(addsuffix /Standard_Version.hxx,$(OCCT_DIRS)))))
+endif
+ifndef X11_INC
+X11_INC := $(patsubst %/X11/Xlib.h,%,$(firstword \
+             $(wildcard $(addsuffix /X11/Xlib.h,$(X11_DIRS)))))
+endif
+
+# Libraries next to the headers, when not in a directory the linker searches
+OCCT_PREFIX := $(firstword $(subst /include/, ,$(OCCT_INC)))
+X11_PREFIX := $(patsubst %/include,%,$(X11_INC))
+ifndef OCCT_LIB
+OCCT_LIB := $(patsubst %/,%,$(dir $(firstword $(wildcard \
+              $(OCCT_PREFIX)/lib/libTKernel.so* \
+              $(OCCT_PREFIX)/lib64/libTKernel.so*))))
+endif
+ifndef X11_LIB
+X11_LIB := $(patsubst %/,%,$(dir $(firstword $(wildcard \
+             $(X11_PREFIX)/lib/libX11.so* \
+             $(X11_PREFIX)/lib64/libX11.so*))))
+endif
+LIB_DIRS = $(addprefix -L,$(sort $(OCCT_LIB) $(X11_LIB)))
 OCCT_LIBS = -lTKernel -lTKMath -lTKG2d -lTKG3d -lTKGeomBase -lTKGeomAlgo \
             -lTKBRep -lTKTopAlgo -lTKPrim -lTKBO -lTKFillet -lTKOffset \
             -lTKMesh -lTKDESTEP -lTKXSBase -lTKDE -lTKXCAF -lTKLCAF -lTKCAF \
@@ -22,8 +47,9 @@ APT = libocct-foundation-dev libocct-modeling-data-dev \
 # 7.8 is the first release with the data exchange libraries linked above
 OCCT_HDR = $(wildcard $(OCCT_INC)/Standard_Version.hxx)
 ifeq ($(OCCT_HDR),)
-$(error drafting needs Open CASCADE, not found in $(OCCT_INC); on Debian or \
-  Ubuntu install $(APT), or set OCCT_INC)
+$(error drafting needs Open CASCADE, not found in \
+  $(or $(OCCT_INC),$(OCCT_DIRS)); on Debian or Ubuntu install $(APT), or set \
+  OCCT_INC)
 endif
 OCCT_VERSION := $(shell awk '/define OCC_VERSION_COMPLETE/ \
                   {gsub (/"/, "", $$3); print $$3}' $(OCCT_HDR))
@@ -40,8 +66,8 @@ $(error drafting needs the visualization libraries of Open CASCADE, not \
   found in $(OCCT_INC); on Debian or Ubuntu install libocct-visualization-dev)
 endif
 ifeq ($(wildcard $(X11_INC)/X11/Xlib.h),)
-$(error drafting needs X11, not found in $(X11_INC); on Debian or Ubuntu \
-  install libx11-dev, or set X11_INC)
+$(error drafting needs X11, not found in $(or $(X11_INC),$(X11_DIRS)); \
+  on Debian or Ubuntu install libx11-dev, or set X11_INC)
 endif
 
 OCTFILES = __mesh__.oct __dxf__.oct __occt__.oct __occtfont__.oct
@@ -57,14 +83,14 @@ __dxf__.oct: __dxf__.cc
 	$(MKOCTFILE) -O2 __dxf__.cc
 
 __occtfont__.oct: __occtfont__.cc
-	$(MKOCTFILE) -I$(OCCT_INC) __occtfont__.cc $(FONT_LIBS)
+	$(MKOCTFILE) -I$(OCCT_INC) __occtfont__.cc $(LIB_DIRS) $(FONT_LIBS)
 
 __occt__.oct: __occt__.cc
-	$(MKOCTFILE) -I$(OCCT_INC) __occt__.cc $(OCCT_LIBS)
+	$(MKOCTFILE) -I$(OCCT_INC) __occt__.cc $(LIB_DIRS) $(OCCT_LIBS)
 
 __occtview__: __occtview__.cc
 	$(shell $(MKOCTFILE) -p CXX) -O2 -I$(OCCT_INC) -I$(X11_INC) \
-	  -o __occtview__ __occtview__.cc $(VIEW_LIBS)
+	  -o __occtview__ __occtview__.cc $(LIB_DIRS) $(VIEW_LIBS)
 
 # What pkg install copies: exactly what was built
 FILES:

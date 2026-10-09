@@ -91,8 +91,8 @@ jobs:
               if [ -n "${OCCT:-}" ]; then
                 $S tar -C / -xzf "/occt/$OCCT"
                 $S ldconfig
-                export OCCT_INC=/usr/local/include/opencascade
-                grep "define OCC_VERSION_COMPLETE" "$OCCT_INC/Standard_Version.hxx"
+                grep "define OCC_VERSION_COMPLETE" \
+                  /usr/local/include/opencascade/Standard_Version.hxx
               else
                 dpkg-query -W libocct-foundation-dev
               fi
