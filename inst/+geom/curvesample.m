@@ -151,9 +151,7 @@ endfunction
 %!
 %! D = draw.Drawing ().polyline (geom.Polyline (P, 'Closed', true));
 %! D.Colour = 'red';
-%! for k = 1:4:rows (P)
-%!   D = D.circle (P(k,:), 0.6);
-%! endfor
+%! D = D.circle (P(1:4:end,:), 0.6);
 %! plot (D);
 %! title ('adaptive sampling: dense at the ends, sparse along the flanks');
 

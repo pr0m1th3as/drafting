@@ -119,10 +119,7 @@ endfunction
 %!
 %! D = draw.Drawing ().circle ([0, 0], 50).circle ([70, 0], 40);
 %! D.Colour = 'red';
-%! for k = 1:rows (P)
-%!   D = D.line (P(k,:) - [4, 0], P(k,:) + [4, 0]);
-%!   D = D.line (P(k,:) - [0, 4], P(k,:) + [0, 4]);
-%! endfor
+%! D = D.line ([P - [4, 0]; P - [0, 4]], [P + [4, 0]; P + [0, 4]]);
 %! plot (D);
 %! title ('a point located from two distances');
 

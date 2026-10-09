@@ -108,10 +108,8 @@ endfunction
 %! ## The outer tangent touches where a circle of the radius difference does
 %! T = geom.tangentpoints (C1, R1 - R2, C2);
 %! D = draw.Drawing ().circle (C1, R1).circle (C2, R2);
-%! for k = 1:2
-%!   u = (T(k,:) - C1) / norm (T(k,:) - C1);
-%!   D = D.line (C1 + R1 * u, C2 + R2 * u);
-%! endfor
+%! U = (T - C1) ./ vecnorm (T - C1, 2, 2);
+%! D = D.line (C1 + R1 * U, C2 + R2 * U);
 %! plot (D);
 %! title ('an open belt over two pulleys');
 

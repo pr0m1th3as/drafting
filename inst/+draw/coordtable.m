@@ -171,10 +171,9 @@ endfunction
 %!
 %! D = draw.Drawing ().polyline (geom.Polyline (P, 'Closed', true));
 %! D.Colour = 'red';
-%! for k = 1:rows (pts)
-%!   D = D.circle (pts(k,:), 1);
-%!   D = D.text (pts(k,:) + [2, 2], sprintf ('%d', k), 2.5);
-%! endfor
+%! D = D.circle (pts, 1);
+%! D = D.text (pts + [2, 2], arrayfun (@num2str, 1:rows (pts), ...
+%!                                     'UniformOutput', false), 2.5);
 %! D = D.merge (draw.coordtable (pts, [55, 35], 'Decimals', 2));
 %! plot (D, 'FontSize', 6);
 %! title ('the table is the dimension; the view is illustrative');

@@ -174,9 +174,7 @@ endfunction
 %!
 %! D = draw.Drawing ().polyline (geom.Polyline (P, 'Closed', true));
 %! D.Colour = 'red';
-%! for k = 1:rows (Q)
-%!   D = D.circle (Q(k,:), 1);
-%! endfor
+%! D = D.circle (Q, 1);
 %! plot (D);
 %! title ('24 points spaced equally along the profile');
 

@@ -190,9 +190,7 @@ endfunction
 %!
 %! D = draw.Drawing ().polyline (geom.Polyline (P, 'Closed', true));
 %! D.Colour = 'blue';
-%! for k = 1:rows (S)
-%!   D = D.line (S(k,1:2), S(k,3:4));
-%! endfor
+%! D = D.line (S(:,1:2), S(:,3:4));
 %! plot (D);
 %! title ('ANSI31 clipped around a re-entrant notch');
 
@@ -208,9 +206,7 @@ endfunction
 %!   Q = P + [x, 0];
 %!   D = D.polyline (geom.Polyline (Q, 'Closed', true));
 %!   S = geom.hatchlines (Q, nm{1}, 0, 5);
-%!   for k = 1:rows (S)
-%!     D = D.line (S(k,1:2), S(k,3:4));
-%!   endfor
+%!   D = D.line (S(:,1:2), S(:,3:4));
 %!   D = D.text ([x, -6], nm{1}, 3);
 %!   x += 50;
 %! endfor

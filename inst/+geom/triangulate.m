@@ -133,10 +133,9 @@ endfunction
 %! [T, V, COVERAGE] = geom.triangulate (outer, H);
 %! printf ('%d triangles covering %.4f of the area\n', rows (T), COVERAGE);
 %!
-%! D = draw.Drawing ();
-%! for k = 1:rows (T)
-%!   D = D.polyline (geom.Polyline (V(T(k,:),:), 'Closed', true));
-%! endfor
+%! ## Each edge once, though most are shared by two triangles
+%! E = unique (sort ([T(:,[1, 2]); T(:,[2, 3]); T(:,[3, 1])], 2), 'rows');
+%! D = draw.Drawing ().line (V(E(:,1),:), V(E(:,2),:));
 %! plot (D);
 %! title ('an end cap triangulated around its bore and holes');
 

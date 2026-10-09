@@ -112,9 +112,7 @@ endfunction
 %!   D.Colour = 'byLayer';
 %!   D = D.line (L(1,:), L(2,:));
 %!   D.Colour = 'red';
-%!   for k = 1:rows (P)
-%!     D = D.circle (P(k,:), 1.5);
-%!   endfor
+%!   D = D.circle (P, 1.5);
 %! endfor
 %! plot (D);
 %! title ('two points, two points, one at tangency, then none');
