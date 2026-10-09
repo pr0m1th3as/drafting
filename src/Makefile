@@ -85,8 +85,11 @@ __dxf__.oct: __dxf__.cc
 __occtfont__.oct: __occtfont__.cc
 	$(MKOCTFILE) -I$(OCCT_INC) __occtfont__.cc $(LIB_DIRS) $(FONT_LIBS)
 
+# Never unloaded: Open CASCADE's worker threads outlive the calls that start
+# them, and would crash Octave at exit if their libraries went first
 __occt__.oct: __occt__.cc
-	$(MKOCTFILE) -I$(OCCT_INC) __occt__.cc $(LIB_DIRS) $(OCCT_LIBS)
+	$(MKOCTFILE) -I$(OCCT_INC) __occt__.cc $(LIB_DIRS) $(OCCT_LIBS) \
+	  -Wl,-z,nodelete
 
 __occtview__: __occtview__.cc
 	$(shell $(MKOCTFILE) -p CXX) -O2 -I$(OCCT_INC) -I$(X11_INC) \
