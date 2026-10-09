@@ -998,10 +998,17 @@ classdef Drawing
     ## -*- texinfo -*-
     ## @deftypefn {draw.Drawing} {@var{D} =} line (@var{D}, @var{P1}, @var{P2})
     ##
-    ## Append a straight line segment from @var{P1} to @var{P2}.
+    ## Append straight line segments from @var{P1} to @var{P2}.
     ##
-    ## Both points are 1-by-2 vectors in millimetres.  A zero-length line is an
-    ## error rather than an invisible entity in the output.
+    ## @var{P1} and @var{P2} are N-by-2 matrices in millimetres, one line per
+    ## row; zero rows append nothing.  A zero-length line is an error rather
+    ## than an invisible entity in the output, and the error names its row.
+    ##
+    ## @example
+    ## @group
+    ## D = draw.Drawing ().line ([0, 0; 0, 10], [40, 0; 40, 10]);
+    ## @end group
+    ## @end example
     ##
     ## @end deftypefn
     function this = line (this, P1, P2)
@@ -1009,32 +1016,40 @@ classdef Drawing
       if (nargin != 3)
         error ("draw.Drawing.line: invalid number of input arguments.");
       endif
-      errmsg = checkpt (P1);
+      errmsg = checkpts (P1);
       if (! isempty (errmsg))
         error ("draw.Drawing.line: P1 %s", errmsg);
       endif
-      errmsg = checkpt (P2);
+      errmsg = checkpts (P2);
       if (! isempty (errmsg))
         error ("draw.Drawing.line: P2 %s", errmsg);
       endif
-      if (isequal (P1, P2))
-        error ("draw.Drawing.line: P1 and P2 must not be the same point.");
+      if (rows (P1) != rows (P2))
+        error (strcat ("draw.Drawing.line: P1 and P2 must have the same", ...
+                       " number of rows."));
+      endif
+      k = find (all (P1 == P2, 2), 1);
+      if (! isempty (k))
+        error ("draw.Drawing.line: P1 and P2 are the same point in row %d.", k);
       endif
 
-      e = makeentity ('line', pen (this));
-      e.pts = [P1; P2];
-      this.Entities(end+1) = e;
+      ## One 2-by-2 page per line, its two ends as rows
+      ends = permute (cat (3, double (P1), double (P2)), [3, 2, 1]);
+      E = makeentities ('line', pen (this), rows (P1));
+      E = byrow (E, 'pts', num2cell (ends, [1, 2]));
+      this.Entities = [this.Entities, E];
 
     endfunction
 
     ## -*- texinfo -*-
     ## @deftypefn {draw.Drawing} {@var{D} =} point (@var{D}, @var{P})
     ##
-    ## Append a single point.
+    ## Append points.
     ##
-    ## @var{P} is a 1-by-2 vector in millimetres.  A point marks a location
-    ## without drawing anything through it --- a setting-out mark, a hole
-    ## centre, the origin a coordinate table is measured from.
+    ## @var{P} is an N-by-2 matrix in millimetres, one point per row; zero rows
+    ## append nothing.  A point marks a location without drawing anything
+    ## through it --- a setting-out mark, a hole centre, the origin a
+    ## coordinate table is measured from.
     ##
     ## It reaches a DXF file as a @code{POINT} entity, which is also how one
     ## arrives from a file: without it a drawing read back would lose every
@@ -1046,14 +1061,14 @@ classdef Drawing
       if (nargin != 2)
         error ("draw.Drawing.point: invalid number of input arguments.");
       endif
-      errmsg = checkpt (P);
+      errmsg = checkpts (P);
       if (! isempty (errmsg))
         error ("draw.Drawing.point: P %s", errmsg);
       endif
 
-      e = makeentity ('point', pen (this));
-      e.pts = P(:)';
-      this.Entities(end+1) = e;
+      E = makeentities ('point', pen (this), rows (P));
+      E = byrow (E, 'pts', double (P));
+      this.Entities = [this.Entities, E];
 
     endfunction
 
@@ -1251,7 +1266,11 @@ classdef Drawing
     ## -*- texinfo -*-
     ## @deftypefn {draw.Drawing} {@var{D} =} arc (@var{D}, @var{C}, @var{R}, @var{A1}, @var{A2})
     ##
-    ## Append a circular arc centred on @var{C} with radius @var{R}.
+    ## Append circular arcs centred on @var{C} with radius @var{R}.
+    ##
+    ## @var{C} is an N-by-2 matrix in millimetres, one arc per row; zero rows
+    ## append nothing.  @var{R}, @var{A1} and @var{A2} are each one value for
+    ## every arc or a vector of one per row.
     ##
     ## @var{A1} and @var{A2} are the start and end angles in @strong{degrees},
     ## measured counter-clockwise from the positive @math{x} axis.  The arc is
@@ -1267,33 +1286,46 @@ classdef Drawing
       if (nargin != 5)
         error ("draw.Drawing.arc: invalid number of input arguments.");
       endif
-      errmsg = checkpt (C);
+      errmsg = checkpts (C);
       if (! isempty (errmsg))
         error ("draw.Drawing.arc: C %s", errmsg);
       endif
-      errmsg = checkradius (R);
+      N = rows (C);
+      [errmsg, R] = checkperrow (R, N, true);
       if (! isempty (errmsg))
         error ("draw.Drawing.arc: R %s", errmsg);
       endif
-      if (! isnumeric (A1) || ! isreal (A1) || ! isscalar (A1)
-          || ! isfinite (A1) || ! isnumeric (A2) || ! isreal (A2)
-          || ! isscalar (A2) || ! isfinite (A2))
-        error (strcat ("draw.Drawing.arc: A1 and A2 must be real finite", ...
-                       " scalar angles in degrees."));
+      [errmsg, A1] = checkperrow (A1, N, false);
+      if (! isempty (errmsg))
+        error ("draw.Drawing.arc: A1 %s", errmsg);
+      endif
+      [errmsg, A2] = checkperrow (A2, N, false);
+      if (! isempty (errmsg))
+        error ("draw.Drawing.arc: A2 %s", errmsg);
       endif
 
-      e = makeentity ('arc', pen (this));
-      e.pts = double (C);
-      e.radius = double (R);
-      e.angles = double ([A1, A2]);
-      this.Entities(end+1) = e;
+      E = makeentities ('arc', pen (this), N);
+      E = byrow (E, 'pts', double (C));
+      E = byrow (E, 'radius', R);
+      E = byrow (E, 'angles', [A1, A2]);
+      this.Entities = [this.Entities, E];
 
     endfunction
 
     ## -*- texinfo -*-
     ## @deftypefn {draw.Drawing} {@var{D} =} circle (@var{D}, @var{C}, @var{R})
     ##
-    ## Append a full circle centred on @var{C} with radius @var{R} millimetres.
+    ## Append full circles centred on @var{C} with radius @var{R} millimetres.
+    ##
+    ## @var{C} is an N-by-2 matrix, one circle per row; zero rows append
+    ## nothing.  @var{R} is one radius for every circle or a vector of one per
+    ## row, so a row of equal holes is one call:
+    ##
+    ## @example
+    ## @group
+    ## D = draw.Drawing ().circle ([10, 10; 30, 10; 50, 10], 4);
+    ## @end group
+    ## @end example
     ##
     ## @end deftypefn
     function this = circle (this, C, R)
@@ -1301,19 +1333,19 @@ classdef Drawing
       if (nargin != 3)
         error ("draw.Drawing.circle: invalid number of input arguments.");
       endif
-      errmsg = checkpt (C);
+      errmsg = checkpts (C);
       if (! isempty (errmsg))
         error ("draw.Drawing.circle: C %s", errmsg);
       endif
-      errmsg = checkradius (R);
+      [errmsg, R] = checkperrow (R, rows (C), true);
       if (! isempty (errmsg))
         error ("draw.Drawing.circle: R %s", errmsg);
       endif
 
-      e = makeentity ('circle', pen (this));
-      e.pts = double (C);
-      e.radius = double (R);
-      this.Entities(end+1) = e;
+      E = makeentities ('circle', pen (this), rows (C));
+      E = byrow (E, 'pts', double (C));
+      E = byrow (E, 'radius', R);
+      this.Entities = [this.Entities, E];
 
     endfunction
 
@@ -1321,7 +1353,11 @@ classdef Drawing
     ## @deftypefn  {draw.Drawing} {@var{D} =} ellipse (@var{D}, @var{C}, @var{A}, @var{B})
     ## @deftypefnx {draw.Drawing} {@var{D} =} ellipse (@var{D}, @var{C}, @var{A}, @var{B}, @var{ROT})
     ##
-    ## Append an ellipse centred at @var{C} with semi-axes @var{A} and @var{B}.
+    ## Append ellipses centred at @var{C} with semi-axes @var{A} and @var{B}.
+    ##
+    ## @var{C} is an N-by-2 matrix in millimetres, one ellipse per row; zero
+    ## rows append nothing.  @var{A}, @var{B} and @var{ROT} are each one value
+    ## for every ellipse or a vector of one per row.
     ##
     ## @var{ROT} turns the first axis away from horizontal, in degrees
     ## counter-clockwise, and defaults to zero.
@@ -1337,28 +1373,29 @@ classdef Drawing
       if (nargin < 4 || nargin > 5)
         error ("draw.Drawing.ellipse: invalid number of input arguments.");
       endif
-      errmsg = checkpt (C);
+      errmsg = checkpts (C);
       if (! isempty (errmsg))
         error ("draw.Drawing.ellipse: C %s", errmsg);
       endif
-      errmsg = checkradius (A);
+      N = rows (C);
+      [errmsg, A] = checkperrow (A, N, true);
       if (! isempty (errmsg))
         error ("draw.Drawing.ellipse: A %s", errmsg);
       endif
-      errmsg = checkradius (B);
+      [errmsg, B] = checkperrow (B, N, true);
       if (! isempty (errmsg))
         error ("draw.Drawing.ellipse: B %s", errmsg);
       endif
-      if (! isnumeric (ROT) || ! isreal (ROT) || ! isscalar (ROT)
-          || ! isfinite (ROT))
-        error ("draw.Drawing.ellipse: ROT must be a real finite scalar.");
+      [errmsg, ROT] = checkperrow (ROT, N, false);
+      if (! isempty (errmsg))
+        error ("draw.Drawing.ellipse: ROT %s", errmsg);
       endif
 
-      e = makeentity ('ellipse', pen (this));
-      e.pts = C(:)';
-      e.radius = [A, B];
-      e.angle = ROT;
-      this.Entities(end+1) = e;
+      E = makeentities ('ellipse', pen (this), N);
+      E = byrow (E, 'pts', double (C));
+      E = byrow (E, 'radius', [A, B]);
+      E = byrow (E, 'angle', ROT);
+      this.Entities = [this.Entities, E];
 
     endfunction
 
@@ -1368,6 +1405,17 @@ classdef Drawing
     ## @deftypefnx {draw.Drawing} {@var{D} =} text (@var{D}, @var{P}, @var{S}, @var{H}, @var{ROT})
     ##
     ## Append the single-line text @var{S} with its insertion point at @var{P}.
+    ##
+    ## @var{P} is an N-by-2 matrix in millimetres, one text per row; zero rows
+    ## append nothing.  @var{S} is one character vector for every row or a
+    ## cell array of one per row, and @var{H} and @var{ROT} are each one value
+    ## or a vector of one per row:
+    ##
+    ## @example
+    ## @group
+    ## D = draw.Drawing ().text ([0, 0; 0, 10], @{'A', 'B'@});
+    ## @end group
+    ## @end example
     ##
     ## @var{H} is the cap height in millimetres and defaults to @math{2.5}, the
     ## smallest of the ISO 3098 sizes and the usual height for notes on a
@@ -1383,29 +1431,34 @@ classdef Drawing
       if (nargin < 3 || nargin > 5)
         error ("draw.Drawing.text: invalid number of input arguments.");
       endif
-      errmsg = checkpt (P);
+      errmsg = checkpts (P);
       if (! isempty (errmsg))
         error ("draw.Drawing.text: P %s", errmsg);
       endif
-      if (! ischar (S) || ! isrow (S) || isempty (S))
+      N = rows (P);
+      if (ischar (S) && isrow (S))
+        S = repmat ({S}, N, 1);
+      endif
+      if (! iscellstr (S) || numel (S) != N
+          || ! all (cellfun (@(s) isrow (s) && ! isempty (s), S)))
         error (strcat ("draw.Drawing.text: S must be a non-empty character", ...
-                       " vector."));
+                       " vector or a cell array of one per row."));
       endif
-      if (! isnumeric (H) || ! isreal (H) || ! isscalar (H)
-          || ! isfinite (H) || H <= 0)
-        error ("draw.Drawing.text: H must be a real positive finite scalar.");
+      [errmsg, H] = checkperrow (H, N, true);
+      if (! isempty (errmsg))
+        error ("draw.Drawing.text: H %s", errmsg);
       endif
-      if (! isnumeric (ROT) || ! isreal (ROT) || ! isscalar (ROT)
-          || ! isfinite (ROT))
-        error ("draw.Drawing.text: ROT must be a real finite scalar.");
+      [errmsg, ROT] = checkperrow (ROT, N, false);
+      if (! isempty (errmsg))
+        error ("draw.Drawing.text: ROT %s", errmsg);
       endif
 
-      e = makeentity ('text', pen (this));
-      e.pts = double (P);
-      e.text = S;
-      e.height = double (H);
-      e.angle = double (ROT);
-      this.Entities(end+1) = e;
+      E = makeentities ('text', pen (this), N);
+      E = byrow (E, 'pts', double (P));
+      E = byrow (E, 'text', S);
+      E = byrow (E, 'height', H);
+      E = byrow (E, 'angle', ROT);
+      this.Entities = [this.Entities, E];
 
     endfunction
 
@@ -1786,8 +1839,10 @@ classdef Drawing
     ##
     ## Append the small cross that marks the centre of a round feature.
     ##
-    ## @code{centremark (@var{D}, @var{C}, @var{R})} marks one centre, sized to
-    ## a feature of radius @var{R}.
+    ## @code{centremark (@var{D}, @var{C}, @var{R})} marks the centres in the
+    ## rows of the N-by-2 matrix @var{C}, each sized to a feature of radius
+    ## @var{R}, one value for every mark or a vector of one per row; zero rows
+    ## append nothing.
     ##
     ## @code{centremark (@var{D})} with no centre marks @strong{every} circle
     ## and arc already in the drawing.  A drawing of a bolt circle or a bore
@@ -1803,35 +1858,33 @@ classdef Drawing
     function this = centremark (this, C, R)
 
       if (nargin == 1)
-        marks = [];
+        marks = zeros (0, 3);
         for ii = 1:numel (this.Entities)
           e = this.Entities(ii);
           if (any (strcmp (e.type, {'circle', 'arc'})))
             marks = [marks; e.pts, e.radius(1)];
           endif
         endfor
-        for k = 1:rows (marks)
-          this = centremark (this, marks(k,1:2), marks(k,3));
-        endfor
+        this = centremark (this, marks(:,1:2), marks(:,3));
         return;
       endif
 
       if (nargin != 3)
         error ("draw.Drawing.centremark: invalid number of input arguments.");
       endif
-      errmsg = checkpt (C);
+      errmsg = checkpts (C);
       if (! isempty (errmsg))
         error ("draw.Drawing.centremark: C %s", errmsg);
       endif
-      errmsg = checkradius (R);
+      [errmsg, R] = checkperrow (R, rows (C), true);
       if (! isempty (errmsg))
         error ("draw.Drawing.centremark: R %s", errmsg);
       endif
 
-      e = makeentity ('centremark', pen (this));
-      e.pts = C(:)';
-      e.radius = R;
-      this.Entities(end+1) = e;
+      E = makeentities ('centremark', pen (this), rows (C));
+      E = byrow (E, 'pts', double (C));
+      E = byrow (E, 'radius', R);
+      this.Entities = [this.Entities, E];
 
     endfunction
 
@@ -3385,6 +3438,24 @@ function e = makeentity (type, p)
 
 endfunction
 
+## N entities of one type, as a row, for the caller to fill with byrow
+function E = makeentities (type, p, N)
+
+  E = repmat (makeentity (type, p), 1, N);
+
+endfunction
+
+## E with FIELD of each entity taken in turn from V: the rows of a matrix, or
+## the elements of a cell
+function E = byrow (E, field, V)
+
+  if (! iscell (V))
+    V = num2cell (V, 2);
+  endif
+  [E.(field)] = V{:};
+
+endfunction
+
 ## Shared validation for the two circular dimensions
 function e = dimcircle (this, kind, C, R, ANG, LABEL)
 
@@ -3468,6 +3539,29 @@ function errmsg = checkradius (R)
   if (! isnumeric (R) || ! isreal (R) || ! isscalar (R) || ! isfinite (R)
       || R <= 0)
     errmsg = "must be a real positive finite scalar.";
+  endif
+
+endfunction
+
+## Validate values given once for all N rows or once per row, and return them
+## as an N-by-1 column, or say why they are not valid: an error-message body.
+function [errmsg, V] = checkperrow (V, N, positive)
+
+  errmsg = '';
+  if (! isnumeric (V) || ! isreal (V) || ! any (numel (V) == [1, N])
+      || (! isvector (V) && ! isempty (V)) || ! all (isfinite (V))
+      || (positive && any (V <= 0)))
+    if (positive)
+      errmsg = "must be real, positive and finite, one value or one per row.";
+    else
+      errmsg = "must be real and finite, one value or one per row.";
+    endif
+    return;
+  endif
+  if (isscalar (V))
+    V = repmat (double (V), N, 1);
+  else
+    V = double (V(:));
   endif
 
 endfunction

@@ -68,14 +68,36 @@
 %!test  # append methods chain
 %! D = draw.Drawing ().line ([0, 0], [1, 0]).line ([1, 0], [1, 1]);
 %! assert_equal (D.numentities (), 2);
+%!test  # one line per row
+%! D = draw.Drawing ().line ([0, 0; 0, 10], [40, 0; 40, 10]);
+%! assert_equal ({D.Entities.type}, {'line', 'line'});
+%! assert_equal (D.Entities(2).pts, [0, 10; 40, 10]);
+%!test  # zero rows append nothing
+%! D = draw.Drawing ().line (zeros (0, 2), zeros (0, 2));
+%! assert_equal (D.numentities (), 0);
 %!error<draw.Drawing.line: invalid number of input arguments.> ...
 %! draw.Drawing ().line ([0, 0])
-%!error<draw.Drawing.line: P1 must be a real finite 1-by-2 vector.> ...
+%!error<draw.Drawing.line: P1 and P2 must have the same number of rows.> ...
+%! draw.Drawing ().line ([0, 0; 1, 1], [5, 5])
+%!error<draw.Drawing.line: P1 and P2 are the same point in row 2.> ...
+%! draw.Drawing ().line ([0, 0; 1, 1], [5, 5; 1, 1])
+%!error<draw.Drawing.line: P1 must be an N-by-2 matrix of point coordinates.> ...
 %! draw.Drawing ().line ([0, 0, 0], [1, 1])
-%!error<draw.Drawing.line: P2 must be a real finite 1-by-2 vector.> ...
+%!error<draw.Drawing.line: P2 must not contain NaN or Inf values.> ...
 %! draw.Drawing ().line ([0, 0], [Inf, 1])
-%!error<draw.Drawing.line: P1 and P2 must not be the same point.> ...
+%!error<draw.Drawing.line: P1 and P2 are the same point in row 1.> ...
 %! draw.Drawing ().line ([3, 4], [3, 4])
+
+%!test  # one point per row
+%! D = draw.Drawing ().point ([1, 2; 3, 4; 5, 6]);
+%! assert_equal ({D.Entities.type}, {'point', 'point', 'point'});
+%! assert_equal (D.Entities(3).pts, [5, 6]);
+%!test  # zero rows append nothing
+%! assert_equal (draw.Drawing ().point (zeros (0, 2)).numentities (), 0);
+%!error<draw.Drawing.point: invalid number of input arguments.> ...
+%! draw.Drawing ().point ()
+%!error<draw.Drawing.point: P must be an N-by-2 matrix of point coordinates.> ...
+%! draw.Drawing ().point ([1, 2, 3])
 
 %!test  # a polyline is open unless told otherwise
 %! P = [0, 0; 10, 0; 10, 10];
@@ -181,16 +203,28 @@
 %! assert_equal (D.Entities(1).pts, [10, 20]);
 %! assert_equal (D.Entities(1).radius, 5);
 %! assert_equal (D.Entities(1).angles, [30, 120]);
+%!test  # one arc per row, R and A2 per row, A1 for every row
+%! D = draw.Drawing ().arc ([0, 0; 10, 0], [2, 3], 0, [90; 180]);
+%! assert_equal (D.Entities(2).pts, [10, 0]);
+%! assert_equal (D.Entities(2).radius, 3);
+%! assert_equal (D.Entities(2).angles, [0, 180]);
+%!test  # zero rows append nothing
+%! D = draw.Drawing ().arc (zeros (0, 2), 1, 0, 90);
+%! assert_equal (D.numentities (), 0);
 %!error<draw.Drawing.arc: invalid number of input arguments.> ...
 %! draw.Drawing ().arc ([0, 0], 1, 0)
-%!error<draw.Drawing.arc: C must be a real finite 1-by-2 vector.> ...
+%!error<draw.Drawing.arc: C must be an N-by-2 matrix of point coordinates.> ...
 %! draw.Drawing ().arc ([0; 0], 1, 0, 90)
-%!error<draw.Drawing.arc: R must be a real positive finite scalar.> ...
+%!error<draw.Drawing.arc: R must be real, positive and finite, one value or one per row.> ...
 %! draw.Drawing ().arc ([0, 0], 0, 0, 90)
-%!error<draw.Drawing.arc: R must be a real positive finite scalar.> ...
+%!error<draw.Drawing.arc: R must be real, positive and finite, one value or one per row.> ...
 %! draw.Drawing ().arc ([0, 0], -3, 0, 90)
-%!error<draw.Drawing.arc: A1 and A2 must be real finite scalar angles in degrees.> ...
+%!error<draw.Drawing.arc: A2 must be real and finite, one value or one per row.> ...
 %! draw.Drawing ().arc ([0, 0], 1, 0, Inf)
+%!error<draw.Drawing.arc: A1 must be real and finite, one value or one per row.> ...
+%! draw.Drawing ().arc ([0, 0; 1, 1], 1, [0, 10, 20], 90)
+%!error<draw.Drawing.arc: R must be real, positive and finite, one value or one per row.> ...
+%! draw.Drawing ().arc ([0, 0; 1, 1], [1, 2, 3], 0, 90)
 
 %!test  # circle keeps its centre and radius
 %! D = draw.Drawing ().circle ([1, 2], 7);
@@ -198,11 +232,20 @@
 %! assert_equal (D.Entities(1).pts, [1, 2]);
 %! assert_equal (D.Entities(1).radius, 7);
 %! assert_equal (D.Entities(1).angles, []);
+%!test  # one radius serves every row
+%! D = draw.Drawing ().circle ([10, 10; 30, 10; 50, 10], 4);
+%! assert_equal ([D.Entities.radius], [4, 4, 4]);
+%! assert_equal (D.Entities(3).pts, [50, 10]);
+%!test  # or one radius per row
+%! D = draw.Drawing ().circle ([0, 0; 20, 0], [3; 5]);
+%! assert_equal ([D.Entities.radius], [3, 5]);
+%!test  # zero rows append nothing
+%! assert_equal (draw.Drawing ().circle (zeros (0, 2), 1).numentities (), 0);
 %!error<draw.Drawing.circle: invalid number of input arguments.> ...
 %! draw.Drawing ().circle ([0, 0])
-%!error<draw.Drawing.circle: C must be a real finite 1-by-2 vector.> ...
+%!error<draw.Drawing.circle: C must be an N-by-2 matrix of point coordinates.> ...
 %! draw.Drawing ().circle (0, 1)
-%!error<draw.Drawing.circle: R must be a real positive finite scalar.> ...
+%!error<draw.Drawing.circle: R must be real, positive and finite, one value or one per row.> ...
 %! draw.Drawing ().circle ([0, 0], [1, 2])
 
 %!test  # text defaults to a 2.5 mm cap height and no rotation
@@ -219,15 +262,32 @@
 %!test  # the string is stored exactly as given
 %! D = draw.Drawing ().text ([0, 0], 'ΤΟΜΗ 160x180');
 %! assert_equal (D.Entities(1).text, 'ΤΟΜΗ 160x180');
+%!test  # one string serves every row
+%! D = draw.Drawing ().text ([0, 0; 0, 10], 'A');
+%! assert_equal ({D.Entities.text}, {'A', 'A'});
+%! assert_equal (D.Entities(2).pts, [0, 10]);
+%!test  # or a cell of one per row, with height and rotation per row
+%! D = draw.Drawing ().text ([0, 0; 0, 10], {'A', 'B'}, [2.5, 5], [0; 90]);
+%! assert_equal ({D.Entities.text}, {'A', 'B'});
+%! assert_equal ([D.Entities.height], [2.5, 5]);
+%! assert_equal ([D.Entities.angle], [0, 90]);
+%!test  # zero rows append nothing
+%! assert_equal (draw.Drawing ().text (zeros (0, 2), 'A').numentities (), 0);
 %!error<draw.Drawing.text: invalid number of input arguments.> ...
 %! draw.Drawing ().text ([0, 0])
-%!error<draw.Drawing.text: S must be a non-empty character vector.> ...
+%!error<draw.Drawing.text: S must be a non-empty character vector or a cell array of one per row.> ...
 %! draw.Drawing ().text ([0, 0], '')
-%!error<draw.Drawing.text: S must be a non-empty character vector.> ...
+%!error<draw.Drawing.text: S must be a non-empty character vector or a cell array of one per row.> ...
 %! draw.Drawing ().text ([0, 0], 42)
-%!error<draw.Drawing.text: H must be a real positive finite scalar.> ...
+%!error<draw.Drawing.text: S must be a non-empty character vector or a cell array of one per row.> ...
+%! draw.Drawing ().text ([0, 0; 1, 1], {'A', 'B', 'C'})
+%!error<draw.Drawing.text: S must be a non-empty character vector or a cell array of one per row.> ...
+%! draw.Drawing ().text ([0, 0; 1, 1], {'A', ''})
+%!error<draw.Drawing.text: P must be an N-by-2 matrix of point coordinates.> ...
+%! draw.Drawing ().text ([0; 0], 'A')
+%!error<draw.Drawing.text: H must be real, positive and finite, one value or one per row.> ...
 %! draw.Drawing ().text ([0, 0], 'A', 0)
-%!error<draw.Drawing.text: ROT must be a real finite scalar.> ...
+%!error<draw.Drawing.text: ROT must be real and finite, one value or one per row.> ...
 %! draw.Drawing ().text ([0, 0], 'A', 2.5, NaN)
 
 %!test  # hatch defaults to ANSI31 at 2.5 mm and is always closed
@@ -898,6 +958,14 @@
 %! assert_equal (D.Entities(1).pts, [1, 2]);
 %! assert_equal (D.Entities(1).radius, [20, 8]);
 %! assert_equal (D.Entities(1).angle, 30);
+%!test  # one ellipse per row, axes and rotation per row or for every row
+%! D = draw.Drawing ().ellipse ([0, 0; 50, 0], [20; 10], 8, [0, 45]);
+%! assert_equal (D.Entities(2).pts, [50, 0]);
+%! assert_equal (D.Entities(2).radius, [10, 8]);
+%! assert_equal (D.Entities(2).angle, 45);
+%!test  # zero rows append nothing
+%! D = draw.Drawing ().ellipse (zeros (0, 2), 2, 1);
+%! assert_equal (D.numentities (), 0);
 
 %!test  # a bulge of one makes a semicircle on the chord it spans
 %! D = draw.Drawing ().polyline (geom.Polyline ([0, 0, 1; 20, 0, 0]));
@@ -961,9 +1029,13 @@
 %! assert_equal (E(1).bulge, [-1, 0]);
 %! F = entities (D, 'bulges', 'flatten', 'dimensions', 'explode');
 %! assert_equal (min (F(1).pts(:,2)), -10, 1e-6);
-%!error<draw.Drawing.ellipse: A must be a real positive finite scalar.> ...
+%!error<draw.Drawing.ellipse: A must be real, positive and finite, one value or one per row.> ...
 %! draw.Drawing ().ellipse ([0, 0], 0, 5)
-%!error<draw.Drawing.ellipse: ROT must be a real finite scalar.> ...
+%!error<draw.Drawing.ellipse: B must be real, positive and finite, one value or one per row.> ...
+%! draw.Drawing ().ellipse ([0, 0; 1, 1], 5, [3, 2, 1])
+%!error<draw.Drawing.ellipse: C must be an N-by-2 matrix of point coordinates.> ...
+%! draw.Drawing ().ellipse ([0, 0, 0], 5, 3)
+%!error<draw.Drawing.ellipse: ROT must be real and finite, one value or one per row.> ...
 %! draw.Drawing ().ellipse ([0, 0], 5, 3, Inf)
 
 %!test  # a diameter dimension labels itself with the symbol and the figure
@@ -1013,6 +1085,14 @@
 %! D = D.arc ([20, 0], 5, 0, 90).circle ([40, 0], 5);
 %! D = D.centremark ();
 %! assert_equal (sum (strcmp ({D.Entities.type}, 'centremark')), 3);
+%!test  # with no circle or arc there is nothing to mark
+%! D = draw.Drawing ().line ([0, 0], [1, 1]).centremark ();
+%! assert_equal (D.numentities (), 1);
+%!test  # one mark per row, sized per row
+%! D = draw.Drawing ().centremark ([0, 0; 20, 0], [5, 8]);
+%! assert_equal ({D.Entities.type}, {'centremark', 'centremark'});
+%! assert_equal (D.Entities(2).pts, [20, 0]);
+%! assert_equal (D.Entities(2).radius, 8);
 
 %!test  # the marks take the current line type, which is how they become
 %!       # centre lines rather than solid crosses
@@ -1049,8 +1129,10 @@
 %! draw.Drawing ().angdim ([0, 0], [0, 0], [1, 1], 5)
 %!error<draw.Drawing.leader: P must hold at least two points.> ...
 %! draw.Drawing ().leader ([0, 0], 'x')
-%!error<draw.Drawing.centremark: R must be a real positive finite scalar.> ...
+%!error<draw.Drawing.centremark: R must be real, positive and finite, one value or one per row.> ...
 %! draw.Drawing ().centremark ([0, 0], -1)
+%!error<draw.Drawing.centremark: C must be an N-by-2 matrix of point coordinates.> ...
+%! draw.Drawing ().centremark ([0; 0], 1)
 
 %!test  # a measured angle is stated to a hundredth, not to six figures
 %! D = draw.Drawing ().angdim ([0, 0], [40.24, 2.02], [-2.13, 42.23], 30);
