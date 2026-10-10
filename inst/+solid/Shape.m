@@ -3309,6 +3309,15 @@ endfunction
 %! assert_equal (volume (union (A)), 1000, 1e-9);
 %! assert_equal (isempty (union (solid.Shape (), solid.Shape ())), true);
 
+%!test  # a compound of solids from solid.surface as one operand
+%! [x, y] = meshgrid (linspace (15, 30, 6), linspace (2, 8, 5));
+%! B = solid.surface (x, 0.5 * sind (20 * x), y, [0.5, 0.5]);
+%! K = union (B, rotate (B, 90, [0, 0, 1]));
+%! c = solid.cylinder (20, 10);
+%! V = volume (c) + 2 * volume (subtract (B, c));
+%! assert_equal (volume (union (c, K)), V, -1e-9);
+%! assert_equal (volume (union (K, c)), V, -1e-9);
+
 %!test  # a through hole
 %! C = subtract (solid.box (80, 40, 12), ...
 %!               translate (solid.cylinder (4, 12), [20, 20, 0]));

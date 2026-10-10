@@ -3533,7 +3533,23 @@ function directly. \n\
       for (int i = 2; i < args.length (); i++)
       {
         sources.push_back (toshape (args(i), caller));
-        (i == 2 ? objects : tools).Append (sources.back ());
+        ShapeList& list = (i == 2 ? objects : tools);
+        if (cmd == "fuse")
+        {
+          // A union takes each solid of an operand on its own: given a
+          // compound of solids made by solid.surface as one operand, Open
+          // CASCADE returns the union of the others without it, and
+          // reports nothing
+          const ShapeMap solids = solidsof (sources.back ());
+          for (int k = 1; k <= solids.Extent (); k++)
+          {
+            list.Append (solids (k));
+          }
+        }
+        else
+        {
+          list.Append (sources.back ());
+        }
       }
       if (cmd == "fuse")
       {
