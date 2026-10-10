@@ -2221,9 +2221,9 @@ traced (const TopoDS_Shape& r, const origins& L)
 // Whether a cut came back without a tool's face that passes inside the shape
 // and outside every other tool: such a face bounds the hollow it cuts, so a
 // result without it, or without any piece of it, is the shape returned
-// uncut, which Open CASCADE before 8.0 can report as a success.  Each face is
-// tried at the middle of its parameter range, and a face whose middle falls
-// off it is passed over.
+// uncut, which Open CASCADE 7.8 can report as a success.  Each face is tried
+// at the middle of its parameter range, and a face whose middle falls off it
+// is passed over.
 static bool
 uncut (BRepAlgoAPI_BooleanOperation& op)
 {
