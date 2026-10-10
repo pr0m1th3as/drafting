@@ -2,7 +2,7 @@
 # name: cache
 # type: cell
 # rows: 3
-# columns: 233
+# columns: 236
 # name: <cell-element>
 # type: sq_string
 # elements: 1
@@ -375,9 +375,13 @@ draw.Drawing.arc
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 467
+# length: 622
 draw.Drawing: D = arc (D, C, R, A1, A2)
-Append a circular arc centred on C with radius R.
+Append circular arcs centred on C with radius R.
+
+C is an N-by-2 matrix in millimetres, one arc per row; zero rows
+append nothing. R, A1 and A2 are each one value for
+every arc or a vector of one per row.
 
 A1 and A2 are the start and end angles in degrees,
 measured counter-clockwise from the positive x axis. The arc is
@@ -391,8 +395,8 @@ sweep of 360 degrees. Prefer circle when that is what is meant.
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 49
-Append a circular arc centred on C with radius R.
+# length: 48
+Append circular arcs centred on C with radius R.
 
 
 
@@ -491,13 +495,15 @@ draw.Drawing.centremark
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 654
+# length: 774
 draw.Drawing: D = centremark (D, C, R)
 draw.Drawing: D = centremark (D)
 Append the small cross that marks the centre of a round feature.
 
-centremark (D, C, R) marks one centre, sized to
-a feature of radius R.
+centremark (D, C, R) marks the centres in the
+rows of the N-by-2 matrix C, each sized to a feature of radius
+R, one value for every mark or a vector of one per row; zero rows
+append nothing.
 
 centremark (D) with no centre marks every circle
 and arc already in the drawing. A drawing of a bolt circle or a bore
@@ -532,16 +538,22 @@ draw.Drawing.circle
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 95
+# length: 321
 draw.Drawing: D = circle (D, C, R)
-Append a full circle centred on C with radius R millimetres.
+Append full circles centred on C with radius R millimetres.
+
+C is an N-by-2 matrix, one circle per row; zero rows append
+nothing. R is one radius for every circle or a vector of one per
+row, so a row of equal holes is one call:
+
+D = draw.Drawing ().circle ([10, 10; 30, 10; 50, 10], 4);
 
 
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 60
-Append a full circle centred on C with radius R millimetres.
+# length: 59
+Append full circles centred on C with radius R millimetres.
 
 
 
@@ -642,10 +654,14 @@ draw.Drawing.ellipse
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 457
+# length: 619
 draw.Drawing: D = ellipse (D, C, A, B)
 draw.Drawing: D = ellipse (D, C, A, B, ROT)
-Append an ellipse centred at C with semi-axes A and B.
+Append ellipses centred at C with semi-axes A and B.
+
+C is an N-by-2 matrix in millimetres, one ellipse per row; zero
+rows append nothing. A, B and ROT are each one value
+for every ellipse or a vector of one per row.
 
 ROT turns the first axis away from horizontal, in degrees
 counter-clockwise, and defaults to zero.
@@ -663,8 +679,8 @@ polyline
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 54
-Append an ellipse centred at C with semi-axes A and B.
+# length: 52
+Append ellipses centred at C with semi-axes A and B.
 
 
 
@@ -975,19 +991,22 @@ draw.Drawing.line
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 206
+# length: 337
 draw.Drawing: D = line (D, P1, P2)
-Append a straight line segment from P1 to P2.
+Append straight line segments from P1 to P2.
 
-Both points are 1-by-2 vectors in millimetres. A zero-length line is an
-error rather than an invisible entity in the output.
+P1 and P2 are N-by-2 matrices in millimetres, one line per
+row; zero rows append nothing. A zero-length line is an error rather
+than an invisible entity in the output, and the error names its row.
+
+D = draw.Drawing ().line ([0, 0; 0, 10], [40, 0; 40, 10]);
 
 
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 45
-Append a straight line segment from P1 to P2.
+# length: 44
+Append straight line segments from P1 to P2.
 
 
 
@@ -1312,13 +1331,14 @@ draw.Drawing.point
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 392
+# length: 430
 draw.Drawing: D = point (D, P)
-Append a single point.
+Append points.
 
-P is a 1-by-2 vector in millimetres. A point marks a location
-without drawing anything through it --- a setting-out mark, a hole
-centre, the origin a coordinate table is measured from.
+P is an N-by-2 matrix in millimetres, one point per row; zero rows
+append nothing. A point marks a location without drawing anything
+through it --- a setting-out mark, a hole centre, the origin a
+coordinate table is measured from.
 
 It reaches a DXF file as a POINT entity, which is also how one
 arrives from a file: without it a drawing read back would lose every
@@ -1328,8 +1348,8 @@ point it was given.
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 22
-Append a single point.
+# length: 14
+Append points.
 
 
 
@@ -1610,11 +1630,18 @@ draw.Drawing.text
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 539
+# length: 810
 draw.Drawing: D = text (D, P, S)
 draw.Drawing: D = text (D, P, S, H)
 draw.Drawing: D = text (D, P, S, H, ROT)
 Append the single-line text S with its insertion point at P.
+
+P is an N-by-2 matrix in millimetres, one text per row; zero rows
+append nothing. S is one character vector for every row or a
+cell array of one per row, and H and ROT are each one value
+or a vector of one per row:
+
+D = draw.Drawing ().text ([0, 0; 0, 10], {'A', 'B'});
 
 H is the cap height in millimetres and defaults to 2.5, the
 smallest of the ISO 3098 sizes and the usual height for notes on a
@@ -6671,7 +6698,7 @@ model.Assembly.add
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 807
+# length: 953
 model.Assembly: A = add (A, NAME, X, U)
 model.Assembly: A = add (A, NAME, [], U)
 model.Assembly: A = add (..., 'Name', INSTANCE)
@@ -6686,7 +6713,9 @@ with solid.Shape.mirror or polymesh.Mesh.mirror.
 
 The first use of a name defines the part. A later use places the same
 part again, and gives the same X, or [] for it; another
-X under a name already used is an error.
+X under a name already used is an error. The same means stored
+the same, not only shaped the same: a shape read back from a file is
+another shape, so a part is best placed again with [].
 
 Each placement is named after its part, NAME the first time and
 then NAME:2, NAME:3 and so on;
@@ -6792,16 +6821,17 @@ model.Assembly.shape
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 577
+# length: 623
 model.Assembly: S = shape (A)
 Every part placed, as one shape.
 
 S = shape (A) returns a solid.Shape holding
 the solids of every part where the assembly places it, sub-assemblies
-included, each in its part's colour. The solids are kept apart, not
-united, so parts that touch stay separate solids. This is the shape
-to measure, cut, show or tessellate. The empty assembly gives the
-empty shape. An assembly with a mesh among its parts has no exact
+included, each with the solid.Shape.Colour and
+solid.Shape.Name its part gives it. The solids are kept apart,
+not united, so parts that touch stay separate solids. This is the
+shape to measure, cut, show or tessellate. The empty assembly gives
+the empty shape. An assembly with a mesh among its parts has no exact
 shape and is an error; tessellate gives it whole as a mesh.
 
 See also:
@@ -6899,22 +6929,23 @@ model.Assembly.write
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 984
+# length: 1024
 model.Assembly: write (A, FILE)
 model.Assembly: write (A, FILE, 'Tolerance', TOL)
 Write an assembly to a STEP, 3MF, STL, OBJ or PLY file.
 
 write (A, FILE) writes the assembly in the format
 the extension of FILE names, in either case. A STEP file,
-.step, keeps its structure: each part once, with its name and
-colours, placed by its placements, which carry their names, and each
-sub-assembly the same way, so that a CAD program opens the product as
-it was built; it cannot hold a mesh part. A 3MF file,
-the archive slicers take, keeps the same structure, each part a mesh
-written once and placed as a component, in its colours. 3MF has no
-place for the name of a placement, so model.read names the
-placements of a 3MF file after their parts. An STL, OBJ or PLY file
-holds tessellate (A).
+.step, keeps its structure: each part once, with its name, its
+colours and the solid.Shape.Name of its solids, placed by its
+placements, which carry their names, and each sub-assembly the same
+way, so that a CAD program opens the product as it was built; it
+cannot hold a mesh part. A 3MF file, the archive slicers take, keeps
+the same structure, each part a mesh written once and placed as a
+component, in its colours. 3MF has no place for the name of a
+placement, so model.read names the placements of a 3MF file
+after their parts. An STL, OBJ or PLY file holds
+tessellate (A).
 
 write (..., 'Tolerance', TOL) sets, for a
 mesh, how far its facets may stray from the parts' surfaces, as
@@ -6943,7 +6974,7 @@ model.Viewer
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1959
+# length: 2143
 drafting: model.Viewer
 A window showing a solid or a triangle mesh, in which edges, faces and
 coordinate systems can be picked.
@@ -6962,11 +6993,13 @@ The window is drawn by Open CASCADE in a process of its own, so a complex
 model turns smoothly and never holds up the Octave prompt. The world
 axes are drawn in the lower right corner, turning with the view, x
 red, y green and z blue. The left mouse button rotates,
-the middle one pans and the wheel zooms. The view turns about the
-centre of the window, wherever it has been panned to, or about a point
-of the shape chosen by double-clicking it; a double click that misses
-the shape, or fitting the view, returns to the centre of the window.
-During a pick a double click is a click like any other. Keys:
+the middle one pans and the wheel zooms. The view turns keeping
+z up the window, as Octave's rotate3d turns a plot, until
+T lets it turn any way. It turns about the centre of the window,
+wherever it has been panned to, or about a point of the shape chosen by
+double-clicking it; a double click that misses the shape, or fitting the
+view, returns to the centre of the window. During a pick a double click
+is a click like any other. Keys:
 
 F fit the shape to the window, and turn about the
 centre of the window again
@@ -6974,6 +7007,8 @@ centre of the window again
 1 front view, looking along +y
 2 top view, looking down z
 3 right view, looking along -x
+T let the mouse turn the view any way, or keep
+z up again, standing the view upright
 C on a mesh, the next of the colourings it has: its
 faces' colours, its vertices', grey
 E on a mesh, its triangle edges drawn or not, not at
@@ -7091,6 +7126,54 @@ tested.
 # elements: 1
 # length: 14
 Make a viewer.
+
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 20
+model.Viewer.capture
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 915
+model.Viewer: IMG = capture (V)
+model.Viewer: capture (V, FILE)
+model.Viewer: capture (..., 'Size', [W, H])
+The picture the viewer shows, as an image or a file.
+
+IMG = capture (V) returns what the window shows, the
+shape as it is turned and lit, as an H-by-W-by-3
+uint8 image of red, green and blue, the size of the window: the
+form imread gives and image and imwrite take.
+
+capture (V, FILE) writes it to FILE instead,
+in the format its extension names, as imwrite writes it; PNG
+keeps every pixel.
+
+capture (..., 'Size', [W, H]) draws the
+picture W pixels wide and H high instead, whatever the size
+of the window, so a picture for print can be finer than the screen.
+The view keeps its height: a picture of another shape than the window
+shows more or less at the sides.
+
+V = show (solid.cylinder (10, 30));
+view (V, 30, 20);
+capture (V, 'cylinder.png', 'Size', [1800, 1400]);
+
+See also:
+model.Viewer.view,
+imwrite
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 52
+The picture the viewer shows, as an image or a file.
 
 
 
@@ -7294,10 +7377,12 @@ model.Viewer.view
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1300
+# length: 2345
 model.Viewer: view (V, AZ, EL)
-model.Viewer: [AZ, EL] = view (V)
-Set or query the direction the viewer looks from.
+model.Viewer: view (V, AZ, EL, ZOOM)
+model.Viewer: view (V, AZ, EL, ZOOM, TARGET)
+model.Viewer: [AZ, EL, ZOOM, TARGET] = view (V)
+Set or query the direction the viewer looks from, and how close.
 
 view (V, AZ, EL) turns the view to look at the
 shape from azimuth AZ and elevation EL, in degrees, and fits
@@ -7309,10 +7394,25 @@ straight down. The z axis points up the window; looking
 straight down or up, the y axis does, turned by AZ. The
 mouse still turns the view afterwards.
 
-[AZ, EL] = view (V) returns the angles the
-view looks from now, however it got there, AZ from -180 to 180,
-so that a view found with the mouse can be kept in a script. A turn
-about the line of sight, which the mouse can give, is not part of them.
+view (V, AZ, EL, ZOOM) then magnifies
+the shape ZOOM times about the centre of the window: 1 is the
+shape fitted, 2 shows it twice as large and 0.5 half as large.
+
+view (V, AZ, EL, ZOOM, TARGET)
+looks at the point TARGET, a 3-element vector in millimetres,
+instead of the middle of the shape: the point Octave calls the camera
+target. It is put at the centre of the window, ZOOM magnifies
+about it, and the mouse turns the view about it afterwards, as after a
+double click. So a detail is seen close up from a script.
+
+[AZ, EL, ZOOM, TARGET] = view (V)
+returns the view as it is now, however it got there: the angles it
+looks from, AZ from -180 to 180, its magnification against the
+shape fitted, and the point at the centre of the window, wherever the
+view was panned to. Given back to view, they restore it, so a
+view found with the mouse can be kept in a script. After T,
+the mouse can also turn the view about the line of sight, which they
+do not hold, so such a view is restored upright.
 
 The keys of the window give four of these views: 0 is
 view (V, 45, 35.26), near enough, the isometric view the
@@ -7325,8 +7425,13 @@ view (V, 90, 0).
 part = solid.box (80, 40, 4);
 V = show (part);
 view (V, 30, 60);
-## Keep a view found with the mouse
-[az, el] = view (V);
+## Closer, on the middle of the part
+view (V, 30, 60, 2);
+## Four times larger, on a corner
+view (V, 30, 60, 4, [80, 40, 4]);
+## Keep a view found with the mouse, and restore it
+[az, el, zoom, target] = view (V);
+view (V, az, el, zoom, target);
 
 See also:
 solid.Shape.show
@@ -7335,8 +7440,8 @@ solid.Shape.show
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 49
-Set or query the direction the viewer looks from.
+# length: 64
+Set or query the direction the viewer looks from, and how close.
 
 
 
@@ -7350,15 +7455,16 @@ model.read
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1337
+# length: 1358
 drafting: A = model.read (FILE)
 Read an assembly from a STEP or 3MF file.
 
 A = model.read (FILE) returns the product the STEP file
 FILE holds as a model.Assembly, in millimetres whatever unit
-the file was written in: its parts with their names and the colours of
-their solids, placed where the file places them and named as it names the
-placements, and its sub-assemblies the same way. A part the file places
+the file was written in: its parts with their names and the colours and
+solid.Shape.Name of their solids, placed where the file places
+them and named as it names the placements, and its sub-assemblies the
+same way. A part the file places
 several times is one part placed several times. Several products at the
 top of the file are placed where they are in one assembly, and a file of
 a single part gives an assembly placing it once; either is named after
@@ -8315,6 +8421,41 @@ Colour of each solid
 # name: <cell-element>
 # type: sq_string
 # elements: 1
+# length: 16
+solid.Shape.Name
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 687
+solid.Shape: property Name
+Name of each solid
+
+A cell column of character vectors, one for each of the shape's
+N solids in the order solid.Shape.numsolids counts them,
+'' for a solid without a name, or empty when none has one.
+Assigning a single character vector, or a cell of one, names every
+solid; a cell of N names each in turn. A name is free text,
+kept as it is given and never read for meaning. A STEP file carries
+it out and in, and a 3MF file out, as solid.Shape.write
+describes. A transform keeps it, and each solid a boolean or a
+feature makes takes the name of the first named solid it came from, as
+it takes its colour by solid.Shape.Colour; the tools of
+subtract give none.
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 18
+Name of each solid
+
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
 # length: 17
 solid.Shape.Shape
 
@@ -8774,7 +8915,7 @@ solid.Shape.hole
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 2201
+# length: 5526
 solid.Shape: S = hole (S, P, D, DEPTH)
 solid.Shape: S = hole (..., Name, Value, ...)
 Drill holes into a shape.
@@ -8792,17 +8933,76 @@ sloping or curved face is clean all round. A hole started under
 material that its axis passes through first cuts that material as
 well. All the holes are cut in one operation.
 
-D may instead name an ISO metric coarse thread, such as
-'M6' or 'M2.5', from M1 to M64: the hole is then drilled
-at the tapping size for that thread, its nominal diameter less its
-pitch, so 'M6' drills 5 millimetres. The thread itself is not
-modelled.
+P may instead be a geom.UCS, such as geom.UCS
+(V) picks off a face in the viewer: the hole starts at its origin
+and runs against its normal, which points out of the part, so its
+normal sets the direction. With 'At', a hole is drilled at
+every point given in the plane of the UCS instead, which places a bolt
+circle or a row of holes on a face in one call.
+
+Tapping holes
+
+D may instead name an ISO metric thread from M1 to M64 with a
+diameter and pitch of ISO 261: a coarse thread by its diameter, as
+'M6', a fine one with its pitch, as 'M10x1.25'. The
+hole is then drilled for tapping that thread by hand, and the thread
+itself is cut by solid.Shape.thread. The drill is the one ISO
+2306:1972 lists for the thread in its tables 1 and 2, so 'M6'
+drills 5 millimetres and 'M8' 6.8; for a thread it does not
+list, M60 and M64 among them, it is the rule ISO 2306 states, the
+nominal diameter less the pitch.
+
+With 'Custom', D may name a thread of any diameter and
+pitch, as 'M16x0.8', or 'M6.35x1.27' for the 1/4-20
+UNC of an imperial screw, whose basic profile is the same. Its drill
+is the nominal diameter less the pitch rounded to a step of 0.05
+millimetres, the step nearest that inside the band below.
+
+Every drill lies in the 6H tolerance band of the thread's minor
+diameter, from D_1, the nominal diameter less 1.0825 P,
+up by the tolerance of ISO 965-1:1998, 13.3.2, table 3, so a drawing
+that states 6H is met. At a pitch of 0.25 and 0.2, where ISO 965-1
+has no grade 6, the band is the coarsest grade it has, 5 and 4. Tough
+materials take a larger drill than soft ones, and 'Material'
+and 'Engagement' choose another drill inside the band. For a
+custom thread the drills are the steps of 0.05 millimetres, and a band
+too narrow to hold one, at the finest pitches, is an error naming the
+thread. A drill chosen otherwise is the ISO 2306 drill or one of the
+sizes of the twist drills in RUKO's catalogue, chapter 1.01
+Twist drills (2014): DIN 338 type N, HSS ground, article 214,
+0.3 to 20 millimetres, pages 54 to 56; DIN 345 type N, HSS, article
+204, 10 to 60 millimetres, pages 78 and 79.
 
 Name/Value pairs shape the hole:
 
 'Direction'
 The nonzero 3-element direction the holes run in from their points,
-[0, 0, -1] by default.
+[0, 0, -1] by default. It cannot be given when P is a
+geom.UCS.
+'At'
+An N-by-2 matrix of points in the plane of the geom.UCS
+P, one hole at each, all against its normal; the UCS origin alone
+by default. It applies only when P is a geom.UCS.
+'Material'
+The material tapped, for a named thread. A tough one,
+'stainless' or 'nickel', takes the largest drill inside
+the band, and 'steel', 'aluminium', 'brass',
+'castiron' and 'plastic' keep the ISO 2306 drill. The
+tough ones are those OSG's chart Tap Drill Size and Pitch
+Diameter Limit, volume 3 (2024), names hard or tough: stainless
+steel, nickel steel, Monel, cast steel and drop forgings.
+'Engagement'
+The thread engagement for a named thread, as a percentage of the full
+thread in ISO's terms, 100 drilling at D_1: the diameter asked
+is the nominal diameter less 1.0825 P times the percentage over
+100, and the drill is the one nearest it inside the band. A
+percentage that falls outside the band is an error naming the thread
+and the band, from 78.2 to 100 for M6. It cannot be given with
+'Material'.
+'Custom'
+True to take a named thread of any diameter and pitch, false by
+default, so that a name outside ISO 261, as a mistyped pitch, is an
+error. A thread of ISO 261 is drilled as without it.
 'Counterbore'
 [CD, CDEPTH]: a flat-bottomed bore of diameter
 CD, wider than the hole, CDEPTH deep, shallower than the
@@ -8826,7 +9026,14 @@ S = solid.box (80, 40, 12);
 P = [10, 10, 12; 70, 10, 12; 10, 30, 12; 70, 30, 12];
 S = hole (S, P, 6.6, Inf, 'Counterbore', [11, 6.5]);
 
+## Four holes tapped M5 in stainless steel on a bolt circle of 30
+S = solid.cylinder (25, 10);
+U = geom.UCS ([0, 0, 1], [0, 0, 10]);
+XY = 15 * [1, 0; 0, 1; -1, 0; 0, -1];
+S = hole (S, U, 'M5', 8, 'At', XY, 'Material', 'stainless');
+
 See also:
+solid.Shape.thread,
 solid.Shape.subtract,
 solid.cylinder
 
@@ -9633,7 +9840,7 @@ solid.Shape.show
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1727
+# length: 1786
 solid.Shape: show (S)
 solid.Shape: V = show (S)
 Show a shape in a viewer of its own, redrawing in place.
@@ -9649,10 +9856,12 @@ and all, and each part changes in its own window. A shape given as an
 expression rather than a variable, such as show (fillet (part,
 E, 3)), has no name, and all such shapes share one window.
 
-Drag with the left mouse button to rotate, the middle one to pan, and
-turn the wheel to zoom; F fits the part to the window and
-0, 1, 2 and 3 turn it to the isometric, front,
-top and right views. Closing a window ends its viewer, and the next
+Drag with the left mouse button to rotate, keeping z up, the
+middle one to pan, and turn the wheel to zoom; F fits the part to
+the window, 0, 1, 2 and 3 turn it to the
+isometric, front, top and right views, and T lets it turn any way
+or keeps z up again. Closing a window ends its viewer, and the
+next
 show of that variable opens a new one. Showing the empty shape
 opens a variable's window before there is anything to draw in it.
 
@@ -9776,6 +9985,100 @@ solid.polyhedron
 # elements: 1
 # length: 27
 A triangle mesh of a shape.
+
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 18
+solid.Shape.thread
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 3286
+solid.Shape: S = thread (S, P, NAME, DEPTH)
+solid.Shape: S = thread (..., Name, Value, ...)
+Cut screw threads into a shape.
+
+S = thread (S, P, NAME, DEPTH) cuts
+the ISO metric thread NAME at every row of the M-by-3
+matrix P, each along an axis starting at its point and running
+down the z axis, DEPTH millimetres deep. NAME is
+named as for solid.Shape.hole: a coarse thread by its diameter,
+as 'M6', a fine one with its pitch, as 'M10x1.25', from
+M1 to M64 with a diameter and pitch of ISO 261, or any diameter and
+pitch with 'Custom', cut by the same profile and turned to the
+same class 6g as an ISO thread. P and
+DEPTH are those of solid.Shape.hole, so a thread is placed
+as its tapping hole is: DEPTH is the usable length of thread,
+the full profile reaching it, and a blind tapped hole is drilled deeper
+than it is threaded. An Inf DEPTH threads right through,
+and no thread runs more than a pitch past the far side of the part.
+
+What the axis meets decides the thread. Where it runs through a bore
+between the thread's minor diameter D_1 = D - 1.0825 P and its
+nominal diameter, the thread is internal and is cut from the bore as
+drilled, so its crest stands where the drill left it: a hole drilled
+with solid.Shape.hole for steel or for stainless steel models
+the engagement each gives. Where it runs into a solid cylinder from
+halfway between the pitch diameter d - 0.6495 P and the nominal
+diameter up to the nominal diameter, 5.675 to 6 for M6, the thread is
+external and is cut from the cylinder as turned. A cylinder at the
+nominal diameter, which is how a rod is designed, is first turned down
+over the threaded length to the largest major diameter of tolerance
+class 6g, as a machinist turns a blank before threading it: the
+nominal diameter plus the fundamental deviation of position g,
+-(15 + 11 P) micrometres, of ISO 965-1:1998, 13.1, rounded as
+its table 1 is, to the R 40 series of ISO 3 and then to a whole
+number. M6 is turned to 5.974. A blank of another diameter is turned
+in the design. An axis that meets neither is an error naming the
+thread and the point, and so is an internal thread deeper than its
+bore.
+
+The profile is the basic profile of ISO 68-1, its 60 degree flanks
+swept round the axis by solid.helix: an internal thread's root
+is flat at the nominal diameter, an external thread's flat at
+D_1. The thread is right-handed, and starts a pitch before the
+point so that it runs out of the surface clean.
+
+Name/Value pairs place the threads as for solid.Shape.hole:
+
+'Direction'
+The nonzero 3-element direction the axes run in from their points,
+[0, 0, -1] by default. It cannot be given when P is a
+geom.UCS.
+'At'
+An N-by-2 matrix of points in the plane of the geom.UCS
+P, one thread at each, all against its normal; the UCS origin
+alone by default. It applies only when P is a geom.UCS.
+'Custom'
+True to take a thread of any diameter and pitch, as for
+solid.Shape.hole, false by default.
+
+Threading the empty shape leaves it empty.
+
+## A block tapped M6 12 deep, its hole drilled 15 deep
+S = solid.box (20, 20, 20);
+S = hole (S, [10, 10, 20], 'M6', 15);
+S = thread (S, [10, 10, 20], 'M6', 12);
+
+## A rod of 10 threaded M10 for 15 from its end
+S = solid.cylinder (5, 40);
+S = thread (S, [0, 0, 40], 'M10', 15);
+
+See also:
+solid.Shape.hole,
+solid.helix
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 31
+Cut screw threads into a shape.
 
 
 
@@ -9918,7 +10221,7 @@ solid.Shape.write
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1548
+# length: 1865
 solid.Shape: write (S, FILE)
 solid.Shape: write (S, FILE, 'Tolerance', TOL)
 Write a solid to a STEP, STL, OBJ, PLY or 3MF file.
@@ -9930,14 +10233,19 @@ named by the extension of FILE, in either case:
 STEP (ISO 10303-21, application protocol 214), in millimetres. The
 exact geometry is kept, so this is the file to send to a CAD program or
 to another manufacturer. The part is named after the base name of
-FILE, and each solid carries its solid.Shape.Colour.
+FILE, and each solid carries its solid.Shape.Colour and,
+as the name of the solid itself, its solid.Shape.Name.
 .stl, .obj, .ply, .3mf
 A mesh of triangles in millimetres, the mesh
 solid.Shape.tessellate makes, written by
 polymesh.Mesh.write: binary STL, OBJ, binary PLY, or 3MF, the
 archive slicers take. The facets approximate every curved surface;
 their vertices lie on it. OBJ, PLY and 3MF carry the solids' colours on
-their triangles; STL has none.
+their triangles; STL has none. A 3MF file holds one object, named
+after the base name of FILE, or for a named shape an object for
+each name its solids carry, named by it, the solids without one an
+object without a name, and these placed in a group named after
+FILE when there are several.
 
 write (..., 'Tolerance', TOL) sets, for a
 mesh, the largest distance in millimetres between a facet and the true
@@ -10430,7 +10738,7 @@ solid.read
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1006
+# length: 1122
 drafting: S = solid.read (FILE)
 Read a solid from a STEP file.
 
@@ -10439,7 +10747,9 @@ STEP file FILE as one solid.Shape, in millimetres whatever
 unit the file was written in. A file holding several parts returns them
 together, and solid.Shape.numsolids counts them. The colour the
 file gives a solid, or failing that the first of its faces with one, is
-its row of solid.Shape.Colour.
+its row of solid.Shape.Colour. The name the file gives a solid
+itself, not the name of the part it belongs to, is its element of
+solid.Shape.Name.
 
 STEP (ISO 10303-21) is the format every mechanical CAD program exchanges
 solids in, and it keeps their exact geometry: a hole read from it is a true
