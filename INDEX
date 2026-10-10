@@ -63,6 +63,7 @@ Solid modelling
  solid.sweep
  solid.helix
  solid.read
+ solid.threadspec
 Assemblies and viewing
  model.Assembly
  model.read
