@@ -115,6 +115,19 @@ show (rod);</code></pre>
 <p>A rod turned to another diameter in the design, between 9.513 and 10 for M10, is threaded as it is. A cylinder outside that range, or a bore outside its own, is refused with the diameters the thread takes.</p>
 <pre class="code-in"><code>thread (solid.cylinder (4.5, 40), [0, 0, 40], 'M10', 15);</code></pre>
 <pre class="code-out"><code>solid.Shape.thread: M10 at (0, 0, 40): the axis meets neither a bore from 8.376 up to 10 nor a cylinder from 9.513 to 10.</code></pre>
+<h2>Threads of any size</h2>
+<p>A name outside ISO 261 is refused, so that a mistyped pitch does not pass for a thread.</p>
+<pre class="code-in"><code>plate = solid.box (40, 40, 10);
+hole (plate, [20, 20, 10], 'M16x0.8', Inf);</code></pre>
+<pre class="code-out"><code>solid.Shape.hole: 'M16x0.8' is not an ISO 261 thread.</code></pre>
+<p><code>'Custom', true</code> takes a thread of any diameter and pitch, as a lathe cuts one. It is cut in the same basic profile, and its tapping drill is the nominal diameter less the pitch, rounded to a step of 0.05 inside the 6H band: 15.2 for M16x0.8.</p>
+<pre class="code-in"><code>plate = hole (plate, [20, 20, 10], 'M16x0.8', Inf, 'Custom', true);
+plate = thread (plate, [20, 20, 10], 'M16x0.8', Inf, 'Custom', true);</code></pre>
+<p>It is also how an inch screw is made in millimetres. 1/4-20 UNC is 6.35 across with 20 threads to the inch, a pitch of 1.27, in the same basic profile as ISO's. The rod is turned to the top of 6g first, 6.322, as a metric one is.</p>
+<pre class="code-in"><code>bolt = solid.cylinder (6.35 / 2, 30);
+bolt = thread (bolt, [0, 0, 30], 'M6.35x1.27', 20, 'Custom', true);
+show (bolt);</code></pre>
+<figure class="shot"><img src="img/16_holes_and_threads-3.png" alt="Holes and threads, picture 3"></figure>
 <h2>A bolt circle on a picked face</h2>
 <p>A flange 80 square with a bore of 40 through it takes six M8 screws on a circle of 60.</p>
 <pre class="code-in"><code>flange = solid.box (80, 80, 12);
@@ -127,7 +140,7 @@ flange = hole (flange, [40, 40, 12], 40, Inf);</code></pre>
   geom.UCS: origin [0, 0, 12], x axis [1, 0, 0], normal [0, 0, 1]
 
 CODE = geom.UCS ([0, 0, 1], [0, 0, 12], [1, 0, 12])</code></pre>
-<figure class="shot"><img src="img/16_holes_and_threads-3.png" alt="Holes and threads, picture 3"></figure>
+<figure class="shot"><img src="img/16_holes_and_threads-4.png" alt="Holes and threads, picture 4"></figure>
 <p><code>CODE</code> goes in the script in place of the pick.</p>
 <pre class="code-in"><code>U = geom.UCS ([0, 0, 1], [0, 0, 12], [1, 0, 12]);</code></pre>
 <p>With a UCS in place of the point, <code>hole</code> and <code>thread</code> work against its normal, into the part, and <code>'At'</code> gives the points in the face's own coordinates: one call drills the circle, and one threads it.</p>
@@ -136,7 +149,7 @@ XY = [40 + 30 * cosd(a), 40 + 30 * sind(a)];
 flange = hole (flange, U, 'M8', Inf, 'At', XY);
 flange = thread (flange, U, 'M8', Inf, 'At', XY);
 show (flange);</code></pre>
-<figure class="shot"><img src="img/16_holes_and_threads-4.png" alt="Holes and threads, picture 4"></figure>
+<figure class="shot"><img src="img/16_holes_and_threads-5.png" alt="Holes and threads, picture 5"></figure>
 <nav class="d-flex justify-content-between my-5">
 <a href="15_testing_parts.html">&larr; Testing parts</a>
 </nav>

@@ -130,6 +130,14 @@ pitches it prints in parentheses, which it asks to be avoided as far as
 possible: the choice is the designer's. A diameter with no coarse pitch,
 such as M15, is named with its pitch, <code>'M15x1.5'</code>.</p>
 
+<p>Any other diameter and pitch is a custom thread, taken only with
+<code>'Custom', true</code>, so that a mistyped name is still refused:
+<code>'M16x0.8'</code>, cut on a lathe, or <code>'M6.35x1.27'</code> for
+1/4-20 UNC, whose basic profile is the same as ISO's. A custom thread is
+named with its pitch, and its pitch and minor diameter must be positive. It
+is cut by the same formulas as an ISO thread, below, and held to the same
+6H and 6g.</p>
+
 <h2 id="profile">The basic profile</h2>
 
 <p>ISO 68-1 builds the thread on a triangle of height <i>H</i> = 0.866 025
@@ -178,6 +186,10 @@ package takes the table's value: 140 micrometres at a pitch of 0.5, 236 at
 the coarsest grade it has: grade 5 at 0.25, 56 micrometres from the table,
 and grade 4 at 0.2, 0.63 <i>T</i><sub>D1</sub>(6) rounded, 38.</p>
 
+<p>A custom pitch takes the first formula below a pitch of 1 and the second
+from 1, rounded the same way; at the pitches named above, the values above
+apply whatever the diameter.</p>
+
 <h2 id="drill">The tapping drill</h2>
 
 <p>Without options the drill is the one ISO 2306 lists, in table 1 for a
@@ -192,6 +204,18 @@ every one of the 162 threads ISO 261 gives from M1 to M64.</p>
   <tr><th>Thread</th><th>6H band</th><th>ISO 2306 drill</th></tr>
   <tr><td>M6</td><td>4.917 to 5.153</td><td>5.0</td></tr>
   <tr><td>M8</td><td>6.647 to 6.912</td><td>6.8</td></tr>
+</table>
+
+<p>ISO 2306 lists no custom thread, so its drill is the nominal diameter
+less the pitch, rounded to a step of 0.05 millimetres, the package's
+choice: the step nearest that inside the band. At the finest pitches a
+band can be narrower than a step and hold none, and the thread is refused:
+M1.97x0.2, whose band runs from 1.753 to 1.791.</p>
+
+<table class="guide">
+  <tr><th>Thread</th><th>6H band</th><th>Drill</th></tr>
+  <tr><td>M16x0.8</td><td>15.134 to 15.334</td><td>15.2</td></tr>
+  <tr><td>M6.35x1.27 (1/4-20 UNC)</td><td>4.975 to 5.240</td><td>5.1</td></tr>
 </table>
 
 <h2 id="material">Material and engagement</h2>
@@ -219,7 +243,9 @@ band is refused, with the band it allows: 78.2 to 100 % for M6, 80.4 to
 the ISO 2306 drill or one of the sizes in RUKO's catalogue: every 0.1
 millimetre from 0.3 to 13, the quarters from 1.25 to 9.75, every 0.5 to 50
 and every millimetre to 60. Where the catalogue has no size inside a band,
-as for M1, the ISO 2306 drill stands.</p>
+as for M1, the ISO 2306 drill stands. For a custom thread they choose among
+the steps of 0.05 inside the band instead: 15.3 for M16x0.8 in stainless,
+15.15 at 100 %.</p>
 
 <table class="guide">
   <tr><th>Thread</th><th>Stainless</th><th>100 % engagement</th></tr>
@@ -245,6 +271,7 @@ takes 22.</p>
   <tr><td>M6</td><td>1</td><td>5.974</td></tr>
   <tr><td>M8</td><td>1.25</td><td>7.972</td></tr>
   <tr><td>M10</td><td>1.5</td><td>9.968</td></tr>
+  <tr><td>M6.35x1.27 (1/4-20 UNC)</td><td>1.27</td><td>6.322</td></tr>
 </table>
 
 <p>A cylinder below the nominal diameter is threaded as it is, its crest
@@ -269,7 +296,10 @@ profile swept round the axis to about one part in ten thousand.</p>
 <ul>
   <li><b>Forming taps:</b> the drawing states the thread, not how it is
   made, and a hole for a forming tap is drilled by its diameter.</li>
-  <li><b>Left-hand and multi-start threads</b>, and inch threads.</li>
+  <li><b>Left-hand and multi-start threads.</b></li>
+  <li><b>Inch threads by their own names and classes:</b> a unified thread
+  is a custom one in millimetres, as <code>'M6.35x1.27'</code>, held to 6H
+  and 6g, not to the classes 2A and 2B of ASME B1.1.</li>
   <li><b>Tolerances of the thread itself:</b> the thread is cut at the basic
   profile. Only the tapping hole keeps to the 6H band, and only the turned
   blank to 6g.</li>

@@ -84,6 +84,31 @@ show (rod);
 
 thread (solid.cylinder (4.5, 40), [0, 0, 40], 'M10', 15);  #: error
 
+## ## Threads of any size
+##
+## A name outside ISO 261 is refused, so that a mistyped pitch does not
+## pass for a thread.
+
+plate = solid.box (40, 40, 10);
+hole (plate, [20, 20, 10], 'M16x0.8', Inf);  #: error
+
+## `'Custom', true` takes a thread of any diameter and pitch, as a lathe
+## cuts one. It is cut in the same basic profile, and its tapping drill is
+## the nominal diameter less the pitch, rounded to a step of 0.05 inside
+## the 6H band: 15.2 for M16x0.8.
+
+plate = hole (plate, [20, 20, 10], 'M16x0.8', Inf, 'Custom', true);
+plate = thread (plate, [20, 20, 10], 'M16x0.8', Inf, 'Custom', true);
+
+## It is also how an inch screw is made in millimetres. 1/4-20 UNC is 6.35
+## across with 20 threads to the inch, a pitch of 1.27, in the same basic
+## profile as ISO's. The rod is turned to the top of 6g first, 6.322, as a
+## metric one is.
+
+bolt = solid.cylinder (6.35 / 2, 30);
+bolt = thread (bolt, [0, 0, 30], 'M6.35x1.27', 20, 'Custom', true);
+show (bolt);
+
 ## ## A bolt circle on a picked face
 ##
 ## A flange 80 square with a bore of 40 through it takes six M8 screws on a
