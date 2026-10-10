@@ -64,6 +64,7 @@ Solid modelling
  solid.helix
  solid.read
  solid.threadspec
+ solid.holespec
 Assemblies and viewing
  model.Assembly
  model.read

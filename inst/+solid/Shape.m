@@ -1760,16 +1760,30 @@ classdef Shape
     ## default, so that a name outside ISO 261, as a mistyped pitch, is an
     ## error.  A thread of ISO 261 is drilled as without it.
     ##
+    ## @item @qcode{'Clearance'}
+    ## For a named thread, @qcode{'fine'}, @qcode{'medium'} or
+    ## @qcode{'coarse'}: the hole is the clearance hole of ISO 273 in that
+    ## series for a screw of the thread, not a hole for tapping it, 6.6 for
+    ## M6 in the medium series.
+    ##
     ## @item @qcode{'Counterbore'}
     ## @code{[@var{CD}, @var{CDEPTH}]}: a flat-bottomed bore of diameter
     ## @var{CD}, wider than the hole, @var{CDEPTH} deep, shallower than the
-    ## hole, for the head of a cap screw.
+    ## hole, for the head of a cap screw.  With a named thread and
+    ## @qcode{'Clearance'}, true takes the counterbore of IS 3406 (Part 2)
+    ## for a socket head cap screw of ISO 4762, and @qcode{'washer'} the one
+    ## for the same screw on a plain washer.
     ##
     ## @item @qcode{'Countersink'}
-    ## @var{CD} or @code{[@var{CD}, @var{ANGLE}]}: a conical seat of diameter
-    ## @var{CD} at the surface, wider than the hole, with an included angle of
-    ## @var{ANGLE} degrees, 90 by default as for ISO countersunk screws.  It
-    ## must be shallower than the hole.
+    ## @var{CD}, @code{[@var{CD}, @var{ANGLE}]} or @code{[@var{CD},
+    ## @var{ANGLE}, @var{CDEPTH}]}: a conical seat of diameter @var{CD} at the
+    ## surface, wider than the hole, with an included angle of @var{ANGLE}
+    ## degrees, 90 by default as for ISO countersunk screws, below a cylinder
+    ## of the same diameter @var{CDEPTH} deep, none by default.  It must be
+    ## shallower than the hole.  With a named thread and @qcode{'Clearance'},
+    ## true takes the countersink of IS 3406 (Part 1) for the countersunk
+    ## heads of ISO 7721, and @qcode{'socket'} the one for a hexagon socket
+    ## countersunk screw of ISO 10642.
     ##
     ## @item @qcode{'Tip'}
     ## The included angle in degrees of the cone a twist drill leaves at the
@@ -1779,7 +1793,10 @@ classdef Shape
     ## @end table
     ##
     ## A counterbore and a countersink cannot both be given, and a tip applies
-    ## only to a blind hole.  Drilling the empty shape leaves it empty.
+    ## only to a blind hole.  The standard ones need a named thread and
+    ## @qcode{'Clearance'}, fine or medium; @code{solid.holespec} gives their
+    ## sizes, and the sizes of every hole for a named thread, before it is
+    ## drilled.  Drilling the empty shape leaves it empty.
     ##
     ## @example
     ## @group
@@ -1800,8 +1817,8 @@ classdef Shape
     ## @end group
     ## @end example
     ##
-    ## @seealso{solid.Shape.thread, solid.threadspec, solid.Shape.subtract,
-    ## solid.cylinder}
+    ## @seealso{solid.Shape.thread, solid.holespec, solid.threadspec,
+    ## solid.Shape.subtract, solid.cylinder}
     ## @end deftypefn
     function this = hole (this, P, D, DEPTH, varargin)
 
@@ -1811,6 +1828,7 @@ classdef Shape
       endif
       [errmsg, opt] = options (varargin, struct ('Direction', [], ...
                                                  'At', [], ...
+                                                 'Clearance', [], ...
                                                  'Counterbore', [], ...
                                                  'Countersink', [], ...
                                                  'Tip', [], ...
@@ -1823,21 +1841,39 @@ classdef Shape
       if (! isempty (errmsg))
         error ("solid.Shape.hole: %s", errmsg);
       endif
+      cb = opt.Counterbore;
+      cs = opt.Countersink;
       if (ischar (D))
-        if (isempty (opt.Custom))
-          t = solid.threadspec (D);
-        else
-          t = solid.threadspec (D, 'Custom', opt.Custom);
-        endif
-        [errmsg, D] = tapdrill (t, opt.Material, opt.Engagement);
-        if (! isempty (errmsg))
-          error ("solid.Shape.hole: %s", errmsg);
-        endif
+        ## The hole for the thread, with the options that size it
+        names = {'Clearance', 'Counterbore', 'Countersink', 'Material', ...
+                 'Engagement', 'Custom'};
+        args = {};
+        for k = 1:numel (names)
+          if (! isempty (opt.(names{k})))
+            args(end+1:end+2) = {names{k}, opt.(names{k})};
+          endif
+        endfor
+        H = solid.holespec (D, args{:});
+        D = H.drill;
+        cb = H.counterbore;
+        cs = H.countersink;
       elseif (! isempty (opt.Material) || ! isempty (opt.Engagement))
         error (strcat ("solid.Shape.hole: Material and Engagement apply", ...
                        " only to a named thread."));
       elseif (! isempty (opt.Custom))
         error ("solid.Shape.hole: Custom applies only to a named thread.");
+      elseif (! isempty (opt.Clearance))
+        error ("solid.Shape.hole: Clearance applies only to a named thread.");
+      elseif (ischar (cb) || ischar (cs) || (islogical (cb) && any (cb))
+              || (islogical (cs) && any (cs)))
+        error (strcat ("solid.Shape.hole: a standard Counterbore or", ...
+                       " Countersink needs a named thread."));
+      endif
+      if (islogical (cb) && isscalar (cb) && ! cb)
+        cb = [];
+      endif
+      if (islogical (cs) && isscalar (cs) && ! cs)
+        cs = [];
       endif
       if (! isempty (solid.__checkpos__ (D, 'D')))
         error (strcat ("solid.Shape.hole: D must be a positive and finite", ...
@@ -1849,7 +1885,6 @@ classdef Shape
         error (strcat ("solid.Shape.hole: DEPTH must be positive, or Inf", ...
                        " for a through hole."));
       endif
-      cb = opt.Counterbore;
       if (! isempty (cb) && (! isnumeric (cb) || ! isreal (cb)
                              || numel (cb) != 2 || ! all (isfinite (cb))
                              || ! (cb(1) > D) || ! (cb(2) > 0)
@@ -1858,18 +1893,21 @@ classdef Shape
                        " [CD, CDEPTH],", ...
                        " wider than D and shallower than DEPTH."));
       endif
-      cs = opt.Countersink;
       if (! isempty (cs))
         if (isnumeric (cs) && isscalar (cs))
           cs(2) = 90;
         endif
-        if (! isnumeric (cs) || ! isreal (cs) || numel (cs) != 2
+        if (isnumeric (cs) && numel (cs) == 2)
+          cs(3) = 0;
+        endif
+        if (! isnumeric (cs) || ! isreal (cs) || numel (cs) != 3
             || ! all (isfinite (cs)) || ! (cs(1) > D) || ! (cs(2) > 0)
-            || ! (cs(2) < 180)
-            || ! ((cs(1) - D) / 2 / tand (cs(2) / 2) < DEPTH))
-          error (strcat ("solid.Shape.hole: Countersink must be CD or", ...
-                         " [CD, ANGLE], wider than D, with ANGLE in the", ...
-                         " range (0, 180), and shallower than DEPTH."));
+            || ! (cs(2) < 180) || ! (cs(3) >= 0)
+            || ! (cs(3) + (cs(1) - D) / 2 / tand (cs(2) / 2) < DEPTH))
+          error (strcat ("solid.Shape.hole: Countersink must be CD,", ...
+                         " [CD, ANGLE] or [CD, ANGLE, CDEPTH], wider than", ...
+                         " D, with ANGLE in the range (0, 180), and", ...
+                         " shallower than DEPTH."));
         endif
       endif
       if (! isempty (cb) && ! isempty (cs))
@@ -1915,9 +1953,9 @@ classdef Shape
                               [0, 0, -reach]);
       endif
       if (! isempty (cs))
-        T{end+1} = solid.cone (cs(1) / 2, D / 2, ...
-                               (cs(1) - D) / 2 / tand (cs(2) / 2));
-        T{end+1} = translate (solid.cylinder (cs(1) / 2, reach), ...
+        h = (cs(1) - D) / 2 / tand (cs(2) / 2);
+        T{end+1} = translate (solid.cone (cs(1) / 2, D / 2, h), [0, 0, cs(3)]);
+        T{end+1} = translate (solid.cylinder (cs(1) / 2, reach + cs(3)), ...
                               [0, 0, -reach]);
       endif
       if (! isempty (tip))
@@ -3142,72 +3180,6 @@ function T = aim (T, V)
 
 endfunction
 
-## The drill for tapping the thread T by hand: the one ISO 2306 gives, or
-## within the 6H band of the minor diameter the one MATERIAL or ENGAGEMENT,
-## each empty when not given, chooses.  Returns an error message body,
-## empty when they are valid.
-function [errmsg, D] = tapdrill (T, MATERIAL, ENGAGEMENT)
-
-  errmsg = '';
-  lo = T.minor(1);
-  hi = T.minor(2);
-  D = T.drill;
-  if (T.custom)
-    if (isempty (D))
-      errmsg = sprintf (strcat ("%s: no drill of a 0.05 step lies in the", ...
-                                " 6H band of its minor diameter."), T.name);
-      return;
-    endif
-    ## The steps of 0.05 in the band
-    C = (ceil (20 * lo - 1e-6):floor (20 * hi + 1e-6)) / 20;
-  else
-    C = [drillsizes(), D];
-    C = C(C >= lo - 1e-9 & C <= hi + 1e-9);
-  endif
-  if (! isempty (MATERIAL) && ! isempty (ENGAGEMENT))
-    errmsg = "Material and Engagement cannot both be given.";
-  elseif (! isempty (MATERIAL))
-    if (! ischar (MATERIAL) || ! isrow (MATERIAL))
-      errmsg = "Material must be a character vector.";
-      return;
-    endif
-    switch (lower (MATERIAL))
-      case {'stainless', 'nickel'}
-        D = max (C);
-      case {'steel', 'aluminium', 'brass', 'castiron', 'plastic'}
-      otherwise
-        errmsg = sprintf ("unknown material '%s'.", MATERIAL);
-    endswitch
-  elseif (! isempty (ENGAGEMENT))
-    if (! isnumeric (ENGAGEMENT) || ! isreal (ENGAGEMENT)
-        || ! isscalar (ENGAGEMENT) || ! isfinite (ENGAGEMENT))
-      errmsg = "Engagement must be a real and finite scalar.";
-      return;
-    endif
-    h = 1.25 * sqrt (3) / 2 * T.P;
-    e0 = (T.d - hi) / h * 100;
-    if (ENGAGEMENT > 100 + 1e-9 || ENGAGEMENT < e0 - 1e-9)
-      errmsg = sprintf ("%s: engagement must lie between %.1f and 100 %%.", ...
-                        T.name, e0);
-      return;
-    endif
-    [~, k] = min (abs (C - (T.d - h * ENGAGEMENT / 100)));
-    D = C(k);
-  endif
-
-endfunction
-
-## The diameters of the twist drills in RUKO's catalogue, chapter 1.01
-## Twist drills (2014): DIN 338 type N, HSS ground, article 214, pages 54
-## to 56, and DIN 345 type N, HSS, article 204, pages 78 and 79
-function D = drillsizes ()
-
-  q = [1.25, 1.75, 2.25, 2.75, 3.25, 3.75, 4.25, 4.75, 5.25, 5.75, 6.25, ...
-       6.75, 7.25, 7.75, 8.25, 8.75, 9.25, 9.75];
-  D = unique ([(3:130) / 10, q, (27:40) / 2, (41:100) / 2, 51:60]);
-
-endfunction
-
 ## The smallest circle about the axis at P along V in the section of S a
 ## distance Z along it: KIND is 'bore' when it bounds a hole of the section,
 ## 'rod' when it is the outline of the material round the axis, and empty,
@@ -3710,6 +3682,25 @@ endfunction
 %! assert_equal (volume (S), 38400 - pi * (4 / 3 * (64 + 32 + 16) + 16 * 8), ...
 %!               1e-9);
 %! assert_equal (isvalid (S), true);
+
+%!test  # countersunk below a cylinder 1 deep
+%! S = hole (solid.box (80, 40, 12), [20, 20, 12], 8, Inf, ...
+%!           'Countersink', [16, 90, 1]);
+%! assert_equal (volume (S), 38400 - pi * (64 + 4 / 3 * 112 + 16 * 7), 1e-9);
+%! assert_equal (isvalid (S), true);
+
+%!test  # an M6 cap screw in a medium clearance hole, its head counterbored
+%! S = hole (solid.box (80, 40, 12), [20, 20, 12], 'M6', Inf, ...
+%!           'Clearance', 'medium', 'Counterbore', true);
+%! assert_equal (volume (S), 38400 - pi * (5.5 ^ 2 * 6.8 + 3.3 ^ 2 * 5.2), ...
+%!               1e-9);
+
+%!test  # an M6 countersunk screw in a fine clearance hole
+%! S = hole (solid.box (80, 40, 12), [20, 20, 12], 'M6', Inf, ...
+%!           'Clearance', 'fine', 'Countersink', true);
+%! V = pi * (5.75 ^ 2 * 0.45 + 2.55 / 3 * (5.75 ^ 2 + 5.75 * 3.2 + 3.2 ^ 2) ...
+%!          + 3.2 ^ 2 * 9);
+%! assert_equal (volume (S), 38400 - V, 1e-9);
 
 %!test  # tapping size for M6, drilled from the side
 %! S = hole (solid.box (80, 40, 12), [0, 20, 6], 'M6', Inf, ...
@@ -4637,25 +4628,16 @@ endfunction
 %! hole (solid.Shape (), [0, 0, 0], 5, 1, 'Material', 'steel')
 %!error<solid.Shape.hole: Material and Engagement apply only to a named thread.> ...
 %! hole (solid.Shape (), [0, 0, 0], 5, 1, 'Engagement', 90)
-%!error<solid.Shape.hole: M1.97x0.2: no drill of a 0.05 step lies in the 6H band of its minor diameter.> ...
-%! hole (solid.Shape (), [0, 0, 0], 'M1.97x0.2', 1, 'Custom', true)
 %!error<solid.Shape.hole: Custom applies only to a named thread.> ...
 %! hole (solid.Shape (), [0, 0, 0], 5, 1, 'Custom', true)
-%!error<solid.Shape.hole: Material and Engagement cannot both be given.> ...
-%! hole (solid.Shape (), [0, 0, 0], 'M6', 1, 'Material', 'steel', ...
-%!       'Engagement', 90)
-%!error<solid.Shape.hole: Material must be a character vector.> ...
-%! hole (solid.Shape (), [0, 0, 0], 'M6', 1, 'Material', 1)
-%!error<solid.Shape.hole: unknown material 'wood'.> ...
-%! hole (solid.Shape (), [0, 0, 0], 'M6', 1, 'Material', 'wood')
-%!error<solid.Shape.hole: Engagement must be a real and finite scalar.> ...
-%! hole (solid.Shape (), [0, 0, 0], 'M6', 1, 'Engagement', [80, 90])
-%!error<solid.Shape.hole: Engagement must be a real and finite scalar.> ...
-%! hole (solid.Shape (), [0, 0, 0], 'M6', 1, 'Engagement', Inf)
-%!error<solid.Shape.hole: M6: engagement must lie between 78.2 and 100 %.> ...
-%! hole (solid.Shape (), [0, 0, 0], 'M6', 1, 'Engagement', 75)
-%!error<solid.Shape.hole: M6: engagement must lie between 78.2 and 100 %.> ...
-%! hole (solid.Shape (), [0, 0, 0], 'M6', 1, 'Engagement', 101)
+%!error<solid.Shape.hole: Clearance applies only to a named thread.> ...
+%! hole (solid.Shape (), [0, 0, 0], 5, 1, 'Clearance', 'medium')
+%!error<solid.Shape.hole: a standard Counterbore or Countersink needs a named thread.> ...
+%! hole (solid.Shape (), [0, 0, 0], 5, 1, 'Counterbore', true)
+%!error<solid.Shape.hole: a standard Counterbore or Countersink needs a named thread.> ...
+%! hole (solid.Shape (), [0, 0, 0], 5, 1, 'Countersink', 'socket')
+%!error<solid.Shape.hole: Countersink must be CD, \[CD, ANGLE\] or \[CD, ANGLE, CDEPTH\], wider than D, with ANGLE in the range \(0, 180\), and shallower than DEPTH.> ...
+%! hole (solid.Shape (), [0, 0, 0], 5, 3, 'Countersink', [10, 90, 1])
 %!error<solid.Shape.hole: DEPTH must be positive, or Inf for a through hole.> ...
 %! hole (solid.Shape (), [0, 0, 0], 5, 0)
 %!error<solid.Shape.hole: DEPTH must be positive, or Inf for a through hole.> ...
@@ -4670,11 +4652,11 @@ endfunction
 %! hole (solid.Shape (), [0, 0, 0], 5, 10, 'Counterbore', [5, 2])
 %!error<solid.Shape.hole: Counterbore must be \[CD, CDEPTH\], wider than D and shallower than DEPTH.> ...
 %! hole (solid.Shape (), [0, 0, 0], 5, 10, 'Counterbore', [8, 10])
-%!error<solid.Shape.hole: Countersink must be CD or \[CD, ANGLE\], wider than D, with ANGLE in the range \(0, 180\), and shallower than DEPTH.> ...
+%!error<solid.Shape.hole: Countersink must be CD, \[CD, ANGLE\] or \[CD, ANGLE, CDEPTH\], wider than D, with ANGLE in the range \(0, 180\), and shallower than DEPTH.> ...
 %! hole (solid.Shape (), [0, 0, 0], 5, 10, 'Countersink', 4)
-%!error<solid.Shape.hole: Countersink must be CD or \[CD, ANGLE\], wider than D, with ANGLE in the range \(0, 180\), and shallower than DEPTH.> ...
+%!error<solid.Shape.hole: Countersink must be CD, \[CD, ANGLE\] or \[CD, ANGLE, CDEPTH\], wider than D, with ANGLE in the range \(0, 180\), and shallower than DEPTH.> ...
 %! hole (solid.Shape (), [0, 0, 0], 5, 10, 'Countersink', [10, 180])
-%!error<solid.Shape.hole: Countersink must be CD or \[CD, ANGLE\], wider than D, with ANGLE in the range \(0, 180\), and shallower than DEPTH.> ...
+%!error<solid.Shape.hole: Countersink must be CD, \[CD, ANGLE\] or \[CD, ANGLE, CDEPTH\], wider than D, with ANGLE in the range \(0, 180\), and shallower than DEPTH.> ...
 %! hole (solid.Shape (), [0, 0, 0], 5, 2, 'Countersink', 10)
 %!error<solid.Shape.hole: Counterbore and Countersink cannot both be given.> ...
 %! hole (solid.Shape (), [0, 0, 0], 5, 10, 'Counterbore', [8, 2], ...
