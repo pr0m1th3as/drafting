@@ -59,6 +59,7 @@
             <h6>Standards</h6>
             <ul>
               <li><a href="standards_threads.html">Threads and tapped holes</a></li>
+              <li><a href="standards_holes.html">Clearance holes, counterbores and countersinks</a></li>
             </ul>
             <h6>Tutorials</h6>
             <ul>
@@ -78,6 +79,7 @@
               <li><a href="14_parts_as_functions.html">Parts as functions</a></li>
               <li><a href="15_testing_parts.html">Testing parts</a></li>
               <li><a href="16_holes_and_threads.html" class="active">Holes and threads</a></li>
+              <li><a href="17_clearance_holes.html">Clearance holes, counterbores and countersinks</a></li>
             </ul>
 <!-- /guide-nav -->
           </nav>
@@ -94,7 +96,7 @@ block = hole (block, [45, 15, 20], 'M10x1.25', 16);</code></pre>
 <pre class="code-in"><code>nut = solid.cylinder (8, 8);
 nut = hole (nut, [0, 0, 8], 'M8', Inf, 'Material', 'stainless');
 hole (nut, [0, 0, 8], 'M6', Inf, 'Engagement', 60);</code></pre>
-<pre class="code-out"><code>solid.Shape.hole: M6: engagement must lie between 78.2 and 100 %.</code></pre>
+<pre class="code-out"><code>solid.holespec: M6: engagement must lie between 78.2 and 100 %.</code></pre>
 <h2>Internal threads</h2>
 <p><code>thread</code> takes the point and depth <code>hole</code> took. The holes are drilled 16 deep, and a thread deeper than its bore would drill the bore deeper, so it is refused.</p>
 <pre class="code-in"><code>thread (block, [15, 15, 20], 'M6', 18);</code></pre>
@@ -119,7 +121,7 @@ show (rod);</code></pre>
 <p>A name outside ISO 261 is refused, so that a mistyped pitch does not pass for a thread.</p>
 <pre class="code-in"><code>plate = solid.box (40, 40, 10);
 hole (plate, [20, 20, 10], 'M16x0.8', Inf);</code></pre>
-<pre class="code-out"><code>solid.Shape.hole: 'M16x0.8' is not an ISO 261 thread.</code></pre>
+<pre class="code-out"><code>solid.threadspec: 'M16x0.8' is not an ISO 261 thread.</code></pre>
 <p><code>'Custom', true</code> takes a thread of any diameter and pitch, as a lathe cuts one. It is cut in the same basic profile, and its tapping drill is the nominal diameter less the pitch, rounded to a step of 0.05 inside the 6H band: 15.2 for M16x0.8.</p>
 <pre class="code-in"><code>plate = hole (plate, [20, 20, 10], 'M16x0.8', Inf, 'Custom', true);
 plate = thread (plate, [20, 20, 10], 'M16x0.8', Inf, 'Custom', true);</code></pre>
@@ -152,6 +154,7 @@ show (flange);</code></pre>
 <figure class="shot"><img src="img/16_holes_and_threads-5.png" alt="Holes and threads, picture 5"></figure>
 <nav class="d-flex justify-content-between my-5">
 <a href="15_testing_parts.html">&larr; Testing parts</a>
+<a href="17_clearance_holes.html">Clearance holes, counterbores and countersinks &rarr;</a>
 </nav>
 
         </main>

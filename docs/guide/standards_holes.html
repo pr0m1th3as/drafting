@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Clearance holes, counterbores and countersinks - drafting guide</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" integrity="sha512-1ycn6IcaQQ40/MKBW2W4Rhis/DbILU74C1vSrLJxCq57o941Ym01SwNsOMqvEBFlcgUa6xLiPY/NS5R+E6ztJQ==" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/css/bootstrap.min.css" integrity="sha384-KyZXEAg3QhqLMpG8r+8fhAXLRk2vvoC2f3B09zVXn8CA5QIVfZOJ3BCsw2P0p/We" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-U1DAWAznBHeqEIlVSCgzq+c9gqGAJn5c/t99JyeKa9xxaYpSvHU5awsuZVVFIhvj" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="guide.css">
+  </head>
+  <body>
+    <div class="bg-dark">
+      <div class="container-xl">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+          <div class="container-fluid">
+            <a class="navbar-brand" href="index.html">
+              <img src="../assets/drafting.png" alt="drafting" class="d-inline-block align-top" width="25" height="25">
+              drafting guide
+            </a>
+            <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+              <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+              <ul class="navbar-nav">
+                <li class="nav-item">
+                  <a class="nav-link" href="../index.html">
+                    <i class="fas fa-book"></i>
+                    Function reference
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="https://github.com/pr0m1th3as/drafting">
+                    <i class="fab fa-github"></i>
+                    Source
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </nav>
+      </div>
+    </div>
+    <div class="container-xl my-4">
+      <div class="row">
+        <div class="col-md-3 col-lg-2 mb-4">
+          <nav class="guide-nav">
+<!-- guide-nav -->
+            <h6>Guide</h6>
+            <ul>
+              <li><a href="index.html">Overview</a></li>
+              <li><a href="layout.html">Package layout</a></li>
+              <li><a href="dxf.html">DXF and the classes</a></li>
+            </ul>
+            <h6>Octave</h6>
+            <ul>
+              <li><a href="primer.html">A brief Octave primer</a></li>
+            </ul>
+            <h6>Standards</h6>
+            <ul>
+              <li><a href="standards_threads.html">Threads and tapped holes</a></li>
+              <li><a href="standards_holes.html" class="active">Clearance holes, counterbores and countersinks</a></li>
+            </ul>
+            <h6>Tutorials</h6>
+            <ul>
+              <li><a href="01_first_part.html">A first part</a></li>
+              <li><a href="02_outlines.html">Outlines: polylines, splines, paths and regions</a></li>
+              <li><a href="03_regions.html">Working with regions</a></li>
+              <li><a href="04_coordinate_systems.html">Coordinate systems</a></li>
+              <li><a href="05_solids_from_regions.html">Solids from regions</a></li>
+              <li><a href="06_primitives_and_booleans.html">Primitives, booleans and transforms</a></li>
+              <li><a href="07_features.html">Features: holes, pockets, fillets, chamfers and shells</a></li>
+              <li><a href="08_sections_and_projections.html">Sections and projections</a></li>
+              <li><a href="09_drawings.html">Technical drawings</a></li>
+              <li><a href="10_meshes.html">Meshes</a></li>
+              <li><a href="11_assemblies.html">Assemblies</a></li>
+              <li><a href="12_from_openscad.html">For OpenSCAD users</a></li>
+              <li><a href="13_surfaces.html">Surfaces through a grid</a></li>
+              <li><a href="14_parts_as_functions.html">Parts as functions</a></li>
+              <li><a href="15_testing_parts.html">Testing parts</a></li>
+              <li><a href="16_holes_and_threads.html">Holes and threads</a></li>
+              <li><a href="17_clearance_holes.html">Clearance holes, counterbores and countersinks</a></li>
+            </ul>
+<!-- /guide-nav -->
+          </nav>
+        </div>
+        <main class="col-md-9 col-lg-10">
+
+<h1>Clearance holes, counterbores and countersinks</h1>
+<p class="lead">The standards behind <code>solid.Shape.hole</code> with
+<code>'Clearance'</code> and its standard counterbores and countersinks,
+and behind <code>solid.holespec</code>, which returns their sizes before a
+hole is drilled: where each number comes from, and what the package takes
+from each standard and what it leaves.</p>
+
+<h2 id="sources">The sources</h2>
+
+<p>Every number is read from a published standard, never from memory or
+from another library. ISO 273 was read in the Indian Standard that adopts
+it without change. The counterbores and countersinks were read in an
+Indian Standard of their own, IS 3406, which the Bureau of Indian Standards
+prepared from DIN 74 of 1980; both parts are published free, so any value
+here can be checked without buying a standard.</p>
+
+<table class="guide">
+  <tr><th>Source</th><th>What it gives</th><th>Read in</th></tr>
+  <tr><td>ISO 273:1979</td><td>The clearance holes of the fine, medium and
+  coarse series, from M1 to M150; the package takes M1 to M64.</td>
+  <td>IS 1821:1987, identical</td></tr>
+  <tr><td>IS 3406 (Part 2):1986</td><td>The counterbores: type K for
+  socket head cap screws, and K2 for the same screws on a plain washer.
+  With amendment 1 of October 1987.</td><td>The standard itself</td></tr>
+  <tr><td>IS 3406 (Part 1):1986</td><td>The countersinks: type A for the
+  countersunk heads of ISO 7721, in a medium and a fine series, and type B
+  for hexagon socket countersunk screws.</td><td>The standard itself</td></tr>
+</table>
+
+<h2 id="clearance">Clearance holes</h2>
+
+<p>A clearance hole is drilled for a screw to pass through, not to be
+tapped. ISO 273 gives it in three series by the nominal diameter of the
+thread: fine, for precise location, medium for general engineering, and
+coarse. Its table is the one <code>'Clearance'</code> reads, so
+<code>'M6'</code> with <code>'Clearance', 'medium'</code> drills 6.6. The
+table is read by the diameter alone, so a fine thread takes the hole of its
+coarse one, and a custom thread the hole of its diameter.</p>
+
+<table class="guide">
+  <tr><th>Thread</th><th>Fine</th><th>Medium</th><th>Coarse</th></tr>
+  <tr><td>M3</td><td>3.2</td><td>3.4</td><td>3.6</td></tr>
+  <tr><td>M4</td><td>4.3</td><td>4.5</td><td>4.8</td></tr>
+  <tr><td>M5</td><td>5.3</td><td>5.5</td><td>5.8</td></tr>
+  <tr><td>M6</td><td>6.4</td><td>6.6</td><td>7</td></tr>
+  <tr><td>M8</td><td>8.4</td><td>9</td><td>10</td></tr>
+  <tr><td>M10</td><td>10.5</td><td>11</td><td>12</td></tr>
+  <tr><td>M12</td><td>13</td><td>13.5</td><td>14.5</td></tr>
+  <tr><td>M16</td><td>17</td><td>17.5</td><td>18.5</td></tr>
+  <tr><td>M20</td><td>21</td><td>22</td><td>24</td></tr>
+</table>
+
+<p>ISO 273 lists 35 diameters from M1 to M64, fewer than ISO 261's 53. A
+diameter it does not list, such as M5.5, M9 or M11, has no clearance hole,
+and <code>'Clearance'</code> refuses it. The tolerances it gives for
+information, H12, H13 and H14 for the three series, are not applied, nor is
+the chamfer it recommends where the hole's edge would meet the fillet under
+a head.</p>
+
+<h2 id="counterbores">Counterbores</h2>
+
+<p>A counterbore sinks the head of a socket head cap screw below the
+surface. <code>'Counterbore', true</code> takes IS 3406 (Part 2), type K,
+which it gives for the screws of IS 2269, the Indian adoption of ISO 4762,
+from M1.6 to M36: the diameter d2 and the depth t1.
+<code>'Counterbore', 'washer'</code> takes its type K2, for the same screw
+on a plain washer of IS 2016, from M3 to M36: wider, d4, and deeper, t2. A
+plain washer of ISO 7089 fits it, 12 across and 1.6 thick for M6 against
+13 and the 1.7 the counterbore deepens by.</p>
+
+<table class="guide">
+  <tr><th>Thread</th><th>Type K</th><th>Type K2, on a washer</th></tr>
+  <tr><td>M3</td><td>6 &times; 3.4</td><td>9 &times; 4.3</td></tr>
+  <tr><td>M4</td><td>8 &times; 4.6</td><td>10 &times; 5.5</td></tr>
+  <tr><td>M5</td><td>10 &times; 5.7</td><td>13 &times; 7</td></tr>
+  <tr><td>M6</td><td>11 &times; 6.8</td><td>13 &times; 8.5</td></tr>
+  <tr><td>M8</td><td>15 &times; 9</td><td>20 &times; 11</td></tr>
+  <tr><td>M10</td><td>18 &times; 11</td><td>24 &times; 13.5</td></tr>
+  <tr><td>M12</td><td>20 &times; 13</td><td>26 &times; 16</td></tr>
+  <tr><td>M16</td><td>26 &times; 17.5</td><td>33 &times; 21</td></tr>
+  <tr><td>M20</td><td>33 &times; 21.5</td><td>40 &times; 25.5</td></tr>
+</table>
+
+<p>The counterbore is the same over a fine and a medium clearance hole,
+which are the two series IS 3406 draws it with; over a coarse one it gives
+none, and a standard counterbore there is refused. Amendment 1 corrects two
+misprints of the table: the depth of type K at M5 is 5.7, printed 57, and
+the medium clearance hole at M12 is 13.5, printed 1.35. The table also
+prints a depth of type K at M1.4, below the M1.6 its scope begins at and
+below the smallest screw of ISO 4762, and the package leaves it out.</p>
+
+<h2 id="countersinks">Countersinks</h2>
+
+<p>A countersink seats the head of a countersunk screw. IS 3406 (Part 1)
+gives one for each family of heads, all at 90 degrees:</p>
+
+<ul>
+  <li><b>Type A</b>, <code>'Countersink', true</code>, for the heads of
+  ISO 7721: slotted, cross recessed and hexalobular countersunk screws,
+  raised or not, as ISO 2009, 7046, 14581, 2010, 7047 and 14584, from M1 to
+  M20. It names the Indian screws IS 1365, 7485, 7486 and 8911.</li>
+  <li><b>Type B</b>, <code>'Countersink', 'socket'</code>, for hexagon
+  socket countersunk screws, ISO 10642, from M3 to M24. It names the Indian
+  screw IS 6761.</li>
+</ul>
+
+<p>Type A has a series for each clearance hole, chosen by
+<code>'Clearance'</code>. In the medium series it is a plain cone, d2
+across at the surface. In the fine series it is a cone below a short
+cylinder of the same diameter, d3 across and t2 deep, which lets a head sit
+just below the surface. Type B is drawn in the fine series only. Neither
+gives a countersink over a coarse hole, and type B none over a medium one;
+those are refused.</p>
+
+<table class="guide">
+  <tr><th>Thread</th><th>Type A, medium</th><th>Type A, fine</th>
+  <th>Type B, fine</th></tr>
+  <tr><td>M3</td><td>6.5</td><td>6, 0.25 deep</td><td>6.3, 0.2 deep</td></tr>
+  <tr><td>M4</td><td>8.6</td><td>8, 0.3 deep</td><td>8.3, 0.3 deep</td></tr>
+  <tr><td>M5</td><td>10.4</td><td>10, 0.2 deep</td><td>10.4, 0.3 deep</td></tr>
+  <tr><td>M6</td><td>12.4</td><td>11.5, 0.45 deep</td><td>12.4, 0.3 deep</td></tr>
+  <tr><td>M8</td><td>16.4</td><td>15, 0.7 deep</td><td>16.5, 0.4 deep</td></tr>
+  <tr><td>M10</td><td>20.4</td><td>19, 0.7 deep</td><td>20.5, 0.5 deep</td></tr>
+  <tr><td>M12</td><td>23.9</td><td>23, 0.7 deep</td><td>25, 0.5 deep</td></tr>
+  <tr><td>M16</td><td>31.9</td><td>30, 1.2 deep</td><td>31, 0.5 deep</td></tr>
+  <tr><td>M20</td><td>40.4</td><td>37, 1.7 deep</td><td>37, 0.5 deep</td></tr>
+</table>
+
+<p>The depth of the cone follows from the diameters at 90 degrees: half the
+difference between the countersink and the clearance hole, below the
+cylinder. The approximate depths t1 the tables print agree with it, and
+are not used. Type B steps up between M20 and M22, from 37 to 48.2 across,
+and on to 52 at M24. The depths printed for both are 0.5 less than their
+diameters give, where the smaller sizes agree exactly; as the two rows agree
+with each other, neither stands out as a misprint, and both are taken as
+printed.</p>
+
+<h2 id="numbers">Numbers instead</h2>
+
+<p>A counterbore or countersink of another size is given by its numbers,
+which are taken as given, with any clearance hole and with a plain
+diameter: <code>[CD, CDEPTH]</code> for a counterbore, and
+<code>CD</code>, <code>[CD, ANGLE]</code> or <code>[CD, ANGLE,
+CDEPTH]</code> for a countersink, the last a cylinder above the cone as in
+the fine series. A deeper counterbore, so that a screw of a standard length
+reaches, is the common case.</p>
+
+<h2 id="not-done">What is not done</h2>
+
+<ul>
+  <li>The counterbores of IS 3406 (Part 2) for cheese and pan heads, its
+  type H, and for screws on spring washers, its types K1 and K3.</li>
+  <li>The countersinks of IS 3406 (Part 1) for tapping screws, its type C
+  at 80 degrees, and for countersunk bolts for steel structures, its type
+  E.</li>
+  <li>The tolerances: H12 and H13 on the diameters, and the plus tolerances
+  on the depths.</li>
+  <li>The 90 degree chamfer or radius IS 3406 (Part 2) asks for at the
+  bottom edge of a counterbore from M12.</li>
+  <li>Counterbores for low head cap screws, DIN 7984, which IS 3406 does
+  not give.</li>
+</ul>
+
+<h2 id="editions">Editions</h2>
+
+<p>ISO 273:1979 is current, confirmed in 2024, and Europe adopts it as EN
+20273. IS 3406 was prepared from DIN 74, parts 1 and 2, of 1980. Their
+successors are DIN 974-1, for counterbores, current in its edition of 2008,
+and ISO 15065:2005, for countersinks, confirmed in 2023. Neither was read,
+so where they differ from DIN 74 of 1980 the package follows the older
+values. The screws IS 3406 names are Indian Standards of the 1970s and
+1980s, and the heads of the current ISO editions were not compared with
+them.</p>
+
+        </main>
+      </div>
+    </div>
+  </body>
+</html>
