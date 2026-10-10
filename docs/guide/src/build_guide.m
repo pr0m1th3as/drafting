@@ -409,7 +409,7 @@ function [img, n] = capture (ctx, views, n)
     n += 1;
     f = sprintf ("%s-%d.png", ctx.base, n);
     if (ctx.build)
-      imwrite (V.__dump__ (), fullfile (ctx.imgdir, f));
+      V.capture (fullfile (ctx.imgdir, f));
     endif
     img{end+1} = f;
   endfor

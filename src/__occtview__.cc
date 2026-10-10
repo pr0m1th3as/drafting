@@ -77,11 +77,20 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 //   drag PX PY QX QY
 //                  the left button pressed at one pixel and released at the
 //                  other, which turns the view; replies "dragged"
-//   view AZ EL     looks from azimuth AZ and elevation EL in degrees, as
+//   view AZ EL [ZOOM [X Y Z]]
+//                  looks from azimuth AZ and elevation EL in degrees, as
 //                  Octave's view takes them, and fits the shape to the
-//                  window; replies "viewed"
-//   getview        replies "view AZ EL", the angles the view looks from
-//   dump FILE      writes the view to an image file (PPM); replies "dumped"
+//                  window, then magnifies it ZOOM times, 1 by default,
+//                  about the centre of the window; with X Y Z, it first
+//                  moves that point to the centre of the window, where the
+//                  view then turns about it; replies "viewed"
+//   getview        replies "view AZ EL ZOOM X Y Z", the angles the view looks
+//                  from, how many times the shape is magnified from fitting
+//                  the window, and the point at the centre of the window
+//   capture W H    draws the view W by H pixels, the window's size when both
+//                  are 0, and replies "image W H" followed by its pixels,
+//                  W * H * 3 bytes of red, green and blue, a row at a time
+//                  from the top
 //   close          closes the window
 //
 // K is a 1-based index into the map of all edges or faces of the shape, the
@@ -152,6 +161,7 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <TopoDS_Face.hxx>
 #include <TopoDS_Vertex.hxx>
 #include <TopoDS_Shape.hxx>
+#include <Image_PixMap.hxx>
 #include <V3d_View.hxx>
 #include <V3d_Viewer.hxx>
 
@@ -647,9 +657,24 @@ public:
     }
     else if (cmd == "view")
     {
-      double az, el;
+      double az, el, zoom = 1, x, y, z;
       in >> az >> el;
+      if (! (in >> zoom))
+      {
+        zoom = 1;
+      }
+      const bool target = static_cast<bool> (in >> x >> y >> z);
       setview (az, el);
+      Handle (Graphic3d_Camera) cam = m_view->Camera ();
+      if (target)
+      {
+        const gp_Pnt t (x, y, z);
+        const gp_Vec v (cam->Center (), t);
+        cam->SetEyeAndCenter (cam->Eye ().Translated (v), t);
+        m_centre = t;
+        m_hascentre = true;
+      }
+      cam->SetScale (cam->Scale () / zoom);
       reply ("viewed");
     }
     else if (cmd == "getview")
@@ -658,16 +683,17 @@ public:
       getview (az, el);
       ostringstream o;
       o.precision (17);
-      o << "view " << az << " " << el;
+      const gp_Pnt t = m_view->Camera ()->Center ();
+      o << "view " << az << " " << el << " "
+        << fitted () / m_view->Camera ()->Scale () << " " << t.X () << " "
+        << t.Y () << " " << t.Z ();
       reply (o.str ());
     }
-    else if (cmd == "dump")
+    else if (cmd == "capture")
     {
-      string file;
-      getline (in, file);
-      m_view->Redraw ();
-      const bool ok = m_view->Dump (file.empty () ? "" : file.c_str () + 1);
-      reply (ok ? "dumped" : "error the view could not be written");
+      int w = 0, h = 0;
+      in >> w >> h;
+      capture (w, h);
     }
     else if (cmd == "title")
     {
@@ -1152,6 +1178,48 @@ private:
     m_view->SetProj (o);
     m_view->FitAll (0.05, false);
     m_hascentre = false;
+  }
+
+  // The scale of the camera with the shape fitted to the window, looking as
+  // it looks now; the camera is left as it was
+  double fitted ()
+  {
+    Handle (Graphic3d_Camera) cam = m_view->Camera ();
+    Handle (Graphic3d_Camera) keep = new Graphic3d_Camera ();
+    keep->Copy (cam);
+    m_view->FitAll (0.05, false);
+    const double s = cam->Scale ();
+    cam->Copy (keep);
+    return s;
+  }
+
+  // The view drawn W by H pixels, or at the window's size when both are 0,
+  // replied as "image W H" and its rows of red, green and blue from the top
+  void capture (int w, int h)
+  {
+    if (w <= 0 || h <= 0)
+    {
+      m_window->Size (w, h);
+    }
+    Image_PixMap img;
+    V3d_ImageDumpOptions opt;
+    opt.Width = w;
+    opt.Height = h;
+    opt.BufferType = Graphic3d_BT_RGB;
+    opt.ToAdjustAspect = true;
+    if (! m_view->ToPixMap (img, opt) || img.Format () != Image_Format_RGB
+        || static_cast<int> (img.SizeX ()) != w
+        || static_cast<int> (img.SizeY ()) != h)
+    {
+      reply ("error the view could not be drawn at that size");
+      return;
+    }
+    reply ("image " + std::to_string (w) + " " + std::to_string (h));
+    for (int r = 0; r < h; r++)
+    {
+      fwrite (img.Row (r), 1, 3 * w, stdout);
+    }
+    fflush (stdout);
   }
 
   // Look from azimuth AZ and elevation EL in degrees, as Octave's view takes

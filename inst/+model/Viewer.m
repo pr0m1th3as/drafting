@@ -215,20 +215,6 @@ classdef Viewer < handle
 
     endfunction
 
-    ## The view as an RGB image
-    function IMG = __dump__ (this)
-
-      f = [tempname() '.ppm'];
-      send (this, ["dump " f]);
-      r = receive (this, 30);
-      if (! strcmp (r, 'dumped'))
-        error ("model.Viewer: %s", r);
-      endif
-      IMG = imread (f);
-      unlink (f);
-
-    endfunction
-
     ## The picking behind pick.  CLICKS, for tests and the guide, replaces
     ## the mouse: a row of pixels per click, then NaN for the Enter key or
     ## Inf for Escape, Enter when neither ends it; empty is the mouse.
@@ -815,9 +801,11 @@ classdef Viewer < handle
 
     ## -*- texinfo -*-
     ## @deftypefn  {model.Viewer} {} view (@var{V}, @var{AZ}, @var{EL})
-    ## @deftypefnx {model.Viewer} {[@var{AZ}, @var{EL}] =} view (@var{V})
+    ## @deftypefnx {model.Viewer} {} view (@var{V}, @var{AZ}, @var{EL}, @var{ZOOM})
+    ## @deftypefnx {model.Viewer} {} view (@var{V}, @var{AZ}, @var{EL}, @var{ZOOM}, @var{TARGET})
+    ## @deftypefnx {model.Viewer} {[@var{AZ}, @var{EL}, @var{ZOOM}, @var{TARGET}] =} view (@var{V})
     ##
-    ## Set or query the direction the viewer looks from.
+    ## Set or query the direction the viewer looks from, and how close.
     ##
     ## @code{view (@var{V}, @var{AZ}, @var{EL})} turns the view to look at the
     ## shape from azimuth @var{AZ} and elevation @var{EL}, in degrees, and fits
@@ -829,10 +817,24 @@ classdef Viewer < handle
     ## straight down or up, the @math{y} axis does, turned by @var{AZ}.  The
     ## mouse still turns the view afterwards.
     ##
-    ## @code{[@var{AZ}, @var{EL}] = view (@var{V})} returns the angles the
-    ## view looks from now, however it got there, @var{AZ} from -180 to 180,
-    ## so that a view found with the mouse can be kept in a script.  A turn
-    ## about the line of sight, which the mouse can give, is not part of them.
+    ## @code{view (@var{V}, @var{AZ}, @var{EL}, @var{ZOOM})} then magnifies
+    ## the shape @var{ZOOM} times about the centre of the window: 1 is the
+    ## shape fitted, 2 shows it twice as large and 0.5 half as large.
+    ##
+    ## @code{view (@var{V}, @var{AZ}, @var{EL}, @var{ZOOM}, @var{TARGET})}
+    ## looks at the point @var{TARGET}, a 3-element vector in millimetres,
+    ## instead of the middle of the shape: the point Octave calls the camera
+    ## target.  It is put at the centre of the window, @var{ZOOM} magnifies
+    ## about it, and the mouse turns the view about it afterwards, as after a
+    ## double click.  So a detail is seen close up from a script.
+    ##
+    ## @code{[@var{AZ}, @var{EL}, @var{ZOOM}, @var{TARGET}] = view (@var{V})}
+    ## returns the view as it is now, however it got there: the angles it
+    ## looks from, @var{AZ} from -180 to 180, its magnification against the
+    ## shape fitted, and the point at the centre of the window, wherever the
+    ## view was panned to.  Given back to @code{view}, they restore it, so a
+    ## view found with the mouse can be kept in a script.  A turn about the
+    ## line of sight, which the mouse can give, is not part of them.
     ##
     ## The keys of the window give four of these views: @kbd{0} is
     ## @code{view (@var{V}, 45, 35.26)}, near enough, the isometric view the
@@ -847,8 +849,13 @@ classdef Viewer < handle
     ## part = solid.box (80, 40, 4);
     ## V = show (part);
     ## view (V, 30, 60);
-    ## ## Keep a view found with the mouse
-    ## [az, el] = view (V);
+    ## ## Closer, on the middle of the part
+    ## view (V, 30, 60, 2);
+    ## ## Four times larger, on a corner
+    ## view (V, 30, 60, 4, [80, 40, 4]);
+    ## ## Keep a view found with the mouse, and restore it
+    ## [az, el, zoom, target] = view (V);
+    ## view (V, az, el, zoom, target);
     ## @end group
     ## @end example
     ##
@@ -857,14 +864,17 @@ classdef Viewer < handle
     function varargout = view (this, varargin)
 
       ## Input validation
-      if (! any (numel (varargin) == [0, 2]))
+      if (! any (numel (varargin) == [0, 2, 3, 4]))
         error ("model.Viewer.view: invalid number of input arguments.");
       endif
-      if (numel (varargin) == 2)
+      ZOOM = 1;
+      TARGET = [];
+      if (numel (varargin) > 0)
         if (nargout > 0)
           error ("model.Viewer.view: invalid number of output arguments.");
         endif
-        [AZ, EL] = varargin{:};
+        AZ = varargin{1};
+        EL = varargin{2};
         if (! isnumeric (AZ) || ! isreal (AZ) || ! isscalar (AZ)
             || ! isfinite (AZ))
           error ("model.Viewer.view: AZ must be a finite real scalar.");
@@ -874,20 +884,131 @@ classdef Viewer < handle
           error (strcat ("model.Viewer.view: EL must be a real scalar in", ...
                          " the range [-90, 90] degrees."));
         endif
+        if (numel (varargin) > 2)
+          ZOOM = varargin{3};
+          if (! isnumeric (ZOOM) || ! isreal (ZOOM) || ! isscalar (ZOOM)
+              || ! isfinite (ZOOM) || ! (ZOOM > 0))
+            error (strcat ("model.Viewer.view: ZOOM must be a positive and", ...
+                           " finite real scalar."));
+          endif
+        endif
+        if (numel (varargin) > 3)
+          TARGET = varargin{4};
+          if (! isnumeric (TARGET) || ! isreal (TARGET) || numel (TARGET) != 3
+              || ! isvector (TARGET) || ! all (isfinite (TARGET)))
+            error (strcat ("model.Viewer.view: TARGET must be a real", ...
+                           " 3-element vector of finite values."));
+          endif
+        endif
       endif
       if (! isopen (this))
         error ("model.Viewer.view: the viewer's window is not open.");
       endif
 
-      if (numel (varargin) == 2)
-        send (this, sprintf ("view %.17g %.17g", double (AZ), double (EL)));
+      if (numel (varargin) > 0)
+        send (this, sprintf ("view%s", sprintf (" %.17g", double (AZ), ...
+                                                 double (EL), double (ZOOM), ...
+                                                 double (TARGET))));
         receive (this, 10);
       else
         send (this, "getview");
         r = strsplit (receive (this, 10));
-        ## Rounded to 1e-9 degrees, so that angles set read back as given
-        A = round (str2double (r(2:3)) * 1e9) / 1e9 + 0;
-        varargout = {A(1), A(2)};
+        ## Rounded to 1e-9, so that a view set reads back as given
+        A = round (str2double (r(2:7)) * 1e9) / 1e9 + 0;
+        varargout = {A(1), A(2), A(3), A(4:6)};
+      endif
+
+    endfunction
+
+    ## -*- texinfo -*-
+    ## @deftypefn  {model.Viewer} {@var{IMG} =} capture (@var{V})
+    ## @deftypefnx {model.Viewer} {} capture (@var{V}, @var{FILE})
+    ## @deftypefnx {model.Viewer} {} capture (@dots{}, @qcode{'Size'}, [@var{W}, @var{H}])
+    ##
+    ## The picture the viewer shows, as an image or a file.
+    ##
+    ## @code{@var{IMG} = capture (@var{V})} returns what the window shows, the
+    ## shape as it is turned and lit, as an @math{H}-by-@math{W}-by-3
+    ## @code{uint8} image of red, green and blue, the size of the window: the
+    ## form @code{imread} gives and @code{image} and @code{imwrite} take.
+    ##
+    ## @code{capture (@var{V}, @var{FILE})} writes it to @var{FILE} instead,
+    ## in the format its extension names, as @code{imwrite} writes it; PNG
+    ## keeps every pixel.
+    ##
+    ## @code{capture (@dots{}, @qcode{'Size'}, [@var{W}, @var{H}])} draws the
+    ## picture @var{W} pixels wide and @var{H} high instead, whatever the size
+    ## of the window, so a picture for print can be finer than the screen.
+    ## The view keeps its height: a picture of another shape than the window
+    ## shows more or less at the sides.
+    ##
+    ## @example
+    ## @group
+    ## V = show (solid.cylinder (10, 30));
+    ## view (V, 30, 20);
+    ## capture (V, 'cylinder.png', 'Size', [1800, 1400]);
+    ## @end group
+    ## @end example
+    ##
+    ## @seealso{model.Viewer.view, imwrite}
+    ## @end deftypefn
+    function varargout = capture (this, varargin)
+
+      ## Input validation
+      FILE = '';
+      if (mod (numel (varargin), 2) == 1)
+        FILE = varargin{1};
+        varargin(1) = [];
+        if (! ischar (FILE) || ! isrow (FILE))
+          error (strcat ("model.Viewer.capture: FILE must be a non-empty", ...
+                         " character vector."));
+        endif
+      endif
+      SZ = [0, 0];
+      for ii = 1:2:numel (varargin)
+        name = varargin{ii};
+        val = varargin{ii+1};
+        if (! ischar (name) || ! isrow (name))
+          error (strcat ("model.Viewer.capture: option names must be", ...
+                         " character vectors."));
+        endif
+        switch (lower (name))
+          case 'size'
+            if (! isnumeric (val) || ! isreal (val) || numel (val) != 2
+                || ! all (isfinite (val)) || any (val < 1)
+                || any (val != fix (val)))
+              error (strcat ("model.Viewer.capture: Size must be [W, H],", ...
+                             " two positive whole numbers of pixels."));
+            endif
+            SZ = double (val(:)');
+          otherwise
+            error ("model.Viewer.capture: unknown option '%s'.", name);
+        endswitch
+      endfor
+      if (! isempty (FILE))
+        folder = fileparts (FILE);
+        if (! isempty (folder) && ! isfolder (folder))
+          error ("model.Viewer.capture: folder '%s' does not exist.", folder);
+        endif
+      endif
+      if (! isopen (this))
+        error ("model.Viewer.capture: the viewer's window is not open.");
+      endif
+
+      send (this, sprintf ("capture %d %d", SZ));
+      r = strsplit (receive (this, 30));
+      if (! strcmp (r{1}, 'image'))
+        error ("model.Viewer.capture: %s", strjoin (r(2:end), ' '));
+      endif
+      W = str2double (r{2});
+      H = str2double (r{3});
+      B = bytes (this, 3 * W * H, 30);
+      IMG = permute (reshape (B, 3, W, H), [3, 2, 1]);
+      if (! isempty (FILE))
+        imwrite (IMG, FILE);
+      endif
+      if (isempty (FILE) || nargout > 0)
+        varargout = {IMG};
       endif
 
     endfunction
@@ -1030,6 +1151,34 @@ classdef Viewer < handle
         LAST = receive (this, TIMEOUT);
         R{end+1} = LAST;
       until (any (strcmp (LAST, {'done', 'cancel', 'closed'})))
+
+    endfunction
+
+    ## The next N bytes from the viewer, waiting up to TIMEOUT seconds for
+    ## each part of them
+    function B = bytes (this, N, TIMEOUT)
+
+      st = state (this);
+      B = zeros (N, 1, 'uint8');
+      got = 0;
+      t0 = tic ();
+      while (got < N)
+        [b, n] = fread (st.out, N - got, 'uint8=>uint8');
+        if (n > 0)
+          B(got+1:got+n) = b;
+          got += n;
+          t0 = tic ();
+          continue;
+        endif
+        fclear (st.out);
+        if (waitpid (st.pid, WNOHANG ()) != 0)
+          error ("model.Viewer: the viewer closed.");
+        endif
+        if (toc (t0) > TIMEOUT)
+          error ("model.Viewer: the viewer did not reply.");
+        endif
+        pause (0.001);
+      endwhile
 
     endfunction
 
@@ -1327,6 +1476,94 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
+%!testif ; ! isempty (getenv ('DISPLAY'))
+%! ## A zoom set reads back as given
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Shape = solid.box (10, 20, 30);
+%!   view (V, 30, 60, 2.5);
+%!   [az, el, zoom] = view (V);
+%!   assert_equal ([az, el, zoom], [30, 60, 2.5]);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; ! isempty (getenv ('DISPLAY'))
+%! ## A view set without a zoom fits the shape
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Shape = solid.box (10, 20, 30);
+%!   view (V, 30, 60, 2);
+%!   view (V, 30, 60);
+%!   [~, ~, zoom] = view (V);
+%!   assert_equal (zoom, 1);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; ! isempty (getenv ('DISPLAY'))
+%! ## A zoom of 2 shows the shape twice as large
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Shape = solid.box (10, 20, 30);
+%!   view (V, 0, 0);
+%!   a = norm (diff ([V.__project__([0, 0, 0]); V.__project__([10, 0, 0])]));
+%!   view (V, 0, 0, 2);
+%!   b = norm (diff ([V.__project__([0, 0, 0]); V.__project__([10, 0, 0])]));
+%!   assert_equal (b / a, 2, 0.02);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; ! isempty (getenv ('DISPLAY'))
+%! ## A target set reads back as given
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Shape = solid.box (80, 40, 4);
+%!   view (V, 30, 60, 4, [80, 40, 4]);
+%!   [az, el, zoom, target] = view (V);
+%!   assert_equal ([az, el, zoom, target], [30, 60, 4, 80, 40, 4]);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; ! isempty (getenv ('DISPLAY'))
+%! ## The target is at the centre of the window
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Shape = solid.box (80, 40, 4);
+%!   view (V, 30, 60, 4, [80, 40, 4]);
+%!   assert_equal (V.__project__ ([80, 40, 4]), [450, 350], 1);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; ! isempty (getenv ('DISPLAY'))
+%! ## Without a target, the middle of the shape is
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Shape = solid.box (80, 40, 4);
+%!   view (V, 30, 60, 4);
+%!   [~, ~, ~, target] = view (V);
+%!   assert_equal (target, [40, 20, 2], 1e-9);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; ! isempty (getenv ('DISPLAY'))
+%! ## A view read back and set again draws the same picture
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Shape = solid.box (80, 40, 4);
+%!   view (V, 30, 60, 4, [80, 40, 4]);
+%!   I = capture (V);
+%!   [az, el, zoom, target] = view (V);
+%!   view (V, az, el, zoom, target);
+%!   assert_equal (capture (V), I);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
 %!error<model.Viewer.view: invalid number of input arguments.> ...
 %! view (model.Viewer ('Hidden', true), 30)
 %!error<model.Viewer.view: invalid number of output arguments.> ...
@@ -1341,6 +1578,74 @@ endfunction
 %! view (model.Viewer ('Hidden', true), 30, NaN)
 %!error<model.Viewer.view: EL must be a real scalar in the range \[-90, 90\] degrees.> ...
 %! view (model.Viewer ('Hidden', true), 30, 'a')
+%!error<model.Viewer.view: ZOOM must be a positive and finite real scalar.> ...
+%! view (model.Viewer ('Hidden', true), 30, 60, 0)
+%!error<model.Viewer.view: ZOOM must be a positive and finite real scalar.> ...
+%! view (model.Viewer ('Hidden', true), 30, 60, Inf)
+%!error<model.Viewer.view: ZOOM must be a positive and finite real scalar.> ...
+%! view (model.Viewer ('Hidden', true), 30, 60, [1, 2])
+%!error<model.Viewer.view: TARGET must be a real 3-element vector of finite values.> ...
+%! view (model.Viewer ('Hidden', true), 30, 60, 1, [1, 2])
+%!error<model.Viewer.view: TARGET must be a real 3-element vector of finite values.> ...
+%! view (model.Viewer ('Hidden', true), 30, 60, 1, [1, 2, NaN])
+%!error<model.Viewer.view: TARGET must be a real 3-element vector of finite values.> ...
+%! view (model.Viewer ('Hidden', true), 30, 60, 1, 'abc')
+%!error<model.Viewer.view: invalid number of input arguments.> ...
+%! view (model.Viewer ('Hidden', true), 30, 60, 1, [1, 2, 3], 2)
+%!error<model.Viewer.view: invalid number of output arguments.> ...
+%! A = view (model.Viewer ('Hidden', true), 30, 60, 2);
+
+%!testif ; ! isempty (getenv ('DISPLAY'))
+%! ## capture: the window's picture, the right way up
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Shape = solid.box (10, 20, 30);
+%!   I = capture (V);
+%!   assert_equal ([size(I), isa(I, 'uint8')], [700, 900, 3, true]);
+%!   assert_equal (mean (I(1,:,:)(:)) > mean (I(end,:,:)(:)), true);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; ! isempty (getenv ('DISPLAY'))
+%! ## capture: Size draws the picture at any size
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Shape = solid.box (10, 20, 30);
+%!   assert_equal (size (capture (V, 'Size', [1800, 400])), [400, 1800, 3]);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; ! isempty (getenv ('DISPLAY'))
+%! ## capture: a file holds the picture
+%! V = model.Viewer ('Hidden', true);
+%! f = [tempname(), '.png'];
+%! unwind_protect
+%!   V.Shape = solid.box (10, 20, 30);
+%!   capture (V, f, 'size', [300, 200]);
+%!   assert_equal (imread (f), capture (V, 'Size', [300, 200]));
+%! unwind_protect_cleanup
+%!   close (V);
+%!   [~] = unlink (f);
+%! end_unwind_protect
+
+%!error<model.Viewer.capture: FILE must be a non-empty character vector.> ...
+%! capture (model.Viewer ('Hidden', true), 1)
+%!error<model.Viewer.capture: Size must be \[W, H\], two positive whole numbers of pixels.> ...
+%! capture (model.Viewer ('Hidden', true), 'Size', [0, 10])
+%!error<model.Viewer.capture: Size must be \[W, H\], two positive whole numbers of pixels.> ...
+%! capture (model.Viewer ('Hidden', true), 'Size', [10.5, 10])
+%!error<model.Viewer.capture: Size must be \[W, H\], two positive whole numbers of pixels.> ...
+%! capture (model.Viewer ('Hidden', true), 'Size', 10)
+%!error<model.Viewer.capture: unknown option 'Width'.> ...
+%! capture (model.Viewer ('Hidden', true), 'Width', 10)
+%!error<model.Viewer.capture: option names must be character vectors.> ...
+%! capture (model.Viewer ('Hidden', true), 'a.png', 1, 2)
+%!error<model.Viewer.capture: folder 'no_such_folder_9f2c' does not exist.> ...
+%! capture (model.Viewer ('Hidden', true), fullfile ('no_such_folder_9f2c', 'a.png'))
+%!error<model.Viewer.capture: the viewer's window is not open.> ...
+%! capture (model.Viewer ('Hidden', true))
 %!error<model.Viewer.view: the viewer's window is not open.> ...
 %! view (model.Viewer ('Hidden', true))
 
@@ -1397,14 +1702,14 @@ endfunction
 %!   pe = V.__project__ ([5, 0, 30]);
 %!   pf = V.__project__ ([10, 10, 15]);
 %!   V.__pickstart__ ('any');
-%!   M = orange (V.__dump__ ());
+%!   M = orange (capture (V));
 %!   assert_equal ([near(M, pe), near(M, pf)], [false, false]);
 %!   assert_equal (V.__click__ (pe), 1);
-%!   M = orange (V.__dump__ ());
+%!   M = orange (capture (V));
 %!   assert_equal (near (M, pe), true);
 %!   assert_equal (near (M, pf), false);
 %!   assert_equal (V.__click__ (pf), 2);
-%!   assert_equal (near (orange (V.__dump__ ()), pf), true);
+%!   assert_equal (near (orange (capture (V)), pf), true);
 %! unwind_protect_cleanup
 %!   close (V);
 %! end_unwind_protect
@@ -1687,7 +1992,7 @@ endfunction
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
 %!   V.Shape = U;
-%!   I = double (V.__dump__ ());
+%!   I = double (capture (V));
 %!   p = round ([V.__project__([5, 5, 10]); V.__project__([25, 5, 10])]);
 %!   c = [squeeze(I(p(1,2), p(1,1), :))'; squeeze(I(p(2,2), p(2,1), :))'];
 %!   red = c(:,1) > 100 & c(:,2) < 40 & c(:,3) < 40;
@@ -1708,14 +2013,14 @@ endfunction
 %!   p = round (V.__project__ ([40, 20, 12]));
 %!   at = @(I) double (squeeze (I(p(2), p(1), :)))';
 %!   assert_equal (V.__look__ (), 'face');
-%!   c = at (V.__dump__ ());
+%!   c = at (capture (V));
 %!   assert_equal (c(1) > 100 && c(2) < 40 && c(3) < 40, true);
 %!   V.__colours__ ('vertex');
 %!   assert_equal (V.__look__ (), 'vertex');
-%!   c = at (V.__dump__ ());
+%!   c = at (capture (V));
 %!   assert_equal (c(3) > 100 && c(1) < 40 && c(2) < 40, true);
 %!   V.__colours__ ('grey');
-%!   c = at (V.__dump__ ());
+%!   c = at (capture (V));
 %!   assert_equal (max (c) - min (c) < 30 && min (c) > 60, true);
 %! unwind_protect_cleanup
 %!   close (V);
@@ -1750,11 +2055,11 @@ endfunction
 %!   p = V.__project__ ([40, 20, 12]);
 %!   [~, edges] = V.__look__ ();
 %!   assert_equal (edges, 'off');
-%!   assert_equal (near (dark (V.__dump__ ()), p), false);
+%!   assert_equal (near (dark (capture (V)), p), false);
 %!   V.__edges__ ('on');
 %!   [~, edges] = V.__look__ ();
 %!   assert_equal (edges, 'on');
-%!   assert_equal (near (dark (V.__dump__ ()), p), true);
+%!   assert_equal (near (dark (capture (V)), p), true);
 %! unwind_protect_cleanup
 %!   close (V);
 %! end_unwind_protect
