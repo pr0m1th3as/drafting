@@ -142,7 +142,9 @@ classdef Assembly
     ##
     ## The first use of a name defines the part.  A later use places the same
     ## part again, and gives the same @var{X}, or @code{[]} for it; another
-    ## @var{X} under a name already used is an error.
+    ## @var{X} under a name already used is an error.  The same means stored
+    ## the same, not only shaped the same: a shape read back from a file is
+    ## another shape, so a part is best placed again with @code{[]}.
     ##
     ## Each placement is named after its part, @var{NAME} the first time and
     ## then @var{NAME}@code{:2}, @var{NAME}@code{:3} and so on;
