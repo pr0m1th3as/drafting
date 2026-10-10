@@ -298,6 +298,11 @@ classdef Shape
     ## Removing empty shapes, or nothing, leaves @var{A}, and removing
     ## anything from the empty shape leaves the empty shape.
     ##
+    ## Open CASCADE before 8.0 can return @var{A} uncut and report success,
+    ## as it does for a dome cut by a circle that starts in the plane of the
+    ## dome's seam.  A shape that comes back without the faces of a tool that
+    ## reaches inside it is refused with an error, not returned uncut.
+    ##
     ## The result takes its colours from @var{A}; the shapes taken away give
     ## none, as @code{solid.Shape.Colour} describes.
     ##
@@ -3592,6 +3597,31 @@ endfunction
 %! C = subtract (A, B);
 %! assert_equal (volume (A), 1000, 1e-9);
 %! assert_equal (bbox (B), [5, 0, 0, 15, 10, 10], 1e-9);
+
+%!testif ; str2double (strtok (__occt__ ('version', 'test'), '.')) >= 8
+%! ## a dome cut by a circle that starts in the plane of its seam
+%! f = 1.2; r = 4.65; w = asin (2 * r * f / (r ^ 2 + f ^ 2));
+%! R = geom.Region ([0, -5, 0; r, -5, 0; r, 0, tan(w/4); 0, f, 0]);
+%! R.UCS = geom.UCS ([0, -1, 0], [0, 0, 0]);
+%! S = solid.revolve (R);
+%! C = translate (solid.extrude (geom.Region ([2.25, 0, 1; -2.25, 0, 1]), 5), ...
+%!                [0, 0, -0.45]);
+%! s = (r ^ 2 + f ^ 2) / (2 * f);
+%! V = pi * 2.25 ^ 2 * (f - s + 0.45) ...
+%!     + 2 * pi / 3 * (s ^ 3 - (s ^ 2 - 2.25 ^ 2) ^ 1.5);
+%! assert_equal (volume (S) - volume (subtract (S, C)), V, -1e-9);
+
+%!testif ; str2double (strtok (__occt__ ('version', 'test'), '.')) < 8
+%! ## the same cut, which Open CASCADE 7 returns uncut
+%! f = 1.2; r = 4.65; w = asin (2 * r * f / (r ^ 2 + f ^ 2));
+%! R = geom.Region ([0, -5, 0; r, -5, 0; r, 0, tan(w/4); 0, f, 0]);
+%! R.UCS = geom.UCS ([0, -1, 0], [0, 0, 0]);
+%! S = solid.revolve (R);
+%! C = translate (solid.extrude (geom.Region ([2.25, 0, 1; -2.25, 0, 1]), 5), ...
+%!                [0, 0, -0.45]);
+%! fail ("subtract (S, C)", ["solid.Shape.subtract: Open CASCADE", ...
+%!                            " returned the shape uncut although a tool", ...
+%!                            " reaches inside it."]);
 
 %!test
 %! S = translate (solid.box (10, 20, 30), [1, -2, 3]);

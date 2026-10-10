@@ -2218,6 +2218,68 @@ traced (const TopoDS_Shape& r, const origins& L)
   return c;
 }
 
+// Whether a cut came back without a tool's face that passes inside the shape
+// and outside every other tool: such a face bounds the hollow it cuts, so a
+// result without it, or without any piece of it, is the shape returned
+// uncut, which Open CASCADE before 8.0 can report as a success.  Each face is
+// tried at the middle of its parameter range, and a face whose middle falls
+// off it is passed over.
+static bool
+uncut (BRepAlgoAPI_BooleanOperation& op)
+{
+  ShapeMap result;
+  TopExp::MapShapes (op.Shape (), TopAbs_FACE, result);
+  vector<TopoDS_Shape> tools;
+  for (const TopoDS_Shape& t : op.Tools ())
+  {
+    tools.push_back (t);
+  }
+  const double tol = Precision::Confusion ();
+  for (size_t k = 0; k < tools.size (); k++)
+  {
+    for (TopExp_Explorer x (tools[k], TopAbs_FACE); x.More (); x.Next ())
+    {
+      // A face kept, or kept in pieces, needs no point classified
+      const TopoDS_Face& f = TopoDS::Face (x.Current ());
+      bool kept = result.Contains (f);
+      for (const TopoDS_Shape& m : op.Modified (f))
+      {
+        kept = kept || result.Contains (m);
+      }
+      if (kept)
+      {
+        continue;
+      }
+      double u0, u1, v0, v1;
+      BRepTools::UVBounds (f, u0, u1, v0, v1);
+      const gp_Pnt2d uv ((u0 + u1) / 2, (v0 + v1) / 2);
+      if (BRepClass_FaceClassifier (f, uv, tol).State () != TopAbs_IN)
+      {
+        continue;
+      }
+      const gp_Pnt p = BRep_Tool::Surface (f)->Value (uv.X (), uv.Y ());
+      bool inside = false;
+      for (const TopoDS_Shape& a : op.Arguments ())
+      {
+        inside = inside
+                 || BRepClass3d_SolidClassifier (a, p, tol).State ()
+                    == TopAbs_IN;
+      }
+      for (size_t j = 0; j < tools.size () && inside; j++)
+      {
+        inside = j == k
+                 || BRepClass3d_SolidClassifier (tools[j], p, tol).State ()
+                    == TopAbs_OUT;
+      }
+      if (inside)
+      {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 // The result of a boolean operation, its coplanar faces and collinear edges
 // merged so that a union of two blocks reads as one block.
 static TopoDS_Shape
@@ -2229,6 +2291,11 @@ boolean (BRepAlgoAPI_BooleanOperation& op, const string& caller,
   {
     error ("%s: Open CASCADE could not compute the %s.", caller.c_str (),
            what);
+  }
+  if (op.Operation () == BOPAlgo_CUT && uncut (op))
+  {
+    error ("%s: Open CASCADE returned the shape uncut although a tool "
+           "reaches inside it.", caller.c_str ());
   }
   op.SimplifyResult ();
   return op.Shape ();
@@ -3970,6 +4037,11 @@ function directly. \n\
     else if (cmd == "readstep")
     {
       out = readstep (args(2).string_value (), caller);
+    }
+    // The Open CASCADE release built against, which tests may depend on
+    else if (cmd == "version")
+    {
+      out = OCC_VERSION_COMPLETE;
     }
     else
     {
