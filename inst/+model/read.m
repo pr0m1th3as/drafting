@@ -22,9 +22,10 @@
 ##
 ## @code{@var{A} = model.read (@var{FILE})} returns the product the STEP file
 ## @var{FILE} holds as a @code{model.Assembly}, in millimetres whatever unit
-## the file was written in: its parts with their names and the colours of
-## their solids, placed where the file places them and named as it names the
-## placements, and its sub-assemblies the same way.  A part the file places
+## the file was written in: its parts with their names and the colours and
+## @code{solid.Shape.Name} of their solids, placed where the file places
+## them and named as it names the placements, and its sub-assemblies the
+## same way.  A part the file places
 ## several times is one part placed several times.  Several products at the
 ## top of the file are placed where they are in one assembly, and a file of
 ## a single part gives an assembly placing it once; either is named after
@@ -99,6 +100,16 @@ endfunction
 %! assert_equal ({R.Instances.part}, {'plate', 'pin', 'pin'});
 %! assert_equal (R.Instances(3).placement == A.Instances(3).placement, true);
 %! assert_equal (R.Parts(2).item.Colour, [0.8, 0.2, 0.2], 1e-6);
+
+%!test  # the names of the parts' solids come back
+%! pin = solid.cylinder (2, 12);
+%! pin.Name = 'Pin ISO 2338 - 4 m6 x 12';
+%! A = model.Assembly ('ring');
+%! A = add (A, 'plate', solid.box (60, 60, 4), geom.UCS ());
+%! A = add (A, 'pin', pin, geom.UCS ([0, 0, 1], [20, 0, 4]));
+%! R = ringstep (A);
+%! assert_equal (R.Parts(1).item.Name, {});
+%! assert_equal (R.Parts(2).item.Name, {'Pin ISO 2338 - 4 m6 x 12'});
 
 %!test  # a sub-assembly placed twice, once defined
 %! A = add (model.Assembly ('stage'), 'pin', solid.cylinder (2, 12), ...

@@ -25,7 +25,9 @@
 ## unit the file was written in.  A file holding several parts returns them
 ## together, and @code{solid.Shape.numsolids} counts them.  The colour the
 ## file gives a solid, or failing that the first of its faces with one, is
-## its row of @code{solid.Shape.Colour}.
+## its row of @code{solid.Shape.Colour}.  The name the file gives a solid
+## itself, not the name of the part it belongs to, is its element of
+## @code{solid.Shape.Name}.
 ##
 ## STEP (ISO 10303-21) is the format every mechanical CAD program exchanges
 ## solids in, and it keeps their exact geometry: a hole read from it is a true
@@ -64,6 +66,7 @@ function S = read (FILE)
   c = __occt__ ('readstep', 'solid.read', FILE);
   S = solid.Shape (c{1});
   S.Colour = c{2};
+  S.Name = c{3};
 
 endfunction
 
@@ -169,6 +172,54 @@ endfunction
 %!   write (B, f);
 %!   R = solid.read (f);
 %!   assert_equal (R.Colour, []);
+%! unwind_protect_cleanup
+%!   [~] = unlink (f);
+%! end_unwind_protect
+
+%!test  # the names of the solids come back
+%! B = solid.box (10, 10, 10);
+%! U = union (B, translate (B, [20, 0, 0]));
+%! U.Name = {'pin'; 'Βίδα ISO 4762 - M5 x 20'};
+%! f = [tempname(), '.step'];
+%! unwind_protect
+%!   write (U, f);
+%!   R = solid.read (f);
+%!   assert_equal (R.Name, U.Name);
+%! unwind_protect_cleanup
+%!   [~] = unlink (f);
+%! end_unwind_protect
+
+%!test  # a single solid's name comes back
+%! U = solid.box (10, 10, 10);
+%! U.Name = 'Andreas''s pin';
+%! f = [tempname(), '.step'];
+%! unwind_protect
+%!   write (U, f);
+%!   R = solid.read (f);
+%!   assert_equal (R.Name, U.Name);
+%! unwind_protect_cleanup
+%!   [~] = unlink (f);
+%! end_unwind_protect
+
+%!test  # a solid without a name comes back without one
+%! B = solid.box (10, 10, 10);
+%! U = union (B, translate (B, [20, 0, 0]));
+%! U.Name = {''; 'pin'};
+%! f = [tempname(), '.step'];
+%! unwind_protect
+%!   write (U, f);
+%!   R = solid.read (f);
+%!   assert_equal (R.Name, {''; 'pin'});
+%! unwind_protect_cleanup
+%!   [~] = unlink (f);
+%! end_unwind_protect
+
+%!test  # an unnamed shape comes back unnamed, not named after its file
+%! f = [tempname(), '.step'];
+%! unwind_protect
+%!   write (solid.box (10, 10, 10), f);
+%!   R = solid.read (f);
+%!   assert_equal (R.Name, {});
 %! unwind_protect_cleanup
 %!   [~] = unlink (f);
 %! end_unwind_protect

@@ -230,10 +230,11 @@ classdef Assembly
     ##
     ## @code{@var{S} = shape (@var{A})} returns a @code{solid.Shape} holding
     ## the solids of every part where the assembly places it, sub-assemblies
-    ## included, each in its part's colour.  The solids are kept apart, not
-    ## united, so parts that touch stay separate solids.  This is the shape
-    ## to measure, cut, show or tessellate.  The empty assembly gives the
-    ## empty shape.  An assembly with a mesh among its parts has no exact
+    ## included, each with the @code{solid.Shape.Colour} and
+    ## @code{solid.Shape.Name} its part gives it.  The solids are kept apart,
+    ## not united, so parts that touch stay separate solids.  This is the
+    ## shape to measure, cut, show or tessellate.  The empty assembly gives
+    ## the empty shape.  An assembly with a mesh among its parts has no exact
     ## shape and is an error; @code{tessellate} gives it whole as a mesh.
     ##
     ## @seealso{model.Assembly.tessellate, model.Assembly.write, solid.Shape}
@@ -251,7 +252,7 @@ classdef Assembly
       endif
       n = numel (this.Instances);
       data = cell (1, n);
-      C = cell (n, 1);
+      [C, N] = deal (cell (n, 1));
       for k = 1:n
         p = strcmp (this.Instances(k).part, {this.Parts.name});
         X = this.Parts(p).item;
@@ -265,10 +266,15 @@ classdef Assembly
         if (isempty (C{k}))
           C{k} = NaN (numsolids (X), 3);
         endif
+        N{k} = X.Name;
+        if (isempty (N{k}))
+          N{k} = repmat ({''}, numsolids (X), 1);
+        endif
       endfor
       r = __occt__ ('compound', 'model.Assembly.shape', data{:});
       S = solid.Shape (r{1});
       S.Colour = vertcat (C{:});
+      S.Name = vertcat (N{:});
 
     endfunction
 
@@ -366,15 +372,16 @@ classdef Assembly
     ##
     ## @code{write (@var{A}, @var{FILE})} writes the assembly in the format
     ## the extension of @var{FILE} names, in either case.  A STEP file,
-    ## @file{.step}, keeps its structure: each part once, with its name and
-    ## colours, placed by its placements, which carry their names, and each
-    ## sub-assembly the same way, so that a CAD program opens the product as
-    ## it was built; it cannot hold a mesh part.  A 3MF file,
-    ## the archive slicers take, keeps the same structure, each part a mesh
-    ## written once and placed as a component, in its colours.  3MF has no
-    ## place for the name of a placement, so @code{model.read} names the
-    ## placements of a 3MF file after their parts.  An STL, OBJ or PLY file
-    ## holds @code{tessellate (@var{A})}.
+    ## @file{.step}, keeps its structure: each part once, with its name, its
+    ## colours and the @code{solid.Shape.Name} of its solids, placed by its
+    ## placements, which carry their names, and each sub-assembly the same
+    ## way, so that a CAD program opens the product as it was built; it
+    ## cannot hold a mesh part.  A 3MF file, the archive slicers take, keeps
+    ## the same structure, each part a mesh written once and placed as a
+    ## component, in its colours.  3MF has no place for the name of a
+    ## placement, so @code{model.read} names the placements of a 3MF file
+    ## after their parts.  An STL, OBJ or PLY file holds
+    ## @code{tessellate (@var{A})}.
     ##
     ## @code{write (@dots{}, @qcode{'Tolerance'}, @var{TOL})} sets, for a
     ## mesh, how far its facets may stray from the parts' surfaces, as
@@ -459,13 +466,15 @@ classdef Assembly
                   F, FC, T.children);
       else
         data = repmat ({uint8([])}, 1, numel (T.names));
-        colours = cell (1, numel (T.names));
+        [colours, solids] = deal (cell (1, numel (T.names)));
         data(ispart) = cellfun (@(p) p.Data, T.parts(ispart), ...
                                 'UniformOutput', false);
         colours(ispart) = cellfun (@(p) p.Colour, T.parts(ispart), ...
                                    'UniformOutput', false);
+        solids(ispart) = cellfun (@(p) p.Name, T.parts(ispart), ...
+                                  'UniformOutput', false);
         __occt__ ('writeassembly', 'model.Assembly.write', FILE, T.names, ...
-                  data, colours, T.children, T.instances);
+                  data, colours, solids, T.children, T.instances);
       endif
 
     endfunction
@@ -519,7 +528,8 @@ classdef Assembly
   methods (Static, Hidden)
 
     ## The assembly of the definitions model.read gets from a STEP file, as
-    ## writeassembly takes them, the whole last: a part placed several times
+    ## writeassembly takes them, the whole last, then the names of each
+    ## part's solids: a part placed several times
     ## is one part.  A single part comes back placed in an assembly named
     ## NAME.
     function A = __fromtree__ (T, NAME)
@@ -530,6 +540,7 @@ classdef Assembly
         if (! isempty (T{2}{i}))
           S = solid.Shape (T{2}{i});
           S.Colour = T{3}{i};
+          S.Name = T{6}{i};
           D{i} = S;
         else
           A = model.Assembly (T{1}{i});
@@ -723,6 +734,15 @@ endfunction
 %! assert_equal (numsolids (S), 4);
 %! assert_equal (S.Colour, [0.2, 0.4, 0.8; repmat([0.8, 0.2, 0.2], 3, 1)]);
 
+%!test  # shape: the names the parts' solids carry
+%! pin = solid.cylinder (2, 12);
+%! pin.Name = 'Pin ISO 2338 - 4 m6 x 12';
+%! A = add (model.Assembly (), 'plate', solid.box (60, 60, 4), geom.UCS ());
+%! A = add (A, 'pin', pin, geom.UCS ([0, 0, 1], [20, 0, 4]));
+%! A = add (A, 'pin', [], geom.UCS ([0, 0, 1], [-20, 0, 4]));
+%! assert_equal (shape (A).Name, ...
+%!               {''; 'Pin ISO 2338 - 4 m6 x 12'; 'Pin ISO 2338 - 4 m6 x 12'});
+
 %!test  # shape: a part where its frame puts it
 %! A = add (model.Assembly (), 'pin', solid.cylinder (2, 12), ...
 %!          geom.UCS ([1, 0, 0], [5, 0, 0]));
@@ -746,6 +766,21 @@ endfunction
 %!   assert_equal (numel (strfind (t, "PRODUCT('pin'")), 1);
 %!   assert_equal (numel (strfind (t, "PRODUCT('stage'")), 1);
 %!   assert_equal (numel (strfind (t, 'NEXT_ASSEMBLY_USAGE_OCCURRENCE')), 6);
+%! unwind_protect_cleanup
+%!   [~] = unlink (f);
+%! end_unwind_protect
+
+%!test  # write: STEP names a part's solids by their Name
+%! pin = solid.cylinder (2, 12);
+%! pin.Name = 'Pin ISO 2338 - 4 m6 x 12';
+%! A = add (model.Assembly ('ring'), 'pin', pin, geom.UCS ());
+%! f = [tempname(), '.step'];
+%! unwind_protect
+%!   write (A, f);
+%!   t = fileread (f);
+%!   assert_equal (numel (strfind (t, "PRODUCT('pin'")), 1);
+%!   m = "MANIFOLD_SOLID_BREP('Pin ISO 2338 - 4 m6 x 12'";
+%!   assert_equal (numel (strfind (t, m)), 1);
 %! unwind_protect_cleanup
 %!   [~] = unlink (f);
 %! end_unwind_protect

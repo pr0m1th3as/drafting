@@ -137,6 +137,11 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <Poly_Triangulation.hxx>
 #include <STEPControl_Reader.hxx>
 #include <STEPControl_Writer.hxx>
+#include <StepShape_ManifoldSolidBrep.hxx>
+#include <Transfer_TransientProcess.hxx>
+#include <TransferBRep.hxx>
+#include <XSControl_TransferReader.hxx>
+#include <XSControl_WorkSession.hxx>
 #include <Standard_Failure.hxx>
 #include <TCollection_HAsciiString.hxx>
 #include <TopExp.hxx>
@@ -2436,6 +2441,28 @@ colourpart (const xdedoc& d, const TDF_Label& l, const TopoDS_Shape& s,
   }
 }
 
+// The solids of the part S at the label L of the document D, S not itself
+// a solid, each named by its element of NAMES, in the order a map of them
+// gives, unless the element is empty or NAMES has none: a name STEP gives
+// the solid itself, not the part
+static void
+namepart (const xdedoc& d, const TDF_Label& l, const TopoDS_Shape& s,
+          const Cell& names)
+{
+  ShapeMap solids;
+  TopExp::MapShapes (s, TopAbs_SOLID, solids);
+  for (int i = 1; i <= solids.Extent () && i <= names.numel (); i++)
+  {
+    const string nm = names(i-1).string_value ();
+    if (nm.empty ())
+    {
+      continue;
+    }
+    const TDF_Label sub = d.shapes ()->AddSubShape (l, solids (i));
+    TDataStd_Name::Set (sub, TCollection_ExtendedString (nm.c_str (), true));
+  }
+}
+
 // The document D written to FILE as STEP in millimetres, its file named NAME
 static void
 writedoc (const xdedoc& d, const string& file, const string& name,
@@ -2445,6 +2472,7 @@ writedoc (const xdedoc& d, const string& file, const string& name,
   w.SetColorMode (true);
   w.SetNameMode (true);
   Interface_Static::SetCVal ("write.step.unit", "MM");
+  Interface_Static::SetIVal ("write.stepcaf.subshapes.name", 1);
   if (! w.Transfer (d.doc, STEPControl_AsIs))
   {
     error ("%s: Open CASCADE could not translate the shape to STEP.",
@@ -2463,16 +2491,34 @@ writedoc (const xdedoc& d, const string& file, const string& name,
   }
 }
 
+// S as namepart can name its solids by NAMES: a single solid named is put
+// in a compound, since STEP names the part by it otherwise
+static TopoDS_Shape
+named (const TopoDS_Shape& s, const Cell& names)
+{
+  if (names.numel () == 0 || s.ShapeType () != TopAbs_SOLID)
+  {
+    return s;
+  }
+  TopoDS_Compound c;
+  BRep_Builder b;
+  b.MakeCompound (c);
+  b.Add (c, s);
+  return c;
+}
+
 // S written to FILE as STEP, one part named NAME, its solids coloured as
-// colourpart colours them
+// colourpart colours them and named as namepart names them
 static void
 writestep (const TopoDS_Shape& s, const string& file, const string& name,
-           const Matrix& colours, const string& caller)
+           const Matrix& colours, const Cell& names, const string& caller)
 {
   xdedoc d;
-  const TDF_Label top = d.shapes ()->AddShape (s, false);
+  const TopoDS_Shape t = named (s, names);
+  const TDF_Label top = d.shapes ()->AddShape (t, false);
   TDataStd_Name::Set (top, TCollection_ExtendedString (name.c_str (), true));
-  colourpart (d, top, s, colours);
+  colourpart (d, top, t, colours);
+  namepart (d, top, t, names);
   writedoc (d, file, name, caller);
 }
 
@@ -2503,13 +2549,14 @@ labelname (const TDF_Label& l)
 
 // An assembly written to FILE as STEP, given as definitions, those it places
 // before it and the whole last: each named in NAMES, a part by its bytes in
-// DATA and the colours of its solids in COLOURS, an assembly by an empty
-// DATA, its placed definitions in CHILDREN, a row for each of the index from
-// 1 of the definition and the frame it is placed in, as displacement takes
-// it, and the names of those placements in INSTANCES
+// DATA, the colours of its solids in COLOURS and their own names in SOLIDS,
+// as namepart takes them, an assembly by an empty DATA, its placed
+// definitions in CHILDREN, a row for each of the index from 1 of the
+// definition and the frame it is placed in, as displacement takes it, and
+// the names of those placements in INSTANCES
 static void
 writeassembly (const string& file, const Cell& names, const Cell& data,
-               const Cell& colours, const Cell& children,
+               const Cell& colours, const Cell& solids, const Cell& children,
                const Cell& instances, const string& caller)
 {
   xdedoc d;
@@ -2519,9 +2566,11 @@ writeassembly (const string& file, const Cell& names, const Cell& data,
   {
     if (! data(i).isempty ())
     {
-      const TopoDS_Shape s = toshape (data(i), caller);
+      const Cell sn = solids(i).cell_value ();
+      const TopoDS_Shape s = named (toshape (data(i), caller), sn);
       label[i] = d.shapes ()->AddShape (s, false);
       colourpart (d, label[i], s, colours(i).matrix_value ());
+      namepart (d, label[i], s, sn);
     }
     else
     {
@@ -2710,10 +2759,55 @@ colourof (const xdedoc& d, const TopoDS_Shape& s, Quantity_Color& c)
   return false;
 }
 
+// The solids the STEP file read by R names, each with its name: the name
+// of a solid's own entity, never that of the part it belongs to
+static vector<std::pair<TopoDS_Shape, string>>
+solidnames (STEPCAFControl_Reader& r)
+{
+  vector<std::pair<TopoDS_Shape, string>> out;
+  const Handle (XSControl_WorkSession)& ws = r.ChangeReader ().WS ();
+  const Handle (Interface_InterfaceModel) model = ws->Model ();
+  const Handle (Transfer_TransientProcess) tp
+    = ws->TransferReader ()->TransientProcess ();
+  for (int i = 1; i <= model->NbEntities (); i++)
+  {
+    const Handle (StepShape_ManifoldSolidBrep) b
+      = Handle (StepShape_ManifoldSolidBrep)::DownCast (model->Value (i));
+    if (b.IsNull () || b->Name ().IsNull () || b->Name ()->Length () == 0)
+    {
+      continue;
+    }
+    const TopoDS_Shape x = TransferBRep::ShapeResult (tp, b);
+    if (! x.IsNull ())
+    {
+      out.push_back ({x, b->Name ()->ToCString ()});
+    }
+  }
+  return out;
+}
+
+// The name NAMES, as solidnames gives them, has for the solid S, wherever
+// it is placed, or empty
+static string
+nameof (const TopoDS_Shape& s,
+        const vector<std::pair<TopoDS_Shape, string>>& names)
+{
+  for (const auto& xn : names)
+  {
+    if (xn.first.IsPartner (s))
+    {
+      return xn.second;
+    }
+  }
+  return "";
+}
+
 // The shapes of the STEP file FILE as one shape, in millimetres, and the
-// colours of its solids, in the order a map of them gives: a cell of the
-// shape's bytes and an N-by-3 matrix of red, green and blue from 0 to 1, a
-// row of NaN for a solid without one, or empty when none has one
+// colours and names of its solids, in the order a map of them gives: a
+// cell of the shape's bytes, an N-by-3 matrix of red, green and blue from 0
+// to 1, a row of NaN for a solid without one, or empty when none has one,
+// and a cell column of names, '' for a solid without one, or empty when
+// none has one
 static Cell
 readstep (const string& file, const string& caller)
 {
@@ -2755,8 +2849,11 @@ readstep (const string& file, const string& caller)
   }
   ShapeMap solids;
   TopExp::MapShapes (s, TopAbs_SOLID, solids);
+  const vector<std::pair<TopoDS_Shape, string>> names = solidnames (r);
   Matrix C (solids.Extent (), 3, octave_NaN);
+  Cell N (solids.Extent (), 1, octave_value (""));
   bool any = false;
+  bool anyname = false;
   for (int i = 1; i <= solids.Extent (); i++)
   {
     Quantity_Color c;
@@ -2770,10 +2867,17 @@ readstep (const string& file, const string& caller)
       }
       any = true;
     }
+    const string nm = nameof (solids (i), names);
+    if (! nm.empty ())
+    {
+      N(i-1) = nm;
+      anyname = true;
+    }
   }
-  Cell out (1, 2);
+  Cell out (1, 3);
   out(0) = todata (s);
   out(1) = any ? C : Matrix ();
+  out(2) = anyname ? N : Cell ();
   return out;
 }
 
@@ -2805,7 +2909,8 @@ frameof (const TopLoc_Location& loc, double *f, const string& caller)
 
 // The assembly of the STEP file FILE, in millimetres, as writeassembly takes
 // one: a cell of NAMES, DATA, COLOURS, CHILDREN and INSTANCES, the whole
-// last.  A part placed several times is one definition.  Several shapes at
+// last, then SOLIDS, the names of each part's solids as readstep gives
+// them.  A part placed several times is one definition.  Several shapes at
 // the top of the file are placed, where they are, in an assembly named
 // NAME; a single part is returned as it is.
 static Cell
@@ -2825,7 +2930,8 @@ readassembly (const string& file, const string& name, const string& caller)
   {
     error ("%s: '%s' holds no shape.", caller.c_str (), file.c_str ());
   }
-  vector<octave_value> names, data, colours, children, instances;
+  const vector<std::pair<TopoDS_Shape, string>> own = solidnames (r);
+  vector<octave_value> names, data, colours, solids, children, instances;
   std::map<string, int> seen;
   std::function<int (const TDF_Label&)> visit;
   visit = [&] (const TDF_Label& l) -> int
@@ -2861,19 +2967,22 @@ readassembly (const string& file, const string& name, const string& caller)
       names.push_back (nm.empty () ? "assembly" : nm);
       data.push_back (uint8NDArray (dim_vector (0, 0)));
       colours.push_back (Matrix ());
+      solids.push_back (Cell ());
       children.push_back (C);
       instances.push_back (inst);
     }
     else
     {
       const TopoDS_Shape s = XCAFDoc_ShapeTool::GetShape (l);
-      const ShapeMap solids = solidsof (s);
-      Matrix C (solids.Extent (), 3, octave_NaN);
+      const ShapeMap sm = solidsof (s);
+      Matrix C (sm.Extent (), 3, octave_NaN);
+      Cell N (sm.Extent (), 1, octave_value (""));
       bool any = false;
-      for (int i = 1; i <= solids.Extent (); i++)
+      bool anyname = false;
+      for (int i = 1; i <= sm.Extent (); i++)
       {
         Quantity_Color c;
-        if (colourof (d, solids (i), c))
+        if (colourof (d, sm (i), c))
         {
           double rgb[3];
           c.Values (rgb[0], rgb[1], rgb[2], Quantity_TOC_sRGB);
@@ -2883,10 +2992,17 @@ readassembly (const string& file, const string& name, const string& caller)
           }
           any = true;
         }
+        const string sn = nameof (sm (i), own);
+        if (! sn.empty ())
+        {
+          N(i-1) = sn;
+          anyname = true;
+        }
       }
       names.push_back (nm.empty () ? "part" : nm);
       data.push_back (todata (s));
       colours.push_back (any ? C : Matrix ());
+      solids.push_back (anyname ? N : Cell ());
       children.push_back (Matrix ());
       instances.push_back (Cell ());
     }
@@ -2919,6 +3035,7 @@ readassembly (const string& file, const string& name, const string& caller)
     names.push_back (name);
     data.push_back (uint8NDArray (dim_vector (0, 0)));
     colours.push_back (Matrix ());
+    solids.push_back (Cell ());
     children.push_back (C);
     instances.push_back (inst);
   }
@@ -2931,12 +3048,13 @@ readassembly (const string& file, const string& name, const string& caller)
     }
     return c;
   };
-  Cell out (1, 5);
+  Cell out (1, 6);
   out(0) = tocell (names);
   out(1) = tocell (data);
   out(2) = tocell (colours);
   out(3) = tocell (children);
   out(4) = tocell (instances);
+  out(5) = tocell (solids);
   return out;
 }
 
@@ -3824,7 +3942,8 @@ function directly. \n\
     else if (cmd == "writestep")
     {
       writestep (toshape (args(2), caller), args(3).string_value (),
-                 args(4).string_value (), args(5).matrix_value (), caller);
+                 args(4).string_value (), args(5).matrix_value (),
+                 args(6).cell_value (), caller);
     }
     else if (cmd == "tessellate")
     {
@@ -3840,7 +3959,8 @@ function directly. \n\
     {
       writeassembly (args(2).string_value (), args(3).cell_value (),
                      args(4).cell_value (), args(5).cell_value (),
-                     args(6).cell_value (), args(7).cell_value (), caller);
+                     args(6).cell_value (), args(7).cell_value (),
+                     args(8).cell_value (), caller);
     }
     else if (cmd == "readassembly")
     {

@@ -112,6 +112,26 @@ classdef Shape
     ## @end deftp
     Colour = [];
 
+    ## -*- texinfo -*-
+    ## @deftp {solid.Shape} {property} Name
+    ##
+    ## Name of each solid
+    ##
+    ## A cell column of character vectors, one for each of the shape's
+    ## @math{N} solids in the order @code{solid.Shape.numsolids} counts them,
+    ## @qcode{''} for a solid without a name, or empty when none has one.
+    ## Assigning a single character vector, or a cell of one, names every
+    ## solid; a cell of @math{N} names each in turn.  A name is free text,
+    ## kept as it is given and never read for meaning.  A STEP file carries
+    ## it out and in, and a 3MF file out, as @code{solid.Shape.write}
+    ## describes.  A transform keeps it, and each solid a boolean or a
+    ## feature makes takes the name of the first named solid it came from, as
+    ## it takes its colour by @code{solid.Shape.Colour}; the tools of
+    ## @code{subtract} give none.
+    ##
+    ## @end deftp
+    Name = {};
+
   endproperties
 
   methods (Hidden)
@@ -124,6 +144,9 @@ classdef Shape
         c = '';
         if (! isempty (this.Colour))
           c = ", coloured";
+        endif
+        if (! isempty (this.Name))
+          c = [c, ", named"];
         endif
         sn = numsolids (this);
         sw = 'solid';
@@ -255,7 +278,7 @@ classdef Shape
         data = cellfun (@(x) x.Data, S, 'UniformOutput', false);
         r = occt ('solid.Shape.union', 'fuse', data{:});
         C = solid.Shape (r{1});
-        C.Colour = inherit (r{2}, S{:});
+        [C.Colour, C.Name] = inherit (r{2}, S{:});
       endif
 
     endfunction
@@ -309,7 +332,7 @@ classdef Shape
         A = C;
         C = solid.Shape (r{1});
         tools = cellfun (@bare, tools, 'UniformOutput', false);
-        C.Colour = inherit (r{2}, A, tools{:});
+        [C.Colour, C.Name] = inherit (r{2}, A, tools{:});
       endif
 
     endfunction
@@ -360,7 +383,7 @@ classdef Shape
         data = cellfun (@(x) x.Data, varargin, 'UniformOutput', false);
         r = occt ('solid.Shape.intersect', 'common', data{:});
         C = solid.Shape (r{1});
-        C.Colour = inherit (r{2}, varargin{:});
+        [C.Colour, C.Name] = inherit (r{2}, varargin{:});
       endif
 
     endfunction
@@ -417,23 +440,7 @@ classdef Shape
         M = polymesh.Mesh ();
         return;
       endif
-      c = occt ('solid.Shape.tessellate', 'tessellate', this.Data, ...
-                double (TOL), 20);
-
-      ## Points that are equal are one vertex, and a triangle two of whose
-      ## corners become one is dropped
-      [V, ~, j] = unique (c{1}, 'rows', 'stable');
-      F = reshape (j(c{2}), size (c{2}));
-      keep = F(:,1) != F(:,2) & F(:,2) != F(:,3) & F(:,3) != F(:,1);
-      M = polymesh.Mesh (V, F(keep,:));
-
-      ## Each triangle in the colour of its solid, grey where it has none
-      if (! isempty (this.Colour))
-        C = [NaN, NaN, NaN; this.Colour](c{3}(keep) + 1,:);
-        C(isnan (C(:,1)),:) = repmat ([0.72, 0.74, 0.78], ...
-                                      nnz (isnan (C(:,1))), 1);
-        M.FaceColour = C;
-      endif
+      M = meshof (this, TOL, 'solid.Shape.tessellate');
 
     endfunction
 
@@ -507,7 +514,8 @@ classdef Shape
     ## STEP (ISO 10303-21, application protocol 214), in millimetres.  The
     ## exact geometry is kept, so this is the file to send to a CAD program or
     ## to another manufacturer.  The part is named after the base name of
-    ## @var{FILE}, and each solid carries its @code{solid.Shape.Colour}.
+    ## @var{FILE}, and each solid carries its @code{solid.Shape.Colour} and,
+    ## as the name of the solid itself, its @code{solid.Shape.Name}.
     ##
     ## @item @file{.stl}, @file{.obj}, @file{.ply}, @file{.3mf}
     ## A mesh of triangles in millimetres, the mesh
@@ -515,7 +523,11 @@ classdef Shape
     ## @code{polymesh.Mesh.write}: binary STL, OBJ, binary PLY, or 3MF, the
     ## archive slicers take.  The facets approximate every curved surface;
     ## their vertices lie on it.  OBJ, PLY and 3MF carry the solids' colours on
-    ## their triangles; STL has none.
+    ## their triangles; STL has none.  A 3MF file holds one object, named
+    ## after the base name of @var{FILE}, or for a named shape an object for
+    ## each name its solids carry, named by it, the solids without one an
+    ## object without a name, and these placed in a group named after
+    ## @var{FILE} when there are several.
     ## @end table
     ##
     ## @code{write (@dots{}, @qcode{'Tolerance'}, @var{TOL})} sets, for a
@@ -594,7 +606,9 @@ classdef Shape
 
       if (isstep)
         __occt__ ('writestep', 'solid.Shape.write', this.Data, FILE, base, ...
-                  this.Colour);
+                  this.Colour, this.Name);
+      elseif (strcmpi (ext, '.3mf') && ! isempty (this.Name))
+        write3mf (this, FILE, base, opt.Tolerance);
       else
         write (tessellate (this, opt.Tolerance), FILE);
       endif
@@ -1406,7 +1420,7 @@ classdef Shape
                 unique (double (E)), double (R));
       A = this;
       this.Data = r{1};
-      this.Colour = inherit (r{2}, A);
+      [this.Colour, this.Name] = inherit (r{2}, A);
 
     endfunction
 
@@ -1522,7 +1536,7 @@ classdef Shape
                 unique (double (E)), double (D), F0, double (A));
       A = this;
       this.Data = r{1};
-      this.Colour = inherit (r{2}, A);
+      [this.Colour, this.Name] = inherit (r{2}, A);
 
     endfunction
 
@@ -1640,7 +1654,7 @@ classdef Shape
                 unique (double (F)), double (T), logical (opt.Outward), TF, TT);
       A = this;
       this.Data = r{1};
-      this.Colour = inherit (r{2}, A);
+      [this.Colour, this.Name] = inherit (r{2}, A);
 
     endfunction
 
@@ -2654,6 +2668,33 @@ classdef Shape
 
     endfunction
 
+    function this = set.Name (this, N)
+
+      if (isempty (N))
+        this.Name = {};
+        return;
+      endif
+      n = numsolids (this);
+      if (ischar (N))
+        N = {N};
+      endif
+      if (! iscell (N) || ! isvector (N) || ! any (numel (N) == [1, n]) ||
+          n == 0 || ! all (cellfun (@(x) ischar (x) && (isrow (x) ||
+                                                        isempty (x)), N)))
+        error (strcat ("solid.Shape: Name must be empty, a character", ...
+                       " vector, or a cell of 1 or N character vectors, N", ...
+                       " the number of solids, '' for no name."));
+      endif
+      N = repmat (N(:), n / numel (N), 1);
+      none = cellfun (@isempty, N);
+      N(none) = {''};
+      if (all (none))
+        N = {};
+      endif
+      this.Name = N;
+
+    endfunction
+
   endmethods
 
 endclassdef
@@ -2709,6 +2750,7 @@ function C = copies (S, D, A, K, P, caller)
   if (n == 1)
     C = solid.Shape (data{1});
     C.Colour = S.Colour;
+    C.Name = S.Name;
     return;
   elseif (all (apart(:)))
     r = occt (caller, 'compound', data{:});
@@ -2716,34 +2758,108 @@ function C = copies (S, D, A, K, P, caller)
     r = occt (caller, 'fuse', data{:});
   endif
   C = solid.Shape (r{1});
-  C.Colour = inherit (r{2}, repmat ({S}, 1, n){:});
+  [C.Colour, C.Name] = inherit (r{2}, repmat ({S}, 1, n){:});
 
 endfunction
 
-## The colours of a result's solids, each the colour of the first coloured
-## solid it came from: L a row for each, the indices from 1 of the solids it
-## came from, in increasing order and padded with 0, into the solids of the
-## shapes SRC, those of each in turn
-function C = inherit (L, varargin)
+## The mesh of the shape S that tessellate describes, made for CALLER, and
+## the solid each of its triangles lies on, an index from 1 into a map of
+## them, 0 for a face of no solid
+function [M, K] = meshof (S, TOL, caller)
+
+  c = occt (caller, 'tessellate', S.Data, double (TOL), 20);
+
+  ## Points that are equal are one vertex, and a triangle two of whose
+  ## corners become one is dropped
+  [V, ~, j] = unique (c{1}, 'rows', 'stable');
+  F = reshape (j(c{2}), size (c{2}));
+  keep = F(:,1) != F(:,2) & F(:,2) != F(:,3) & F(:,3) != F(:,1);
+  K = c{3}(keep);
+  M = polymesh.Mesh (V, F(keep,:));
+
+  ## Each triangle in the colour of its solid, grey where it has none
+  if (! isempty (S.Colour))
+    C = [NaN, NaN, NaN; S.Colour](K + 1,:);
+    C(isnan (C(:,1)),:) = repmat ([0.72, 0.74, 0.78], ...
+                                  nnz (isnan (C(:,1))), 1);
+    M.FaceColour = C;
+  endif
+
+endfunction
+
+## The shape S written to the 3MF file FILE within TOL as an object for each
+## name its solids carry, in a group named BASE when there are several; the
+## solids without a name are an object without one
+function write3mf (S, FILE, BASE, TOL)
+
+  [M, K] = meshof (S, TOL, 'solid.Shape.write');
+  N = [{''}; names(S)](K + 1);
+  [u, ~, g] = unique (N, 'stable');
+  n = numel (u);
+  [V, F, FC] = deal (cell (1, n));
+  for k = 1:n
+    t = (g == k);
+    f = M.Faces(t,:);
+    [iv, ~, jv] = unique (f(:));
+    V{k} = M.Vertices(iv,:);
+    F{k} = reshape (jv, [], 3);
+    FC{k} = zeros (0, 3);
+    if (! isempty (M.FaceColour))
+      FC{k} = M.FaceColour(t,:);
+    endif
+  endfor
+  C = {[]};
+  if (n > 1)
+    u{end+1} = BASE;
+    [V{end+1}, F{end+1}, FC{end+1}] = deal ([]);
+    C = [repmat({[]}, 1, n), ...
+         {[(1:n)', zeros(n, 3), repmat([1, 0, 0, 0, 1, 0, 0, 0, 1], n, 1)]}];
+  endif
+  __mesh__ ('write3mf', 'solid.Shape.write', FILE, u(:)', V, F, FC, C);
+
+endfunction
+
+## The colours and names of a result's solids, each the colour of the first
+## coloured solid it came from and the name of the first named one: L a row
+## for each, the indices from 1 of the solids it came from, in increasing
+## order and padded with 0, into the solids of the shapes SRC, those of each
+## in turn
+function [C, N] = inherit (L, varargin)
 
   C = [];
-  if (all (cellfun (@(s) isempty (s.Colour), varargin)) || isempty (L))
+  N = {};
+  if (isempty (L))
     return;
   endif
-  P = cellfun (@colours, varargin, 'UniformOutput', false);
-  P = [NaN, NaN, NaN; vertcat(P{:})];
-  has = reshape (! isnan (P(L + 1,1)), size (L));
+  if (! all (cellfun (@(s) isempty (s.Colour), varargin)))
+    P = cellfun (@colours, varargin, 'UniformOutput', false);
+    P = [NaN, NaN, NaN; vertcat(P{:})];
+    C = P(firstof (L, ! isnan (P(:,1))) + 1,:);
+  endif
+  if (! all (cellfun (@(s) isempty (s.Name), varargin)))
+    P = cellfun (@names, varargin, 'UniformOutput', false);
+    P = [{''}; vertcat(P{:})];
+    N = P(firstof (L, ! cellfun (@isempty, P)) + 1);
+  endif
+
+endfunction
+
+## For each row of L, as inherit takes it, the first solid it came from for
+## which HAS is true, HAS indexed from 0 for no solid, or 0 when none is
+function first = firstof (L, HAS)
+
+  has = reshape (HAS(L + 1), size (L));
   [found, k] = max (has, [], 2);
   first = L(sub2ind (size (L), (1:rows (L))', k));
   first(! found) = 0;
-  C = P(first + 1,:);
 
 endfunction
 
-## S without colours, a tool whose material is taken away
+## S without colours or names, a tool whose material is taken away
 function S = bare (S)
 
   S.Colour = [];
+  S.Name = {};
 
 endfunction
 
@@ -2753,6 +2869,16 @@ function C = colours (S)
   C = S.Colour;
   if (isempty (C))
     C = NaN (numsolids (S), 3);
+  endif
+
+endfunction
+
+## The name of each solid of S, a cell column, '' where it has none
+function N = names (S)
+
+  N = S.Name;
+  if (isempty (N))
+    N = repmat ({''}, numsolids (S), 1);
   endif
 
 endfunction
@@ -3991,6 +4117,37 @@ endfunction
 %!   [~] = unlink (f);
 %! end_unwind_protect
 
+%!test  # a named solid carries its name, the product the file's
+%! f = [tempname(), '.step'];
+%! [~, base] = fileparts (f);
+%! S = solid.box (1, 1, 1);
+%! S.Name = 'pin';
+%! unwind_protect
+%!   write (S, f);
+%!   txt = fileread (f);
+%!   assert_equal (isempty (strfind (txt, ["PRODUCT('", base])), false);
+%!   assert_equal (isempty (strfind (txt, "MANIFOLD_SOLID_BREP('pin'")), ...
+%!                 false);
+%! unwind_protect_cleanup
+%!   [~] = unlink (f);
+%! end_unwind_protect
+
+%!test  # solids of different names carry their own
+%! f = [tempname(), '.step'];
+%! B = solid.box (1, 1, 1);
+%! U = union (B, translate (B, [5, 0, 0]));
+%! U.Name = {'pin'; 'plate'};
+%! unwind_protect
+%!   write (U, f);
+%!   txt = fileread (f);
+%!   assert_equal (isempty (strfind (txt, "MANIFOLD_SOLID_BREP('pin'")), ...
+%!                 false);
+%!   assert_equal (isempty (strfind (txt, "MANIFOLD_SOLID_BREP('plate'")), ...
+%!                 false);
+%! unwind_protect_cleanup
+%!   [~] = unlink (f);
+%! end_unwind_protect
+
 %!test  # STL: a box is twelve triangles
 %! f = [tempname(), '.stl'];
 %! unwind_protect
@@ -4086,6 +4243,53 @@ endfunction
 %!   [~] = unlink (f);
 %!   confirm_recursive_rmdir (false, 'local');
 %!   rmdir (d, 's');
+%! end_unwind_protect
+
+%!testif ; ! isempty (file_in_path (getenv ('PATH'), 'unzip')) || ! isempty (file_in_path (getenv ('PATH'), 'unzip.exe'))
+%! ## 3MF: a named solid is an object of its name
+%! f = [tempname(), '.3mf'];
+%! d = tempname ();
+%! S = solid.box (10, 20, 30);
+%! S.Name = 'block & pin';
+%! unwind_protect
+%!   write (S, f);
+%!   unzip (f, d);
+%!   t = fileread (fullfile (d, '3D', '3dmodel.model'));
+%!   assert_equal (numel (strfind (t, '<object ')), 1);
+%!   assert_equal (! isempty (strfind (t, 'name="block &amp; pin"')), true);
+%! unwind_protect_cleanup
+%!   [~] = unlink (f);
+%!   confirm_recursive_rmdir (false, 'local');
+%!   rmdir (d, 's');
+%! end_unwind_protect
+
+%!test  # 3MF: an object for each name, grouped, read back as parts
+%! f = [tempname(), '.3mf'];
+%! [~, base] = fileparts (f);
+%! B = solid.box (1, 1, 1);
+%! U = union (B, translate (B, [5, 0, 0]), translate (B, [10, 0, 0]));
+%! U.Name = {'pin'; 'plate'; 'pin'};
+%! unwind_protect
+%!   write (U, f);
+%!   A = model.read (f);
+%!   assert_equal (A.Name, base);
+%!   assert_equal ({A.Parts.name}, {'pin', 'plate'});
+%!   assert_equal (numfaces (A.Parts(1).item), 24);
+%! unwind_protect_cleanup
+%!   [~] = unlink (f);
+%! end_unwind_protect
+
+%!test  # 3MF: the solids without a name are an object without one
+%! f = [tempname(), '.3mf'];
+%! B = solid.box (1, 1, 1);
+%! U = union (B, translate (B, [5, 0, 0]));
+%! U.Name = {''; 'plate'};
+%! unwind_protect
+%!   write (U, f);
+%!   A = model.read (f);
+%!   assert_equal ({A.Parts.name}, {'object1', 'plate'});
+%! unwind_protect_cleanup
+%!   [~] = unlink (f);
 %! end_unwind_protect
 
 %!error<solid.Shape.write: invalid number of input arguments.> ...
@@ -4202,6 +4406,122 @@ endfunction
 %! assert_equal (rotate (S, 30, [0, 0, 1]).Colour, [0.2, 0.4, 0.6]);
 %! assert_equal (mirror (S, [1, 0, 0]).Colour, [0.2, 0.4, 0.6]);
 %! assert_equal (scale (S, 2).Colour, [0.2, 0.4, 0.6]);
+
+%!test  # Name: one name names every solid
+%! B = solid.box (1, 1, 1);
+%! U = union (B, translate (B, [5, 0, 0]));
+%! U.Name = 'pin';
+%! assert_equal (U.Name, {'pin'; 'pin'});
+
+%!test  # Name: a cell of one name names every solid
+%! B = solid.box (1, 1, 1);
+%! U = union (B, translate (B, [5, 0, 0]));
+%! U.Name = {'pin'};
+%! assert_equal (U.Name, {'pin'; 'pin'});
+
+%!test  # Name: a cell names each solid in turn, a row as a column
+%! B = solid.box (1, 1, 1);
+%! U = union (B, translate (B, [5, 0, 0]));
+%! U.Name = {'', 'plate'};
+%! assert_equal (U.Name, {''; 'plate'});
+
+%!test  # Name: no name at all is empty
+%! S = solid.box (1, 1, 1);
+%! S.Name = {''};
+%! assert_equal (S.Name, {});
+
+%!test  # Name: assigning empty clears it
+%! S = solid.box (1, 1, 1);
+%! S.Name = 'pin';
+%! S.Name = '';
+%! assert_equal (S.Name, {});
+
+%!test  # Name: free text, kept as given
+%! S = solid.box (1, 1, 1);
+%! S.Name = 'Hexagon socket head cap screw ISO 4762 - M5 x 20';
+%! assert_equal (S.Name, {'Hexagon socket head cap screw ISO 4762 - M5 x 20'});
+
+%!test  # Name: overlapping, the first operand's
+%! A = solid.box (10, 10, 10);
+%! A.Name = 'a';
+%! B = translate (solid.box (10, 10, 10), [5, 5, 5]);
+%! B.Name = 'b';
+%! assert_equal (union (B, A).Name, {'b'});
+
+%!test  # Name: parts apart keep their own
+%! A = solid.box (10, 10, 10);
+%! A.Name = 'a';
+%! B = translate (solid.box (10, 10, 10), [30, 0, 0]);
+%! B.Name = 'b';
+%! assert_equal (sort (union (A, B).Name), {'a'; 'b'});
+
+%!test  # Name: the first named operand's
+%! A = solid.box (10, 10, 10);
+%! B = translate (solid.box (10, 10, 10), [5, 5, 5]);
+%! B.Name = 'b';
+%! assert_equal (union (A, B).Name, {'b'});
+
+%!test  # Name: a tool's never names the part
+%! A = solid.box (10, 10, 10);
+%! B = translate (solid.box (10, 10, 10), [5, 5, 5]);
+%! B.Name = 'b';
+%! assert_equal (subtract (A, B).Name, {});
+
+%!test  # Name: subtract keeps the part's
+%! A = solid.box (10, 10, 10);
+%! A.Name = 'a';
+%! B = translate (solid.box (10, 10, 10), [5, 5, 5]);
+%! B.Name = 'b';
+%! assert_equal (subtract (A, B).Name, {'a'});
+
+%!test  # Name: intersect, the first operand's
+%! A = solid.box (10, 10, 10);
+%! A.Name = 'a';
+%! B = translate (solid.box (10, 10, 10), [5, 5, 5]);
+%! B.Name = 'b';
+%! assert_equal (intersect (B, A).Name, {'b'});
+
+%!test  # Name: a fillet keeps it
+%! A = solid.box (10, 10, 10);
+%! A.Name = 'a';
+%! F = fillet (A, edges (A, 'Direction', [0, 0, 1]), 1);
+%! assert_equal (F.Name, {'a'});
+
+%!test  # Name: a chamfer keeps it
+%! A = solid.box (10, 10, 10);
+%! A.Name = 'a';
+%! F = chamfer (A, edges (A, 'Direction', [0, 0, 1]), 1);
+%! assert_equal (F.Name, {'a'});
+
+%!test  # Name: a shell keeps it
+%! A = solid.box (10, 10, 10);
+%! A.Name = 'a';
+%! H = shell (A, faces (A, 'Normal', [0, 0, 1]), 1);
+%! assert_equal (H.Name, {'a'});
+
+%!test  # Name: a hole keeps it
+%! A = solid.box (10, 10, 10);
+%! A.Name = 'a';
+%! assert_equal (hole (A, [5, 5, 10], 3, 10).Name, {'a'});
+
+%!test  # Name: copies keep it
+%! A = solid.box (10, 10, 10);
+%! A.Name = 'a';
+%! assert_equal (rectarray (A, [3, 1, 1], [20, 0, 0]).Name, {'a'; 'a'; 'a'});
+
+%!test  # Name: a single copy keeps it
+%! A = solid.box (10, 10, 10);
+%! A.Name = 'a';
+%! assert_equal (copy (A, [5, 0, 0]).Name, {'a'});
+
+%!test  # Name: transforms keep it
+%! S = solid.box (1, 2, 3);
+%! S.Name = 'a';
+%! assert_equal (translate (S, [1, 2, 3]).Name, {'a'});
+%! assert_equal (rotate (S, 30, [0, 0, 1]).Name, {'a'});
+%! assert_equal (mirror (S, [1, 0, 0]).Name, {'a'});
+%! assert_equal (scale (S, 2).Name, {'a'});
+%! assert_equal (resize (S, [2, 4, 6]).Name, {'a'});
 
 %!error<solid.Shape.pocket: Taper cannot be applied to a region with splines.> ...
 %! R = geom.Region (geom.Spline ([20, 10; 50, 8; 35, 32], 'Closed', true));
@@ -4799,3 +5119,21 @@ endfunction
 %!error<solid.Shape: Colour must be empty or a 1-by-3 or N-by-3 matrix of values from 0 to 1, N the number of solids, a row of NaN for no colour.>
 %! S = solid.box (1, 1, 1);
 %! S.Colour = 'red';
+%!error<solid.Shape: Name must be empty, a character vector, or a cell of 1 or N character vectors, N the number of solids, '' for no name.>
+%! S = solid.Shape ();
+%! S.Name = 'pin';
+%!error<solid.Shape: Name must be empty, a character vector, or a cell of 1 or N character vectors, N the number of solids, '' for no name.>
+%! S = solid.box (1, 1, 1);
+%! S.Name = 1;
+%!error<solid.Shape: Name must be empty, a character vector, or a cell of 1 or N character vectors, N the number of solids, '' for no name.>
+%! S = solid.box (1, 1, 1);
+%! S.Name = {'pin', 'plate'};
+%!error<solid.Shape: Name must be empty, a character vector, or a cell of 1 or N character vectors, N the number of solids, '' for no name.>
+%! S = solid.box (1, 1, 1);
+%! S.Name = {1};
+%!error<solid.Shape: Name must be empty, a character vector, or a cell of 1 or N character vectors, N the number of solids, '' for no name.>
+%! S = solid.box (1, 1, 1);
+%! S.Name = ['pin'; 'nut'];
+%!error<solid.Shape: Name must be empty, a character vector, or a cell of 1 or N character vectors, N the number of solids, '' for no name.>
+%! S = rectarray (solid.box (1, 1, 1), [4, 1, 1], [5, 0, 0]);
+%! S.Name = {'a', 'b'; 'c', 'd'};
