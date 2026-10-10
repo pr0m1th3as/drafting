@@ -2,7 +2,7 @@
 # name: cache
 # type: cell
 # rows: 3
-# columns: 236
+# columns: 238
 # name: <cell-element>
 # type: sq_string
 # elements: 1
@@ -8915,7 +8915,7 @@ solid.Shape.hole
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 5526
+# length: 6411
 solid.Shape: S = hole (S, P, D, DEPTH)
 solid.Shape: S = hole (..., Name, Value, ...)
 Drill holes into a shape.
@@ -9003,15 +9003,28 @@ and the band, from 78.2 to 100 for M6. It cannot be given with
 True to take a named thread of any diameter and pitch, false by
 default, so that a name outside ISO 261, as a mistyped pitch, is an
 error. A thread of ISO 261 is drilled as without it.
+'Clearance'
+For a named thread, 'fine', 'medium' or
+'coarse': the hole is the clearance hole of ISO 273 in that
+series for a screw of the thread, not a hole for tapping it, 6.6 for
+M6 in the medium series.
 'Counterbore'
 [CD, CDEPTH]: a flat-bottomed bore of diameter
 CD, wider than the hole, CDEPTH deep, shallower than the
-hole, for the head of a cap screw.
+hole, for the head of a cap screw. With a named thread and
+'Clearance', true takes the counterbore of IS 3406 (Part 2)
+for a socket head cap screw of ISO 4762, and 'washer' the one
+for the same screw on a plain washer.
 'Countersink'
-CD or [CD, ANGLE]: a conical seat of diameter
-CD at the surface, wider than the hole, with an included angle of
-ANGLE degrees, 90 by default as for ISO countersunk screws. It
-must be shallower than the hole.
+CD, [CD, ANGLE] or [CD,
+ANGLE, CDEPTH]: a conical seat of diameter CD at the
+surface, wider than the hole, with an included angle of ANGLE
+degrees, 90 by default as for ISO countersunk screws, below a cylinder
+of the same diameter CDEPTH deep, none by default. It must be
+shallower than the hole. With a named thread and 'Clearance',
+true takes the countersink of IS 3406 (Part 1) for the countersunk
+heads of ISO 7721, and 'socket' the one for a hexagon socket
+countersunk screw of ISO 10642.
 'Tip'
 The included angle in degrees of the cone a twist drill leaves at the
 bottom of a blind hole, 118 for a standard drill. It is beyond
@@ -9019,7 +9032,10 @@ DEPTH, which is measured to the full diameter as a drawing
 dimensions it. By default a blind hole is flat-bottomed.
 
 A counterbore and a countersink cannot both be given, and a tip applies
-only to a blind hole. Drilling the empty shape leaves it empty.
+only to a blind hole. The standard ones need a named thread and
+'Clearance', fine or medium; solid.holespec gives their
+sizes, and the sizes of every hole for a named thread, before it is
+drilled. Drilling the empty shape leaves it empty.
 
 ## A plate with four counterbored holes for M6 cap screws
 S = solid.box (80, 40, 12);
@@ -9034,6 +9050,8 @@ S = hole (S, U, 'M5', 8, 'At', XY, 'Material', 'stainless');
 
 See also:
 solid.Shape.thread,
+solid.holespec,
+solid.threadspec,
 solid.Shape.subtract,
 solid.cylinder
 
@@ -9905,7 +9923,7 @@ solid.Shape.subtract
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 928
+# length: 1189
 solid.Shape: C = subtract (A, B, ...)
 The difference of shapes, the material of the first in none of the
 others.
@@ -9918,6 +9936,11 @@ an order of magnitude faster than a hundred calls of one hole each.
 
 Removing empty shapes, or nothing, leaves A, and removing
 anything from the empty shape leaves the empty shape.
+
+Open CASCADE 7.8 can return A uncut and report success, as it
+does for a dome cut by a circle that starts in the plane of the dome's
+seam. A shape that comes back without the faces of a tool that
+reaches inside it is refused with an error, not returned uncut.
 
 The result takes its colours from A; the shapes taken away give
 none, as solid.Shape.Colour describes.
@@ -9998,7 +10021,7 @@ solid.Shape.thread
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 3286
+# length: 3304
 solid.Shape: S = thread (S, P, NAME, DEPTH)
 solid.Shape: S = thread (..., Name, Value, ...)
 Cut screw threads into a shape.
@@ -10071,6 +10094,7 @@ S = thread (S, [0, 0, 40], 'M10', 15);
 
 See also:
 solid.Shape.hole,
+solid.threadspec,
 solid.helix
 
 
@@ -10617,6 +10641,110 @@ A coil, swept by a region turning about its own axis as it rises.
 # name: <cell-element>
 # type: sq_string
 # elements: 1
+# length: 14
+solid.holespec
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 3421
+drafting: H = solid.holespec (NAME)
+drafting: H = solid.holespec (NAME, Name, Value, ...)
+The dimensions of the hole for a metric screw, read from its thread.
+
+H = solid.holespec (NAME) returns the hole
+solid.Shape.hole drills for the thread NAME, as
+solid.threadspec reads it, and H = solid.holespec
+(NAME, Name, Value, ...) the hole the same
+options give solid.Shape.hole, so that a hole can be laid out
+from its numbers before it is drilled. H is a struct with the
+fields:
+
+name NAME as given.
+clearance The series of the clearance hole,
+'fine', 'medium' or 'coarse', empty for a hole
+tapped for the thread.
+drill The diameter of the hole in millimetres: the
+clearance hole of ISO 273, or the drill for tapping the thread.
+counterbore [CD, CDEPTH], the
+diameter and the depth of the counterbore, empty when there is none.
+countersink [CD, ANGLE,
+CDEPTH], the diameter of the countersink at the surface, its
+included angle in degrees and the depth of the cylinder of diameter
+CD above the cone, empty when there is none.
+
+Without 'Clearance' the hole is drilled for tapping the thread:
+the drill of ISO 2306, or the one 'Material' or
+'Engagement' chooses inside the 6H band of its minor diameter,
+as solid.Shape.hole describes. With 'Clearance' it is
+the clearance hole for a screw of that thread, and only then can it take
+a counterbore or a countersink.
+
+Name/Value pairs:
+
+'Clearance'
+The series of the clearance hole of ISO 273:1979, 'fine',
+'medium' or 'coarse': 5.3, 5.5 and 5.8 for M5, 6.4, 6.6
+and 7 for M6. The table is read by the nominal diameter, from M1 to
+M64; a diameter it does not list, as M5.5, is an error.
+'Counterbore'
+True for the counterbore of IS 3406 (Part 2):1986, type K, for a
+socket head cap screw of ISO 4762 from M1.6 to M36: 11 wide and 6.8 deep
+for M6. 'washer' for its type K2, for the same screw on a plain
+washer, from M3 to M36: 13 wide and 8.5 deep for M6. Or
+[CD, CDEPTH], taken as given. Both standard ones are
+for a fine or a medium clearance hole.
+'Countersink'
+True for the countersink of IS 3406 (Part 1):1986, type A, for the
+countersunk heads of ISO 7721, as on ISO 2009, ISO 7046, ISO 14581 and
+their raised kinds, from M1 to M20. 'socket' for its type B,
+for the hexagon socket countersunk screws of ISO 10642, from M3 to M24.
+Type A has a medium and a fine series, chosen by 'Clearance':
+a plain cone in the medium series, 12.4 wide at the surface for M6, and
+in the fine series a cone below a short cylinder of the same width, 11.5
+wide and 0.45 deep for M6. Type B is in the fine series only. Or
+CD, [CD, ANGLE] or [CD,
+ANGLE, CDEPTH], taken as given, with an angle of 90 and no
+cylinder by default.
+'Material'
+'Engagement'
+The material tapped, or the thread engagement, which choose the drill of
+a tapped hole as in solid.Shape.hole.
+'Custom'
+True to take a thread of any diameter and pitch, as in
+solid.threadspec.
+
+A counterbore and a countersink cannot both be given. False for either
+is the same as leaving it out.
+
+IS 3406 was prepared from DIN 74, parts 1 and 2, of 1980, the forerunners
+of ISO 15065 and DIN 974-1, whose current editions were not read. Where
+each number comes from is set out on the Standards page of the guide.
+
+## The hole for an M6 cap screw, its head sunk in a counterbore
+H = solid.holespec ('M6', 'Clearance', 'medium', 'Counterbore', true);
+H.drill
+=> 6.6000
+H.counterbore
+=> 11.0000 6.8000
+
+See also:
+solid.Shape.hole,
+solid.threadspec
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 68
+The dimensions of the hole for a metric screw, read from its thread.
+
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
 # length: 10
 solid.loft
 
@@ -10996,6 +11124,78 @@ solid.helix
 # elements: 1
 # length: 39
 A solid swept by a region along a path.
+
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 16
+solid.threadspec
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 1932
+drafting: T = solid.threadspec (NAME)
+drafting: T = solid.threadspec (NAME, 'Custom', TF)
+The dimensions of a metric screw thread, read from its name.
+
+T = solid.threadspec (NAME) reads NAME as a
+drawing names a thread, 'M6' for a coarse thread by its nominal
+diameter and 'M10x1.25' for a fine one with its pitch, and
+returns the numbers solid.Shape.hole and solid.Shape.thread
+cut it by, as a struct with the fields:
+
+name NAME as given.
+d The nominal diameter in millimetres.
+P The pitch in millimetres.
+coarse True for the coarse pitch of ISO 261, false for
+a fine or a custom one.
+custom True for a thread outside ISO 261, taken with
+'Custom'.
+minor The 6H band of the minor diameter of the
+internal thread, [min, max], from ISO 965-1.
+drill The tapping drill solid.Shape.hole takes
+without 'Material' or 'Engagement': the one ISO 2306
+lists, or the nominal diameter less the pitch for a thread it does not
+list. For a custom thread, the step of 0.05 inside the band nearest the
+nominal diameter less the pitch, empty when the band holds none.
+major The largest major diameter of the external
+thread in class 6g, from ISO 965-1, which solid.Shape.thread turns
+a rod at the nominal diameter down to.
+
+The names are those of ISO 261, table 2, from M1 to M64, all three of
+its columns. A diameter with no coarse pitch is named with its pitch, as
+'M15x1.5'.
+
+T = solid.threadspec (NAME, 'Custom', TF) with
+TF true takes a thread of any diameter and pitch, named with its
+pitch, as 'M16x0.8' cut on a lathe or 'M6.35x1.27' for
+1/4-20 UNC; its pitch and minor diameter must be positive. Without it a
+name outside ISO 261 is refused, so that a mistyped name is caught.
+
+Where each number comes from, and how it is computed, is set out on the
+Standards page of the guide.
+
+## The tapping drill and the 6H band of M8
+T = solid.threadspec ('M8');
+T.drill
+=> 6.8000
+T.minor
+=> 6.6468 6.9118
+
+See also:
+solid.Shape.hole,
+solid.Shape.thread
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 60
+The dimensions of a metric screw thread, read from its name.
 
 
 
