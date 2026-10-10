@@ -37,6 +37,11 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 //                  as the C key chooses, where the mesh has those colours
 //   edges ON       ON is on or off: whether a mesh's triangle edges are
 //                  drawn, as the E key turns them
+//   key K          as pressing the key K, a letter or a digit; replies
+//                  "keyed"
+//   getturn        replies "turn MODE", MODE upright when the mouse turns
+//                  the view keeping z up, as it starts, or free when the T
+//                  key has let it turn any way
 //   getlook        replies "look LOOK EDGES", the colouring shown and
 //                  whether the edges are drawn
 //   pick KIND      KIND is edge, face or any: clicks toggle a selection until
@@ -100,6 +105,7 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 // exits when stdin closes, so it never outlives Octave.  With --hidden the
 // window is never shown, which is how it is tested.
 
+#include <cctype>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -375,6 +381,10 @@ public:
     // the point a double click chose
     SetRotationMode (AIS_RotationMode_CameraAt);
     SetShowRotateCenter (true);
+
+    // The mouse turns the view keeping z up the window, as Octave's rotate3d
+    // does, until the T key frees it
+    SetLockOrbitZUp (true);
 
     // The world axes in a corner, turning with the view, clear of the
     // prompts at the lower left
@@ -689,6 +699,25 @@ public:
         << t.Y () << " " << t.Z ();
       reply (o.str ());
     }
+    else if (cmd == "key")
+    {
+      string k;
+      in >> k;
+      if (k.size () == 1 && std::isalnum (static_cast<unsigned char> (k[0])))
+      {
+        const char c = std::toupper (static_cast<unsigned char> (k[0]));
+        const Aspect_VKey key = std::isdigit (static_cast<unsigned char> (c))
+                                ? Aspect_VKey (Aspect_VKey_0 + (c - '0'))
+                                : Aspect_VKey (Aspect_VKey_A + (c - 'A'));
+        KeyDown (key, 0, 1);
+        KeyUp (key, 0);
+      }
+      reply ("keyed");
+    }
+    else if (cmd == "getturn")
+    {
+      reply (ToLockOrbitZUp () ? "turn upright" : "turn free");
+    }
     else if (cmd == "capture")
     {
       int w = 0, h = 0;
@@ -770,6 +799,13 @@ public:
       case Aspect_VKey_F:
         m_view->FitAll (0.05, false);
         m_hascentre = false;
+        break;
+      case Aspect_VKey_T:
+        SetLockOrbitZUp (! ToLockOrbitZUp ());
+        if (ToLockOrbitZUp ())
+        {
+          upright ();
+        }
         break;
       case Aspect_VKey_C:
         if (m_mesh)
@@ -1178,6 +1214,18 @@ private:
     m_view->SetProj (o);
     m_view->FitAll (0.05, false);
     m_hascentre = false;
+  }
+
+  // The view turned about its line of sight until z points up the window,
+  // unless it looks straight along z
+  void upright ()
+  {
+    Handle (Graphic3d_Camera) cam = m_view->Camera ();
+    if (std::abs (cam->Direction ().Z ()) < 1 - 1e-9)
+    {
+      cam->SetUp (gp_Dir (0, 0, 1));
+      cam->OrthogonalizeUp ();
+    }
   }
 
   // The scale of the camera with the shape fitted to the window, looking as

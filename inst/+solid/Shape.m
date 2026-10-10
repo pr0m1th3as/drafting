@@ -461,10 +461,12 @@ classdef Shape
     ## expression rather than a variable, such as @code{show (fillet (part,
     ## E, 3))}, has no name, and all such shapes share one window.
     ##
-    ## Drag with the left mouse button to rotate, the middle one to pan, and
-    ## turn the wheel to zoom; @kbd{F} fits the part to the window and
-    ## @kbd{0}, @kbd{1}, @kbd{2} and @kbd{3} turn it to the isometric, front,
-    ## top and right views.  Closing a window ends its viewer, and the next
+    ## Drag with the left mouse button to rotate, keeping @math{z} up, the
+    ## middle one to pan, and turn the wheel to zoom; @kbd{F} fits the part to
+    ## the window, @kbd{0}, @kbd{1}, @kbd{2} and @kbd{3} turn it to the
+    ## isometric, front, top and right views, and @kbd{T} lets it turn any way
+    ## or keeps @math{z} up again.  Closing a window ends its viewer, and the
+    ## next
     ## @code{show} of that variable opens a new one.  Showing the empty shape
     ## opens a variable's window before there is anything to draw in it.
     ##

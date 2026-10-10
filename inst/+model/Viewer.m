@@ -36,11 +36,13 @@ classdef Viewer < handle
   ## model turns smoothly and never holds up the Octave prompt.  The world
   ## axes are drawn in the lower right corner, turning with the view, @math{x}
   ## red, @math{y} green and @math{z} blue.  The left mouse button rotates,
-  ## the middle one pans and the wheel zooms.  The view turns about the
-  ## centre of the window, wherever it has been panned to, or about a point
-  ## of the shape chosen by double-clicking it; a double click that misses
-  ## the shape, or fitting the view, returns to the centre of the window.
-  ## During a pick a double click is a click like any other.  Keys:
+  ## the middle one pans and the wheel zooms.  The view turns keeping
+  ## @math{z} up the window, as Octave's @code{rotate3d} turns a plot, until
+  ## @kbd{T} lets it turn any way.  It turns about the centre of the window,
+  ## wherever it has been panned to, or about a point of the shape chosen by
+  ## double-clicking it; a double click that misses the shape, or fitting the
+  ## view, returns to the centre of the window.  During a pick a double click
+  ## is a click like any other.  Keys:
   ##
   ## @multitable @columnfractions 0.15 0.85
   ## @item @kbd{F} @tab fit the shape to the window, and turn about the
@@ -49,6 +51,8 @@ classdef Viewer < handle
   ## @item @kbd{1} @tab front view, looking along @math{+y}
   ## @item @kbd{2} @tab top view, looking down @math{z}
   ## @item @kbd{3} @tab right view, looking along @math{-x}
+  ## @item @kbd{T} @tab let the mouse turn the view any way, or keep
+  ## @math{z} up again, standing the view upright
   ## @item @kbd{C} @tab on a mesh, the next of the colourings it has: its
   ## faces' colours, its vertices', grey
   ## @item @kbd{E} @tab on a mesh, its triangle edges drawn or not, not at
@@ -165,6 +169,23 @@ classdef Viewer < handle
 
       send (this, sprintf ("drag %d %d %d %d", round (PX), round (QX)));
       receive (this, 10);
+
+    endfunction
+
+    ## As pressing the key K, a letter or a digit
+    function __key__ (this, K)
+
+      send (this, ["key " K]);
+      receive (this, 10);
+
+    endfunction
+
+    ## How the mouse turns the view: 'upright' or 'free'
+    function T = __turn__ (this)
+
+      send (this, "getturn");
+      r = strsplit (receive (this, 10));
+      T = r{2};
 
     endfunction
 
@@ -833,8 +854,9 @@ classdef Viewer < handle
     ## looks from, @var{AZ} from -180 to 180, its magnification against the
     ## shape fitted, and the point at the centre of the window, wherever the
     ## view was panned to.  Given back to @code{view}, they restore it, so a
-    ## view found with the mouse can be kept in a script.  A turn about the
-    ## line of sight, which the mouse can give, is not part of them.
+    ## view found with the mouse can be kept in a script.  After @kbd{T},
+    ## the mouse can also turn the view about the line of sight, which they
+    ## do not hold, so such a view is restored upright.
     ##
     ## The keys of the window give four of these views: @kbd{0} is
     ## @code{view (@var{V}, 45, 35.26)}, near enough, the isometric view the
@@ -1377,6 +1399,62 @@ endfunction
 %!   PX = V.__project__ (C);
 %!   V.__drag__ ([450, 350], [520, 300]);
 %!   assert_equal (V.__project__ (C), PX, 1);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; ! isempty (getenv ('DISPLAY'))
+%! ## The mouse turns the view keeping z up the window
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Shape = solid.box (80, 40, 30);
+%!   assert_equal (V.__turn__ (), 'upright');
+%!   V.__drag__ ([450, 350], [520, 280]);
+%!   u = diff ([V.__project__([0, 0, 0]); V.__project__([0, 0, 30])]);
+%!   assert_equal (u(1), 0, 1);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; ! isempty (getenv ('DISPLAY'))
+%! ## so a view the mouse found is restored as it was
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Shape = solid.box (80, 40, 30);
+%!   V.__drag__ ([450, 350], [520, 280]);
+%!   I = capture (V);
+%!   [az, el, zoom, target] = view (V);
+%!   view (V, az, el, zoom, target);
+%!   assert_equal (capture (V), I);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; ! isempty (getenv ('DISPLAY'))
+%! ## T lets the mouse turn the view any way
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Shape = solid.box (80, 40, 30);
+%!   V.__key__ ('T');
+%!   assert_equal (V.__turn__ (), 'free');
+%!   V.__drag__ ([450, 350], [520, 280]);
+%!   u = diff ([V.__project__([0, 0, 0]); V.__project__([0, 0, 30])]);
+%!   assert_equal (abs (u(1)) > 5, true);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; ! isempty (getenv ('DISPLAY'))
+%! ## and T again stands the view upright
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Shape = solid.box (80, 40, 30);
+%!   V.__key__ ('T');
+%!   V.__drag__ ([450, 350], [520, 280]);
+%!   V.__key__ ('T');
+%!   assert_equal (V.__turn__ (), 'upright');
+%!   u = diff ([V.__project__([0, 0, 0]); V.__project__([0, 0, 30])]);
+%!   assert_equal (u(1), 0, 1);
 %! unwind_protect_cleanup
 %!   close (V);
 %! end_unwind_protect
