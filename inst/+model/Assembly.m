@@ -281,6 +281,73 @@ classdef Assembly
     endfunction
 
     ## -*- texinfo -*-
+    ## @deftypefn {model.Assembly} {@var{L} =} solids (@var{A})
+    ##
+    ## The solids of an assembly, one by one, with where each is placed.
+    ##
+    ## @code{@var{L} = solids (@var{A})} returns an @math{N}-by-1 struct
+    ## array, an element for each of the @math{N} solids of
+    ## @code{shape (@var{A})}, in that order, with the fields:
+    ##
+    ## @multitable @columnfractions 0.15 0.85
+    ## @item @code{index} @tab its index in @code{shape (@var{A})}, from 1 to
+    ## @math{N}
+    ## @item @code{name} @tab the @code{solid.Shape.Name} its part gives it,
+    ## @qcode{''} where it has none
+    ## @item @code{colour} @tab the @code{solid.Shape.Colour} its part gives
+    ## it, a row of @code{NaN} where it has none
+    ## @item @code{path} @tab a cell row of placement names, from the
+    ## placement in @var{A} down through each sub-assembly to the placement of
+    ## its part
+    ## @item @code{part} @tab the name of the part it belongs to
+    ## @end multitable
+    ##
+    ## @code{model.Viewer.opacity} takes a path, or a name from either field,
+    ## to choose which solids to hide or show through.  An assembly with a
+    ## mesh among its parts has no solids to list and is an error.
+    ##
+    ## @example
+    ## @group
+    ## pin = solid.cylinder (2, 12);
+    ## B = add (model.Assembly ('stage'), 'pin', pin, geom.UCS ());
+    ## A = add (model.Assembly ('top'), 'base', solid.box (40, 40, 4), ...
+    ##          geom.UCS ([0, 0, 1], [-20, -20, -4]));
+    ## A = add (A, 'stage', B, geom.UCS ([0, 0, 1], [0, 0, 10]));
+    ## L = solids (A);
+    ## L(2).path
+    ## @result{} @{'stage', 'pin'@}
+    ## @end group
+    ## @end example
+    ##
+    ## @seealso{model.Assembly.shape, solid.Shape.solids, model.Viewer.opacity}
+    ## @end deftypefn
+    function L = solids (this)
+
+      name = meshpart (this);
+      if (! isempty (name))
+        error (strcat ("model.Assembly.solids: the part '%s' is a mesh,", ...
+                       " which has no solids."), name);
+      endif
+      L = solids (solid.Shape ());
+      for k = 1:numel (this.Instances)
+        I = this.Instances(k);
+        X = this.Parts(strcmp (I.part, {this.Parts.name})).item;
+        Q = solids (X);
+        if (isa (X, 'model.Assembly'))
+          P = cellfun (@(p) [{I.name}, p], {Q.path}, 'UniformOutput', false);
+          [Q.path] = P{:};
+        else
+          [Q.path] = deal ({I.name});
+          [Q.part] = deal (I.part);
+        endif
+        L = [L; Q];
+      endfor
+      idx = num2cell (1:numel (L));
+      [L.index] = idx{:};
+
+    endfunction
+
+    ## -*- texinfo -*-
     ## @deftypefn  {model.Assembly} {@var{M} =} tessellate (@var{A})
     ## @deftypefnx {model.Assembly} {@var{M} =} tessellate (@var{A}, @var{TOL})
     ##
@@ -344,22 +411,20 @@ classdef Assembly
     ##
     ## Show an assembly in a viewer of its own, redrawing in place.
     ##
-    ## @code{show (@var{A})} shows @code{shape (@var{A})} in the
-    ## @code{model.Viewer} kept for the variable, as
-    ## @code{solid.Shape.show} does, each part in its colour, or
-    ## @code{tessellate (@var{A})} when a part is a mesh.
-    ## @code{@var{V} = show (@var{A})} also returns the viewer.
+    ## @code{show (@var{A})} shows the assembly in the @code{model.Viewer}
+    ## kept for the variable, as @code{solid.Shape.show} does: drawn as
+    ## @code{shape (@var{A})}, each part in its colour, or as
+    ## @code{tessellate (@var{A})} when a part is a mesh.  The viewer keeps
+    ## the assembly, so @code{model.Viewer.opacity} can hide its solids or
+    ## show them through by the names and paths @code{model.Assembly.solids}
+    ## lists.  @code{@var{V} = show (@var{A})} also returns the viewer.
     ##
-    ## @seealso{model.Viewer, solid.Shape.show}
+    ## @seealso{model.Viewer, model.Viewer.opacity, solid.Shape.show}
     ## @end deftypefn
     function V = show (this)
 
       viewer = model.Viewer.__named__ (inputname (1, false));
-      if (isempty (meshpart (this)))
-        viewer.Model = shape (this);
-      else
-        viewer.Model = tessellate (this);
-      endif
+      viewer.Model = this;
       if (nargout > 0)
         V = viewer;
       endif
@@ -757,6 +822,35 @@ endfunction
 %! assert_equal ([numparts(B), numinstances(B)], [1, 2]);
 %! assert_equal (numsolids (shape (B)), 8);
 
+%!test
+%! L = solids (model.Assembly ());
+%! assert_equal (size (L), [0, 1]);
+%!test
+%! L = solids (pinring ());
+%! assert_equal ([L.index], 1:4);
+%! assert_equal ({L.part}, {'plate', 'pin', 'pin', 'pin'});
+%! assert_equal ({L.path}, {{'plate'}, {'pin'}, {'pin:2'}, {'lying'}});
+%! assert_equal (vertcat (L.colour), shape (pinring ()).Colour);
+%!test  # names as shape gives them
+%! pin = solid.cylinder (2, 12);
+%! pin.Name = 'Pin ISO 2338 - 4 m6 x 12';
+%! A = add (model.Assembly (), 'plate', solid.box (60, 60, 4), geom.UCS ());
+%! A = add (A, 'pin', pin, geom.UCS ([0, 0, 1], [20, 0, 4]));
+%! assert_equal ({solids(A).name}', shape (A).Name);
+%!test  # a sub-assembly placed twice, and a part of two solids
+%! two = union (solid.box (4, 4, 4), ...
+%!              translate (solid.box (4, 4, 4), [10, 0, 0]));
+%! B = model.Assembly ('top');
+%! B = add (B, 'stage', pinring (), geom.UCS ());
+%! B = add (B, 'stage', [], geom.UCS ([0, 0, 1], [0, 0, 50]));
+%! B = add (B, 'pair', two, geom.UCS ([0, 0, 1], [0, 0, -50]));
+%! L = solids (B);
+%! assert_equal (numel (L), numsolids (shape (B)));
+%! assert_equal (L(2).path, {'stage', 'pin'});
+%! assert_equal (L(8).path, {'stage:2', 'lying'});
+%! assert_equal ({L(9:10).path}, {{'pair'}, {'pair'}});
+%! assert_equal ({L([2, 9]).part}, {'pin', 'pair'});
+
 %!test  # write: STEP defines each part once
 %! B = model.Assembly ('top');
 %! B = add (B, 'stage', pinring (), geom.UCS ());
@@ -863,6 +957,10 @@ endfunction
 %!  M = polymesh.Mesh ([0, 0, 0; 1, 0, 0; 0, 1, 0; 0, 0, 1], ...
 %!                     [1, 3, 2; 1, 2, 4; 2, 3, 4; 3, 1, 4]);
 %!endfunction
+
+%!error<model.Assembly.solids: the part 'tet' is a mesh, which has no solids.>
+%! A = add (model.Assembly (), 'tet', tetrapart (), geom.UCS ());
+%! solids (A);
 
 %!test  # a mesh part placed twice
 %! A = add (model.Assembly (), 'tet', tetrapart (), geom.UCS ());

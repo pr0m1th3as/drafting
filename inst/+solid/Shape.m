@@ -1000,7 +1000,7 @@ classdef Shape
 ##                             Available Methods                              ##
 ##                                                                            ##
 ## 'isvalid'         'isempty'         'numsolids'       'numfaces'           ##
-## 'numedges'                                                                 ##
+## 'numedges'        'solids'                                                 ##
 ################################################################################
 
   methods (Access = public)
@@ -1149,6 +1149,60 @@ classdef Shape
     function N = numedges (this)
 
       N = topology (this, 'edge', 'solid.Shape.numedges');
+
+    endfunction
+
+    ## -*- texinfo -*-
+    ## @deftypefn {solid.Shape} {@var{L} =} solids (@var{S})
+    ##
+    ## The solids of a shape, one by one.
+    ##
+    ## @code{@var{L} = solids (@var{S})} returns an @math{N}-by-1 struct
+    ## array, an element for each of the shape's @math{N} solids in the order
+    ## @code{solid.Shape.numsolids} counts them, with the fields:
+    ##
+    ## @multitable @columnfractions 0.15 0.85
+    ## @item @code{index} @tab its index, from 1 to @math{N}
+    ## @item @code{name} @tab its @code{solid.Shape.Name}, @qcode{''} where it
+    ## has none
+    ## @item @code{colour} @tab its @code{solid.Shape.Colour}, a row of
+    ## @code{NaN} where it has none
+    ## @item @code{path} @tab an empty cell, since a shape places nothing
+    ## @item @code{part} @tab @qcode{''}, for the same reason
+    ## @end multitable
+    ##
+    ## @code{model.Assembly.solids} lists the solids of an assembly with the
+    ## same fields, and @code{model.Viewer.opacity} takes the names either
+    ## gives to choose which solids to hide or show through.
+    ##
+    ## @example
+    ## @group
+    ## S = union (solid.box (10, 10, 10), ...
+    ##            translate (solid.sphere (4), [30, 0, 0]));
+    ## S.Name = @{'block'; 'ball'@};
+    ## L = solids (S);
+    ## L(2).name
+    ## @result{} ball
+    ## @end group
+    ## @end example
+    ##
+    ## @seealso{model.Assembly.solids, model.Viewer.opacity,
+    ## solid.Shape.numsolids}
+    ## @end deftypefn
+    function L = solids (this)
+
+      N = numsolids (this);
+      name = this.Name;
+      if (isempty (name))
+        name = repmat ({''}, N, 1);
+      endif
+      C = this.Colour;
+      if (isempty (C))
+        C = NaN (N, 3);
+      endif
+      L = struct ('index', num2cell ((1:N)'), 'name', name, ...
+                  'colour', num2cell (C, 2), 'path', {cell(1, 0)}, ...
+                  'part', '');
 
     endfunction
 
@@ -3275,6 +3329,28 @@ endfunction
 %! assert_equal (numsolids (S), 0);
 %! assert_equal (numfaces (S), 0);
 %! assert_equal (numedges (S), 0);
+
+%!test
+%! L = solids (solid.Shape ());
+%! assert_equal (size (L), [0, 1]);
+%! assert_equal (fieldnames (L), {'index'; 'name'; 'colour'; 'path'; 'part'});
+%!test
+%! S = union (solid.box (10, 10, 10), ...
+%!            translate (solid.sphere (4), [30, 0, 0]));
+%! S.Name = {'block'; 'ball'};
+%! S.Colour = [1, 0, 0; NaN, NaN, NaN];
+%! L = solids (S);
+%! assert_equal (size (L), [2, 1]);
+%! assert_equal ([L.index], [1, 2]);
+%! assert_equal ({L.name}, {'block', 'ball'});
+%! assert_equal (L(1).colour, [1, 0, 0]);
+%! assert_equal (L(2).colour, [NaN, NaN, NaN]);
+%! assert_equal ({L.path}, {cell(1, 0), cell(1, 0)});
+%! assert_equal ({L.part}, {'', ''});
+%!test  # a shape without names or colours
+%! L = solids (solid.box (10, 10, 10));
+%! assert_equal (L.name, '');
+%! assert_equal (L.colour, [NaN, NaN, NaN]);
 
 %!test  # transforming the empty shape leaves it empty
 %! S = solid.Shape ();

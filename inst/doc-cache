@@ -2,7 +2,7 @@
 # name: cache
 # type: cell
 # rows: 3
-# columns: 238
+# columns: 241
 # name: <cell-element>
 # type: sq_string
 # elements: 1
@@ -6858,19 +6858,22 @@ model.Assembly.show
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 355
+# length: 551
 model.Assembly: show (A)
 model.Assembly: V = show (A)
 Show an assembly in a viewer of its own, redrawing in place.
 
-show (A) shows shape (A) in the
-model.Viewer kept for the variable, as
-solid.Shape.show does, each part in its colour, or
-tessellate (A) when a part is a mesh.
-V = show (A) also returns the viewer.
+show (A) shows the assembly in the model.Viewer
+kept for the variable, as solid.Shape.show does: drawn as
+shape (A), each part in its colour, or as
+tessellate (A) when a part is a mesh. The viewer keeps
+the assembly, so model.Viewer.opacity can hide its solids or
+show them through by the names and paths model.Assembly.solids
+lists. V = show (A) also returns the viewer.
 
 See also:
 model.Viewer,
+model.Viewer.opacity,
 solid.Shape.show
 
 
@@ -6879,6 +6882,62 @@ solid.Shape.show
 # elements: 1
 # length: 60
 Show an assembly in a viewer of its own, redrawing in place.
+
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 21
+model.Assembly.solids
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 1145
+model.Assembly: L = solids (A)
+The solids of an assembly, one by one, with where each is placed.
+
+L = solids (A) returns an N-by-1 struct
+array, an element for each of the N solids of
+shape (A), in that order, with the fields:
+
+index its index in shape (A), from 1 to
+N
+name the solid.Shape.Name its part gives it,
+'' where it has none
+colour the solid.Shape.Colour its part gives
+it, a row of NaN where it has none
+path a cell row of placement names, from the
+placement in A down through each sub-assembly to the placement of
+its part
+part the name of the part it belongs to
+
+model.Viewer.opacity takes a path, or a name from either field,
+to choose which solids to hide or show through. An assembly with a
+mesh among its parts has no solids to list and is an error.
+
+pin = solid.cylinder (2, 12);
+B = add (model.Assembly ('stage'), 'pin', pin, geom.UCS ());
+A = add (model.Assembly ('top'), 'base', solid.box (40, 40, 4), ...
+geom.UCS ([0, 0, 1], [-20, -20, -4]));
+A = add (A, 'stage', B, geom.UCS ([0, 0, 1], [0, 0, 10]));
+L = solids (A);
+L(2).path
+=> {'stage', 'pin'}
+
+See also:
+model.Assembly.shape,
+solid.Shape.solids,
+model.Viewer.opacity
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 65
+The solids of an assembly, one by one, with where each is placed.
 
 
 
@@ -6974,10 +7033,11 @@ model.Viewer
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 2143
+# length: 2556
 drafting: model.Viewer
-A window showing a solid or a triangle mesh, in which edges, faces and
-coordinate systems can be picked.
+A window showing a solid, a triangle mesh or an assembly, in which
+edges, faces, solids and coordinate systems can be picked, and solids
+hidden or shown through.
 
 Assigning a solid.Shape to the Model of a viewer opens its
 window, or redraws it in place, keeping the camera where it was; each
@@ -6985,9 +7045,15 @@ solid is drawn in its colour, grey where it has none. Nothing
 else redraws it. A polymesh.Mesh is shown the same way, shaded
 facet by facet, however many triangles it has, in its faces' colours
 where it has them, else in its vertices', blended across each facet,
-else in grey. The show method of a shape or a mesh keeps a
-viewer for each variable and is the usual way in; a viewer of your own
-is for when you want to hold it yourself.
+else in grey. A model.Assembly is shown as its shape, each part
+in its colour. The show method of a shape, a mesh or an assembly
+keeps a viewer for each variable and is the usual way in; a viewer of
+your own is for when you want to hold it yourself.
+
+model.Viewer.opacity hides solids or shows them through, to look
+inside a model, and pick with 'solid' tells which solid
+is which. See-through solids are blended so that the nearer reads as
+in front, whatever order they are drawn in.
 
 The window is drawn by Open CASCADE in a process of its own, so a complex
 model turns smoothly and never holds up the Octave prompt. The world
@@ -7025,14 +7091,16 @@ The viewer needs a display to run. It runs on Linux.
 See also:
 solid.Shape.show,
 polymesh.Mesh.show,
-model.Viewer.pick
+model.Assembly.show,
+model.Viewer.pick,
+model.Viewer.opacity
 
 
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 104
-A window showing a solid or a triangle mesh, in which edges, faces and coordinate systems can be picked.
+# length: 161
+A window showing a solid, a triangle mesh or an assembly, in which edges, faces, solids and coordinate systems can be picked, and solids hidden or shown through.
 
 
 
@@ -7046,15 +7114,18 @@ model.Viewer.Model
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 295
+# length: 488
 model.Viewer: property Model
 Model shown
 
-The solid.Shape or the polymesh.Mesh shown. Assigning
-either opens the window if it is not open and redraws it in place if it
-is. The empty shape opens the window empty, or clears
-it if it is open; the first shape shown after it is fitted to the
-window.
+The solid.Shape, the polymesh.Mesh or the
+model.Assembly shown. Assigning any of them opens the window if
+it is not open and redraws it in place if it is. An assembly is drawn
+as model.Assembly.shape gives it, or as one mesh where a part of
+it is a mesh, and its solids are chosen by name and path in
+model.Viewer.opacity. The empty shape opens the window empty,
+or clears it if it is open; the first shape shown after it is fitted to
+the window.
 
 
 # name: <cell-element>
@@ -7228,6 +7299,74 @@ True while the viewer's window is open.
 # name: <cell-element>
 # type: sq_string
 # elements: 1
+# length: 20
+model.Viewer.opacity
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 1920
+model.Viewer: opacity (V, WHAT, A)
+model.Viewer: A = opacity (V)
+Hide solids, or show them through, to look inside a model.
+
+opacity (V, WHAT, A) draws the solids
+WHAT chooses at the opacity A, from 1, opaque, as every
+solid is at first, to 0, hidden. A hidden solid is neither drawn nor
+picked, so a click goes through it to what lies behind; a solid shown
+through is picked as before. The window changes in place: nothing is
+drawn again but the solids chosen, and the view stays where it is.
+This is the viewer's own setting, for looking at a model: it is not
+kept by the shape, and no file carries it.
+
+WHAT chooses by any of:
+
+indices the solids of those indices, in the order
+solid.Shape.solids and model.Assembly.solids list them
+a name every solid of that solid.Shape.Name, and in
+an assembly every solid under a placement of that name, at any depth
+a path a cell row of placement names from the top of the
+assembly, as the path field of model.Assembly.solids
+gives it, choosing every solid under the placement it ends at
+'all' every solid
+
+Names and paths match exactly, case included. A name or a path that
+matches nothing is an error. A mesh has no solids, so it takes one
+opacity for the whole, through 'all' or the index 1.
+
+V = show (A);
+opacity (V, 'casing', 0.3); # see into the casing
+opacity (V, {'rotor', 'shaft'}, 0); # and hide the shaft
+opacity (V, 'all', 1); # everything solid again
+
+Assigning Model again, as show does after a change to the
+model, keeps what was set by a name, a path or 'all' and
+applies it to the new model wherever it still matches. What was set by
+indices is dropped, since indices change with the model.
+
+A = opacity (V) returns the opacity of every solid
+as a column, in the order of their indices, or the one of a mesh. A
+viewer whose window was closed keeps what is set, for the next model
+it shows.
+
+See also:
+model.Viewer.pick,
+solid.Shape.solids,
+model.Assembly.solids
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 58
+Hide solids, or show them through, to look inside a model.
+
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
 # length: 17
 model.Viewer.pick
 
@@ -7235,11 +7374,12 @@ model.Viewer.pick
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 2398
+# length: 3130
 model.Viewer: [E, F] = pick (V)
 model.Viewer: [E, F, ECODE, FCODE] = pick (V)
 model.Viewer: [E, CODE] = pick (V, 'edge')
 model.Viewer: [F, CODE] = pick (V, 'face')
+model.Viewer: [I, CODE] = pick (V, 'solid')
 model.Viewer: [P, F] = pick (V)
 Pick edges and faces of a solid, or points on a mesh, with the mouse.
 
@@ -7273,6 +7413,20 @@ E = edges (part, 'Type', 'line', 'Direction', [0, 0, 1], ...
 'Within', [0, 0, 0, 80, 40, 12]);
 part = fillet (part, E, 3);
 
+[I, CODE] = pick (V, 'solid') picks
+whole solids: a click on any face of a solid selects it, and I
+returns the indices of the solids picked, in the order
+solid.Shape.solids and model.Assembly.solids list them,
+for model.Viewer.opacity. The face clicked stays drawn in
+orange. CODE is what selects the same solids in
+opacity, as code: the name they share, else the path they
+share, where either selects them alone, else their indices.
+
+When the viewer shows a model.Assembly, picking only tells its
+solids apart, since the parts of an assembly are edited as parts, not
+in the assembly. pick (V) then picks solids, and
+'edge' and 'face' are refused.
+
 When the viewer shows a polymesh.Mesh, [P, F]
 = pick (V) waits while you click points on it, each marked
 where it lands, and returns them in P, an N-by-3 matrix of
@@ -7281,13 +7435,14 @@ N-by-4 matrix: for each point the index of the triangle it lies
 on, a row of the mesh's Faces, and the triangle's unit normal,
 turned as its corners run. A click that misses the mesh adds nothing.
 Enter finishes and Escape cancels, returning nothing. A
-mesh has no edges or faces in the sense of a solid, so 'edge'
-and 'face' are refused.
+mesh has no edges, faces or solids in the sense of a solid, so
+'edge', 'face' and 'solid' are refused.
 
 See also:
 solid.Shape.edges,
 solid.Shape.faces,
-solid.Shape.show
+solid.Shape.show,
+model.Viewer.opacity
 
 
 # name: <cell-element>
@@ -9910,6 +10065,57 @@ polymesh.Mesh.show
 # elements: 1
 # length: 56
 Show a shape in a viewer of its own, redrawing in place.
+
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 18
+solid.Shape.solids
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 839
+solid.Shape: L = solids (S)
+The solids of a shape, one by one.
+
+L = solids (S) returns an N-by-1 struct
+array, an element for each of the shape's N solids in the order
+solid.Shape.numsolids counts them, with the fields:
+
+index its index, from 1 to N
+name its solid.Shape.Name, '' where it
+has none
+colour its solid.Shape.Colour, a row of
+NaN where it has none
+path an empty cell, since a shape places nothing
+part '', for the same reason
+
+model.Assembly.solids lists the solids of an assembly with the
+same fields, and model.Viewer.opacity takes the names either
+gives to choose which solids to hide or show through.
+
+S = union (solid.box (10, 10, 10), ...
+translate (solid.sphere (4), [30, 0, 0]));
+S.Name = {'block'; 'ball'};
+L = solids (S);
+L(2).name
+=> ball
+
+See also:
+model.Assembly.solids,
+model.Viewer.opacity,
+solid.Shape.numsolids
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 34
+The solids of a shape, one by one.
 
 
 

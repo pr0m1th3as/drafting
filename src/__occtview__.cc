@@ -390,6 +390,12 @@ public:
     // prompts at the lower left
     m_view->TriedronDisplay (Aspect_TOTP_RIGHT_LOWER, Quantity_NOC_BLACK, 0.12,
                              V3d_ZBUFFER);
+
+    // See-through solids blended in one pass, whatever order they are drawn
+    // in, the nearer weighted more, so that the nearer reads as in front
+    Graphic3d_RenderingParams& rp = m_view->ChangeRenderingParams ();
+    rp.TransparencyMethod = Graphic3d_RTM_BLEND_OIT;
+    rp.OitDepthFactor = 1.0f;
     if (hidden)
     {
       m_window->SetVirtual (true);
@@ -502,6 +508,20 @@ public:
       meshlooks (data, nv, nf, ck);
       setshape (meshface (data, nv, nf), true);
     }
+    else if (cmd == "opacity")
+    {
+      size_t n = 0;
+      in >> n;
+      for (size_t i = 0; i < n; i++)
+      {
+        uint32_t j;
+        double a;
+        std::memcpy (&j, data.data () + 12 * i, 4);
+        std::memcpy (&a, data.data () + 12 * i + 4, 8);
+        opacity (static_cast<int> (j), a);
+      }
+      m_context->Redisplay (m_shape, false);
+    }
     else if (cmd == "colours")
     {
       string look;
@@ -606,7 +626,7 @@ public:
       string r = "none";
       if (m_context->HasDetected ())
       {
-        r = describe (m_context->DetectedOwner ());
+        r = describe (m_context->DetectedOwner (), kindcode (kind) == 8);
       }
       m_context->ClearDetected (false);
       activate (m_pick);
@@ -1003,6 +1023,52 @@ private:
   }
 
   // Redraw the mesh shown in the colouring and the edges chosen
+  // Solid J drawn at opacity A, from 1, opaque, to 0, hidden; on a mesh,
+  // which has no solids, the whole of it.  The caller redisplays.
+  void opacity (int j, double a)
+  {
+    if (m_shape.IsNull ())
+    {
+      return;
+    }
+    if (m_mesh)
+    {
+      if (a <= 0)
+      {
+        m_context->Erase (m_shape, false);
+        return;
+      }
+      if (! m_context->IsDisplayed (m_shape))
+      {
+        m_context->Display (m_shape, AIS_Shaded,
+                            AIS_Shape::SelectionMode (TopAbs_FACE), false);
+        activate (m_pick);
+      }
+      if (a < 1)
+      {
+        m_shape->SetTransparency (1 - a);
+      }
+      else
+      {
+        m_shape->UnsetTransparency ();
+      }
+      return;
+    }
+    Handle (AIS_ColoredShape) cs = Handle (AIS_ColoredShape)::DownCast
+                                     (m_shape);
+    if (cs.IsNull () || j < 1 || j > m_solids.Extent ())
+    {
+      return;
+    }
+    // A hidden solid is neither drawn nor picked
+    const TopoDS_Shape& so = m_solids (j);
+    cs->CustomAspects (so)->SetHidden (a <= 0);
+    if (a > 0)
+    {
+      cs->SetCustomTransparency (so, 1 - a);
+    }
+  }
+
   void restyle ()
   {
     Handle (pickshape) ps = Handle (pickshape)::DownCast (m_shape);
@@ -1206,7 +1272,7 @@ private:
 
   static int kindcode (const string& kind)
   {
-    return kind == "edge" ? 1 : kind == "face" ? 2 : 3;
+    return kind == "edge" ? 1 : kind == "face" ? 2 : kind == "solid" ? 8 : 3;
   }
 
   void turn (V3d_TypeOfOrientation o)
@@ -1356,6 +1422,21 @@ private:
     m_skip.clear ();
     TopExp::MapShapes (s, TopAbs_EDGE, m_edges);
     TopExp::MapShapes (s, TopAbs_FACE, m_faces);
+    // The solid each face lies on, by index
+    m_solids.Clear ();
+    TopExp::MapShapes (s, TopAbs_SOLID, m_solids);
+    m_solidof.assign (m_faces.Extent () + 1, 0);
+    for (int j = 1; j <= m_solids.Extent (); j++)
+    {
+      for (TopExp_Explorer x (m_solids (j), TopAbs_FACE); x.More (); x.Next ())
+      {
+        const int k = m_faces.FindIndex (x.Current ());
+        if (k > 0)
+        {
+          m_solidof[k] = j;
+        }
+      }
+    }
     ShapeListMap anc;
     TopExp::MapShapesAndAncestors (s, TopAbs_EDGE, TopAbs_FACE, anc);
     for (int i = 1; i <= m_edges.Extent (); i++)
@@ -1484,7 +1565,7 @@ private:
     {
       m_context->Activate (m_shape, edge);
     }
-    if (kind & 2)
+    if (kind & 10)
     {
       m_context->Activate (m_shape, face);
     }
@@ -1494,9 +1575,11 @@ private:
     }
   }
 
-  // "edge K" or "face K" for a picked owner, empty for a seam or anything
-  // that is not an edge or a face of the shape
-  string describe (const Handle (SelectMgr_EntityOwner)& owner) const
+  // "edge K" or "face K" for a picked owner, or with SOLID "solid K" for the
+  // solid a picked face lies on; empty for a seam or anything that is not an
+  // edge or a face of the shape
+  string describe (const Handle (SelectMgr_EntityOwner)& owner,
+                   bool solid = false) const
   {
     Handle (StdSelect_BRepOwner) o = Handle (StdSelect_BRepOwner)::DownCast
                                        (owner);
@@ -1516,6 +1599,10 @@ private:
     else if (s.ShapeType () == TopAbs_FACE)
     {
       const int k = m_faces.FindIndex (s);
+      if (k > 0 && solid)
+      {
+        return "solid " + to_string (m_solidof[k]);
+      }
       if (k > 0)
       {
         return "face " + to_string (k);
@@ -1548,7 +1635,7 @@ private:
       for (m_context->InitSelected (); m_context->MoreSelected ();
            m_context->NextSelected ())
       {
-        const string r = describe (m_context->SelectedOwner ());
+        const string r = describe (m_context->SelectedOwner (), m_pick == 8);
         if (! r.empty ())
         {
           reply (r);
@@ -1594,6 +1681,8 @@ private:
   ShapeMap m_edges;
   ShapeMap m_faces;
   ShapeMap m_vertices;
+  ShapeMap m_solids;
+  vector<int> m_solidof;
   set<int> m_skip;
   set<int> m_vskip;
   vector<Handle (AIS_Point)> m_marks;
@@ -1677,6 +1766,10 @@ main (int argc, char **argv)
         char *q;
         need = strtoul (line.c_str () + 6, &q, 10);
         need += 7 * strtoul (q, nullptr, 10);
+      }
+      else if (line.compare (0, 8, "opacity ") == 0)
+      {
+        need = 12 * strtoul (line.c_str () + 8, nullptr, 10);
       }
       else if (line.compare (0, 5, "mesh ") == 0)
       {

@@ -19,8 +19,9 @@ classdef Viewer < handle
   ## -*- texinfo -*-
   ## @deftp {drafting} model.Viewer
   ##
-  ## A window showing a solid or a triangle mesh, in which edges, faces and
-  ## coordinate systems can be picked.
+  ## A window showing a solid, a triangle mesh or an assembly, in which
+  ## edges, faces, solids and coordinate systems can be picked, and solids
+  ## hidden or shown through.
   ##
   ## Assigning a @code{solid.Shape} to the @code{Model} of a viewer opens its
   ## window, or redraws it in place, keeping the camera where it was; each
@@ -28,9 +29,15 @@ classdef Viewer < handle
   ## else redraws it.  A @code{polymesh.Mesh} is shown the same way, shaded
   ## facet by facet, however many triangles it has, in its faces' colours
   ## where it has them, else in its vertices', blended across each facet,
-  ## else in grey.  The @code{show} method of a shape or a mesh keeps a
-  ## viewer for each variable and is the usual way in; a viewer of your own
-  ## is for when you want to hold it yourself.
+  ## else in grey.  A @code{model.Assembly} is shown as its shape, each part
+  ## in its colour.  The @code{show} method of a shape, a mesh or an assembly
+  ## keeps a viewer for each variable and is the usual way in; a viewer of
+  ## your own is for when you want to hold it yourself.
+  ##
+  ## @code{model.Viewer.opacity} hides solids or shows them through, to look
+  ## inside a model, and @code{pick} with @qcode{'solid'} tells which solid
+  ## is which.  See-through solids are blended so that the nearer reads as
+  ## in front, whatever order they are drawn in.
   ##
   ## The window is drawn by Open CASCADE in a process of its own, so a complex
   ## model turns smoothly and never holds up the Octave prompt.  The world
@@ -67,7 +74,8 @@ classdef Viewer < handle
   ##
   ## The viewer needs a display to run.  It runs on Linux.
   ##
-  ## @seealso{solid.Shape.show, polymesh.Mesh.show, model.Viewer.pick}
+  ## @seealso{solid.Shape.show, polymesh.Mesh.show, model.Assembly.show,
+  ## model.Viewer.pick, model.Viewer.opacity}
   ## @end deftp
 
   properties (Dependent)
@@ -77,11 +85,14 @@ classdef Viewer < handle
     ##
     ## Model shown
     ##
-    ## The @code{solid.Shape} or the @code{polymesh.Mesh} shown.  Assigning
-    ## either opens the window if it is not open and redraws it in place if it
-    ## is.  The empty shape opens the window empty, or clears
-    ## it if it is open; the first shape shown after it is fitted to the
-    ## window.
+    ## The @code{solid.Shape}, the @code{polymesh.Mesh} or the
+    ## @code{model.Assembly} shown.  Assigning any of them opens the window if
+    ## it is not open and redraws it in place if it is.  An assembly is drawn
+    ## as @code{model.Assembly.shape} gives it, or as one mesh where a part of
+    ## it is a mesh, and its solids are chosen by name and path in
+    ## @code{model.Viewer.opacity}.  The empty shape opens the window empty,
+    ## or clears it if it is open; the first shape shown after it is fitted to
+    ## the window.
     ##
     ## @end deftp
     Model
@@ -248,12 +259,23 @@ classdef Viewer < handle
     function varargout = __pick__ (this, KIND, CLICKS)
 
       ## Input validation
-      if (! ischar (KIND) || ! any (strcmp (KIND, {'edge', 'face', 'any'})))
-        error ("model.Viewer.pick: KIND must be 'edge', 'face' or 'any'.");
+      if (! ischar (KIND)
+          || ! any (strcmp (KIND, {'edge', 'face', 'solid', 'any'})))
+        error (strcat ("model.Viewer.pick: KIND must be 'edge', 'face',", ...
+                       " 'solid' or 'any'."));
       endif
       ismesh = isa (state (this).mesh, 'polymesh.Mesh');
       if (ismesh && ! strcmp (KIND, 'any'))
         error ("model.Viewer.pick: a mesh has only points to pick.");
+      endif
+      ## The parts of an assembly are not edited, so a pick on one only
+      ## tells its solids
+      if (! ismesh && ! isempty (state (this).model))
+        if (any (strcmp (KIND, {'edge', 'face'})))
+          error (strcat ("model.Viewer.pick: the parts of an assembly are", ...
+                         " not edited; pick 'solid' to identify one."));
+        endif
+        KIND = 'solid';
       endif
       if (! isopen (this) || isempty (this.Model))
         error ("model.Viewer.pick: the viewer is showing no shape.");
@@ -298,10 +320,18 @@ classdef Viewer < handle
         [varargout{1:2}] = meshpoints (R);
         return;
       endif
-      [E, F] = items (R);
+      [E, F, I] = items (R);
+      if (strcmp (KIND, 'solid'))
+        CODE = '';
+        if (! isempty (I))
+          CODE = solidcode (st, I);
+        endif
+        varargout = {I, CODE};
+        return;
+      endif
 
       ## The code that selects them again
-      S = this.Model;
+      S = shown (this);
       ECODE = '';
       FCODE = '';
       if (! isempty (E))
@@ -334,7 +364,7 @@ classdef Viewer < handle
       while (ischar (fgetl (st.out)))
       endwhile
       fclear (st.out);
-      S = this.Model;
+      S = shown (this);
       B = bbox (S);
       scale = max (abs (B));
       SHOWN = {};
@@ -610,29 +640,44 @@ classdef Viewer < handle
       setstate (this, struct ('pid', -1, 'in', -1, 'out', -1, ...
                               'hidden', logical (hidden), ...
                               'data', uint8 ([]), 'mesh', [], 'name', 'S', ...
-                              'named', false));
+                              'named', false, 'model', [], 'list', [], ...
+                              'rules', {{}}, 'opacity', []));
 
     endfunction
 
     function S = get.Model (this)
 
       st = state (this);
-      if (isa (st.mesh, 'polymesh.Mesh'))
-        S = st.mesh;
+      if (! isempty (st.model))
+        S = st.model;
       else
-        S = solid.Shape (st.data);
+        S = shown (this);
       endif
 
     endfunction
 
     function set.Model (this, S)
 
+      isasm = isa (S, 'model.Assembly') && isscalar (S);
       ismesh = isa (S, 'polymesh.Mesh') && isscalar (S);
-      if (! ismesh && (! isa (S, 'solid.Shape') || ! isscalar (S)))
-        error (strcat ("model.Viewer: Model must be a solid.Shape or a", ...
-                       " polymesh.Mesh object."));
+      if (! isasm && ! ismesh && (! isa (S, 'solid.Shape') || ! isscalar (S)))
+        error (strcat ("model.Viewer: Model must be a solid.Shape, a", ...
+                       " polymesh.Mesh or a model.Assembly object."));
       endif
       st = state (this);
+      st.model = [];
+      st.list = [];
+      ## An assembly is drawn as its shape, or as one mesh where a part is a
+      ## mesh
+      if (isasm)
+        st.model = S;
+        if (hasmesh (S))
+          S = tessellate (S);
+          ismesh = true;
+        else
+          S = shape (S);
+        endif
+      endif
       if (ismesh)
         st.data = uint8 ([]);
         st.mesh = S;
@@ -643,6 +688,17 @@ classdef Viewer < handle
       setstate (this, st);
       if (! isopen (this))
         launch (this);
+      endif
+      ## The solids listed beside the shape, so that a name or a path finds
+      ## them
+      if (! ismesh)
+        st = state (this);
+        if (isasm)
+          st.list = solids (st.model);
+        else
+          st.list = solids (S);
+        endif
+        setstate (this, st);
       endif
       if (ismesh && ! isempty (S))
         ## The colours follow the triangles, the vertices' before the faces'
@@ -673,6 +729,7 @@ classdef Viewer < handle
         send (this, sprintf ("shape %d %d", numel (st.data), numel (k)), ...
               [st.data(:); rec(:)]);
       endif
+      reapply (this);
 
     endfunction
 
@@ -719,6 +776,7 @@ classdef Viewer < handle
     ## @deftypefnx {model.Viewer} {[@var{E}, @var{F}, @var{ECODE}, @var{FCODE}] =} pick (@var{V})
     ## @deftypefnx {model.Viewer} {[@var{E}, @var{CODE}] =} pick (@var{V}, @qcode{'edge'})
     ## @deftypefnx {model.Viewer} {[@var{F}, @var{CODE}] =} pick (@var{V}, @qcode{'face'})
+    ## @deftypefnx {model.Viewer} {[@var{I}, @var{CODE}] =} pick (@var{V}, @qcode{'solid'})
     ## @deftypefnx {model.Viewer} {[@var{P}, @var{F}] =} pick (@var{V})
     ##
     ## Pick edges and faces of a solid, or points on a mesh, with the mouse.
@@ -757,6 +815,20 @@ classdef Viewer < handle
     ## @end group
     ## @end example
     ##
+    ## @code{[@var{I}, @var{CODE}] = pick (@var{V}, @qcode{'solid'})} picks
+    ## whole solids: a click on any face of a solid selects it, and @var{I}
+    ## returns the indices of the solids picked, in the order
+    ## @code{solid.Shape.solids} and @code{model.Assembly.solids} list them,
+    ## for @code{model.Viewer.opacity}.  The face clicked stays drawn in
+    ## orange.  @var{CODE} is what selects the same solids in
+    ## @code{opacity}, as code: the name they share, else the path they
+    ## share, where either selects them alone, else their indices.
+    ##
+    ## When the viewer shows a @code{model.Assembly}, picking only tells its
+    ## solids apart, since the parts of an assembly are edited as parts, not
+    ## in the assembly.  @code{pick (@var{V})} then picks solids, and
+    ## @qcode{'edge'} and @qcode{'face'} are refused.
+    ##
     ## When the viewer shows a @code{polymesh.Mesh}, @code{[@var{P}, @var{F}]
     ## = pick (@var{V})} waits while you click points on it, each marked
     ## where it lands, and returns them in @var{P}, an @math{N}-by-3 matrix of
@@ -765,10 +837,11 @@ classdef Viewer < handle
     ## on, a row of the mesh's @code{Faces}, and the triangle's unit normal,
     ## turned as its corners run.  A click that misses the mesh adds nothing.
     ## @kbd{Enter} finishes and @kbd{Escape} cancels, returning nothing.  A
-    ## mesh has no edges or faces in the sense of a solid, so @qcode{'edge'}
-    ## and @qcode{'face'} are refused.
+    ## mesh has no edges, faces or solids in the sense of a solid, so
+    ## @qcode{'edge'}, @qcode{'face'} and @qcode{'solid'} are refused.
     ##
-    ## @seealso{solid.Shape.edges, solid.Shape.faces, solid.Shape.show}
+    ## @seealso{solid.Shape.edges, solid.Shape.faces, solid.Shape.show,
+    ## model.Viewer.opacity}
     ## @end deftypefn
     function varargout = pick (this, KIND = 'any')
 
@@ -840,6 +913,126 @@ classdef Viewer < handle
       endif
 
       [U, ~, CODE] = __pickucs__ (this, MODE, []);
+
+    endfunction
+
+    ## -*- texinfo -*-
+    ## @deftypefn  {model.Viewer} {} opacity (@var{V}, @var{WHAT}, @var{A})
+    ## @deftypefnx {model.Viewer} {@var{A} =} opacity (@var{V})
+    ##
+    ## Hide solids, or show them through, to look inside a model.
+    ##
+    ## @code{opacity (@var{V}, @var{WHAT}, @var{A})} draws the solids
+    ## @var{WHAT} chooses at the opacity @var{A}, from 1, opaque, as every
+    ## solid is at first, to 0, hidden.  A hidden solid is neither drawn nor
+    ## picked, so a click goes through it to what lies behind; a solid shown
+    ## through is picked as before.  The window changes in place: nothing is
+    ## drawn again but the solids chosen, and the view stays where it is.
+    ## This is the viewer's own setting, for looking at a model: it is not
+    ## kept by the shape, and no file carries it.
+    ##
+    ## @var{WHAT} chooses by any of:
+    ##
+    ## @multitable @columnfractions 0.2 0.8
+    ## @item indices @tab the solids of those indices, in the order
+    ## @code{solid.Shape.solids} and @code{model.Assembly.solids} list them
+    ## @item a name @tab every solid of that @code{solid.Shape.Name}, and in
+    ## an assembly every solid under a placement of that name, at any depth
+    ## @item a path @tab a cell row of placement names from the top of the
+    ## assembly, as the @code{path} field of @code{model.Assembly.solids}
+    ## gives it, choosing every solid under the placement it ends at
+    ## @item @qcode{'all'} @tab every solid
+    ## @end multitable
+    ##
+    ## Names and paths match exactly, case included.  A name or a path that
+    ## matches nothing is an error.  A mesh has no solids, so it takes one
+    ## opacity for the whole, through @qcode{'all'} or the index 1.
+    ##
+    ## @example
+    ## @group
+    ## V = show (A);
+    ## opacity (V, 'casing', 0.3);          # see into the casing
+    ## opacity (V, @{'rotor', 'shaft'@}, 0);  # and hide the shaft
+    ## opacity (V, 'all', 1);               # everything solid again
+    ## @end group
+    ## @end example
+    ##
+    ## Assigning @code{Model} again, as @code{show} does after a change to the
+    ## model, keeps what was set by a name, a path or @qcode{'all'} and
+    ## applies it to the new model wherever it still matches.  What was set by
+    ## indices is dropped, since indices change with the model.
+    ##
+    ## @code{@var{A} = opacity (@var{V})} returns the opacity of every solid
+    ## as a column, in the order of their indices, or the one of a mesh.  A
+    ## viewer whose window was closed keeps what is set, for the next model
+    ## it shows.
+    ##
+    ## @seealso{model.Viewer.pick, solid.Shape.solids, model.Assembly.solids}
+    ## @end deftypefn
+    function varargout = opacity (this, WHAT, A)
+
+      if (nargin == 1)
+        varargout = {state(this).opacity};
+        return;
+      endif
+
+      ## Input validation
+      if (nargin != 3)
+        error ("model.Viewer.opacity: invalid number of input arguments.");
+      endif
+      if (! isnumeric (A) || ! isreal (A) || ! isscalar (A)
+          || ! (A >= 0 && A <= 1))
+        error ("model.Viewer.opacity: A must be a real scalar from 0 to 1.");
+      endif
+      if (isempty (this.Model))
+        error ("model.Viewer.opacity: the viewer is showing no shape.");
+      endif
+      st = state (this);
+      ismesh = isa (st.mesh, 'polymesh.Mesh');
+      if (ischar (WHAT) && isrow (WHAT))
+        if (ismesh && ! strcmp (WHAT, 'all'))
+          error (strcat ("model.Viewer.opacity: a mesh has no solids to", ...
+                         " name; use 'all'."));
+        endif
+      elseif (iscellstr (WHAT) && isvector (WHAT)
+              && all (cellfun (@isrow, WHAT)))
+        if (ismesh)
+          error (strcat ("model.Viewer.opacity: a mesh has no solids to", ...
+                         " name; use 'all'."));
+        endif
+        WHAT = WHAT(:)';
+      elseif (isnumeric (WHAT) && isreal (WHAT) && ! isempty (WHAT))
+        n = numel (st.opacity);
+        if (any (WHAT(:) != fix (WHAT(:))) || any (WHAT(:) < 1)
+            || any (WHAT(:) > n))
+          error (strcat ("model.Viewer.opacity: indices must be integers", ...
+                         " from 1 to %d."), n);
+        endif
+      else
+        error (strcat ("model.Viewer.opacity: WHAT must be indices, a", ...
+                       " name, a path or 'all'."));
+      endif
+      I = matching (st, WHAT);
+      if (isempty (I) && ischar (WHAT))
+        error ("model.Viewer.opacity: nothing is named %s.", literal (WHAT));
+      elseif (isempty (I))
+        error ("model.Viewer.opacity: nothing lies at the path %s.", ...
+               literal (WHAT));
+      endif
+
+      ## Kept for the next model shown, but for indices
+      st.opacity(I) = A;
+      if (ischar (WHAT) && strcmp (WHAT, 'all'))
+        st.rules = {};
+      endif
+      if (! isnumeric (WHAT))
+        same = cellfun (@(r) isequal (r{1}, WHAT), st.rules);
+        st.rules = [st.rules(! same), {{WHAT, A}}];
+      endif
+      setstate (this, st);
+      if (isopen (this))
+        sendopacity (this, I, repmat (A, size (I)));
+      endif
 
     endfunction
 
@@ -1154,6 +1347,51 @@ classdef Viewer < handle
 
     endfunction
 
+    ## The solid.Shape or polymesh.Mesh the window draws, an assembly's shape
+    ## or mesh where an assembly is shown
+    function S = shown (this)
+
+      st = state (this);
+      if (isa (st.mesh, 'polymesh.Mesh'))
+        S = st.mesh;
+      else
+        S = solid.Shape (st.data);
+      endif
+
+    endfunction
+
+    ## The opacities set by name, path or 'all', applied again to the model
+    ## now shown; those that no longer match anything are dropped
+    function reapply (this)
+
+      st = state (this);
+      st.opacity = ones (numopaque (st), 1);
+      keep = false (1, numel (st.rules));
+      for k = 1:numel (st.rules)
+        I = matching (st, st.rules{k}{1});
+        if (! isempty (I))
+          st.opacity(I) = st.rules{k}{2};
+          keep(k) = true;
+        endif
+      endfor
+      st.rules = st.rules(keep);
+      setstate (this, st);
+      I = find (st.opacity != 1);
+      if (! isempty (I))
+        sendopacity (this, I, st.opacity(I));
+      endif
+
+    endfunction
+
+    ## Solids I drawn at the opacities A, a record of index and value each
+    function sendopacity (this, I, A)
+
+      idx = reshape (typecast (uint32 (I(:)'), 'uint8'), 4, []);
+      val = reshape (typecast (double (A(:)'), 'uint8'), 8, []);
+      send (this, sprintf ("opacity %d", numel (I)), [idx; val](:));
+
+    endfunction
+
     function launch (this)
 
       if (isempty (getenv ('DISPLAY')))
@@ -1255,19 +1493,23 @@ classdef Viewer < handle
 endclassdef
 
 ## The edges E and the faces F a pick replied with in the lines R
-function [E, F] = items (R)
+function [E, F, I] = items (R)
 
   E = zeros (1, 0);
   F = zeros (1, 0);
+  I = zeros (1, 0);
   for k = 1:numel (R)
     if (strncmp (R{k}, 'edge ', 5))
       E(end+1) = str2double (R{k}(6:end));
     elseif (strncmp (R{k}, 'face ', 5))
       F(end+1) = str2double (R{k}(6:end));
+    elseif (strncmp (R{k}, 'solid ', 6))
+      I(end+1) = str2double (R{k}(7:end));
     endif
   endfor
   E = unique (E);
   F = unique (F);
+  I = unique (I);
 
 endfunction
 
@@ -1389,6 +1631,101 @@ function I = chosen (__shape__, Q)
 
   I = eval (Q);
   I = sort (I(:)');
+
+endfunction
+
+## How many opacities the model shown has: one for each solid, or one for
+## the whole of a mesh
+function n = numopaque (st)
+
+  if (isa (st.mesh, 'polymesh.Mesh'))
+    n = double (! isempty (st.mesh));
+  else
+    n = numel (st.list);
+  endif
+
+endfunction
+
+## The indices WHAT selects: every one for 'all'; for a name, the solids of
+## that name and those under a placement of that name at any depth; for a
+## path, the solids under it; nothing by name or path on a mesh
+function I = matching (st, WHAT)
+
+  if (ischar (WHAT) && strcmp (WHAT, 'all'))
+    I = 1:numopaque (st);
+  elseif (isnumeric (WHAT))
+    I = unique (WHAT(:)');
+  elseif (isa (st.mesh, 'polymesh.Mesh'))
+    I = zeros (1, 0);
+  elseif (ischar (WHAT))
+    L = st.list;
+    I = find (strcmp ({L.name}, WHAT) ...
+              | cellfun (@(p) any (strcmp (p, WHAT)), {L.path}));
+  else
+    L = st.list;
+    m = numel (WHAT);
+    I = find (cellfun (@(p) numel (p) >= m && isequal (p(1:m), WHAT), ...
+                       {L.path}));
+  endif
+
+endfunction
+
+## X as Octave code: a name quoted, a path a cell of them, indices a number
+## or a row of them
+function t = literal (X)
+
+  if (ischar (X))
+    t = ["'" strrep(X, "'", "''") "'"];
+  elseif (iscell (X))
+    t = ["{" strjoin(cellfun (@literal, X, 'UniformOutput', false), ", ") "}"];
+  elseif (isscalar (X))
+    t = sprintf ("%d", X);
+  else
+    t = ["[" strjoin(arrayfun (@(k) sprintf ("%d", k), X, ...
+                               'UniformOutput', false), ", ") "]"];
+  endif
+
+endfunction
+
+## The code that selects the solids I again: the name they share, else the
+## longest path they share, where either selects them alone, else I
+function CODE = solidcode (st, I)
+
+  L = st.list;
+  names = unique ({L(I).name});
+  if (numel (names) == 1 && ! isempty (names{1})
+      && isequal (matching (st, names{1}), I))
+    CODE = literal (names{1});
+    return;
+  endif
+  P = L(I(1)).path;
+  for k = I(2:end)
+    q = L(k).path;
+    m = 0;
+    while (m < min (numel (P), numel (q)) && strcmp (P{m+1}, q{m+1}))
+      m++;
+    endwhile
+    P = P(1:m);
+  endfor
+  if (! isempty (P) && isequal (matching (st, P), I))
+    CODE = literal (P);
+  else
+    CODE = literal (I);
+  endif
+
+endfunction
+
+## Whether an assembly has a mesh among its parts, at any depth
+function TF = hasmesh (A)
+
+  TF = false;
+  for k = 1:numel (A.Parts)
+    X = A.Parts(k).item;
+    TF = isa (X, 'polymesh.Mesh') || (isa (X, 'model.Assembly') && hasmesh (X));
+    if (TF)
+      return;
+    endif
+  endfor
 
 endfunction
 
@@ -2183,14 +2520,14 @@ endfunction
 %! assert_equal (isopen (V), false);
 %!error<model.Viewer: Hidden must be a logical scalar.> ...
 %! model.Viewer ('Hidden', 2)
-%!error<model.Viewer: Model must be a solid.Shape or a polymesh.Mesh object.>
+%!error<model.Viewer: Model must be a solid.Shape, a polymesh.Mesh or a model.Assembly object.>
 %! V = model.Viewer ();
 %! V.Model = 1;
 ## Shape, Model's former name, warns and forwards to Model
 %!warning<model.Viewer: Shape is obsolete and will be removed in drafting 0.3.0; use Model instead.>
 %! V = model.Viewer ();
 %! S = V.Shape;
-%!error<model.Viewer: Model must be a solid.Shape or a polymesh.Mesh object.>
+%!error<model.Viewer: Model must be a solid.Shape, a polymesh.Mesh or a model.Assembly object.>
 %! V = model.Viewer ();
 %! V.Shape = 1;
 %!error<model.Viewer: Name must be a valid variable name.>
@@ -2231,7 +2568,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!error<model.Viewer.pick: KIND must be 'edge', 'face' or 'any'.>
+%!error<model.Viewer.pick: KIND must be 'edge', 'face', 'solid' or 'any'.>
 %! pick (model.Viewer (), 'vertex')
 %!error<model.Viewer.pick: the viewer is showing no shape.>
 %! pick (model.Viewer ())
@@ -2255,3 +2592,202 @@ endfunction
 %! pickucs (model.Viewer (), 'edges')
 %!error<model.Viewer.pickucs: the viewer is showing no shape.> ...
 %! pickucs (model.Viewer ())
+
+## Two blocks, A in front and B behind it seen from the front, red and blue
+%!function S = frontback ()
+%!  S = union (solid.box (20, 10, 20), ...
+%!             translate (solid.box (20, 10, 20), [0, 30, 0]));
+%!  S.Colour = [1, 0, 0; 0, 0, 1];
+%!endfunction
+
+## A viewer that holds X as though it showed it, with no window
+%!function V = unopened (X)
+%!  V = model.Viewer ();
+%!  key = sprintf ('drafting_model_viewer_%d', V.Id);
+%!  st = getappdata (0, key);
+%!  if (isa (X, 'polymesh.Mesh'))
+%!    st.mesh = X;
+%!    st.opacity = 1;
+%!  else
+%!    if (isa (X, 'model.Assembly'))
+%!      st.model = X;
+%!      st.list = solids (X);
+%!      X = shape (X);
+%!    else
+%!      st.list = solids (X);
+%!    endif
+%!    st.data = X.Data;
+%!    st.opacity = ones (numsolids (X), 1);
+%!  endif
+%!  setappdata (0, key, st);
+%!endfunction
+
+%!testif ; ! isempty (getenv ('DISPLAY'))
+%! ## A hidden solid is neither drawn nor picked: the one behind shows
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Model = frontback ();
+%!   view (V, 0, 0);
+%!   p = round (V.__project__ ([10, 0, 10]));
+%!   I = capture (V);
+%!   assert_equal (squeeze (I(p(2), p(1), :))' > [150, 50, 255], ...
+%!                 [true, false, false]);
+%!   opacity (V, 1, 0);
+%!   I = capture (V);
+%!   assert_equal (squeeze (I(p(2), p(1), :))' > [50, 50, 150], ...
+%!                 [false, false, true]);
+%!   assert_equal (V.__pickat__ ('solid', p), 'solid 2');
+%!   assert_equal (opacity (V), [0; 1]);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+%!testif ; ! isempty (getenv ('DISPLAY'))
+%! ## A solid shown through blends with the one behind and is still picked
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Model = frontback ();
+%!   view (V, 0, 0);
+%!   p = round (V.__project__ ([10, 0, 10]));
+%!   opacity (V, 1, 0.4);
+%!   c = double (squeeze (capture (V)(p(2), p(1), :)))';
+%!   assert_equal (c(1) > 100 && c(3) > 60, true);
+%!   assert_equal (V.__pickat__ ('solid', p), 'solid 1');
+%!   opacity (V, 'all', 1);
+%!   c = double (squeeze (capture (V)(p(2), p(1), :)))';
+%!   assert_equal (c(3) < 50, true);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+%!testif ; ! isempty (getenv ('DISPLAY'))
+%! ## A pick of solids: the indices, and the name that selects them again
+%! S = frontback ();
+%! S.Name = {'front'; 'back'};
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Model = S;
+%!   view (V, 0, 0);
+%!   [I, CODE] = V.__pick__ ('solid', V.__project__ ([10, 0, 10]));
+%!   assert_equal (I, 1);
+%!   assert_equal (CODE, "'front'");
+%!   opacity (V, eval (CODE), 0);
+%!   assert_equal (opacity (V), [0; 1]);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+%!testif ; ! isempty (getenv ('DISPLAY'))
+%! ## Unnamed solids are given back by index
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Model = frontback ();
+%!   view (V, 0, 0);
+%!   [I, CODE] = V.__pick__ ('solid', V.__project__ ([10, 0, 10]));
+%!   assert_equal ({I, CODE}, {1, '1'});
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+%!testif ; ! isempty (getenv ('DISPLAY'))
+%! ## An assembly: kept as itself, picked by solid, its path given back
+%! A = add (model.Assembly ('pair'), 'front', solid.box (20, 10, 20), ...
+%!          geom.UCS ());
+%! A = add (A, 'back', solid.box (20, 10, 20), ...
+%!          geom.UCS ([0, 0, 1], [0, 30, 0]));
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Model = A;
+%!   assert_equal (class (V.Model), 'model.Assembly');
+%!   view (V, 0, 0);
+%!   [I, CODE] = V.__pick__ ('any', V.__project__ ([10, 0, 10]));
+%!   assert_equal ({I, CODE}, {1, "{'front'}"});
+%!   opacity (V, {'back'}, 0.5);
+%!   assert_equal (opacity (V), [1; 0.5]);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+%!testif ; ! isempty (getenv ('DISPLAY'))
+%! ## A new model keeps what was set by name, path or 'all', not by index
+%! S = frontback ();
+%! S.Name = {'front'; 'back'};
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Model = S;
+%!   opacity (V, 'front', 0);
+%!   opacity (V, 2, 0.5);
+%!   V.Model = S;
+%!   assert_equal (opacity (V), [0; 1]);
+%!   V.Model = solid.box (5, 5, 5);
+%!   assert_equal (opacity (V), 1);
+%!   V.Model = S;
+%!   assert_equal (opacity (V), [1; 1]);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+%!testif ; ! isempty (getenv ('DISPLAY'))
+%! ## A mesh is hidden or shown through as a whole
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Model = boxmesh (20, 10, 20);
+%!   view (V, 0, 0);
+%!   p = round (V.__project__ ([10, 0, 10]));
+%!   assert_equal (V.__pickat__ ('face', p)(1:4), 'face');
+%!   opacity (V, 'all', 0);
+%!   assert_equal (V.__pickat__ ('face', p), 'none');
+%!   opacity (V, 1, 0.4);
+%!   assert_equal (opacity (V), 0.4);
+%!   assert_equal (V.__pickat__ ('face', p)(1:4), 'face');
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!test
+%! V = unopened (frontback ());
+%! opacity (V, [1, 2], 0.5);
+%! assert_equal (opacity (V), [0.5; 0.5]);
+%!test  # a name matches solids and placements at any depth
+%! B = add (model.Assembly ('stage'), 'pin', solid.cylinder (2, 12), ...
+%!          geom.UCS ());
+%! A = add (model.Assembly ('top'), 'pin', solid.cylinder (2, 12), ...
+%!          geom.UCS ([0, 0, 1], [10, 0, 0]));
+%! A = add (A, 'stage', B, geom.UCS ([0, 0, 1], [0, 0, 20]));
+%! V = unopened (A);
+%! opacity (V, 'pin', 0);
+%! assert_equal (opacity (V), [0; 0]);
+%! opacity (V, {'stage'}, 1);
+%! assert_equal (opacity (V), [0; 1]);
+%! opacity (V, {'stage', 'pin'}, 0.5);
+%! assert_equal (opacity (V), [0; 0.5]);
+%!test  # names match case and all
+%! S = frontback ();
+%! S.Name = {'Front'; 'back'};
+%! V = unopened (S);
+%! opacity (V, 'Front', 0);
+%! assert_equal (opacity (V), [0; 1]);
+%!error<model.Viewer.opacity: nothing is named 'front'.>
+%! S = frontback ();
+%! S.Name = {'Front'; 'back'};
+%! opacity (unopened (S), 'front', 0);
+%!error<model.Viewer.opacity: nothing lies at the path {'front', 'x'}.>
+%! A = add (model.Assembly (), 'front', solid.box (2, 2, 2), geom.UCS ());
+%! opacity (unopened (A), {'front', 'x'}, 0);
+%!error<model.Viewer.opacity: indices must be integers from 1 to 2.>
+%! opacity (unopened (frontback ()), 3, 0);
+%!error<model.Viewer.opacity: indices must be integers from 1 to 2.>
+%! opacity (unopened (frontback ()), 1.5, 0);
+%!error<model.Viewer.opacity: WHAT must be indices, a name, a path or 'all'.>
+%! opacity (unopened (frontback ()), {1}, 0);
+%!error<model.Viewer.opacity: A must be a real scalar from 0 to 1.>
+%! opacity (model.Viewer (), 1, 2);
+%!error<model.Viewer.opacity: A must be a real scalar from 0 to 1.>
+%! opacity (model.Viewer (), 1, [0, 1]);
+%!error<model.Viewer.opacity: invalid number of input arguments.>
+%! opacity (model.Viewer (), 1);
+%!error<model.Viewer.opacity: the viewer is showing no shape.>
+%! opacity (model.Viewer (), 'all', 0);
+%!error<model.Viewer.opacity: a mesh has no solids to name; use 'all'.>
+%! opacity (unopened (boxmesh (2, 2, 2)), 'tet', 0);
+%!error<model.Viewer.opacity: a mesh has no solids to name; use 'all'.>
+%! opacity (unopened (boxmesh (2, 2, 2)), {'tet'}, 0);
+%!error<model.Viewer.pick: the parts of an assembly are not edited; pick 'solid' to identify one.>
+%! A = add (model.Assembly (), 'front', solid.box (2, 2, 2), geom.UCS ());
+%! pick (unopened (A), 'edge')
+%!error<model.Viewer.pick: a mesh has only points to pick.>
+%! pick (unopened (boxmesh (2, 2, 2)), 'solid')
