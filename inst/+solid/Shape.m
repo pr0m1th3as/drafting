@@ -476,7 +476,7 @@ classdef Shape
     ## opens a variable's window before there is anything to draw in it.
     ##
     ## @code{@var{V} = show (@var{S})} also returns the viewer.  Assigning to
-    ## @code{@var{V}.Shape} redraws it at once, and
+    ## @code{@var{V}.Model} redraws it at once, and
     ## @code{model.Viewer.pick} picks edges and faces with the mouse:
     ##
     ## @example
@@ -484,12 +484,12 @@ classdef Shape
     ## part = solid.box (80, 40, 12);
     ## V = show (part);
     ## E = pick (V, 'edge');     # click the edges, then press Enter
-    ## V.Shape = fillet (V.Shape, E, 3);
+    ## V.Model = fillet (V.Model, E, 3);
     ## @end group
     ## @end example
     ##
     ## Calling @code{show (@var{S})} is the same as assigning @var{S} to the
-    ## @code{Shape} of the variable's viewer.  Nothing else redraws it:
+    ## @code{Model} of the variable's viewer.  Nothing else redraws it:
     ## changing the variable that was shown does not, until it is shown again.
     ##
     ## The viewer is built with the package when Open CASCADE and X11 are
@@ -500,7 +500,7 @@ classdef Shape
     function V = show (this)
 
       viewer = model.Viewer.__named__ (inputname (1, false));
-      viewer.Shape = this;
+      viewer.Model = this;
       if (nargout > 0)
         V = viewer;
       endif
@@ -3933,9 +3933,9 @@ endfunction
 %!   assert_equal (W.Id, VA.Id);
 %!   show (part_b);
 %!   show (solid.sphere (2));
-%!   assert_equal (volume (VA.Shape), 6000, 1e-9);
-%!   assert_equal (volume (VB.Shape), 192 * pi, 1e-9);
-%!   assert_equal (volume (VU.Shape), 32 / 3 * pi, 1e-9);
+%!   assert_equal (volume (VA.Model), 6000, 1e-9);
+%!   assert_equal (volume (VB.Model), 192 * pi, 1e-9);
+%!   assert_equal (volume (VU.Model), 32 / 3 * pi, 1e-9);
 %!   assert_equal (VA.__title__ (), 'part_a (drafting)');
 %!   assert_equal (VB.__title__ (), 'part_b (drafting)');
 %!   assert_equal (VU.Name, 'S');
@@ -3943,8 +3943,8 @@ endfunction
 %!   ## Showing a variable again redraws its own window
 %!   part_a = solid.box (10, 20, 40);
 %!   show (part_a);
-%!   assert_equal (volume (VA.Shape), 8000, 1e-9);
-%!   assert_equal (volume (VB.Shape), 192 * pi, 1e-9);
+%!   assert_equal (volume (VA.Model), 8000, 1e-9);
+%!   assert_equal (volume (VB.Model), 192 * pi, 1e-9);
 %! unwind_protect_cleanup
 %!   close (VA);
 %!   close (VB);

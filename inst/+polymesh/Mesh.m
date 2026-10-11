@@ -466,7 +466,7 @@ classdef Mesh
     function V = show (this)
 
       viewer = model.Viewer.__named__ (inputname (1, false));
-      viewer.Shape = this;
+      viewer.Model = this;
       if (nargout > 0)
         V = viewer;
       endif
@@ -1174,7 +1174,7 @@ endfunction
 %!   W = show (part);
 %!   assert_equal (W.Id, VP.Id);
 %!   assert_equal (VP.__title__ (), 'part (drafting)');
-%!   assert_equal (VP.Shape.Faces, part.Faces);
+%!   assert_equal (VP.Model.Faces, part.Faces);
 %! unwind_protect_cleanup
 %!   close (VP);
 %!   setappdata (0, 'drafting_model_show', old);

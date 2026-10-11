@@ -22,7 +22,7 @@ classdef Viewer < handle
   ## A window showing a solid or a triangle mesh, in which edges, faces and
   ## coordinate systems can be picked.
   ##
-  ## Assigning a @code{solid.Shape} to the @code{Shape} of a viewer opens its
+  ## Assigning a @code{solid.Shape} to the @code{Model} of a viewer opens its
   ## window, or redraws it in place, keeping the camera where it was; each
   ## solid is drawn in its colour, grey where it has none.  Nothing
   ## else redraws it.  A @code{polymesh.Mesh} is shown the same way, shaded
@@ -73,9 +73,9 @@ classdef Viewer < handle
   properties (Dependent)
 
     ## -*- texinfo -*-
-    ## @deftp {model.Viewer} {property} Shape
+    ## @deftp {model.Viewer} {property} Model
     ##
-    ## Shape shown
+    ## Model shown
     ##
     ## The @code{solid.Shape} or the @code{polymesh.Mesh} shown.  Assigning
     ## either opens the window if it is not open and redraws it in place if it
@@ -84,7 +84,7 @@ classdef Viewer < handle
     ## window.
     ##
     ## @end deftp
-    Shape
+    Model
 
     ## -*- texinfo -*-
     ## @deftp {model.Viewer} {property} Name
@@ -98,6 +98,12 @@ classdef Viewer < handle
     ##
     ## @end deftp
     Name
+
+  endproperties
+
+  properties (Dependent, Hidden)
+
+    Shape
 
   endproperties
 
@@ -249,7 +255,7 @@ classdef Viewer < handle
       if (ismesh && ! strcmp (KIND, 'any'))
         error ("model.Viewer.pick: a mesh has only points to pick.");
       endif
-      if (! isopen (this) || isempty (this.Shape))
+      if (! isopen (this) || isempty (this.Model))
         error ("model.Viewer.pick: the viewer is showing no shape.");
       endif
 
@@ -295,7 +301,7 @@ classdef Viewer < handle
       [E, F] = items (R);
 
       ## The code that selects them again
-      S = this.Shape;
+      S = this.Model;
       ECODE = '';
       FCODE = '';
       if (! isempty (E))
@@ -328,7 +334,7 @@ classdef Viewer < handle
       while (ischar (fgetl (st.out)))
       endwhile
       fclear (st.out);
-      S = this.Shape;
+      S = this.Model;
       B = bbox (S);
       scale = max (abs (B));
       SHOWN = {};
@@ -548,13 +554,13 @@ classdef Viewer < handle
     ##
     ## @code{@var{V} = model.Viewer ()} returns a viewer that shows nothing
     ## yet; its window opens when a shape, even the empty one, is assigned to
-    ## its @code{Shape}:
+    ## its @code{Model}:
     ##
     ## @example
     ## @group
     ## V = model.Viewer ();
-    ## V.Shape = solid.box (80, 40, 12);
-    ## V.Shape = hole (V.Shape, [20, 20, 12], 8, Inf);
+    ## V.Model = solid.box (80, 40, 12);
+    ## V.Model = hole (V.Model, [20, 20, 12], 8, Inf);
     ## @end group
     ## @end example
     ##
@@ -608,7 +614,7 @@ classdef Viewer < handle
 
     endfunction
 
-    function S = get.Shape (this)
+    function S = get.Model (this)
 
       st = state (this);
       if (isa (st.mesh, 'polymesh.Mesh'))
@@ -619,11 +625,11 @@ classdef Viewer < handle
 
     endfunction
 
-    function set.Shape (this, S)
+    function set.Model (this, S)
 
       ismesh = isa (S, 'polymesh.Mesh') && isscalar (S);
       if (! ismesh && (! isa (S, 'solid.Shape') || ! isscalar (S)))
-        error (strcat ("model.Viewer: Shape must be a solid.Shape or a", ...
+        error (strcat ("model.Viewer: Model must be a solid.Shape or a", ...
                        " polymesh.Mesh object."));
       endif
       st = state (this);
@@ -688,6 +694,23 @@ classdef Viewer < handle
       if (isopen (this))
         send (this, ["title " title(st)]);
       endif
+
+    endfunction
+
+    ## Shape is Model's former name, kept until 0.3.0
+    function S = get.Shape (this)
+
+      warning (strcat ("model.Viewer: Shape is obsolete and will be", ...
+                       " removed in drafting 0.3.0; use Model instead."));
+      S = this.Model;
+
+    endfunction
+
+    function set.Shape (this, S)
+
+      warning (strcat ("model.Viewer: Shape is obsolete and will be", ...
+                       " removed in drafting 0.3.0; use Model instead."));
+      this.Model = S;
 
     endfunction
 
@@ -812,7 +835,7 @@ classdef Viewer < handle
       if (! ischar (MODE) || ! any (strcmp (MODE, {'face', 'points'})))
         error ("model.Viewer.pickucs: MODE must be 'face' or 'points'.");
       endif
-      if (! isopen (this) || isempty (this.Shape))
+      if (! isopen (this) || isempty (this.Model))
         error ("model.Viewer.pickucs: the viewer is showing no shape.");
       endif
 
@@ -1373,9 +1396,9 @@ endfunction
 %! ## The window opens with the first shape and closes on demand
 %! V = model.Viewer ('Hidden', true);
 %! assert_equal (isopen (V), false);
-%! V.Shape = solid.box (10, 20, 30);
+%! V.Model = solid.box (10, 20, 30);
 %! assert_equal (isopen (V), true);
-%! assert_equal (volume (V.Shape), 6000, 1e-9);
+%! assert_equal (volume (V.Model), 6000, 1e-9);
 %! close (V);
 %! assert_equal (isopen (V), false);
 
@@ -1383,7 +1406,7 @@ endfunction
 %! ## A double click takes the point of the shape under it
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
-%!   V.Shape = solid.box (10, 20, 30);
+%!   V.Model = solid.box (10, 20, 30);
 %!   C = V.__dblclick__ (V.__project__ ([5, 10, 30]));
 %!   assert_equal (C, [5, 10, 30], 0.05);
 %! unwind_protect_cleanup
@@ -1394,7 +1417,7 @@ endfunction
 %! ## and the view turns about it: the point stays where it is on screen
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
-%!   V.Shape = solid.box (10, 20, 30);
+%!   V.Model = solid.box (10, 20, 30);
 %!   C = V.__dblclick__ (V.__project__ ([10, 20, 30]));
 %!   PX = V.__project__ (C);
 %!   V.__drag__ ([450, 350], [520, 300]);
@@ -1407,7 +1430,7 @@ endfunction
 %! ## The mouse turns the view keeping z up the window
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
-%!   V.Shape = solid.box (80, 40, 30);
+%!   V.Model = solid.box (80, 40, 30);
 %!   assert_equal (V.__turn__ (), 'upright');
 %!   V.__drag__ ([450, 350], [520, 280]);
 %!   u = diff ([V.__project__([0, 0, 0]); V.__project__([0, 0, 30])]);
@@ -1420,7 +1443,7 @@ endfunction
 %! ## so a view the mouse found is restored as it was
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
-%!   V.Shape = solid.box (80, 40, 30);
+%!   V.Model = solid.box (80, 40, 30);
 %!   V.__drag__ ([450, 350], [520, 280]);
 %!   I = capture (V);
 %!   [az, el, zoom, target] = view (V);
@@ -1434,7 +1457,7 @@ endfunction
 %! ## T lets the mouse turn the view any way
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
-%!   V.Shape = solid.box (80, 40, 30);
+%!   V.Model = solid.box (80, 40, 30);
 %!   V.__key__ ('T');
 %!   assert_equal (V.__turn__ (), 'free');
 %!   V.__drag__ ([450, 350], [520, 280]);
@@ -1448,7 +1471,7 @@ endfunction
 %! ## and T again stands the view upright
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
-%!   V.Shape = solid.box (80, 40, 30);
+%!   V.Model = solid.box (80, 40, 30);
 %!   V.__key__ ('T');
 %!   V.__drag__ ([450, 350], [520, 280]);
 %!   V.__key__ ('T');
@@ -1463,7 +1486,7 @@ endfunction
 %! ## A double click that misses the shape takes nothing
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
-%!   V.Shape = solid.box (10, 20, 30);
+%!   V.Model = solid.box (10, 20, 30);
 %!   assert_equal (V.__dblclick__ ([2, 2]), []);
 %! unwind_protect_cleanup
 %!   close (V);
@@ -1473,7 +1496,7 @@ endfunction
 %! ## The window opens on the isometric view
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
-%!   V.Shape = solid.box (10, 20, 30);
+%!   V.Model = solid.box (10, 20, 30);
 %!   [az, el] = view (V);
 %!   assert_equal ([az, el], [45, atand(1 / sqrt (2))], 1e-8);
 %! unwind_protect_cleanup
@@ -1484,7 +1507,7 @@ endfunction
 %! ## A view set reads back as given
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
-%!   V.Shape = solid.box (10, 20, 30);
+%!   V.Model = solid.box (10, 20, 30);
 %!   view (V, 30, 60);
 %!   [az, el] = view (V);
 %!   assert_equal ([az, el], [30, 60]);
@@ -1496,7 +1519,7 @@ endfunction
 %! ## Straight down, the azimuth is kept
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
-%!   V.Shape = solid.box (10, 20, 30);
+%!   V.Model = solid.box (10, 20, 30);
 %!   view (V, 30, 90);
 %!   [az, el] = view (V);
 %!   assert_equal ([az, el], [30, 90]);
@@ -1508,7 +1531,7 @@ endfunction
 %! ## The azimuth reads back from -180 to 180
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
-%!   V.Shape = solid.box (10, 20, 30);
+%!   V.Model = solid.box (10, 20, 30);
 %!   view (V, 200, -20);
 %!   [az, el] = view (V);
 %!   assert_equal ([az, el], [-160, -20]);
@@ -1520,7 +1543,7 @@ endfunction
 %! ## Seen from above, x runs right and y up the window
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
-%!   V.Shape = solid.box (10, 20, 30);
+%!   V.Model = solid.box (10, 20, 30);
 %!   view (V, 0, 90);
 %!   O = V.__project__ ([0, 0, 30]);
 %!   X = V.__project__ ([10, 0, 30]);
@@ -1534,7 +1557,7 @@ endfunction
 %! ## Seen from the front, z runs up the window
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
-%!   V.Shape = solid.box (10, 20, 30);
+%!   V.Model = solid.box (10, 20, 30);
 %!   view (V, 0, 0);
 %!   O = V.__project__ ([0, 0, 0]);
 %!   Z = V.__project__ ([0, 0, 30]);
@@ -1547,7 +1570,7 @@ endfunction
 %! ## and looks along y
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
-%!   V.Shape = solid.box (10, 20, 30);
+%!   V.Model = solid.box (10, 20, 30);
 %!   view (V, 0, 0);
 %!   assert_equal (V.__project__ ([5, 20, 10]), V.__project__ ([5, 0, 10]));
 %! unwind_protect_cleanup
@@ -1558,7 +1581,7 @@ endfunction
 %! ## A zoom set reads back as given
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
-%!   V.Shape = solid.box (10, 20, 30);
+%!   V.Model = solid.box (10, 20, 30);
 %!   view (V, 30, 60, 2.5);
 %!   [az, el, zoom] = view (V);
 %!   assert_equal ([az, el, zoom], [30, 60, 2.5]);
@@ -1570,7 +1593,7 @@ endfunction
 %! ## A view set without a zoom fits the shape
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
-%!   V.Shape = solid.box (10, 20, 30);
+%!   V.Model = solid.box (10, 20, 30);
 %!   view (V, 30, 60, 2);
 %!   view (V, 30, 60);
 %!   [~, ~, zoom] = view (V);
@@ -1583,7 +1606,7 @@ endfunction
 %! ## A zoom of 2 shows the shape twice as large
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
-%!   V.Shape = solid.box (10, 20, 30);
+%!   V.Model = solid.box (10, 20, 30);
 %!   view (V, 0, 0);
 %!   a = norm (diff ([V.__project__([0, 0, 0]); V.__project__([10, 0, 0])]));
 %!   view (V, 0, 0, 2);
@@ -1597,7 +1620,7 @@ endfunction
 %! ## A target set reads back as given
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
-%!   V.Shape = solid.box (80, 40, 4);
+%!   V.Model = solid.box (80, 40, 4);
 %!   view (V, 30, 60, 4, [80, 40, 4]);
 %!   [az, el, zoom, target] = view (V);
 %!   assert_equal ([az, el, zoom, target], [30, 60, 4, 80, 40, 4]);
@@ -1609,7 +1632,7 @@ endfunction
 %! ## The target is at the centre of the window
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
-%!   V.Shape = solid.box (80, 40, 4);
+%!   V.Model = solid.box (80, 40, 4);
 %!   view (V, 30, 60, 4, [80, 40, 4]);
 %!   assert_equal (V.__project__ ([80, 40, 4]), [450, 350], 1);
 %! unwind_protect_cleanup
@@ -1620,7 +1643,7 @@ endfunction
 %! ## Without a target, the middle of the shape is
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
-%!   V.Shape = solid.box (80, 40, 4);
+%!   V.Model = solid.box (80, 40, 4);
 %!   view (V, 30, 60, 4);
 %!   [~, ~, ~, target] = view (V);
 %!   assert_equal (target, [40, 20, 2], 1e-9);
@@ -1632,7 +1655,7 @@ endfunction
 %! ## A view read back and set again draws the same picture
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
-%!   V.Shape = solid.box (80, 40, 4);
+%!   V.Model = solid.box (80, 40, 4);
 %!   view (V, 30, 60, 4, [80, 40, 4]);
 %!   I = capture (V);
 %!   [az, el, zoom, target] = view (V);
@@ -1677,7 +1700,7 @@ endfunction
 %! ## capture: the window's picture, the right way up
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
-%!   V.Shape = solid.box (10, 20, 30);
+%!   V.Model = solid.box (10, 20, 30);
 %!   I = capture (V);
 %!   assert_equal ([size(I), isa(I, 'uint8')], [700, 900, 3, true]);
 %!   assert_equal (mean (I(1,:,:)(:)) > mean (I(end,:,:)(:)), true);
@@ -1689,7 +1712,7 @@ endfunction
 %! ## capture: Size draws the picture at any size
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
-%!   V.Shape = solid.box (10, 20, 30);
+%!   V.Model = solid.box (10, 20, 30);
 %!   assert_equal (size (capture (V, 'Size', [1800, 400])), [400, 1800, 3]);
 %! unwind_protect_cleanup
 %!   close (V);
@@ -1700,7 +1723,7 @@ endfunction
 %! V = model.Viewer ('Hidden', true);
 %! f = [tempname(), '.png'];
 %! unwind_protect
-%!   V.Shape = solid.box (10, 20, 30);
+%!   V.Model = solid.box (10, 20, 30);
 %!   capture (V, f, 'size', [300, 200]);
 %!   assert_equal (imread (f), capture (V, 'Size', [300, 200]));
 %! unwind_protect_cleanup
@@ -1732,7 +1755,7 @@ endfunction
 %! B = solid.box (10, 20, 30);
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
-%!   V.Shape = B;
+%!   V.Model = B;
 %!   r = V.__pickat__ ('face', V.__project__ ([5, 10, 30]));
 %!   assert_equal (r, sprintf ("face %d", faces (B, 'Normal', [0, 0, 1])));
 %!   r = V.__pickat__ ('edge', V.__project__ ([5, 0, 30]));
@@ -1748,7 +1771,7 @@ endfunction
 %! C = solid.cylinder (4, 12);
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
-%!   V.Shape = C;
+%!   V.Model = C;
 %!   assert_equal (V.__pickat__ ('edge', V.__project__ ([4, 0, 6])), 'none');
 %!   assert_equal (V.__pickat__ ('any', V.__project__ ([4, 0, 6])), ...
 %!                 sprintf ("face %d", faces (C, 'Type', 'cylinder')));
@@ -1760,11 +1783,11 @@ endfunction
 %! ## A new shape replaces the old one, and the empty shape clears the view
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
-%!   V.Shape = solid.box (10, 20, 30);
+%!   V.Model = solid.box (10, 20, 30);
 %!   px = V.__project__ ([5, 10, 30]);
-%!   V.Shape = solid.Shape ();
+%!   V.Model = solid.Shape ();
 %!   assert_equal (V.__pickat__ ('face', px), 'none');
-%!   V.Shape = solid.box (10, 20, 30);
+%!   V.Model = solid.box (10, 20, 30);
 %!   assert_equal (V.__pickat__ ('face', px)(1:4), 'face');
 %! unwind_protect_cleanup
 %!   close (V);
@@ -1776,7 +1799,7 @@ endfunction
 %! near = @(M, p) any (any (M(round (p(2)) + (-3:5), round (p(1)) + (-3:5))));
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
-%!   V.Shape = solid.box (10, 20, 30);
+%!   V.Model = solid.box (10, 20, 30);
 %!   pe = V.__project__ ([5, 0, 30]);
 %!   pf = V.__project__ ([10, 10, 15]);
 %!   V.__pickstart__ ('any');
@@ -1800,7 +1823,7 @@ endfunction
 %! W = sprintf ("face %d", faces (B, 'Type', 'cylinder'));
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
-%!   V.Shape = B;
+%!   V.Model = B;
 %!   wall = V.__pickat__ ('face', V.__project__ ([17.17, 22.83, 10]));
 %!   air = V.__pickat__ ('face', V.__project__ ([16, 20, 20]));
 %!   assert_equal (wall, W);
@@ -1844,7 +1867,7 @@ endfunction
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
 %!   V.Name = 'plate';
-%!   V.Shape = solid.box (10, 20, 30);
+%!   V.Model = solid.box (10, 20, 30);
 %!   assert_equal (V.__title__ (), 'plate (drafting)');
 %!   V.Name = 'bracket';
 %!   assert_equal (V.__title__ (), 'bracket (drafting)');
@@ -1856,10 +1879,10 @@ endfunction
 %! ## The empty shape opens the window empty
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
-%!   V.Shape = solid.Shape ();
+%!   V.Model = solid.Shape ();
 %!   assert_equal (isopen (V), true);
 %!   assert_equal (V.__pickat__ ('any', [450, 350]), 'none');
-%!   V.Shape = solid.box (10, 20, 30);
+%!   V.Model = solid.box (10, 20, 30);
 %!   assert_equal (V.__pickat__ ('face', V.__project__ ([5, 10, 30]))(1:4), ...
 %!                 'face');
 %! unwind_protect_cleanup
@@ -1891,7 +1914,7 @@ endfunction
 %! B = hole (solid.box (80, 40, 12), [20, 20, 12], 8, Inf);
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
-%!   V.Shape = B;
+%!   V.Model = B;
 %!   px = @(p) V.__project__ (p);
 %!   C = [px([40, 30, 12]); px([0, 0, 12]); px([80, 0, 12]); ...
 %!        px([20, 24, 12]); NaN, NaN];
@@ -1916,7 +1939,7 @@ endfunction
 %! B = hole (solid.box (80, 40, 12), [20, 20, 12], 8, Inf);
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
-%!   V.Shape = B;
+%!   V.Model = B;
 %!   px = @(p) V.__project__ (p);
 %!   C = [px([17.17, 22.83, 10]); px([40, 30, 12]); px([0, 0, 12]); ...
 %!        px([80, 0, 12]); px([80, 20, 6]); px([40, 0, 6])];
@@ -1931,7 +1954,7 @@ endfunction
 %! ## Three corners, Enter keeping the first: the code of the UCS picked
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
-%!   V.Shape = solid.box (80, 40, 12);
+%!   V.Model = solid.box (80, 40, 12);
 %!   px = @(p) V.__project__ (p);
 %!   C = [px([0, 0, 12]); px([80, 0, 12]); px([0, 40, 12]); NaN, NaN];
 %!   [~, ~, CODE] = V.__pickucs__ ('points', C);
@@ -1944,7 +1967,7 @@ endfunction
 %! ## The code makes the UCS picked on a sloping face again
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
-%!   V.Shape = solid.wedge (60, 40, 30, 10);
+%!   V.Model = solid.wedge (60, 40, 30, 10);
 %!   px = @(p) V.__project__ (p);
 %!   C = [px([35, 20, 15]); px([60, 0, 0]); px([60, 40, 0]); NaN, NaN];
 %!   [U, ~, CODE] = V.__pickucs__ ('face', C);
@@ -1959,7 +1982,7 @@ endfunction
 %! ## A pick prints nothing
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
-%!   V.Shape = solid.box (80, 40, 12);
+%!   V.Model = solid.box (80, 40, 12);
 %!   px = @(p) V.__project__ (p);
 %!   C = [px([0, 0, 12]); px([80, 0, 12]); px([0, 40, 12]); NaN, NaN];
 %!   assert_equal (evalc ("U = V.__pickucs__ ('points', C);"), "");
@@ -1971,7 +1994,7 @@ endfunction
 %! ## Escape cancels the pick with an error, and the viewer goes on
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
-%!   V.Shape = solid.box (80, 40, 12);
+%!   V.Model = solid.box (80, 40, 12);
 %!   C = [V.__project__([40, 30, 12]); Inf, Inf];
 %!   msg = '';
 %!   try
@@ -2000,8 +2023,8 @@ endfunction
 %! M = boxmesh (80, 40, 12);
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
-%!   V.Shape = M;
-%!   assert_equal (V.Shape.Vertices, M.Vertices);
+%!   V.Model = M;
+%!   assert_equal (V.Model.Vertices, M.Vertices);
 %!   V.__pickonestart__ ('face');
 %!   r = str2double (strsplit (V.__clickone__ (V.__project__ ([40, 30, 12]))));
 %!   assert_equal (r(2:4), [0, 0, 1], 1e-12);
@@ -2023,7 +2046,7 @@ endfunction
 %! ## A UCS picked on a mesh: a facet and two corners, Enter for the origin
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
-%!   V.Shape = boxmesh (80, 40, 12);
+%!   V.Model = boxmesh (80, 40, 12);
 %!   px = @(p) V.__project__ (p);
 %!   C = [px([40, 30, 12]); px([0, 0, 12]); px([80, 0, 12]); NaN, NaN];
 %!   evalc ("[U, SHOWN] = V.__pickucs__ ('face', C);");
@@ -2046,7 +2069,7 @@ endfunction
 %! M = boxmesh (80, 40, 12);
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
-%!   V.Shape = M;
+%!   V.Model = M;
 %!   V.__pickstart__ ('any');
 %!   T = [60, 10, 12; 20, 30, 12; 80, 30, 4];
 %!   assert_equal (V.__click__ (V.__project__ (T(1,:))), 1);
@@ -2056,8 +2079,8 @@ endfunction
 %!   [P, F] = V.__pickend__ ();
 %!   assert_equal (P, T, 0.5);
 %!   assert_equal (F, [3, 0, 0, 1; 4, 0, 0, 1; 7, 1, 0, 0], 1e-12);
-%!   V.Shape = solid.box (10, 20, 30);
-%!   assert_equal (volume (V.Shape), 6000, 1e-9);
+%!   V.Model = solid.box (10, 20, 30);
+%!   assert_equal (volume (V.Model), 6000, 1e-9);
 %! unwind_protect_cleanup
 %!   close (V);
 %! end_unwind_protect
@@ -2069,7 +2092,7 @@ endfunction
 %! U.Colour = [1, 0, 0; NaN, NaN, NaN];
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
-%!   V.Shape = U;
+%!   V.Model = U;
 %!   I = double (capture (V));
 %!   p = round ([V.__project__([5, 5, 10]); V.__project__([25, 5, 10])]);
 %!   c = [squeeze(I(p(1,2), p(1,1), :))'; squeeze(I(p(2,2), p(2,1), :))'];
@@ -2087,7 +2110,7 @@ endfunction
 %! M.VertexColour = repmat ([0, 0, 1], 8, 1);
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
-%!   V.Shape = M;
+%!   V.Model = M;
 %!   p = round (V.__project__ ([40, 20, 12]));
 %!   at = @(I) double (squeeze (I(p(2), p(1), :)))';
 %!   assert_equal (V.__look__ (), 'face');
@@ -2111,13 +2134,13 @@ endfunction
 %! M.FaceColour = repmat ([1, 0, 0], 12, 1);
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
-%!   V.Shape = M;
+%!   V.Model = M;
 %!   V.__colours__ ('vertex');
 %!   assert_equal (V.__look__ (), 'face');
 %!   M.VertexColour = repmat ([0, 0, 1], 8, 1);
-%!   V.Shape = M;
+%!   V.Model = M;
 %!   assert_equal (V.__look__ (), 'vertex');
-%!   V.Shape = boxmesh (10, 20, 30);
+%!   V.Model = boxmesh (10, 20, 30);
 %!   assert_equal (V.__look__ (), 'grey');
 %! unwind_protect_cleanup
 %!   close (V);
@@ -2129,7 +2152,7 @@ endfunction
 %! near = @(D, p) any (any (D(round (p(2)) + (-3:3), round (p(1)) + (-3:3))));
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
-%!   V.Shape = boxmesh (80, 40, 12);
+%!   V.Model = boxmesh (80, 40, 12);
 %!   p = V.__project__ ([40, 20, 12]);
 %!   [~, edges] = V.__look__ ();
 %!   assert_equal (edges, 'off');
@@ -2145,7 +2168,7 @@ endfunction
 %!test
 %! V = model.Viewer ();
 %! assert_equal (isopen (V), false);
-%! assert_equal (isempty (V.Shape), true);
+%! assert_equal (isempty (V.Model), true);
 %! assert_equal (V.Name, 'S');
 %! V.Name = 'part';
 %! assert_equal (V.Name, 'part');
@@ -2160,7 +2183,14 @@ endfunction
 %! assert_equal (isopen (V), false);
 %!error<model.Viewer: Hidden must be a logical scalar.> ...
 %! model.Viewer ('Hidden', 2)
-%!error<model.Viewer: Shape must be a solid.Shape or a polymesh.Mesh object.>
+%!error<model.Viewer: Model must be a solid.Shape or a polymesh.Mesh object.>
+%! V = model.Viewer ();
+%! V.Model = 1;
+## Shape, Model's former name, warns and forwards to Model
+%!warning<model.Viewer: Shape is obsolete and will be removed in drafting 0.3.0; use Model instead.>
+%! V = model.Viewer ();
+%! S = V.Shape;
+%!error<model.Viewer: Model must be a solid.Shape or a polymesh.Mesh object.>
 %! V = model.Viewer ();
 %! V.Shape = 1;
 %!error<model.Viewer: Name must be a valid variable name.>
@@ -2170,7 +2200,7 @@ endfunction
 %! ## An edge clicked, then Enter: the code that selects it
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
-%!   V.Shape = solid.box (80, 40, 12);
+%!   V.Model = solid.box (80, 40, 12);
 %!   C = [V.__project__([40, 0, 12]); NaN, NaN];
 %!   [~, CODE] = V.__pick__ ('edge', C);
 %!   assert_equal (CODE, ["edges (S, 'Type', 'line', 'Direction',", ...
@@ -2183,7 +2213,7 @@ endfunction
 %! ## A pick of edges prints nothing
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
-%!   V.Shape = solid.box (80, 40, 12);
+%!   V.Model = solid.box (80, 40, 12);
 %!   C = [V.__project__([40, 0, 12]); NaN, NaN];
 %!   assert_equal (evalc ("E = V.__pick__ ('edge', C);"), "");
 %! unwind_protect_cleanup
@@ -2194,7 +2224,7 @@ endfunction
 %! ## Escape picks nothing
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
-%!   V.Shape = solid.box (80, 40, 12);
+%!   V.Model = solid.box (80, 40, 12);
 %!   E = V.__pick__ ('edge', [V.__project__([40, 0, 12]); Inf, Inf]);
 %!   assert_equal (isempty (E), true);
 %! unwind_protect_cleanup
@@ -2217,7 +2247,7 @@ endfunction
 %! unwind_protect
 %!   setenv ('DISPLAY', '');
 %!   V = model.Viewer ();
-%!   V.Shape = solid.Shape (uint8 (sprintf ("\nOpen CASCADE Topology V3")));
+%!   V.Model = solid.Shape (uint8 (sprintf ("\nOpen CASCADE Topology V3")));
 %! unwind_protect_cleanup
 %!   setenv ('DISPLAY', d);
 %! end_unwind_protect

@@ -6979,7 +6979,7 @@ drafting: model.Viewer
 A window showing a solid or a triangle mesh, in which edges, faces and
 coordinate systems can be picked.
 
-Assigning a solid.Shape to the Shape of a viewer opens its
+Assigning a solid.Shape to the Model of a viewer opens its
 window, or redraws it in place, keeping the camera where it was; each
 solid is drawn in its colour, grey where it has none. Nothing
 else redraws it. A polymesh.Mesh is shown the same way, shaded
@@ -7039,6 +7039,35 @@ A window showing a solid or a triangle mesh, in which edges, faces and coordinat
 # name: <cell-element>
 # type: sq_string
 # elements: 1
+# length: 18
+model.Viewer.Model
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 295
+model.Viewer: property Model
+Model shown
+
+The solid.Shape or the polymesh.Mesh shown. Assigning
+either opens the window if it is not open and redraws it in place if it
+is. The empty shape opens the window empty, or clears
+it if it is open; the first shape shown after it is fitted to the
+window.
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 11
+Model shown
+
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
 # length: 17
 model.Viewer.Name
 
@@ -7067,35 +7096,6 @@ Name of the shape shown
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 18
-model.Viewer.Shape
-
-
-# name: <cell-element>
-# type: sq_string
-# elements: 1
-# length: 295
-model.Viewer: property Shape
-Shape shown
-
-The solid.Shape or the polymesh.Mesh shown. Assigning
-either opens the window if it is not open and redraws it in place if it
-is. The empty shape opens the window empty, or clears
-it if it is open; the first shape shown after it is fitted to the
-window.
-
-
-# name: <cell-element>
-# type: sq_string
-# elements: 1
-# length: 11
-Shape shown
-
-
-
-# name: <cell-element>
-# type: sq_string
-# elements: 1
 # length: 19
 model.Viewer.Viewer
 
@@ -7110,11 +7110,11 @@ Make a viewer.
 
 V = model.Viewer () returns a viewer that shows nothing
 yet; its window opens when a shape, even the empty one, is assigned to
-its Shape:
+its Model:
 
 V = model.Viewer ();
-V.Shape = solid.box (80, 40, 12);
-V.Shape = hole (V.Shape, [20, 20, 12], 8, Inf);
+V.Model = solid.box (80, 40, 12);
+V.Model = hole (V.Model, [20, 20, 12], 8, Inf);
 
 V = model.Viewer ('Hidden', true) never shows its
 window. It draws and picks all the same, which is how the viewer is
@@ -9884,16 +9884,16 @@ show of that variable opens a new one. Showing the empty shape
 opens a variable's window before there is anything to draw in it.
 
 V = show (S) also returns the viewer. Assigning to
-V.Shape redraws it at once, and
+V.Model redraws it at once, and
 model.Viewer.pick picks edges and faces with the mouse:
 
 part = solid.box (80, 40, 12);
 V = show (part);
 E = pick (V, 'edge'); # click the edges, then press Enter
-V.Shape = fillet (V.Shape, E, 3);
+V.Model = fillet (V.Model, E, 3);
 
 Calling show (S) is the same as assigning S to the
-Shape of the variable's viewer. Nothing else redraws it:
+Model of the variable's viewer. Nothing else redraws it:
 changing the variable that was shown does not, until it is shown again.
 
 The viewer is built with the package when Open CASCADE and X11 are

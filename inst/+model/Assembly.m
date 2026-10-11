@@ -356,9 +356,9 @@ classdef Assembly
 
       viewer = model.Viewer.__named__ (inputname (1, false));
       if (isempty (meshpart (this)))
-        viewer.Shape = shape (this);
+        viewer.Model = shape (this);
       else
-        viewer.Shape = tessellate (this);
+        viewer.Model = tessellate (this);
       endif
       if (nargout > 0)
         V = viewer;
