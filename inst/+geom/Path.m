@@ -837,7 +837,7 @@ classdef Path
     ## @item @qcode{'Version'}
     ## @qcode{'R2000'} (@code{AC1015}), the default, or @qcode{'R12'}
     ## (@code{AC1009}) for a program that reads nothing later.  R12 has no
-    ## groups and holds only lines and arcs, so a path is an error there.
+    ## groups, so a path is an error there.
     ## @item @qcode{'LTScale'}
     ## The drawing's line-type scale, 1 by default, written in the header so
     ## the dashes look the same wherever the file is opened.
@@ -1022,10 +1022,10 @@ classdef Path
     ## @example
     ## @group
     ## ## A slot drawn as two lines and two half circles, in no order
-    ## C = geom.Path.chain (@{geom.Polyline ([0, 0; 20, 0]), ...
-    ##                      geom.Polyline ([0, 10, 1; 0, 0, 0]), ...
-    ##                      geom.Polyline ([0, 10; 20, 10]), ...
-    ##                      geom.Polyline ([20, 0, 1; 20, 10, 0])@});
+    ## C = geom.Path.chain (@{geom.Polyline([0, 0; 20, 0]), ...
+    ##                      geom.Polyline([0, 10, 1; 0, 0, 0]), ...
+    ##                      geom.Polyline([0, 10; 20, 10]), ...
+    ##                      geom.Polyline([20, 0, 1; 20, 10, 0])@});
     ## @end group
     ## @end example
     ##
@@ -1793,5 +1793,5 @@ endfunction
 
 %!error<geom.Path.write: invalid number of input arguments.> ...
 %! write (geom.Path ([0, 0; 1, 0]))
-%!error<geom.Path.write: R12 holds only lines and arcs, not a path.> ...
+%!error<geom.Path.write: R12 cannot hold a path.> ...
 %! write (geom.Path ([0, 0; 1, 0]), 'a.dxf', 'Version', 'R12')

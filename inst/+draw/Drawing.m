@@ -345,8 +345,8 @@ classdef Drawing
     ##
     ## @code{@var{E} = entities (@var{D})} converts the @code{draw.Drawing}
     ## @var{D} into a struct array of @code{LINE}, @code{POLYLINE}, @code{ARC},
-    ## @code{CIRCLE}, @code{ELLIPSE}, @code{TEXT}, @code{POINT} and
-    ## @code{INSERT} records, each
+    ## @code{CIRCLE}, @code{ELLIPSE}, @code{TEXT}, @code{POINT},
+    ## @code{INSERT} and @code{DIMENSION} records, each
     ## on the layer, line type and colour it was drawn with.  A spline, a path
     ## and a region become polylines along them, a region one per loop; a
     ## hatch becomes its loops and its fill lines, clear of its holes.  An
@@ -354,8 +354,11 @@ classdef Drawing
     ## semi-axes in @code{radius} and its rotation in degrees in
     ## @code{rotation}.
     ##
-    ## A dimension, a centre mark and a leader become the lines and text that
-    ## draw them, the ornament in millimetres of model space scaled by
+    ## A dimension is a @code{DIMENSION} record that names in @code{block} the
+    ## anonymous block, @qcode{'*D1'}, @qcode{'*D2'} and so on, holding the
+    ## lines and text that draw it, as a CAD file keeps it; @var{BLOCKS}
+    ## holds those blocks.  A centre mark and a leader become their lines and
+    ## text.  The ornament is in millimetres of model space scaled by
     ## @qcode{'DimScale'}: a drawing to be plotted at @math{1:50} wants
     ## @code{'DimScale', 50}.  Ticks are 45-degree obliques and the text is
     ## horizontal whatever the dimension measures.
@@ -371,7 +374,44 @@ classdef Drawing
     ## otherwise than it is held, with fields @code{index}, @code{type} and
     ## @code{reason}; omit @var{LOST} and each distinct reason is warned about
     ## once.  @var{BLOCKS} holds the block definitions, broken down the same
-    ## way, when @qcode{'Blocks'} is @qcode{'reference'}.
+    ## way, when @qcode{'Blocks'} is @qcode{'reference'}, and the blocks of
+    ## the dimensions.
+    ##
+    ## Name/Value pairs:
+    ##
+    ## @table @asis
+    ## @item @qcode{'DimScale'}
+    ## The scale of the dimension ornament, 1 by default.
+    ##
+    ## @item @qcode{'Dimensions'}
+    ## @qcode{'associative'}, the default, for the @code{DIMENSION} records
+    ## above, or @qcode{'explode'} for the lines and text of each dimension in
+    ## its place, as @code{draw.Drawing.plot} and @code{draw.Drawing.tikz}
+    ## draw them.
+    ##
+    ## @item @qcode{'Bulges'}
+    ## @qcode{'keep'}, the default, to keep each arc of a polyline, a path or
+    ## a region as the bulge of its segment, or @qcode{'flatten'} for straight
+    ## segments along it.
+    ##
+    ## @item @qcode{'ChordTol'}
+    ## How far, in millimetres, the straight segments of a flattened arc may
+    ## stray from it, 0.01 by default.
+    ##
+    ## @item @qcode{'Hatch'}
+    ## @qcode{'lines'}, the default, for a hatch's loops and fill lines, or
+    ## @qcode{'boundary'} for its loops alone.
+    ##
+    ## @item @qcode{'Blocks'}
+    ## @qcode{'expand'}, the default, to draw each insert as the entities of
+    ## its block, or @qcode{'reference'} for an @code{INSERT} record and the
+    ## block in @var{BLOCKS}.
+    ##
+    ## @item @qcode{'Layers'}
+    ## @qcode{'resolve'}, the default, to give each record the colour, line
+    ## type and line weight of its layer where it is drawn
+    ## @qcode{'byLayer'}, or @qcode{'keep'}, as above.
+    ## @end table
     ##
     ## @end deftypefn
     function [E, LOST, BLOCKS] = entities (D, varargin)
@@ -3330,9 +3370,10 @@ classdef Drawing
     ## @table @asis
     ## @item @qcode{'Version'}
     ## @qcode{'R2000'}, the default, or @qcode{'R12'} (@code{AC1009}) for a
-    ## program that reads nothing later.  R12 holds only lines and arcs, so a
-    ## drawing holding an ellipse, a spline, a path, a region or a hatch is an
-    ## error there, naming what R12 cannot hold.
+    ## program that reads nothing later.  R12 has no @code{ELLIPSE}, no
+    ## @code{SPLINE}, no groups and no @code{HATCH}, so a drawing holding an
+    ## ellipse, a spline, a path, a region or a hatch is an error there,
+    ## naming what R12 cannot hold.
     ## @item @qcode{'Dimensions'}
     ## @qcode{'associative'}, the default, or @qcode{'explode'} to write each
     ## dimension as the lines and text it is drawn with, for a program that
@@ -3350,8 +3391,8 @@ classdef Drawing
     ## @end table
     ##
     ## Text is written with every character outside ASCII escaped as
-    ## @code{\U+XXXX}, so the file reads the same whatever the reader's code
-    ## page.
+    ## @code{\U+XXXX}, so it reads the same whatever the reader's code page.
+    ## Layer, line-type and block names are written as given, in UTF-8.
     ##
     ## @seealso{draw.read, draw.Drawing.print, draw.Drawing.tikz, geom.write}
     ## @end deftypefn

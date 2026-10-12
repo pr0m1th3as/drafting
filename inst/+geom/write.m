@@ -55,17 +55,16 @@
 ## default.
 ## @item @qcode{'Version'}
 ## @qcode{'R2000'} (@code{AC1015}), the default, or @qcode{'R12'}
-## (@code{AC1009}) for a program that reads nothing later.  R12 holds only
-## lines and arcs, so only polylines may be written as R12; a spline, a path
-## or a region is an error naming it.
+## (@code{AC1009}) for a program that reads nothing later.  R12 has no
+## @code{SPLINE}, no groups and no @code{HATCH}, so only polylines may be
+## written as R12; a spline, a path or a region is an error naming it.
 ## @item @qcode{'LTScale'}
 ## The drawing's line-type scale, 1 by default, written in the header so
 ## the dashes look the same wherever the file is opened.
 ## @end table
 ##
-## The drawing units are millimetres.  Text is written with every character
-## outside ASCII escaped as @code{\U+XXXX}, so the file reads the same
-## whatever the reader's code page.
+## The drawing units are millimetres.  Layer and line-type names are written
+## as given, in UTF-8.
 ##
 ## @seealso{geom.read, geom.Polyline.write, geom.Spline.write,
 ## geom.Path.write, geom.Region.write, draw.Drawing.write}
@@ -165,10 +164,10 @@ endfunction
 %! geom.write ({}, 'a.dxf', 'Version', 'R14')
 %!error<geom.write: LTScale must be a positive finite scalar.> ...
 %! geom.write ({}, 'a.dxf', 'LTScale', 0)
-%!error<geom.write: R12 holds only lines and arcs, not a spline.> ...
+%!error<geom.write: R12 cannot hold a spline.> ...
 %! geom.write ({geom.Spline([0, 0; 1, 1; 2, 0])}, 'a.dxf', 'Version', 'R12')
-%!error<geom.write: R12 holds only lines and arcs, not a path.> ...
+%!error<geom.write: R12 cannot hold a path.> ...
 %! geom.write ({geom.Path([0, 0; 1, 0])}, 'a.dxf', 'Version', 'R12')
-%!error<geom.write: R12 holds only lines and arcs, not a region.> ...
+%!error<geom.write: R12 cannot hold a region.> ...
 %! geom.write ({geom.Region(geom.Polyline([0, 0; 1, 0; 1, 1], 'Closed', ...
 %!                                         true))}, 'a.dxf', 'Version', 'R12')

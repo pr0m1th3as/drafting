@@ -72,7 +72,7 @@ classdef Viewer < handle
   ## Closing the window ends the viewer; assigning a shape again opens a new
   ## one.  The window closes with Octave.
   ##
-  ## The viewer needs a display to run.  It runs on Linux.
+  ## The viewer needs a display to run.  It runs on Linux and FreeBSD.
   ##
   ## @seealso{solid.Shape.show, polymesh.Mesh.show, model.Assembly.show,
   ## model.Viewer.pick, model.Viewer.opacity}

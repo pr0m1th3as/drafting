@@ -581,8 +581,8 @@ classdef Spline
     ## which is the default.  True colour came only with R2004.
     ## @item @qcode{'Version'}
     ## @qcode{'R2000'} (@code{AC1015}), the default, or @qcode{'R12'}
-    ## (@code{AC1009}) for a program that reads nothing later.  R12 holds
-    ## only lines and arcs, so a spline is an error there.
+    ## (@code{AC1009}) for a program that reads nothing later.  R12 has no
+    ## @code{SPLINE}, so a spline is an error there.
     ## @item @qcode{'LTScale'}
     ## The drawing's line-type scale, 1 by default, written in the header so
     ## the dashes look the same wherever the file is opened.
@@ -1263,5 +1263,5 @@ endfunction
 
 %!error<geom.Spline.write: invalid number of input arguments.> ...
 %! write (geom.Spline ([0, 0; 1, 1; 2, 0]))
-%!error<geom.Spline.write: R12 holds only lines and arcs, not a spline.> ...
+%!error<geom.Spline.write: R12 cannot hold a spline.> ...
 %! write (geom.Spline ([0, 0; 1, 1; 2, 0]), 'a.dxf', 'Version', 'R12')

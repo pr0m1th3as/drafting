@@ -24,9 +24,10 @@
 ##
 ## @code{@var{Q} = geom.curveoffset (@var{P}, @var{D})} moves every point of the
 ## curve @var{P} a distance @var{D} along the curve's own normal and returns the
-## result @var{Q}, with one point per point of @var{P}.  @var{P} is an
-## @math{N}-by-2 matrix of points and @var{D} is a real scalar in the units of
-## @var{P}, so millimetres by package convention.
+## result @var{Q}, with one point per point of @var{P}, but for the last
+## point of a closed curve that repeats the first, which is dropped.  @var{P}
+## is an @math{N}-by-2 matrix of points and @var{D} is a real scalar in the
+## units of @var{P}, so millimetres by package convention.
 ##
 ## @code{@var{Q} = geom.curveoffset (@var{P}, @var{D}, @var{CLOSED})} treats the
 ## curve as closed when @var{CLOSED} is true.  @var{CLOSED} defaults to false.

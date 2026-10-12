@@ -36,8 +36,8 @@
 ## list the indices refer to: @var{P} followed by each hole in turn.
 ##
 ## @code{[@var{T}, @var{V}, @var{COVERAGE}] = geom.triangulate (@dots{})}
-## returns the fraction of the true area the triangles actually cover.  Read it;
-## see below.
+## returns the area of the triangles over the area of the polygon, less its
+## holes.  Read it; see below.
 ##
 ## The intended use is generating end caps for an extruded solid, where the
 ## profile carries a central bore and a ring of holes.
@@ -51,10 +51,12 @@
 ## bridging the concavity has its centroid outside and is discarded, and nothing
 ## replaces it.
 ##
-## The consequence is that a triangulated region can be slightly smaller than
-## the polygon, never larger.  Denser sampling of the boundary shrinks the
-## shortfall, and @var{COVERAGE} measures it, so a caller that needs a guarantee
-## can assert on a number rather than trust a description.  For a printed
+## The consequence is that a triangulated region can differ from the polygon
+## along a strongly concave boundary: a sliver of the polygon may go
+## uncovered, and a triangle bridging the concavity whose centroid lies inside
+## covers a sliver outside it.  Denser sampling of the boundary shrinks both.
+## @var{COVERAGE} below 1 shows a shortfall, but a sliver outside can offset
+## one missed inside, so it bounds neither on its own.  For a printed
 ## prototype the shortfall is invisible well before it is zero; for anything
 ## dimensionally critical, a constrained triangulation is the right tool and
 ## this is not it.

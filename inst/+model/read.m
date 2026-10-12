@@ -32,7 +32,9 @@
 ## the base name of @var{FILE}.  A part without a name is named
 ## @qcode{'part'}, an assembly @qcode{'assembly'}, and a name two parts
 ## share, or two placements in one assembly, is made distinct with
-## @qcode{'_2'}, @qcode{'_3'} and so on.
+## @qcode{'_2'}, @qcode{'_3'} and so on.  A placement that mirrors its
+## part is an error, since a @code{geom.UCS} places rigidly and a mirrored
+## part is another part.
 ##
 ## A part of a STEP file is its solids, a closed shell read as the solid it
 ## bounds.  Surfaces, curves and points are left out with a warning that

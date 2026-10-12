@@ -2064,7 +2064,7 @@ r12name (const string& cls)
 static void
 refuser12 (const string& what)
 {
-  error ("%s: R12 holds only lines and arcs, not %s.", g_caller.c_str (),
+  error ("%s: R12 cannot hold %s.", g_caller.c_str (),
          r12name (what).c_str ());
 }
 

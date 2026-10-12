@@ -522,7 +522,7 @@ classdef Shape
     ## changing the variable that was shown does not, until it is shown again.
     ##
     ## The viewer is built with the package when Open CASCADE and X11 are
-    ## found, and needs a display to run.  It runs on Linux.
+    ## found, and needs a display to run.  It runs on Linux and FreeBSD.
     ##
     ## @seealso{model.Viewer, model.Viewer.pick, polymesh.Mesh.show}
     ## @end deftypefn

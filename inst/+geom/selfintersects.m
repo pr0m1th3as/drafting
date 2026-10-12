@@ -48,10 +48,9 @@
 ## at every point and still pinch closed somewhere along its length; only a
 ## test like this one sees that.
 ##
-## The test is exhaustive over segment pairs, so its cost grows as the square of
-## the number of points.  On a profile of a few thousand points that is a
-## fraction of a second, but it is not something to call inside a loop over
-## candidate designs.
+## Only segments whose bounding boxes overlap are tested, found by sweeping
+## along @math{x}, so a profile of half a million points takes a few
+## hundredths of a second.
 ##
 ## @seealso{geom.curveoffset, geom.curvature, geom.signedarea}
 ## @end deftypefn

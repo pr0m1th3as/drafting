@@ -464,7 +464,7 @@ classdef Mesh
     ## mesh and @code{pickucs} a coordinate system.
     ##
     ## The viewer is built with the package when Open CASCADE and X11 are
-    ## found, and needs a display to run.  It runs on Linux.
+    ## found, and needs a display to run.  It runs on Linux and FreeBSD.
     ##
     ## @seealso{model.Viewer, solid.Shape.show}
     ## @end deftypefn
