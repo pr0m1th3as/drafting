@@ -2462,10 +2462,10 @@ classdef Drawing
     ## needs
     ## no adjustment; one spanning metres wants an @qcode{'LTScale'} to match.
     ##
-    ## The cost is one graphics object per dash.  Set @qcode{'Linetypes'} to
-    ## @qcode{'approximate'} on a large drawing to fall back on the figure's
-    ## four
-    ## styles and one object per entity.
+    ## The dashes are pieces of their layer's line object, split by
+    ## @code{NaN}, so a long dotted line costs points rather than objects.
+    ## Set @qcode{'Linetypes'} to @qcode{'approximate'} on a large drawing to
+    ## draw with the figure's four styles instead, and leave the lines whole.
     ##
     ## @strong{Text is not to scale by default.} A figure sets font size in
     ## points,
