@@ -1676,6 +1676,22 @@
 %!   [~] = unlink ([fn, '.pdf']);
 %! end_unwind_protect
 
+## The dashes reach the sheet at their nominal length: a 1000 mm HIDDEN
+## line at 1:50 is 20 mm on paper, 54 dashes of 0.25 and gaps of 0.125
+%!testif ; any (strcmp (graphics_toolkit (), {'qt', 'gnuplot'}))
+%! fn = [tempname(), '.svg'];
+%! D = draw.Drawing ();
+%! D.Linetype = 'HIDDEN';
+%! D = D.line ([0, 0], [1000, 0]);
+%! unwind_protect
+%!   [~, S] = print (D, fn, 'Paper', 'A4', 'Scale', 50);
+%!   t = fileread (fn);
+%! unwind_protect_cleanup
+%!   [~] = unlink (fn);
+%! end_unwind_protect
+%! assert_equal (S, 50);
+%! assert_equal (numel (strfind (t, '<polyline')), 54);
+
 ## Portrait swaps the sheet
 %!testif ; any (strcmp (graphics_toolkit (), {'qt', 'gnuplot'}))
 %! fn = tempname ();
@@ -2125,6 +2141,11 @@
 
 %!test  # text height is emitted in points at the plotted size
 %! S = tikz (draw.Drawing ().text ([0, 0], 'A', 125), 'Scale', 50);
+%! assert_equal (! isempty (strfind (S, '\fontsize{7.11319}')), true);
+
+%!test  # dimension text arrives at its nominal size, whatever the scale
+%! D = draw.Drawing ().dim ([0, 0], [1000, 0], 300);
+%! S = tikz (D, 'Scale', 50);
 %! assert_equal (! isempty (strfind (S, '\fontsize{7.11319}')), true);
 
 %!test  # LaTeX special characters are escaped

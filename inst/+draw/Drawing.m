@@ -2942,6 +2942,10 @@ classdef Drawing
     ##
     ## @qcode{'LineWidth'} is the opposite: a width on the paper, held there at
     ## every scale, because a 0.35 mm pen is 0.35 mm whatever the sheet shows.
+    ## So are the dashes of a line type and the ticks and labels of a
+    ## dimension: they arrive at their nominal size on the sheet whatever the
+    ## scale, as @code{draw.Drawing.plot} draws them with @qcode{'LTScale'} and
+    ## @qcode{'DimScale'} set to the scale denominator.
     ##
     ## @seealso{draw.Drawing.plot, draw.Drawing.tikz, draw.titleblock,
     ## draw.Drawing.write}
@@ -3074,7 +3078,8 @@ classdef Drawing
           cla (ax);
           plot (D, 'Axes', ax, 'Margin', 0, ...
                      'FontScale', 72 / (25.4 * SCALE), ...
-                     'LineWidth', opt.LineWidth * 72 / 25.4);
+                     'LineWidth', opt.LineWidth * 72 / 25.4, ...
+                     'LTScale', SCALE, 'DimScale', SCALE);
           span = [diff(xlim(ax)), diff(ylim(ax))];
           if (all (span / SCALE <= usable + 1e-9) || ! isempty (opt.Scale))
             break;
@@ -3099,7 +3104,8 @@ classdef Drawing
           cla (ax);
           plot (P, 'Axes', ax, 'Margin', 0, ...
                      'FontScale', 72 / (25.4 * SCALE), ...
-                     'LineWidth', opt.LineWidth * 72 / 25.4);
+                     'LineWidth', opt.LineWidth * 72 / 25.4, ...
+                     'LTScale', SCALE, 'DimScale', SCALE);
         endif
         xlim (ax, xl);
         ylim (ax, yl);
@@ -3188,7 +3194,8 @@ classdef Drawing
     ## A dimension, a centre mark and a leader are drawn as the lines and text
     ## @code{draw.Drawing.entities} breaks them into, as
     ## @code{draw.Drawing.plot} draws them: labels unidirectional, ticks the
-    ## 45-degree architectural obliques.  A label is a node anchored at the
+    ## 45-degree architectural obliques, their size on paper nominal whatever
+    ## the scale.  A label is a node anchored at the
     ## start of its baseline, where @code{draw.Drawing.entities} places it
     ## from an estimate of its width.  A hatch is drawn as its outline and its
     ## fill lines.
@@ -3281,7 +3288,7 @@ classdef Drawing
       ## arrived and only this backend still rendered from the drawing model.
       ## What an entity takes from its layer is left to the layer's style
       [E, ~] = entities (D, 'bulges', 'flatten', 'dimensions', 'explode', ...
-                         'layers', 'keep');
+                         'layers', 'keep', 'DimScale', scale);
 
       if (isempty (E))
         L = {};
