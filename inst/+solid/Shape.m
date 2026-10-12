@@ -299,6 +299,11 @@ classdef Shape
     ## Removing empty shapes, or nothing, leaves @var{A}, and removing
     ## anything from the empty shape leaves the empty shape.
     ##
+    ## A shape may hold solids that overlap, as the shape of an assembly
+    ## does where its parts meet.  As a tool it removes the region its solids
+    ## cover together, and as @var{A} each of its solids is cut on its own
+    ## and kept apart from the others.
+    ##
     ## Open CASCADE 7.8 can return @var{A} uncut and report success, as it
     ## does for a dome cut by a circle that starts in the plane of the dome's
     ## seam.  A shape that comes back without the faces of a tool that
@@ -358,6 +363,13 @@ classdef Shape
     ## the volume of the interference, and parts that stay apart give the
     ## empty shape.  Each solid of the result takes the colour of the first
     ## coloured solid it came from.
+    ##
+    ## A shape may hold solids that overlap, as the shape of an assembly
+    ## does where its parts meet.  After the first it counts as the region
+    ## its solids cover together, and each solid of @var{A} is intersected on
+    ## its own and kept apart from the others, so intersecting a part with
+    ## the shape of the assembly round it gives the interference with all its
+    ## parts at once.
     ##
     ## @example
     ## @group
@@ -3639,6 +3651,66 @@ endfunction
 %! C = subtract (A, B);
 %! assert_equal (volume (A), 1000, 1e-9);
 %! assert_equal (bbox (B), [5, 0, 0, 15, 10, 10], 1e-9);
+
+%!test  # a tool whose solids overlap cuts the region they cover
+%! A = model.Assembly ('k');
+%! P = solid.cylinder (5, 30);
+%! A = add (A, 'a', P, geom.UCS ([0, 0, 1], [30, 20, -10]));
+%! A = add (A, 'b', P, geom.UCS ([0, 0, 1], [36, 20, -10]));
+%! K = shape (A);
+%! U = 10 * (50 * pi - 50 * acos (0.6) + 24);
+%! C = subtract (solid.box (80, 40, 10), K);
+%! assert_equal (volume (C), 32000 - U, 1e-9);
+%! assert_equal (numsolids (C), 1);
+
+%!test  # and intersects in it, as one solid
+%! A = model.Assembly ('k');
+%! P = solid.cylinder (5, 30);
+%! A = add (A, 'a', P, geom.UCS ([0, 0, 1], [30, 20, -10]));
+%! A = add (A, 'b', P, geom.UCS ([0, 0, 1], [36, 20, -10]));
+%! K = shape (A);
+%! U = 10 * (50 * pi - 50 * acos (0.6) + 24);
+%! C = intersect (solid.box (80, 40, 10), K);
+%! assert_equal (volume (C), U, 1e-9);
+%! assert_equal (numsolids (C), 1);
+
+%!test  # solids that overlap are cut each on its own
+%! A = model.Assembly ('k');
+%! P = solid.cylinder (5, 30);
+%! A = add (A, 'a', P, geom.UCS ([0, 0, 1], [30, 20, -10]));
+%! A = add (A, 'b', P, geom.UCS ([0, 0, 1], [36, 20, -10]));
+%! K = shape (A);
+%! C = subtract (K, solid.box (80, 40, 10));
+%! assert_equal (volume (C), 2 * 500 * pi, 1e-9);
+%! assert_equal (numsolids (C), 4);
+
+%!test  # and intersected each on its own
+%! A = model.Assembly ('k');
+%! P = solid.cylinder (5, 30);
+%! A = add (A, 'a', P, geom.UCS ([0, 0, 1], [30, 20, -10]));
+%! A = add (A, 'b', P, geom.UCS ([0, 0, 1], [36, 20, -10]));
+%! K = shape (A);
+%! C = intersect (K, solid.box (80, 40, 10));
+%! assert_equal (volume (C), 2 * 250 * pi, 1e-9);
+%! assert_equal (numsolids (C), 2);
+
+%!test  # a tool of solids stacked end to end is no false uncut cut
+%! A = model.Assembly ('k');
+%! P = solid.cylinder (5, 30);
+%! A = add (A, 'a', P, geom.UCS ([0, 0, 1], [30, 20, 5]));
+%! A = add (A, 'b', P, geom.UCS ([0, 0, 1], [30, 20, 10]));
+%! C = subtract (solid.box (80, 40, 10), shape (A));
+%! assert_equal (volume (C), 32000 - 125 * pi, 1e-9);
+
+%!test  # solids that overlap keep their names, cut each on its own
+%! A = model.Assembly ('k');
+%! P = solid.cylinder (5, 30);
+%! A = add (A, 'a', P, geom.UCS ([0, 0, 1], [30, 20, -10]));
+%! A = add (A, 'b', P, geom.UCS ([0, 0, 1], [36, 20, -10]));
+%! K = shape (A);
+%! K.Name = {'pin'; 'bolt'};
+%! C = subtract (K, solid.box (80, 40, 10));
+%! assert_equal (C.Name, {'pin'; 'pin'; 'bolt'; 'bolt'});
 
 %!testif ; compare_versions (__occt__ ('version', 'test'), '7.9.0', '>=')
 %! ## a dome cut by a circle that starts in the plane of its seam

@@ -2099,6 +2099,41 @@ solidsof (const TopoDS_Shape& s)
   return m;
 }
 
+// The solids of the shape S, each on its own, or S itself when it holds none
+static vector<TopoDS_Shape>
+eachsolid (const TopoDS_Shape& s)
+{
+  const ShapeMap m = solidsof (s);
+  vector<TopoDS_Shape> v;
+  for (int i = 1; i <= m.Extent (); i++)
+  {
+    v.push_back (m (i));
+  }
+  if (v.empty ())
+  {
+    v.push_back (s);
+  }
+  return v;
+}
+
+// The shapes V as one, the shape itself when there is one
+static TopoDS_Shape
+gather (const vector<TopoDS_Shape>& v)
+{
+  if (v.size () == 1)
+  {
+    return v[0];
+  }
+  BRep_Builder b;
+  TopoDS_Compound c;
+  b.MakeCompound (c);
+  for (const TopoDS_Shape& s : v)
+  {
+    b.Add (c, s);
+  }
+  return c;
+}
+
 // The solids each solid of a result came from, as indices from 1 into the
 // solids of the operands, those of each in turn in the order a map of them
 // gives
@@ -3561,11 +3596,14 @@ function directly. \n\
       out = traced (r, overlap (s, r));
     }
 
-    // Booleans.  A union and a difference take every shape after the first
-    // as a tool in one operation, which is several times faster than taking
-    // them one at a time.  An intersection cannot: Open CASCADE intersects
-    // the first shape with the union of the tools, so it goes pairwise.
-    else if (cmd == "fuse" || cmd == "cut")
+    // Booleans.  A union and a difference take every solid after the first
+    // shape as a tool in one operation, which is several times faster than
+    // taking them one at a time.  An intersection cannot: Open CASCADE
+    // intersects the first shape with the union of the tools, so it goes
+    // pairwise.  Open CASCADE takes no shape whose solids overlap, as an
+    // assembly's do: given one it returns a wrong result and reports
+    // nothing.  So every operation takes the solids of each shape on its own.
+    else if (cmd == "fuse")
     {
       ShapeList objects, tools;
       vector<TopoDS_Shape> sources;
@@ -3573,77 +3611,126 @@ function directly. \n\
       {
         sources.push_back (toshape (args(i), caller));
         ShapeList& list = (i == 2 ? objects : tools);
-        if (cmd == "fuse")
+        for (const TopoDS_Shape& p : eachsolid (sources.back ()))
         {
-          // A union takes each solid of an operand on its own: given a
-          // compound of solids made by solid.surface as one operand, Open
-          // CASCADE returns the union of the others without it, and
-          // reports nothing
-          const ShapeMap solids = solidsof (sources.back ());
-          for (int k = 1; k <= solids.Extent (); k++)
-          {
-            list.Append (solids (k));
-          }
-        }
-        else
-        {
-          list.Append (sources.back ());
+          list.Append (p);
         }
       }
-      if (cmd == "fuse")
+      BRepAlgoAPI_Fuse op;
+      op.SetArguments (objects);
+      op.SetTools (tools);
+      const TopoDS_Shape r = boolean (op, caller, "union");
+      out = traced (r, lineage (op, sources, r));
+    }
+    else if (cmd == "cut")
+    {
+      // Each solid of the first shape cut on its own by every solid of the
+      // others, since Open CASCADE cuts overlapping solids from one another
+      vector<TopoDS_Shape> sources {toshape (args(2), caller)};
+      ShapeList tools;
+      for (int i = 3; i < args.length (); i++)
       {
-        BRepAlgoAPI_Fuse op;
-        op.SetArguments (objects);
-        op.SetTools (tools);
-        const TopoDS_Shape r = boolean (op, caller, "union");
-        out = traced (r, lineage (op, sources, r));
+        sources.push_back (toshape (args(i), caller));
+        for (const TopoDS_Shape& p : eachsolid (sources.back ()))
+        {
+          tools.Append (p);
+        }
       }
-      else
+      const vector<TopoDS_Shape> objects = eachsolid (sources[0]);
+      const int n = count (sources[0], TopAbs_SOLID);
+      const int m = (n > 0 ? 1 : 0);
+      vector<TopoDS_Shape> results;
+      origins L;
+      for (size_t j = 0; j < objects.size (); j++)
       {
+        ShapeList one;
+        one.Append (objects[j]);
         BRepAlgoAPI_Cut op;
-        op.SetArguments (objects);
+        op.SetArguments (one);
         op.SetTools (tools);
         const TopoDS_Shape r = boolean (op, caller, "difference");
-        out = traced (r, lineage (op, sources, r));
+        vector<TopoDS_Shape> src (sources);
+        src[0] = objects[j];
+        for (const std::set<int>& o : lineage (op, src, r))
+        {
+          std::set<int> g;
+          for (int k : o)
+          {
+            g.insert (k <= m ? int (j) + 1 : k - m + n);
+          }
+          L.push_back (g);
+        }
+        results.push_back (r);
       }
+      out = traced (gather (results), L);
     }
     else if (cmd == "common")
     {
       // Pairwise, each step's lineage carried back to the operands' solids,
-      // numbered all in turn: SEEN of them before the shape intersected next
+      // numbered all in turn: SEEN of them before the shape intersected
+      // next.  The solids of that shape are joined first into the region
+      // they cover, and each solid so far is intersected with it on its own.
       TopoDS_Shape s = toshape (args(2), caller);
       origins L = itself (count (s, TopAbs_SOLID));
       int seen = L.size ();
       for (int i = 3; i < args.length () && count (s, TopAbs_FACE) > 0; i++)
       {
         const TopoDS_Shape t = toshape (args(i), caller);
-        ShapeList objects, tools;
-        objects.Append (s);
-        tools.Append (t);
-        BRepAlgoAPI_Common op;
-        op.SetArguments (objects);
-        op.SetTools (tools);
-        const TopoDS_Shape r = boolean (op, caller, "intersection");
-        const origins step = lineage (op, {s, t}, r);
-        const int ns = count (s, TopAbs_SOLID);
-        origins next (step.size ());
-        for (size_t j = 0; j < step.size (); j++)
+        const int nt = count (t, TopAbs_SOLID);
+        TopoDS_Shape region = t;
+        origins R = itself (nt);
+        if (nt > 1)
         {
-          for (int k : step[j])
+          const vector<TopoDS_Shape> parts = eachsolid (t);
+          ShapeList first, rest;
+          first.Append (parts[0]);
+          for (size_t k = 1; k < parts.size (); k++)
           {
-            if (k <= ns)
-            {
-              next[j].insert (L[k-1].begin (), L[k-1].end ());
-            }
-            else
-            {
-              next[j].insert (seen + k - ns);
-            }
+            rest.Append (parts[k]);
           }
+          BRepAlgoAPI_Fuse join;
+          join.SetArguments (first);
+          join.SetTools (rest);
+          region = boolean (join, caller, "intersection");
+          R = lineage (join, {t}, region);
         }
-        seen += count (t, TopAbs_SOLID);
+        const vector<TopoDS_Shape> objects = eachsolid (s);
+        const int m = (count (s, TopAbs_SOLID) > 0 ? 1 : 0);
+        vector<TopoDS_Shape> results;
+        origins next;
+        for (size_t j = 0; j < objects.size (); j++)
+        {
+          ShapeList one, tools;
+          one.Append (objects[j]);
+          tools.Append (region);
+          BRepAlgoAPI_Common op;
+          op.SetArguments (one);
+          op.SetTools (tools);
+          const TopoDS_Shape r = boolean (op, caller, "intersection");
+          for (const std::set<int>& o : lineage (op, {objects[j], region}, r))
+          {
+            std::set<int> g;
+            for (int k : o)
+            {
+              if (k <= m)
+              {
+                g.insert (L[j].begin (), L[j].end ());
+              }
+              else
+              {
+                for (int q : R[k-m-1])
+                {
+                  g.insert (seen + q);
+                }
+              }
+            }
+            next.push_back (g);
+          }
+          results.push_back (r);
+        }
+        seen += nt;
         L = next;
-        s = r;
+        s = gather (results);
       }
       out = traced (s, L);
     }
