@@ -2289,12 +2289,12 @@ classdef Drawing
         return;
       endif
 
-      out = this;
-      out.Entities(:) = [];
+      ## Each entity's records collected apart and joined once, since growing
+      ## the property one record at a time copies the whole array every time
+      parts = num2cell (this.Entities);
       for ii = 1:numel (this.Entities)
         e = this.Entities(ii);
         if (! strcmp (e.type, 'insert'))
-          out.Entities(end+1) = e;
           continue;
         endif
         k = find (strcmpi (e.block, {this.Blocks.name}), 1);
@@ -2319,12 +2319,14 @@ classdef Drawing
           sub = sub.transform ('rotate', e.angle);
         endif
         sub = sub.transform ('translate', e.pts);
-        for jj = 1:numel (sub.Entities)
-          out.Entities(end+1) = fromblock (sub.Entities(jj), e);
+        blk = sub.Entities;
+        for jj = 1:numel (blk)
+          blk(jj) = fromblock (blk(jj), e);
         endfor
+        parts{ii} = blk;
       endfor
-      out.Blocks = this.Blocks([]);
-      this = out;
+      this.Entities = [this.Entities([]), parts{:}];
+      this.Blocks = this.Blocks([]);
 
     endfunction
 
@@ -3660,34 +3662,33 @@ function S = clipholes (S, H)
   if (isempty (H) || isempty (S))
     return;
   endif
-  out = zeros (0, 4);
+  ## Every hole's edges at once, so each segment is cut in one step
+  P = vertcat (H{:});
+  E = cellfun (@(p) p([2:end, 1],:) - p, H(:), 'UniformOutput', false);
+  E = vertcat (E{:});
+  T = cell (rows (S), 1);
   for k = 1:rows (S)
     A = S(k,1:2);
     d = S(k,3:4) - A;
-    t = [0, 1];
-    for h = 1:numel (H)
-      P = H{h};
-      E = P([2:end, 1],:) - P;
-      W = P - A;
-      den = d(1) * E(:,2) - d(2) * E(:,1);
-      u = (W(:,1) .* E(:,2) - W(:,2) .* E(:,1)) ./ den;
-      v = (W(:,1) * d(2) - W(:,2) * d(1)) ./ den;
-      hit = (den != 0) & u > 0 & u < 1 & v >= 0 & v < 1;
-      t = [t, u(hit)'];
-    endfor
-    t = unique (t);
-    for j = 1:numel (t) - 1
-      m = A + d * (t(j) + t(j+1)) / 2;
-      inside = false;
-      for h = 1:numel (H)
-        inside = inside || inpolygon (m(1), m(2), H{h}(:,1), H{h}(:,2));
-      endfor
-      if (! inside)
-        out(end+1,:) = [A + d * t(j), A + d * t(j+1)];
-      endif
-    endfor
+    W = P - A;
+    den = d(1) * E(:,2) - d(2) * E(:,1);
+    u = (W(:,1) .* E(:,2) - W(:,2) .* E(:,1)) ./ den;
+    v = (W(:,1) * d(2) - W(:,2) * d(1)) ./ den;
+    hit = (den != 0) & u > 0 & u < 1 & v >= 0 & v < 1;
+    t = unique ([0, 1, u(hit)']);
+    T{k} = [repmat(k, numel (t) - 1, 1), t(1:end-1)', t(2:end)'];
   endfor
-  S = out;
+  ## Pieces as rows [segment, t1, t2], kept where the midpoint is in no hole
+  T = vertcat (T{:});
+  A = S(T(:,1),1:2);
+  d = S(T(:,1),3:4) - A;
+  m = A + d .* (T(:,2) + T(:,3)) / 2;
+  inside = false (rows (m), 1);
+  for h = 1:numel (H)
+    inside |= inpolygon (m(:,1), m(:,2), H{h}(:,1), H{h}(:,2));
+  endfor
+  S = [A + d .* T(:,2), A + d .* T(:,3)];
+  S = S(! inside,:);
 
 endfunction
 
