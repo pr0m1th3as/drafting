@@ -1166,7 +1166,7 @@ classdef Drawing
     ## face down: the drawing keeps the same curve, re-expressed in its own
     ## coordinates.
     ##
-    ## @seealso{geom.Spline, polyline, path}
+    ## @seealso{geom.Spline, draw.Drawing.polyline, draw.Drawing.path}
     ## @end deftypefn
     function this = spline (this, SP)
 
@@ -1210,7 +1210,7 @@ classdef Drawing
     ## its @code{geom.UCS}; the drawing keeps the same path, re-expressed in
     ## its own coordinates.
     ##
-    ## @seealso{geom.Path, polyline, spline}
+    ## @seealso{geom.Path, draw.Drawing.polyline, draw.Drawing.spline}
     ## @end deftypefn
     function this = path (this, P)
 
@@ -1257,7 +1257,7 @@ classdef Drawing
     ## face down: the drawing keeps the same region, re-expressed in its own
     ## coordinates.
     ##
-    ## @seealso{geom.Region, hatch, polyline}
+    ## @seealso{geom.Region, draw.Drawing.hatch, draw.Drawing.polyline}
     ## @end deftypefn
     function this = region (this, R)
 
@@ -1382,7 +1382,7 @@ classdef Drawing
     ## obliquely, which is most of the time on an isometric or an auxiliary
     ## view, and what a chamfer on a cylinder projects to.
     ##
-    ## @seealso{circle, arc, polyline}
+    ## @seealso{draw.Drawing.circle, draw.Drawing.arc, draw.Drawing.polyline}
     ## @end deftypefn
     function this = ellipse (this, C, A, B, ROT = 0)
 
@@ -1509,7 +1509,7 @@ classdef Drawing
     ## face down: the drawing keeps the same region, re-expressed in its own
     ## coordinates.
     ##
-    ## @seealso{region, geom.Region, geom.hatchlines}
+    ## @seealso{draw.Drawing.region, geom.Region, geom.hatchlines}
     ## @end deftypefn
     function this = hatch (this, R, PATTERN = 'ANSI31', ANGLE = 0, ...
                            SPACING = 2.5)
@@ -1666,7 +1666,8 @@ classdef Drawing
     ## radius is used only where the full circle is not there to measure ---
     ## which is what @code{radius} is for.
     ##
-    ## @seealso{radius, angdim, centremark, draw.symbol}
+    ## @seealso{draw.Drawing.radius, draw.Drawing.angdim,
+    ## draw.Drawing.centremark, draw.symbol}
     ## @end deftypefn
     function this = diam (this, C, R, ANG = 45, LABEL = '')
 
@@ -1695,7 +1696,7 @@ classdef Drawing
     ## Use it for a fillet or any arc that is less than a full circle, where
     ## there is no diameter to measure across.
     ##
-    ## @seealso{diam, angdim, centremark}
+    ## @seealso{draw.Drawing.diam, draw.Drawing.angdim, draw.Drawing.centremark}
     ## @end deftypefn
     function this = radius (this, C, R, ANG = 45, LABEL = '')
 
@@ -1725,7 +1726,8 @@ classdef Drawing
     ## explement instead.  That is the choice being offered, not an ambiguity:
     ## a corner and its outside both get dimensioned on real drawings.
     ##
-    ## @seealso{diam, radius, ordinate, draw.symbol}
+    ## @seealso{draw.Drawing.diam, draw.Drawing.radius, draw.Drawing.ordinate,
+    ## draw.symbol}
     ## @end deftypefn
     function this = angdim (this, V, P1, P2, RAD, LABEL = '')
 
@@ -1805,7 +1807,7 @@ classdef Drawing
     ## @end group
     ## @end example
     ##
-    ## @seealso{dim, leader}
+    ## @seealso{draw.Drawing.dim, draw.Drawing.leader}
     ## @end deftypefn
     function this = ordinate (this, O, P, AXIS, L, LABEL = '')
 
@@ -1869,7 +1871,7 @@ classdef Drawing
     ## order is to set @qcode{'CENTER'} and the centre-line layer first and then
     ## call this once.
     ##
-    ## @seealso{diam, radius, draw.linetype}
+    ## @seealso{draw.Drawing.diam, draw.Drawing.radius, draw.linetype}
     ## @end deftypefn
     function this = centremark (this, C, R)
 
@@ -1917,7 +1919,7 @@ classdef Drawing
     ## The note is placed at the last point.  It may carry the codes of
     ## @code{draw.symbol}, so a thread callout or a tolerance reads properly.
     ##
-    ## @seealso{diam, radius, draw.symbol}
+    ## @seealso{draw.Drawing.diam, draw.Drawing.radius, draw.symbol}
     ## @end deftypefn
     function this = leader (this, P, TEXT)
 
@@ -2001,7 +2003,7 @@ classdef Drawing
     ## turn are fine and exchange horizontal with vertical; so are mirrors about
     ## either axis.  A dimension made @qcode{'aligned'} rotates freely.
     ##
-    ## @seealso{geom.transform, merge, bbox}
+    ## @seealso{geom.transform, draw.Drawing.merge, draw.Drawing.bbox}
     ## @end deftypefn
     function this = transform (this, varargin)
 
@@ -2133,7 +2135,8 @@ classdef Drawing
     ## separately-built views into a sheet.  With @code{transform} it is the
     ## whole of composition: build once, place as often as needed.
     ##
-    ## @seealso{transform, numentities, layers}
+    ## @seealso{draw.Drawing.transform, draw.Drawing.numentities,
+    ## draw.Drawing.layers}
     ## @end deftypefn
     function this = merge (this, varargin)
 
@@ -2180,7 +2183,7 @@ classdef Drawing
     ## it has already keeps its own properties.  Draw a symbol on layer
     ## @qcode{'0'} to have it take the layer of each insert placing it.
     ##
-    ## @seealso{insert, merge, transform}
+    ## @seealso{draw.Drawing.insert, draw.Drawing.merge, draw.Drawing.transform}
     ## @end deftypefn
     function this = block (this, NAME, B)
 
@@ -2225,7 +2228,7 @@ classdef Drawing
     ## rather than leaving a reference that resolves to nothing when the file is
     ## opened.
     ##
-    ## @seealso{block, merge, transform}
+    ## @seealso{draw.Drawing.block, draw.Drawing.merge, draw.Drawing.transform}
     ## @end deftypefn
     function this = insert (this, NAME, POS, ROT = 0, SCALE = 1)
 
@@ -2293,7 +2296,7 @@ classdef Drawing
     ## backstop against a construction this class does not permit, not a rule a
     ## caller can meet by accident.
     ##
-    ## @seealso{block, insert, draw.Drawing.plot}
+    ## @seealso{draw.Drawing.block, draw.Drawing.insert, draw.Drawing.plot}
     ## @end deftypefn
     function this = expand (this, depth = 0)
 

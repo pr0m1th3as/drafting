@@ -68,7 +68,7 @@
 ## them afterwards with @code{draw.Drawing.layer}, or drop the three layers
 ## before sending the geometry to a machine that has no use for them.
 ##
-## @seealso{draw.Drawing, draw.coordtable, merge}
+## @seealso{draw.Drawing, draw.coordtable, draw.Drawing.merge}
 ## @end deftypefn
 
 function D = titleblock (varargin)
