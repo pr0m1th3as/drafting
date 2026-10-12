@@ -2124,6 +2124,12 @@ classdef Shape
     ## bore or cylinder: the bore must run on 0.03 pitches past the thread,
     ## and a cylinder must reach as far before any shoulder.
     ##
+    ## A tube is threaded inside or outside, by whichever of its bore and its
+    ## cylinder fits: a tube of 6 with a bore of 2 takes an external M6.  A
+    ## wall whose bore and cylinder both fit is thinner than either thread is
+    ## deep, and is an error, as is an internal thread that would cut through
+    ## the cylinder round its bore.
+    ##
     ## The profile is the basic profile of ISO 68-1, its 60 degree flanks
     ## swept round the axis by @code{solid.helix}: an internal thread's root
     ## is flat at the nominal diameter, an external thread's flat at
@@ -2225,16 +2231,36 @@ classdef Shape
       for i = 1:n
         far = max ((C - P(i,:)) * v');
         L = max (min (DEPTH, far + p), p);
-        [kind, r] = axisring (this, P(i,:), v, min (L / 2, p));
+        ## The bores and cylinders about the axis that fit a thread; a wall
+        ## that fits both is thinner than either thread is deep
+        [bores, rods] = axisrings (this, P(i,:), v, min (L / 2, p));
+        inner = bores(2 * bores >= D1 - tol & 2 * bores < d - tol);
+        outer = rods(2 * rods >= d0 - tol & 2 * rods <= d + tol);
+        if (! isempty (inner) && ! isempty (outer))
+          error (strcat ("solid.Shape.thread: %s at (%s): the wall between", ...
+                         " the bore of %.3f and the cylinder of %.3f is", ...
+                         " too thin to thread."), t.name, ...
+                 pointstr (P(i,:)), 2 * min (inner), 2 * max (outer));
+        endif
         ## The space the cutter clears beside the profile, from a pitch
         ## before the point to the groove's far corner, must hold no material
         ## or the thread would cut beyond its bore or cylinder
         len = L + p + p / 20 * tand (30);
-        if (strcmp (kind, 'bore') && 2 * r >= D1 - tol && 2 * r < d - tol)
+        if (! isempty (inner))
+          r = min (inner);
+          ## A cylinder round the bore inside the root would be cut through
+          wall = rods(rods > r & 2 * rods < d + tol);
+          if (! isempty (wall))
+            error (strcat ("solid.Shape.thread: %s at (%s): the thread", ...
+                           " would cut through the cylinder of %.3f round", ...
+                           " the bore."), t.name, pointstr (P(i,:)), ...
+                   2 * min (wall));
+          endif
           specs{i} = {p, r, d / 2, true, L};
           K = solid.cylinder (r, len);
           beyond = "the bore is shallower than the thread";
-        elseif (strcmp (kind, 'rod') && 2 * r >= d0 - tol && 2 * r <= d + tol)
+        elseif (! isempty (outer))
+          r = max (outer);
           K = subtract (solid.cylinder (r + p / 10, len), ...
                         solid.cylinder (r, len));
           if (2 * r > d - tol)
@@ -3352,26 +3378,24 @@ function T = place (T, V, P)
 
 endfunction
 
-## The smallest circle about the axis at P along V in the section of S a
-## distance Z along it: KIND is 'bore' when it bounds a hole of the section,
-## 'rod' when it is the outline of the material round the axis, and empty,
-## with R Inf, when no circle about the axis bounds the section there
-function [kind, R] = axisring (S, P, V, Z)
+## The radii of the circles about the axis at P along V in the section of S
+## a distance Z along it: BORES those that bound a hole of the section, RODS
+## those that are the outline of the material round the axis
+function [bores, rods] = axisrings (S, P, V, Z)
 
-  kind = '';
-  R = Inf;
+  bores = [];
+  rods = [];
   regions = section (S, geom.UCS (V, P + Z * V));
   for i = 1:numel (regions)
     loops = [{regions{i}.Outline}, regions{i}.Holes];
     for j = 1:numel (loops)
       r = ring (loops{j});
-      if (r < R)
-        R = r;
-        if (j == 1)
-          kind = 'rod';
-        else
-          kind = 'bore';
-        endif
+      if (isinf (r))
+        continue;
+      elseif (j == 1)
+        rods(end+1) = r;
+      else
+        bores(end+1) = r;
       endif
     endfor
   endfor
@@ -4111,6 +4135,13 @@ endfunction
 %! T = thread (S, [10, 10, 6], 'M6', Inf);
 %! assert_equal (numsolids (T), 1);
 %! assert_equal (volume (S) - volume (T) > 0, true);
+
+%!test  # a tube takes an external thread on its outside
+%! R = solid.cylinder (3, 20);
+%! S = subtract (R, solid.cylinder (1, 20));
+%! a = volume (R) - volume (thread (R, [0, 0, 20], 'M6', 10));
+%! b = volume (S) - volume (thread (S, [0, 0, 20], 'M6', 10));
+%! assert_equal (b, a, -1e-6);
 
 %!test  # a depth whose cut Open CASCADE fails is cut whole
 %! S = hole (solid.box (30, 30, 40), [15, 15, 40], 'M6', 32, ...
@@ -5007,6 +5038,12 @@ endfunction
 %!error<solid.Shape.thread: M6 at \(10, 10, 20\): the bore is shallower than the thread.> ...
 %! thread (hole (solid.box (20, 20, 20), [10, 10, 20], 'M6', 19.5), ...
 %!         [10, 10, 20], 'M6', Inf)
+%!error<solid.Shape.thread: M6 at \(0, 0, 20\): the wall between the bore of 5.000 and the cylinder of 6.000 is too thin to thread.> ...
+%! thread (subtract (solid.cylinder (3, 20), solid.cylinder (2.5, 20)), ...
+%!         [0, 0, 20], 'M6', 10)
+%!error<solid.Shape.thread: M6 at \(0, 0, 20\): the thread would cut through the cylinder of 5.500 round the bore.> ...
+%! thread (subtract (solid.cylinder (2.75, 20), solid.cylinder (2.5, 20)), ...
+%!         [0, 0, 20], 'M6', 10)
 %!error<solid.Shape.thread: M10 at \(0, 0, 40\): the thread runs past the end of the cylinder.> ...
 %! thread (union (solid.cylinder (5, 40), solid.cylinder (8, 20)), ...
 %!         [0, 0, 40], 'M10', 25)
