@@ -263,14 +263,17 @@ the steps of 0.05 inside the band instead: 15.3 for M16x0.8 in stainless,
 <h2 id="entry">The countersink at the entry</h2>
 
 <p>A tapped hole is countersunk at its entry, so that the tap starts square
-and the first turn of the thread raises no burr. On a tapped hole,
-<code>'Countersink', true</code> takes the countersink IS 1369 (Part 3)
-draws there: 120 degrees, at most 10 less, and from the nominal diameter
-up to 1.05 times it across at the surface. The package takes the top of the
-band, 1.05 times the nominal diameter. The standard asks for a 90 or 60
-degree countersink to be shown on the drawing as a special design; either
-is given by its numbers, as <code>'Countersink', [6.3, 90]</code>. It
-gives no counterbore for a tapped hole, and none is taken.</p>
+and the first turn of the thread raises no burr. Every tapped hole
+<code>hole</code> drills takes the countersink IS 1369 (Part 3) draws
+there: 120 degrees, at most 10 less, and from the nominal diameter up to
+1.05 times it across at the surface. The package takes the top of the band,
+1.05 times the nominal diameter. IS 1369 (Part 3) draws blind holes; a hole
+tapped through is countersunk alike at its exit, as a workshop does, where
+its axis last leaves the part. <code>'Countersink', false</code> leaves both
+out. The standard asks for a 90 or 60 degree countersink to be shown on the
+drawing as a special design; either is given by its numbers, as
+<code>'Countersink', [6.3, 90]</code>, and sizes both ends alike. It gives
+no counterbore for a tapped hole, and none is taken.</p>
 
 <table class="guide">
   <tr><th>Thread</th><th>Across</th><th>Cone deep</th></tr>

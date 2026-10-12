@@ -93,6 +93,19 @@
 <pre class="code-in"><code>block = solid.box (60, 30, 20);
 block = hole (block, [15, 15, 20], 'M6', 16);
 block = hole (block, [45, 15, 20], 'M10x1.25', 16);</code></pre>
+<p>Every tapped hole is countersunk at its entry, as DIN 76-1 draws it: 120 degrees, 1.05 times the nominal diameter across, 6.3 for M6, so that the tap starts square and the thread starts clean. A hole drilled through is countersunk at its exit too. <code>'Countersink', false</code> leaves both out, and numbers give another, as <code>[6.3, 90]</code> for the 90 degree countersink many workshops use. <a href="../solid.holespec.html"><code>solid.holespec</code></a> shows the countersink with the drill.</p>
+<pre class="code-in"><code>H = solid.holespec ('M6')</code></pre>
+<pre class="code-out"><code>H =
+
+  scalar structure containing the fields:
+
+    name = M6
+    clearance = 
+    drill = 5
+    counterbore = [](0x0)
+    countersink =
+
+         6.3000   120.0000          0</code></pre>
 <p>Every drill stays inside the 6H band of the thread's minor diameter, so a drawing that states 6H is met whatever the material. A tough material takes a larger drill and less engagement than a soft one: <code>'Material', 'stainless'</code> takes the largest drill in the band, 6.9 for M8 against 6.8 in steel. <code>'Engagement'</code> asks for the engagement as a percentage, 100 drilling at the minor diameter, and the drill is the one nearest it in the band. A percentage the band cannot give is refused, with the band it allows.</p>
 <pre class="code-in"><code>nut = solid.cylinder (8, 8);
 nut = hole (nut, [0, 0, 8], 'M8', Inf, 'Material', 'stainless');

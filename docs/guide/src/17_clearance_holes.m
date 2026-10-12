@@ -98,8 +98,9 @@ show (subtract (strip, solid.box (90, 15, 10)));
 
 ## ## What the standards do not give
 ##
-## A tapped hole has no head to seat, so a counterbore or countersink is
-## refused without `'Clearance'`.
+## A tapped hole has no head to seat, so a counterbore is refused without
+## `'Clearance'`. Its countersink is the one at the entry of the thread,
+## shown in the tutorial on holes and threads.
 
 hole (cover, [30, 20, 10], 'M6', Inf, 'Counterbore', true);  #: error
 

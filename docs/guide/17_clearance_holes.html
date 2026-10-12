@@ -151,9 +151,9 @@ strip = hole (strip, [75, 15, 10], 'M6', Inf, 'Clearance', 'fine', ...
 show (subtract (strip, solid.box (90, 15, 10)));</code></pre>
 <figure class="shot"><img src="img/17_clearance_holes-3.png" alt="Clearance holes, counterbores and countersinks, picture 3"></figure>
 <h2>What the standards do not give</h2>
-<p>A tapped hole has no head to seat, so a counterbore or countersink is refused without <code>'Clearance'</code>.</p>
+<p>A tapped hole has no head to seat, so a counterbore is refused without <code>'Clearance'</code>. Its countersink is the one at the entry of the thread, shown in the tutorial on holes and threads.</p>
 <pre class="code-in"><code>hole (cover, [30, 20, 10], 'M6', Inf, 'Counterbore', true);</code></pre>
-<pre class="code-out"><code>solid.holespec: 'Counterbore' and 'Countersink' apply only to a clearance hole.</code></pre>
+<pre class="code-out"><code>solid.holespec: 'Counterbore' applies only to a clearance hole.</code></pre>
 <p>The counterbores and countersinks are given for the fine and medium series only, and the one for a socket head in the fine series only.</p>
 <pre class="code-in"><code>solid.holespec ('M6', 'Clearance', 'coarse', 'Counterbore', true);
 solid.holespec ('M6', 'Clearance', 'medium', 'Countersink', 'socket');</code></pre>

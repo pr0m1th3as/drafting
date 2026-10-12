@@ -49,8 +49,8 @@
 ## @qcode{'Engagement'} chooses inside the 6H band of its minor diameter,
 ## as @code{solid.Shape.hole} describes.  With @qcode{'Clearance'} it is
 ## the clearance hole for a screw of that thread, and only then can it take
-## a counterbore or the countersink of a screw head.  A tapped hole can take
-## a countersink at its entry.
+## a counterbore or the countersink of a screw head.  A tapped hole is
+## countersunk at its entry unless @qcode{'Countersink'} is false.
 ##
 ## Name/Value pairs:
 ##
@@ -82,11 +82,13 @@
 ## @var{ANGLE}, @var{CDEPTH}]}, taken as given, with an angle of 90 and no
 ## cylinder by default.
 ##
-## On a tapped hole, true gives the countersink at the entry of an internal
-## thread of IS 1369 (Part 3):1995, prepared from DIN 76-1:1983: 120
-## degrees, and 1.05 times the nominal diameter across at the surface, the
-## largest its band from the nominal diameter allows, 6.3 for M6.  The
-## numbers are taken as given there too, and @qcode{'socket'} is refused.
+## A tapped hole takes by default, or with true, the countersink at the
+## entry of an internal thread of IS 1369 (Part 3):1995, prepared from DIN
+## 76-1:1983: 120 degrees, and 1.05 times the nominal diameter across at the
+## surface, the largest its band from the nominal diameter allows, 6.3 for
+## M6.  False leaves it out, the numbers are taken as given there too, and
+## @qcode{'socket'} is refused.  @code{solid.Shape.hole} sinks a tapped hole
+## drilled through alike at its exit.
 ##
 ## @item @qcode{'Material'}
 ## @itemx @qcode{'Engagement'}
@@ -99,7 +101,7 @@
 ## @end table
 ##
 ## A counterbore and a countersink cannot both be given.  False for either
-## is the same as leaving it out.
+## gives none.
 ##
 ## IS 3406 was prepared from DIN 74, parts 1 and 2, of 1980, the forerunners
 ## of ISO 15065 and DIN 974-1, whose current editions were not read.  Where
@@ -128,6 +130,7 @@ function H = holespec (NAME, varargin)
   clearance = '';
   counterbore = [];
   countersink = [];
+  given = false;
   material = '';
   engagement = [];
   custom = {};
@@ -160,6 +163,7 @@ function H = holespec (NAME, varargin)
                          " false, 'washer' or [CD, CDEPTH]."));
         endif
       case 'countersink'
+        given = true;
         if (islogical (value) && isscalar (value))
           if (value)
             countersink = true;
@@ -280,9 +284,10 @@ function H = holespec (NAME, varargin)
     endif
   endif
 
-  ## The standard countersink: at the entry of a tapped hole, IS 1369
-  ## (Part 3), the top of its band; else IS 3406 (Part 1), type A or B
-  if (islogical (countersink) && isempty (clearance))
+  ## The standard countersink: at the entry of a tapped hole, unless it is
+  ## refused, IS 1369 (Part 3), the top of its band; else IS 3406 (Part 1),
+  ## type A or B
+  if (isempty (clearance) && (! given || islogical (countersink)))
     countersink = [1.05 * T.d, 120, 0];
   elseif (islogical (countersink) || ischar (countersink))
     socket = ischar (countersink);
@@ -400,7 +405,8 @@ endfunction
 %!                                'counterbore'; 'countersink'});
 %! assert_equal (H.clearance, '');
 %! assert_equal (H.drill, 5);
-%! assert_equal ([H.counterbore, H.countersink], []);
+%! assert_equal (H.counterbore, []);
+%! assert_equal (H.countersink, [6.3, 120, 0], 1e-12);
 
 %!test  # a tapped hole in a tough material, and at full engagement
 %! H = solid.holespec ('M8', 'Material', 'stainless');
@@ -467,10 +473,13 @@ endfunction
 
 %!test  # the countersink at the entry of a tapped hole, IS 1369 (Part 3)
 %! H = solid.holespec ('M6', 'Countersink', true);
-%! assert_equal (H.drill, 5);
 %! assert_equal (H.countersink, [6.3, 120, 0], 1e-12);
-%! H = solid.holespec ('M10x1.25', 'Countersink', true);
+%! H = solid.holespec ('M10x1.25');
 %! assert_equal (H.countersink, [10.5, 120, 0], 1e-12);
+
+%!test  # a tapped hole with no countersink
+%! H = solid.holespec ('M6', 'Countersink', false);
+%! assert_equal (H.countersink, []);
 
 %!test  # a countersink given by numbers on a tapped hole
 %! H = solid.holespec ('M6', 'Countersink', [6.5, 90]);

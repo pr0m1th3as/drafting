@@ -33,6 +33,15 @@ block = solid.box (60, 30, 20);
 block = hole (block, [15, 15, 20], 'M6', 16);
 block = hole (block, [45, 15, 20], 'M10x1.25', 16);
 
+## Every tapped hole is countersunk at its entry, as DIN 76-1 draws it: 120
+## degrees, 1.05 times the nominal diameter across, 6.3 for M6, so that the
+## tap starts square and the thread starts clean. A hole drilled through is
+## countersunk at its exit too. `'Countersink', false` leaves both out, and
+## numbers give another, as `[6.3, 90]` for the 90 degree countersink many
+## workshops use. `solid.holespec` shows the countersink with the drill.
+
+H = solid.holespec ('M6')
+
 ## Every drill stays inside the 6H band of the thread's minor diameter, so
 ## a drawing that states 6H is met whatever the material. A tough material
 ## takes a larger drill and less engagement than a soft one: `'Material',

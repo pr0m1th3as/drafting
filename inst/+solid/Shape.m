@@ -1779,6 +1779,16 @@ classdef Shape
     ## 0.3 to 20 millimetres, pages 54 to 56; DIN 345 type N, HSS, article
     ## 204, 10 to 60 millimetres, pages 78 and 79.
     ##
+    ## A tapping hole is countersunk at its entry, as IS 1369 (Part 3):1995,
+    ## prepared from DIN 76-1:1983, draws the entry of an internal thread:
+    ## 120 degrees, and 1.05 times the nominal diameter across at the
+    ## surface, the largest its band from the nominal diameter allows, 6.3
+    ## for M6, so that the tap starts square and the thread starts clean.  A
+    ## hole drilled through, with an @code{Inf} @var{DEPTH} or one that
+    ## reaches past the part, is countersunk alike where its axis last leaves
+    ## the part.  @qcode{'Countersink'} false leaves both out, and numbers
+    ## size both.  A tapping hole takes no counterbore.
+    ##
     ## Name/Value pairs shape the hole:
     ##
     ## @table @asis
@@ -1827,7 +1837,7 @@ classdef Shape
     ## hole, for the head of a cap screw.  With a named thread and
     ## @qcode{'Clearance'}, true takes the counterbore of IS 3406 (Part 2)
     ## for a socket head cap screw of ISO 4762, and @qcode{'washer'} the one
-    ## for the same screw on a plain washer.  A tapped hole takes none.
+    ## for the same screw on a plain washer.  A tapping hole takes none.
     ##
     ## @item @qcode{'Countersink'}
     ## @var{CD}, @code{[@var{CD}, @var{ANGLE}]} or @code{[@var{CD},
@@ -1838,10 +1848,9 @@ classdef Shape
     ## shallower than the hole.  With a named thread and @qcode{'Clearance'},
     ## true takes the countersink of IS 3406 (Part 1) for the countersunk
     ## heads of ISO 7721, and @qcode{'socket'} the one for a hexagon socket
-    ## countersunk screw of ISO 10642.  On a tapped hole, true takes the
-    ## countersink at the entry of an internal thread of IS 1369 (Part 3),
-    ## 120 degrees and 1.05 times the nominal diameter across, 6.3 for M6,
-    ## so that the thread starts clean.
+    ## countersunk screw of ISO 10642.  A tapping hole takes the countersink
+    ## of an internal thread by default, as the tapping holes above describe;
+    ## false leaves it out, and numbers replace it.
     ##
     ## @item @qcode{'Tip'}
     ## The included angle in degrees of the cone a twist drill leaves at the
@@ -1902,6 +1911,7 @@ classdef Shape
       endif
       cb = opt.Counterbore;
       cs = opt.Countersink;
+      tapped = ischar (D) && isempty (opt.Clearance);
       if (ischar (D))
         ## The hole for the thread, with the options that size it
         names = {'Clearance', 'Counterbore', 'Countersink', 'Material', ...
@@ -2030,6 +2040,24 @@ classdef Shape
           tools{(i - 1) * numel (T) + j} = translate (T{j}, P(i,:));
         endfor
       endfor
+
+      ## A tapped hole drilled through is countersunk alike where its axis
+      ## last leaves the part, the cone widening outwards and its cylinder
+      ## clearing the axis on beyond the part
+      if (tapped && ! isempty (cs))
+        for i = 1:rows (P)
+          z = leaves (this, P(i,:), opt.Direction, reach);
+          if (z <= DEPTH + 1e-9)
+            E = {translate(solid.cone (D / 2, cs(1) / 2, h), ...
+                           [0, 0, z - cs(3) - h]), ...
+                 translate(solid.cylinder (cs(1) / 2, reach + cs(3)), ...
+                           [0, 0, z - cs(3)])};
+            E = aim (E, opt.Direction);
+            tools(end+1:end+2) = {translate(E{1}, P(i,:)), ...
+                                  translate(E{2}, P(i,:))};
+          endif
+        endfor
+      endif
       this = subtract (this, tools{:});
 
     endfunction
@@ -3268,6 +3296,34 @@ function T = aim (T, V)
 
 endfunction
 
+## The shape S turned back from running along V to running along the z
+## axis, as aim turned it
+function S = unaim (S, V)
+
+  v = double (V(:)') / norm (V);
+  k = cross ([0, 0, 1], v);
+  if (norm (k) > 1e-12)
+    S = rotate (S, -atan2d (norm (k), v(3)), k);
+  elseif (v(3) < 0)
+    S = rotate (S, 180, [1, 0, 0]);
+  endif
+
+endfunction
+
+## How far from the point P along V the axis last leaves the shape S, within
+## REACH of it, measured along a thin core of the axis; -Inf where the axis
+## meets no material
+function z = leaves (S, P, V, REACH)
+
+  z = -Inf;
+  X = intersect (S, place (solid.cylinder (1e-3, REACH), V, P));
+  if (! isempty (X))
+    B = bbox (unaim (translate (X, -P), V));
+    z = B(6);
+  endif
+
+endfunction
+
 ## The tool T, made along the z axis, turned to run along V from the point P
 function T = place (T, V, P)
 
@@ -3882,94 +3938,115 @@ endfunction
 
 %!test  # tapping size for M6, drilled from the side
 %! S = hole (solid.box (80, 40, 12), [0, 20, 6], 'M6', Inf, ...
-%!           'Direction', [1, 0, 0]);
+%!           'Direction', [1, 0, 0], 'Countersink', false);
 %! assert_equal (volume (S), 38400 - 6.25 * pi * 80, 1e-9);
 %! assert_equal (isvalid (S), true);
 
-%!test  # a tapped M6 hole countersunk at its entry, 120 degrees to 6.3
-%! S = hole (solid.box (80, 40, 12), [20, 20, 12], 'M6', Inf, ...
-%!           'Countersink', true);
+%!test  # a blind tapped M6 hole, countersunk at its entry to 6.3 at 120
+%! S = hole (solid.box (80, 40, 12), [20, 20, 12], 'M6', 8);
 %! h = 0.65 / sqrt (3);
-%! V = pi * (h / 3 * (3.15 ^ 2 + 3.15 * 2.5 + 2.5 ^ 2) + 2.5 ^ 2 * (12 - h));
+%! V = pi * (h / 3 * (3.15 ^ 2 + 3.15 * 2.5 + 2.5 ^ 2) + 2.5 ^ 2 * (8 - h));
+%! assert_equal (volume (S), 38400 - V, 1e-9);
+
+%!test  # a tapped hole drilled through is countersunk at both ends
+%! S = hole (solid.box (80, 40, 12), [20, 20, 12], 'M6', Inf);
+%! h = 0.65 / sqrt (3);
+%! V = pi * (2 * h / 3 * (3.15 ^ 2 + 3.15 * 2.5 + 2.5 ^ 2) ...
+%!          + 2.5 ^ 2 * (12 - 2 * h));
+%! assert_equal (volume (S), 38400 - V, 1e-9);
+
+%!test  # and so is one whose DEPTH reaches past the part
+%! S = hole (solid.box (80, 40, 12), [20, 20, 12], 'M6', 15);
+%! assert_equal (volume (S), volume (hole (solid.box (80, 40, 12), ...
+%!                                         [20, 20, 12], 'M6', Inf)), 1e-9);
+
+%!test  # a countersink given by numbers sinks both ends alike
+%! S = hole (solid.box (80, 40, 12), [20, 20, 12], 'M6', Inf, ...
+%!           'Countersink', [7, 90]);
+%! V = pi * (2 / 3 * (3.5 ^ 2 + 3.5 * 2.5 + 2.5 ^ 2) + 2.5 ^ 2 * 10);
 %! assert_equal (volume (S), 38400 - V, 1e-9);
 
 %!test  # straight up from underneath
 %! S = hole (solid.box (80, 40, 12), [20, 20, 0], 'M2.5', 3, ...
-%!           'Direction', [0, 0, 1]);
+%!           'Direction', [0, 0, 1], 'Countersink', false);
 %! assert_equal (volume (S), 38400 - 1.025 ^ 2 * pi * 3, 1e-9);
 
 %!test  # drilling the empty shape
 %! assert_equal (isempty (hole (solid.Shape (), [0, 0, 0], 5, Inf)), true);
 
 %!test  # the coarse M8 drill of ISO 2306
-%! S = hole (solid.box (80, 40, 12), [40, 20, 12], 'M8', Inf);
+%! S = hole (solid.box (80, 40, 12), [40, 20, 12], 'M8', Inf, ...
+%!           'Countersink', false);
 %! assert_equal (volume (S), 38400 - 3.4 ^ 2 * pi * 12, 1e-9);
 
 %!test  # a fine thread named with its pitch
-%! S = hole (solid.box (80, 40, 12), [40, 20, 12], 'M10x1.25', Inf);
+%! S = hole (solid.box (80, 40, 12), [40, 20, 12], 'M10x1.25', Inf, ...
+%!           'Countersink', false);
 %! assert_equal (volume (S), 38400 - 4.4 ^ 2 * pi * 12, 1e-9);
 
 %!test  # M64 is not in ISO 2306, so its rule, nominal less pitch
-%! S = hole (solid.box (80, 80, 10), [40, 40, 10], 'M64', Inf);
+%! S = hole (solid.box (80, 80, 10), [40, 40, 10], 'M64', Inf, ...
+%!           'Countersink', false);
 %! assert_equal (volume (S), 64000 - 29 ^ 2 * pi * 10, 1e-9);
 
 %!test  # the fine M1x0.2 is not in ISO 2306 either
-%! S = hole (solid.box (10, 10, 2), [5, 5, 2], 'M1x0.2', Inf);
+%! S = hole (solid.box (10, 10, 2), [5, 5, 2], 'M1x0.2', Inf, ...
+%!           'Countersink', false);
 %! assert_equal (volume (S), 200 - 0.4 ^ 2 * pi * 2, 1e-9);
 
 %!test  # stainless takes the largest drill in the 6H band of M8
 %! S = hole (solid.box (80, 40, 12), [40, 20, 12], 'M8', Inf, ...
-%!           'Material', 'stainless');
+%!           'Material', 'stainless', 'Countersink', false);
 %! assert_equal (volume (S), 38400 - 3.45 ^ 2 * pi * 12, 1e-9);
 
 %!test  # nickel steel takes the largest drill in the 6H band of M12
 %! S = hole (solid.box (80, 40, 12), [40, 20, 12], 'M12', Inf, ...
-%!           'Material', 'nickel');
+%!           'Material', 'nickel', 'Countersink', false);
 %! assert_equal (volume (S), 38400 - 5.2 ^ 2 * pi * 12, 1e-9);
 
 %!test  # steel keeps the ISO 2306 drill
 %! S = hole (solid.box (80, 40, 12), [40, 20, 12], 'M8', Inf, ...
-%!           'Material', 'Steel');
+%!           'Material', 'Steel', 'Countersink', false);
 %! assert_equal (volume (S), 38400 - 3.4 ^ 2 * pi * 12, 1e-9);
 
 %!test  # M1 in stainless: no catalogue drill lies in its 5H band
 %! S = hole (solid.box (10, 10, 2), [5, 5, 2], 'M1', Inf, ...
-%!           'Material', 'stainless');
+%!           'Material', 'stainless', 'Countersink', false);
 %! assert_equal (volume (S), 200 - 0.375 ^ 2 * pi * 2, 1e-9);
 
 %!test  # 80 % engagement of M6 asks 5.134, and 5.1 is the nearest drill
 %! S = hole (solid.box (80, 40, 12), [40, 20, 12], 'M6', Inf, ...
-%!           'Engagement', 80);
+%!           'Engagement', 80, 'Countersink', false);
 %! assert_equal (volume (S), 38400 - 2.55 ^ 2 * pi * 12, 1e-9);
 
 %!test  # full engagement of M6 asks D1, and 5 is the nearest in the band
 %! S = hole (solid.box (80, 40, 12), [40, 20, 12], 'M6', Inf, ...
-%!           'Engagement', 100);
+%!           'Engagement', 100, 'Countersink', false);
 %! assert_equal (volume (S), 38400 - 2.5 ^ 2 * pi * 12, 1e-9);
 
 %!test  # Custom: M16x0.8 drills the nominal less the pitch, 15.2
 %! S = hole (solid.box (40, 40, 10), [20, 20, 10], 'M16x0.8', Inf, ...
-%!           'Custom', true);
+%!           'Custom', true, 'Countersink', false);
 %! assert_equal (volume (S), 16000 - 7.6 ^ 2 * pi * 10, 1e-9);
 
 %!test  # Custom: 1/4-20 UNC, 6.35 less 1.27 rounded to 5.1
 %! S = hole (solid.box (40, 40, 10), [20, 20, 10], 'M6.35x1.27', Inf, ...
-%!           'Custom', true);
+%!           'Custom', true, 'Countersink', false);
 %! assert_equal (volume (S), 16000 - 2.55 ^ 2 * pi * 10, 1e-9);
 
 %!test  # Custom: an ISO 261 thread keeps the ISO 2306 drill
 %! S = hole (solid.box (40, 40, 10), [20, 20, 10], 'M8', Inf, ...
-%!           'Custom', true);
+%!           'Custom', true, 'Countersink', false);
 %! assert_equal (volume (S), 16000 - 3.4 ^ 2 * pi * 10, 1e-9);
 
 %!test  # Custom: stainless takes the largest 0.05 step in the band
 %! S = hole (solid.box (40, 40, 10), [20, 20, 10], 'M16x0.8', Inf, ...
-%!           'Custom', true, 'Material', 'stainless');
+%!           'Custom', true, 'Material', 'stainless', 'Countersink', false);
 %! assert_equal (volume (S), 16000 - 7.65 ^ 2 * pi * 10, 1e-9);
 
 %!test  # Custom: full engagement takes the 0.05 step nearest D1
 %! S = hole (solid.box (40, 40, 10), [20, 20, 10], 'M16x0.8', Inf, ...
-%!           'Custom', true, 'Engagement', 100);
+%!           'Custom', true, 'Engagement', 100, 'Countersink', false);
 %! assert_equal (volume (S), 16000 - 7.575 ^ 2 * pi * 10, 1e-9);
 
 %!test  # on a UCS, at its origin and against its normal
@@ -3986,7 +4063,8 @@ endfunction
 %!               [70, 8, 4, 80, 32, 8], 1e-9);
 
 %!test  # an internal thread through a plate cuts the basic profile
-%! S = hole (solid.box (20, 20, 6), [10, 10, 6], 'M6', Inf);
+%! S = hole (solid.box (20, 20, 6), [10, 10, 6], 'M6', Inf, ...
+%!           'Countersink', false);
 %! T = thread (S, [10, 10, 6], 'M6', Inf);
 %! a = 2.5;
 %! b = 3;
@@ -3997,19 +4075,20 @@ endfunction
 %! assert_equal (isvalid (T), true);
 
 %!test  # a blind thread reaches DEPTH and its root the nominal diameter
-%! S = hole (solid.box (20, 20, 20), [10, 10, 20], 'M6', 15);
+%! S = hole (solid.box (20, 20, 20), [10, 10, 20], 'M6', 15, ...
+%!           'Countersink', false);
 %! G = subtract (S, thread (S, [10, 10, 20], 'M6', 12));
 %! assert_equal (bbox (G), [7, 7, 8, 13, 13, 20], 1e-3);
 
-%!test  # a thread below the countersink at the entry of its hole
-%! S = hole (solid.box (20, 20, 6), [10, 10, 6], 'M6', Inf, ...
-%!           'Countersink', true);
+%!test  # a thread through a hole countersunk at both ends
+%! S = hole (solid.box (20, 20, 6), [10, 10, 6], 'M6', Inf);
 %! T = thread (S, [10, 10, 6], 'M6', Inf);
 %! assert_equal (numsolids (T), 1);
 %! assert_equal (volume (S) - volume (T) > 0, true);
 
 %!test  # a depth whose cut Open CASCADE fails is cut whole
-%! S = hole (solid.box (30, 30, 40), [15, 15, 40], 'M6', 32);
+%! S = hole (solid.box (30, 30, 40), [15, 15, 40], 'M6', 32, ...
+%!           'Countersink', false);
 %! T = thread (S, [15, 15, 40], 'M6', 11.5);
 %! assert_equal (numsolids (T), 1);
 %! assert_equal (volume (S) - volume (T), 39.002033, -1e-5);
