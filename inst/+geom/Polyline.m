@@ -491,7 +491,7 @@ function [errmsg, C] = corners (V, closed, IDX)
     endif
   endif
   C = struct ('idx', IDX, 'u', u, 'v', v, 'th', th, 'prev', prev, ...
-              'next', next, 'len', sqrt (sum (v .^ 2, 2))');
+              'next', next, 'len', sqrt (sum (v .^ 2, 2))', 'closed', closed);
 
 endfunction
 
@@ -525,6 +525,16 @@ function W = cut (V, C, TIN, TOUT, B)
     W{i} = [a, B(i); b, 0];
   endfor
   W = vertcat (W{:});
+
+  ## A round or cut that takes a whole side ends where the next begins,
+  ## leaving a straight segment of no length, whose first vertex goes
+  k = rows (W);
+  if (C.closed)
+    L = sqrt (sum ((W([2:k, 1],1:2) - W(:,1:2)) .^ 2, 2));
+  else
+    L = [sqrt(sum (diff (W(:,1:2)) .^ 2, 2)); Inf];
+  endif
+  W = W(! (W(:,3) == 0 & L <= 1e-9 * max (C.len)),:);
 
 endfunction
 
@@ -569,6 +579,20 @@ endfunction
 %!                             60, 35, b; 55, 40, 0; 5, 40, b; 0, 35, 0], ...
 %!               1e-12);
 
+%!test  # rounds that use up a side meet, so a slot's ends are half circles
+%! PL = geom.Polyline ([0, 0; 40, 0; 40, 12; 0, 12], 'Closed', true);
+%! PL = fillet (PL, 6);
+%! b = tand (22.5);
+%! assert_equal (PL.Vertices, [0, 6, b; 6, 0, 0; 34, 0, b; 40, 6, b; ...
+%!                             34, 12, 0; 6, 12, b], 1e-12);
+%! assert_equal (class (geom.Region (PL)), 'geom.Region');
+
+%!test  # a square rounded at half its side is a circle
+%! PL = geom.Polyline ([0, 0; 12, 0; 12, 12; 0, 12], 'Closed', true);
+%! PL = fillet (PL, 6);
+%! assert_equal (rows (PL.Vertices), 4);
+%! assert_equal (PL.Vertices(:,3), tand (22.5) * ones (4, 1), 1e-12);
+
 %!test  # chosen corners; a right turn rounds clockwise
 %! PL = geom.Polyline ([0, 0; 20, 0; 20, 10; 30, 10]);
 %! PL = fillet (PL, 2, [2, 3]);
@@ -595,6 +619,13 @@ endfunction
 %!                        'Closed', true), 2, 3)
 %!error<geom.Polyline.fillet: the round at vertex 1 does not fit its segments.> ...
 %! fillet (geom.Polyline ([0, 0; 4, 0; 4, 10; 0, 10], 'Closed', true), 3)
+
+%!test  # cuts that use up a side meet
+%! PL = geom.Polyline ([0, 0; 40, 0; 40, 12; 0, 12], 'Closed', true);
+%! PL = chamfer (PL, 6);
+%! assert_equal (PL.Vertices, [0, 6, 0; 6, 0, 0; 34, 0, 0; 40, 6, 0; ...
+%!                             34, 12, 0; 6, 12, 0], 1e-12);
+%! assert_equal (class (geom.Region (PL)), 'geom.Region');
 
 %!test  # every corner of a rectangle cut 5 by 45 degrees
 %! PL = geom.Polyline ([0, 0; 60, 0; 60, 40; 0, 40], 'Closed', true);

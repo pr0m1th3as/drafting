@@ -1431,6 +1431,19 @@ endfunction
 %!                            20, 0, 0], 1e-12);
 %! assert_equal (length (P), 80 + 10 * pi, 1e-12);
 
+%!test  # rounds that use up a side of a closed path meet, as in a slot
+%! P = geom.Path ([0, 0, 0; 40, 0, 0; 40, 12, 0; 0, 12, 0], 'Closed', true);
+%! P = fillet (P, 6);
+%! assert_equal (rows (P.Vertices), 6);
+%! assert_equal (length (P), 56 + 12 * pi, 1e-12);
+%! assert_equal (class (geom.Region (P)), 'geom.Region');
+
+%!test  # cuts that use up a side of a closed path meet
+%! P = geom.Path ([0, 0, 0; 40, 0, 0; 40, 12, 0; 0, 12, 0], 'Closed', true);
+%! P = chamfer (P, 6);
+%! assert_equal (rows (P.Vertices), 6);
+%! assert_equal (class (geom.Region (P)), 'geom.Region');
+
 %!test  # an arc through three points, PM anywhere along it
 %! P = geom.Path.arc ([10, 0, 0], [6, 8, 0], [-10, 0, 0]);
 %! assert_equal (P.Midpoints(1,:), [0, 10, 0], 1e-12);

@@ -2707,6 +2707,9 @@ public:
   struct Blk
   {
     string name;
+    // The base point, which an insert places at its insertion point
+    double bx = 0;
+    double by = 0;
     vector<Rec> ents;
   };
   vector<Blk> blocks;
@@ -2986,6 +2989,8 @@ Reader::load (const string& f)
           blocks.push_back (Blk ());
           cur = &blocks.back ();
           cur->name = trim (r.str (2));
+          cur->bx = r.num (10);
+          cur->by = r.num (20);
         }
         else if (r.type == "ENDBLK")
           cur = nullptr;
@@ -4623,6 +4628,15 @@ cmdreaddraw (const octave_value_list& args, octave_value_list& out)
         defined.insert (d);
       }
     B = rp.run (B, b.ents, defined, nullptr);
+    // A drawing's block has its base at the origin, so the contents of one
+    // based elsewhere move by minus its base
+    if (b.bx != 0 || b.by != 0)
+    {
+      RowVector t (2);
+      t(0) = -b.bx;
+      t(1) = -b.by;
+      B = call ("transform", ovl (B, "translate", t));
+    }
     built[upper (b.name)] = B;
     spelt[upper (b.name)] = b.name;
   }

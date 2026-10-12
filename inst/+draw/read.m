@@ -31,14 +31,14 @@
 ## type or line weight from its layer keeps doing so, so the drawing looks as
 ## it did and a layer changed later changes everything on it.
 ##
-## Geometry returns as itself: lines, points, arcs, circles, ellipses,
-## polylines with their bulges, splines, text, and inserts of the blocks the
-## file defines, nested blocks included.  A @code{HATCH} returns as a hatch
-## over the regions it fills, its pattern, angle and spacing kept; a pattern
-## the package does not define is drawn as @qcode{'ANSI31'}.  A path or a
-## region the package wrote, through @code{draw.Drawing.write}, returns as
-## that path or region.  An @code{MTEXT} returns as one line of text, its
-## formatting removed.
+## Geometry returns as itself: lines, points, arcs, circles, ellipses, polylines
+## with their bulges, splines, text, and inserts of the blocks the file defines,
+## nested blocks included, each block moved so that its base point is its
+## origin, where an insert places it.  A @code{HATCH} returns as a hatch over
+## the regions it fills, its pattern, angle and spacing kept; a pattern the
+## package does not define is drawn as @qcode{'ANSI31'}.  A path or a region the
+## package wrote, through @code{draw.Drawing.write}, returns as that path or
+## region.  An @code{MTEXT} returns as one line of text, its formatting removed.
 ##
 ## A @code{DIMENSION} returns as a dimension: its definition points name what
 ## it measures, so a linear, aligned, angular, diameter, radius or ordinate
@@ -445,6 +445,21 @@ endfunction
 %! D = readlayers (tmpf, "0\nLINE\n8\nOTHER\n10\n0\n20\n0\n11\n10\n21\n0\n");
 %! E = entities (D);
 %! assert_equal ({E.linetype, E.colour}, {'CONTINUOUS', 7});
+
+%!test  # a block's base point lands where its insert places it
+%! fid = fopen (tmpf, 'w');
+%! fputs (fid, ["0\nSECTION\n2\nBLOCKS\n0\nBLOCK\n8\n0\n2\nPEG\n70\n0\n" ...
+%!              "10\n10\n20\n5\n30\n0\n0\nLINE\n8\n0\n10\n10\n20\n5\n" ...
+%!              "30\n0\n11\n20\n21\n5\n31\n0\n0\nENDBLK\n0\nENDSEC\n" ...
+%!              "0\nSECTION\n2\nENTITIES\n0\nINSERT\n8\n0\n2\nPEG\n" ...
+%!              "10\n100\n20\n50\n30\n0\n0\nENDSEC\n0\nEOF\n"]);
+%! fclose (fid);
+%! unwind_protect
+%!   E = entities (draw.read (tmpf));
+%! unwind_protect_cleanup
+%!   [~] = unlink (tmpf);
+%! end_unwind_protect
+%! assert_equal (E(1).pts, [100, 50; 110, 50], 1e-12);
 
 %!warning<draw.read: skipped 1 LWPOLYLINE width.> ...
 %! D = readlayers (tmpf, ["0\nLWPOLYLINE\n8\n0\n90\n2\n70\n0\n43\n0.5\n" ...

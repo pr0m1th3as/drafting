@@ -638,7 +638,8 @@ classdef Viewer < handle
       this.Id = id;
       setstate (this, struct ('pid', -1, 'in', -1, 'out', -1, ...
                               'hidden', logical (hidden), ...
-                              'data', uint8 ([]), 'mesh', [], 'name', 'S', ...
+                              'data', uint8 ([]), 'shape', [], ...
+                              'mesh', [], 'name', 'S', ...
                               'named', false, 'model', [], 'list', [], ...
                               'rules', {{}}, 'opacity', []));
 
@@ -679,9 +680,11 @@ classdef Viewer < handle
       endif
       if (ismesh)
         st.data = uint8 ([]);
+        st.shape = [];
         st.mesh = S;
       else
         st.data = S.Data;
+        st.shape = S;
         st.mesh = [];
       endif
       setstate (this, st);
@@ -1353,6 +1356,8 @@ classdef Viewer < handle
       st = state (this);
       if (isa (st.mesh, 'polymesh.Mesh'))
         S = st.mesh;
+      elseif (isa (st.shape, 'solid.Shape') && isequal (st.shape.Data, st.data))
+        S = st.shape;
       else
         S = solid.Shape (st.data);
       endif
@@ -1737,6 +1742,20 @@ endfunction
 %! assert_equal (volume (V.Model), 6000, 1e-9);
 %! close (V);
 %! assert_equal (isopen (V), false);
+
+%!testif ; ! isempty (getenv ('DISPLAY'))
+%! ## A shape read back keeps its colours and names
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   S = solid.box (10, 20, 30);
+%!   S.Colour = [1, 0, 0];
+%!   S.Name = {'block'};
+%!   V.Model = S;
+%!   assert_equal (V.Model.Colour, [1, 0, 0]);
+%!   assert_equal (V.Model.Name, {'block'});
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
 
 %!testif ; ! isempty (getenv ('DISPLAY'))
 %! ## A double click takes the point of the shape under it
