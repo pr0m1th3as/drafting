@@ -90,9 +90,8 @@ function S = loft (REGIONS, varargin)
         error ("solid.loft: unknown option '%s'.", name);
     endswitch
   endfor
-  if (! (islogical (opt.Ruled) || isnumeric (opt.Ruled))
-      || ! isscalar (opt.Ruled) || ! any (opt.Ruled == [0, 1]))
-    error ("solid.loft: Ruled must be a logical scalar.");
+  if (! islogical (opt.Ruled) || ! isscalar (opt.Ruled))
+    error ("solid.loft: Ruled must be true or false.");
   endif
 
   D = cell (1, numel (REGIONS));
@@ -194,6 +193,9 @@ endfunction
 %! R = {geom.Region([0, 0; 1, 0; 1, 1]), T};
 %! assert_equal (isequal (solid.loft (R, 'ruled', true), ...
 %!                       solid.loft (R, 'Ruled', true)), true);
-%!error<solid.loft: Ruled must be a logical scalar.> ...
+%!error<solid.loft: Ruled must be true or false.> ...
 %! solid.loft ({geom.Region([0, 0; 1, 0; 1, 1]), ...
 %!              geom.Region([0, 0; 1, 0; 1, 1])}, 'Ruled', 2)
+%!error<solid.loft: Ruled must be true or false.> ...
+%! solid.loft ({geom.Region([0, 0; 1, 0; 1, 1]), ...
+%!              geom.Region([0, 0; 1, 0; 1, 1])}, 'Ruled', 1)

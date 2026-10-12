@@ -415,9 +415,8 @@ classdef Spline
         error (strcat ("geom.Spline: Tangents must be a 2-by-3 real", ...
                        " matrix, each row a nonzero direction or NaN."));
       endif
-      if (! (islogical (opt.Closed) || isnumeric (opt.Closed))
-          || ! isscalar (opt.Closed) || ! any (opt.Closed == [0, 1]))
-        error ("geom.Spline: Closed must be a logical scalar.");
+      if (! islogical (opt.Closed) || ! isscalar (opt.Closed))
+        error ("geom.Spline: Closed must be true or false.");
       endif
       closed = logical (opt.Closed);
       if (closed && ! all (isnan (T(:))))
@@ -1125,8 +1124,10 @@ endfunction
 %!test  # option names ignore case
 %! S = geom.Spline ([0, 0; 1, 0; 1, 1], 'closed', true);
 %! assert_equal (S.Closed, true);
-%!error<geom.Spline: Closed must be a logical scalar.> ...
+%!error<geom.Spline: Closed must be true or false.> ...
 %! geom.Spline ([0, 0; 1, 0; 1, 1], 'Closed', 'yes')
+%!error<geom.Spline: Closed must be true or false.> ...
+%! geom.Spline ([0, 0; 1, 0; 1, 1], 'Closed', 1)
 %!error<geom.Spline: a closed spline has no ends to give Tangents.> ...
 %! geom.Spline ([0, 0; 1, 0; 1, 1], 'Closed', true, ...
 %!              'Tangents', [1, 0, 0; NaN, NaN, NaN])

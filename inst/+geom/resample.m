@@ -97,8 +97,8 @@ function [Q, S] = resample (P, varargin)
   CLOSED = false;
   if (! isempty (args))
     CLOSED = args{1};
-    if (! (islogical (CLOSED) || isnumeric (CLOSED)) || ! isscalar (CLOSED))
-      error ("geom.resample: CLOSED must be a logical scalar.");
+    if (! islogical (CLOSED) || ! isscalar (CLOSED))
+      error ("geom.resample: CLOSED must be true or false.");
     endif
     CLOSED = logical (CLOSED);
   endif

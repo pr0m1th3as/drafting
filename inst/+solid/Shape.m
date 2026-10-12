@@ -1676,11 +1676,9 @@ classdef Shape
       endif
       [errmsg, opt] = options (varargin, struct ('Outward', false, ...
                                                  'Thickness', {{}}));
-      if (isempty (errmsg) && (! (islogical (opt.Outward)
-                                  || isnumeric (opt.Outward))
-                               || ! isscalar (opt.Outward)
-                               || ! any (opt.Outward == [0, 1])))
-        errmsg = "Outward must be a logical scalar.";
+      if (isempty (errmsg) && (! islogical (opt.Outward)
+                               || ! isscalar (opt.Outward)))
+        errmsg = "Outward must be true or false.";
       endif
       if (! isempty (errmsg))
         error ("solid.Shape.shell: %s", errmsg);
@@ -3168,8 +3166,7 @@ function [errmsg, TF] = flag (ARGS, NAME, DEF)
     endif
     switch (lower (name))
       case lower (NAME)
-        if (! (islogical (val) || isnumeric (val)) || ! isscalar (val)
-            || ! any (val == [0, 1]))
+        if (! islogical (val) || ! isscalar (val))
           errmsg = sprintf ("%s must be true or false.", NAME);
           return;
         endif
@@ -5037,8 +5034,10 @@ endfunction
 %! shell (solid.Shape (), [], 1, 'Inward', true)
 %!error<solid.Shape.shell: option names must be character vectors.> ...
 %! shell (solid.Shape (), [], 1, 1, true)
-%!error<solid.Shape.shell: Outward must be a logical scalar.> ...
+%!error<solid.Shape.shell: Outward must be true or false.> ...
 %! shell (solid.Shape (), [], 1, 'Outward', 2)
+%!error<solid.Shape.shell: Outward must be true or false.> ...
+%! shell (solid.Shape (), [], 1, 'Outward', 1)
 %!error<solid.Shape.shell: Thickness must be a cell array of faces and thicknesses, in pairs.> ...
 %! shell (solid.Shape (), [], 1, 'Thickness', {1})
 %!error<solid.Shape.shell: Thickness must be a cell array of faces and thicknesses, in pairs.> ...
@@ -5455,6 +5454,8 @@ endfunction
 %!                       resize (S, [2, 2, 2], 'Uniform', false)), true);
 %!error<solid.Shape.resize: Uniform must be true or false.> ...
 %! resize (solid.Shape (), [1, 1, 1], 'Uniform', 'yes')
+%!error<solid.Shape.resize: Uniform must be true or false.> ...
+%! resize (solid.Shape (), [1, 1, 1], 'Uniform', 1)
 %!error<solid.Shape.copy: invalid number of input arguments.> ...
 %! copy (solid.Shape ())
 %!error<solid.Shape.copy: D must be an N-by-3 real matrix of finite offsets.> ...
@@ -5479,6 +5480,8 @@ endfunction
 %! polararray (solid.Shape (), 3, 90, [0, 0, 1], [0, 0])
 %!error<solid.Shape.polararray: Rotate must be true or false.> ...
 %! polararray (solid.Shape (), 3, 90, 'Rotate', 2)
+%!error<solid.Shape.polararray: Rotate must be true or false.> ...
+%! polararray (solid.Shape (), 3, 90, 'Rotate', 1)
 %!error<solid.Shape.polararray: unknown option 'Turn'.> ...
 %! polararray (solid.Shape (), 3, 90, 'Turn', true)
 %!error<solid.Shape.polararray: option names must be character vectors.> ...

@@ -61,8 +61,8 @@ function [K, R] = curvature (P, CLOSED = false)
   if (nargin < 1 || nargin > 2)
     error ("geom.curvature: invalid number of input arguments.");
   endif
-  if (! (islogical (CLOSED) || isnumeric (CLOSED)) || ! isscalar (CLOSED))
-    error ("geom.curvature: CLOSED must be a logical scalar.");
+  if (! islogical (CLOSED) || ! isscalar (CLOSED))
+    error ("geom.curvature: CLOSED must be true or false.");
   endif
   CLOSED = logical (CLOSED);
   [errmsg, P] = geom.__checkcurve__ (P, CLOSED);
@@ -174,8 +174,10 @@ endfunction
 %! assert_equal (any (isnan (K)), false);
 
 %!error<geom.curvature: invalid number of input arguments.> geom.curvature ()
-%!error<geom.curvature: CLOSED must be a logical scalar.> ...
+%!error<geom.curvature: CLOSED must be true or false.> ...
 %! geom.curvature ([0, 0; 1, 0; 1, 1], [true, false])
+%!error<geom.curvature: CLOSED must be true or false.> ...
+%! geom.curvature ([0, 0; 1, 0; 1, 1], 1)
 %!error<geom.curvature: P must be a real floating-point matrix.> geom.curvature ('a')
 %!error<geom.curvature: P must be an N-by-2 matrix of point coordinates.> ...
 %! geom.curvature ([1, 2, 3])

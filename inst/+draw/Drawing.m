@@ -936,8 +936,7 @@ classdef Drawing
             endif
             L.lineweight = double (val);
           case {'visible', 'plot'}
-            if (! (islogical (val) || isnumeric (val)) || ! isscalar (val)
-                || ! any (val == [0, 1]))
+            if (! islogical (val) || ! isscalar (val))
               error ("draw.Drawing.layer: %s must be true or false.", name);
             endif
             L.(lower (name)) = logical (val);
@@ -3194,8 +3193,8 @@ classdef Drawing
             endif
             fname = val;
           case 'styles'
-            if (! (islogical (val) || isnumeric (val)) || ! isscalar (val))
-              error ("draw.Drawing.tikz: Styles must be a logical scalar.");
+            if (! islogical (val) || ! isscalar (val))
+              error ("draw.Drawing.tikz: Styles must be true or false.");
             endif
             styles = logical (val);
           case 'ltscale'

@@ -62,8 +62,8 @@ function [TF, IDX] = selfintersects (P, CLOSED = false)
   if (nargin < 1 || nargin > 2)
     error ("geom.selfintersects: invalid number of input arguments.");
   endif
-  if (! (islogical (CLOSED) || isnumeric (CLOSED)) || ! isscalar (CLOSED))
-    error ("geom.selfintersects: CLOSED must be a logical scalar.");
+  if (! islogical (CLOSED) || ! isscalar (CLOSED))
+    error ("geom.selfintersects: CLOSED must be true or false.");
   endif
   CLOSED = logical (CLOSED);
   [errmsg, P] = geom.__checkcurve__ (P, CLOSED);
@@ -142,8 +142,10 @@ endfunction
 
 %!error<geom.selfintersects: invalid number of input arguments.> ...
 %! geom.selfintersects ()
-%!error<geom.selfintersects: CLOSED must be a logical scalar.> ...
+%!error<geom.selfintersects: CLOSED must be true or false.> ...
 %! geom.selfintersects ([0, 0; 1, 0; 1, 1], [true, false])
+%!error<geom.selfintersects: CLOSED must be true or false.> ...
+%! geom.selfintersects ([0, 0; 1, 0; 1, 1], 1)
 %!error<geom.selfintersects: P must be a curve with at least 3 points.> ...
 %! geom.selfintersects ([0, 0; 1, 1])
 %!error<geom.selfintersects: P must not contain NaN or Inf values.> ...

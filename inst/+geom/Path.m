@@ -444,9 +444,8 @@ classdef Path
             error ("geom.Path: unknown option '%s'.", name);
         endswitch
       endfor
-      if (! (islogical (opt.Closed) || isnumeric (opt.Closed))
-          || ! isscalar (opt.Closed) || ! any (opt.Closed == [0, 1]))
-        error ("geom.Path: Closed must be a logical scalar.");
+      if (! islogical (opt.Closed) || ! isscalar (opt.Closed))
+        error ("geom.Path: Closed must be true or false.");
       endif
       if (! isa (opt.UCS, 'geom.UCS') || ! isscalar (opt.UCS))
         error ("geom.Path: UCS must be a geom.UCS object.");
@@ -695,9 +694,8 @@ classdef Path
         switch (lower (name))
           case 'tangent'
             tangent = val;
-            if (! (islogical (tangent) || isnumeric (tangent))
-                || ! isscalar (tangent) || ! any (tangent == [0, 1]))
-              error ("geom.Path.join: Tangent must be a logical scalar.");
+            if (! islogical (tangent) || ! isscalar (tangent))
+              error ("geom.Path.join: Tangent must be true or false.");
             endif
           otherwise
             error ("geom.Path.join: unknown option '%s'.", name);
@@ -1678,8 +1676,10 @@ endfunction
 %!error<geom.Path: UCS must be a geom.UCS object.>
 %! P = geom.Path ([0, 0, 0; 1, 0, 0]);
 %! P.UCS = [0, 0, 0];
-%!error<geom.Path: Closed must be a logical scalar.> ...
+%!error<geom.Path: Closed must be true or false.> ...
 %! geom.Path ([0, 0, 0; 1, 0, 0], 'Closed', 2)
+%!error<geom.Path: Closed must be true or false.> ...
+%! geom.Path ([0, 0, 0; 1, 0, 0], 'Closed', 1)
 %!error<geom.Path: V must not repeat a point consecutively.> ...
 %! geom.Path ([0, 0, 0; 1, 0, 0; 1, 0, 0])
 %!error<geom.Path.fillet: invalid number of input arguments.> ...
@@ -1714,9 +1714,12 @@ endfunction
 %! Q = geom.Path ([1, 0, 0; 2, 1, 0]);
 %! assert_equal (join (P, Q, 'tangent', false).Vertices, ...
 %!               join (P, Q, 'Tangent', false).Vertices);
-%!error<geom.Path.join: Tangent must be a logical scalar.> ...
+%!error<geom.Path.join: Tangent must be true or false.> ...
 %! join (geom.Path ([0, 0, 0; 1, 0, 0]), geom.Path ([1, 0, 0; 2, 0, 0]), ...
 %!       'Tangent', 2)
+%!error<geom.Path.join: Tangent must be true or false.> ...
+%! join (geom.Path ([0, 0, 0; 1, 0, 0]), geom.Path ([1, 0, 0; 2, 0, 0]), ...
+%!       'Tangent', 1)
 %!error<geom.Path.join: path 2 is closed.> ...
 %! join (geom.Path ([0, 0, 0; 1, 0, 0]), ...
 %!       geom.Path ([1, 0, 0; 2, 0, 0; 2, 1, 0], 'Closed', true))

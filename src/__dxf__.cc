@@ -2464,12 +2464,9 @@ cmdwrite (const octave_value_list& args)
                           " cell array of one per object.");
     else if (canfill && name == "fill")
     {
-      if (! (v.islogical () || v.isnumeric ()) || v.numel () != 1)
-        error ("%s: Fill must be a logical scalar.", g_caller.c_str ());
-      double x = v.double_value ();
-      if (x != 0 && x != 1)
-        error ("%s: Fill must be a logical scalar.", g_caller.c_str ());
-      w.fill = x != 0;
+      if (! v.islogical () || v.numel () != 1)
+        error ("%s: Fill must be true or false.", g_caller.c_str ());
+      w.fill = v.bool_value ();
     }
     else
       error ("%s: unknown option '%s'.", g_caller.c_str (),

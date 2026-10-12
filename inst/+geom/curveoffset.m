@@ -102,8 +102,8 @@ function [Q, MARGIN] = curveoffset (P, D, CLOSED = false)
   if (! isfloat (D) || ! isreal (D) || ! isscalar (D) || ! isfinite (D))
     error ("geom.curveoffset: D must be a real finite scalar.");
   endif
-  if (! (islogical (CLOSED) || isnumeric (CLOSED)) || ! isscalar (CLOSED))
-    error ("geom.curveoffset: CLOSED must be a logical scalar.");
+  if (! islogical (CLOSED) || ! isscalar (CLOSED))
+    error ("geom.curveoffset: CLOSED must be true or false.");
   endif
   CLOSED = logical (CLOSED);
   [errmsg, P] = geom.__checkcurve__ (P, CLOSED);
@@ -273,8 +273,10 @@ endfunction
 %! geom.curveoffset ([0, 0; 1, 0; 1, 1])
 %!error<geom.curveoffset: D must be a real finite scalar.> ...
 %! geom.curveoffset ([0, 0; 1, 0; 1, 1], Inf)
-%!error<geom.curveoffset: CLOSED must be a logical scalar.> ...
+%!error<geom.curveoffset: CLOSED must be true or false.> ...
 %! geom.curveoffset ([0, 0; 1, 0; 1, 1], 1, [true, false])
+%!error<geom.curveoffset: CLOSED must be true or false.> ...
+%! geom.curveoffset ([0, 0; 1, 0; 1, 1], 1, 1)
 %!error<geom.curveoffset: P must be a curve with at least 3 points.> ...
 %! geom.curveoffset ([0, 0; 1, 1], 1)
 %!error<geom.curveoffset: P encloses no area, so it has no inside.> ...

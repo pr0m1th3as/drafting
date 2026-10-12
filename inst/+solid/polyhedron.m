@@ -76,8 +76,7 @@ function S = polyhedron (M, varargin)
     switch (lower (name))
       case 'merge'
         merge = val;
-        if (! (islogical (merge) || isnumeric (merge)) || ! isscalar (merge)
-            || ! any (merge == [0, 1]))
+        if (! islogical (merge) || ! isscalar (merge))
           error ("solid.polyhedron: Merge must be true or false.");
         endif
       otherwise
@@ -198,6 +197,8 @@ endfunction
 %!                       solid.polyhedron (M, 'Merge', false)), true);
 %!error<solid.polyhedron: Merge must be true or false.> ...
 %! solid.polyhedron (polymesh.Mesh (eye (3), [1, 2, 3]), 'Merge', 2)
+%!error<solid.polyhedron: Merge must be true or false.> ...
+%! solid.polyhedron (polymesh.Mesh (eye (3), [1, 2, 3]), 'Merge', 1)
 %!error<solid.polyhedron: the mesh has no triangles.> ...
 %! solid.polyhedron (polymesh.Mesh ())
 %!error<solid.polyhedron: the mesh is not closed: 3 edges belong to one triangle only.> ...

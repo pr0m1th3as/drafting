@@ -85,7 +85,7 @@ function T = threadspec (NAME, varargin)
     if (strcmpi (varargin{1}, 'custom'))
       cflag = varargin{2};
       if (! (islogical (cflag) && isscalar (cflag)))
-        error ("solid.threadspec: 'Custom' must be either true or false.");
+        error ("solid.threadspec: 'Custom' must be true or false.");
       endif
     else
       error ("solid.threadspec: second input argument must be 'Custom'.");
@@ -351,9 +351,9 @@ endfunction
 %! solid.threadspec ('M6', 1, true)
 %!error<solid.threadspec: second input argument must be 'Custom'.> ...
 %! solid.threadspec ('M6', 'Pitch', 1)
-%!error<solid.threadspec: 'Custom' must be either true or false.> ...
+%!error<solid.threadspec: 'Custom' must be true or false.> ...
 %! solid.threadspec ('M6', 'Custom', 2)
-%!error<solid.threadspec: 'Custom' must be either true or false.> ...
+%!error<solid.threadspec: 'Custom' must be true or false.> ...
 %! solid.threadspec ('M6', 'Custom', 1)
 %!error<solid.threadspec: 'm6' is not the name of an ISO metric thread.> ...
 %! solid.threadspec ('m6')

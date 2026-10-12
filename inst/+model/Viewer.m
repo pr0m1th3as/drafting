@@ -621,9 +621,8 @@ classdef Viewer < handle
         switch (lower (name))
           case 'hidden'
             hidden = val;
-            if (! (islogical (hidden) || isnumeric (hidden))
-                || ! isscalar (hidden) || ! any (hidden == [0, 1]))
-              error ("model.Viewer: Hidden must be a logical scalar.");
+            if (! islogical (hidden) || ! isscalar (hidden))
+              error ("model.Viewer: Hidden must be true or false.");
             endif
           otherwise
             error ("model.Viewer: unknown option '%s'.", name);
@@ -2518,8 +2517,10 @@ endfunction
 %!testif ; ! isempty (getenv ('DISPLAY'))
 %! V = model.Viewer ('hidden', true);
 %! assert_equal (isopen (V), false);
-%!error<model.Viewer: Hidden must be a logical scalar.> ...
+%!error<model.Viewer: Hidden must be true or false.> ...
 %! model.Viewer ('Hidden', 2)
+%!error<model.Viewer: Hidden must be true or false.> ...
+%! model.Viewer ('Hidden', 1)
 %!error<model.Viewer: Model must be a solid.Shape, a polymesh.Mesh or a model.Assembly object.>
 %! V = model.Viewer ();
 %! V.Model = 1;

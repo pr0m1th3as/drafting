@@ -182,9 +182,8 @@ classdef Polyline
             error ("geom.Polyline: unknown option '%s'.", name);
         endswitch
       endfor
-      if (! (islogical (opt.Closed) || isnumeric (opt.Closed))
-          || ! isscalar (opt.Closed) || ! any (opt.Closed == [0, 1]))
-        error ("geom.Polyline: Closed must be a logical scalar.");
+      if (! islogical (opt.Closed) || ! isscalar (opt.Closed))
+        error ("geom.Polyline: Closed must be true or false.");
       endif
       if (! isa (opt.UCS, 'geom.UCS') || ! isscalar (opt.UCS))
         error ("geom.Polyline: UCS must be a geom.UCS object.");
@@ -668,8 +667,10 @@ endfunction
 %!test  # option names ignore case
 %! P = geom.Polyline ([0, 0; 1, 0; 1, 1], 'closed', true);
 %! assert_equal (P.Closed, true);
-%!error<geom.Polyline: Closed must be a logical scalar.> ...
+%!error<geom.Polyline: Closed must be true or false.> ...
 %! geom.Polyline ([0, 0; 1, 0], 'Closed', 2)
+%!error<geom.Polyline: Closed must be true or false.> ...
+%! geom.Polyline ([0, 0; 1, 0], 'Closed', 1)
 %!error<geom.Polyline: UCS must be a geom.UCS object.> ...
 %! geom.Polyline ([0, 0; 1, 0], 'UCS', [0, 0, 1])
 %!error<geom.Polyline: UCS must be a geom.UCS object.>

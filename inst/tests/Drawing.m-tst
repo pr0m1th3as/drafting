@@ -110,10 +110,6 @@
 %! D = draw.Drawing ().polyline (geom.Polyline (P, 'Closed', true));
 %! assert_equal (D.Entities(1).closed, true);
 %! assert_equal (rows (D.Entities(1).pts), 4);
-%!test  # a numeric flag is accepted and stored as a logical
-%! D = draw.Drawing ().polyline (geom.Polyline ([0, 0; 1, 1], 'Closed', 1));
-%! assert_equal (D.Entities(1).closed, true);
-%! assert_equal (islogical (D.Entities(1).closed), true);
 %!error<draw.Drawing.polyline: invalid number of input arguments.> ...
 %! draw.Drawing ().polyline ()
 %!error<draw.Drawing.polyline: PL must be a geom.Polyline object.> ...
@@ -543,6 +539,8 @@
 %! layer (draw.Drawing (), 'A', 'LineWeight', -0.5)
 %!error<draw.Drawing.layer: Visible must be true or false.> ...
 %! layer (draw.Drawing (), 'A', 'Visible', 2)
+%!error<draw.Drawing.layer: Visible must be true or false.> ...
+%! layer (draw.Drawing (), 'A', 'Visible', 1)
 
 %!test  # merge keeps the first drawing's properties for a layer both have
 %! A = draw.Drawing ().layer ('X', 'Colour', 1);
@@ -2219,8 +2217,10 @@
 %! tikz (draw.Drawing (), 'Scale', [1, 2])
 %!error<draw.Drawing.tikz: File must be a non-empty character vector.> ...
 %! tikz (draw.Drawing (), 'File', '')
-%!error<draw.Drawing.tikz: Styles must be a logical scalar.> ...
+%!error<draw.Drawing.tikz: Styles must be true or false.> ...
 %! tikz (draw.Drawing (), 'Styles', 'yes')
+%!error<draw.Drawing.tikz: Styles must be true or false.> ...
+%! tikz (draw.Drawing (), 'Styles', 1)
 
 %!test  # a styled entity carries colour and dash pattern as draw options
 %! D = draw.Drawing ();
