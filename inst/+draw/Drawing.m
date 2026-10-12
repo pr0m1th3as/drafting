@@ -2127,9 +2127,7 @@ classdef Drawing
           error (strcat ("draw.Drawing.merge: argument %d is not a", ...
                          " draw.Drawing object."), k);
         endif
-        for ii = 1:numel (other.Entities)
-          this.Entities(end+1) = other.Entities(ii);
-        endfor
+        this.Entities = [this.Entities, other.Entities];
         this.Layers = foldlayers (this.Layers, other.Layers);
         for bb = 1:numel (other.Blocks)
           name = other.Blocks(bb).name;
