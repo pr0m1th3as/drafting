@@ -39,6 +39,11 @@ block = hole (block, [45, 15, 20], 'M10x1.25', 16);
 ## countersunk at its exit too. `'Countersink', false` leaves both out, and
 ## numbers give another, as `[6.3, 90]` for the 90 degree countersink many
 ## workshops use. `solid.holespec` shows the countersink with the drill.
+##
+## A tapping hole is expected to be drilled, not milled, so a blind one
+## ends in the cone of a 118 degree twist drill, beyond its depth, which is
+## measured to the full diameter. `'Tip'` gives another angle, and
+## `'Tip', false` a flat bottom, as an end mill leaves.
 
 H = solid.holespec ('M6')
 

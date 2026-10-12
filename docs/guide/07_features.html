@@ -119,9 +119,9 @@ show (S);</code></pre>
 <p><code>hole</code> drills from a point on the surface along <code>'Direction'</code>, straight down by default. The bore enters the front face and runs along <i>y</i>; a <code>'Counterbore'</code> of 32 by 8 is the seat of a bearing 32 millimetres across.</p>
 <pre class="code-in"><code>S = hole (S, [45, 0, 32], 25, Inf, 'Direction', [0, 1, 0], ...
           'Counterbore', [32, 8]);</code></pre>
-<p>Two clearance holes for M6 screws through the base, with a countersunk seat for flat heads, and a blind hole on top of the boss for a grease nipple. Naming a thread, <code>'M6'</code>, drills at its tapping size, 5 millimetres, and countersinks the entry for the tap; <code>'Tip'</code> leaves the cone of a 118 degree twist drill at the bottom of the blind hole.</p>
+<p>Two clearance holes for M6 screws through the base, with a countersunk seat for flat heads, and a blind hole on top of the boss for a grease nipple. Naming a thread, <code>'M6'</code>, drills at its tapping size, 5 millimetres, and countersinks the entry for the tap. A tapping hole is expected to be drilled, not milled, so the blind one ends in the cone of a 118 degree twist drill; <code>'Tip'</code> gives another angle, and <code>'Tip', false</code> a flat bottom, as an end mill leaves.</p>
 <pre class="code-in"><code>S = hole (S, [9, 15, 12; 81, 15, 12], 6.6, Inf, 'Countersink', 13);
-S = hole (S, [45, 15, 52], 'M6', 10, 'Tip', 118);</code></pre>
+S = hole (S, [45, 15, 52], 'M6', 10);</code></pre>
 <h2>Choosing faces</h2>
 <p><code>faces</code> chooses faces as <code>edges</code> chooses edges: by <code>'Type'</code> of surface, by <code>'Normal'</code> for flat faces, by <code>'Axis'</code> for faces turned about an axis, and by <code>'Within'</code>. The faces round the <i>y</i> axis that are cylinders are the outside of the boss, the bore and the bearing seat:</p>
 <pre class="code-in"><code>F = faces (S, 'Type', 'cylinder', 'Axis', [0, 1, 0])</code></pre>

@@ -1789,6 +1789,11 @@ classdef Shape
     ## the part.  @qcode{'Countersink'} false leaves both out, and numbers
     ## size both.  A tapping hole takes no counterbore.
     ##
+    ## A tapping hole is expected to be drilled, not milled, so a blind one
+    ## ends in the cone the point of a 118 degree twist drill leaves, beyond
+    ## @var{DEPTH}, as the drawing of a blind tapped hole in IS 1369 (Part 3)
+    ## shows it.  @qcode{'Tip'} gives another angle, and false a flat bottom.
+    ##
     ## Name/Value pairs shape the hole:
     ##
     ## @table @asis
@@ -1854,9 +1859,12 @@ classdef Shape
     ##
     ## @item @qcode{'Tip'}
     ## The included angle in degrees of the cone a twist drill leaves at the
-    ## bottom of a blind hole, 118 for a standard drill.  It is beyond
-    ## @var{DEPTH}, which is measured to the full diameter as a drawing
-    ## dimensions it.  By default a blind hole is flat-bottomed.
+    ## bottom of a blind hole, 118 for a standard drill, or false for none.
+    ## It is beyond @var{DEPTH}, which is measured to the full diameter as a
+    ## drawing dimensions it.  A blind tapping hole is drilled, so it takes
+    ## the point of a 118 degree drill by default; false leaves it
+    ## flat-bottomed, as an end mill or a flat-bottom drill leaves it.  Every
+    ## other blind hole is flat-bottomed by default, as an end mill leaves it.
     ## @end table
     ##
     ## A counterbore and a countersink cannot both be given, and a tip applies
@@ -1983,12 +1991,17 @@ classdef Shape
         error (strcat ("solid.Shape.hole: Counterbore and Countersink", ...
                        " cannot both be given."));
       endif
+      ## A blind tapping hole is drilled, so it ends in the point of a twist
+      ## drill unless a tip is given or refused
       tip = opt.Tip;
-      if (! isempty (tip))
+      point = tapped && isempty (tip) && ! isinf (DEPTH);
+      if (islogical (tip) && isscalar (tip) && ! tip)
+        tip = [];
+      elseif (! isempty (tip))
         if (! isnumeric (tip) || ! isreal (tip) || ! isscalar (tip)
             || ! (tip > 0) || ! (tip < 180))
-          error (strcat ("solid.Shape.hole: Tip must be an angle in the", ...
-                         " range (0, 180)."));
+          error (strcat ("solid.Shape.hole: Tip must be false or an angle", ...
+                         " in the range (0, 180)."));
         endif
         if (isinf (DEPTH))
           error ("solid.Shape.hole: Tip applies to blind holes only.");
@@ -2043,19 +2056,26 @@ classdef Shape
 
       ## A tapped hole drilled through is countersunk alike where its axis
       ## last leaves the part, the cone widening outwards and its cylinder
-      ## clearing the axis on beyond the part
-      if (tapped && ! isempty (cs))
+      ## clearing the axis on beyond the part; one that stops in the part
+      ## ends in the point of a 118 degree drill
+      if (tapped && (! isempty (cs) || point))
         for i = 1:rows (P)
           z = leaves (this, P(i,:), opt.Direction, reach);
-          if (z <= DEPTH + 1e-9)
+          if (z <= DEPTH + 1e-9 && ! isempty (cs))
             E = {translate(solid.cone (D / 2, cs(1) / 2, h), ...
                            [0, 0, z - cs(3) - h]), ...
                  translate(solid.cylinder (cs(1) / 2, reach + cs(3)), ...
                            [0, 0, z - cs(3)])};
-            E = aim (E, opt.Direction);
-            tools(end+1:end+2) = {translate(E{1}, P(i,:)), ...
-                                  translate(E{2}, P(i,:))};
+          elseif (z > DEPTH + 1e-9 && point)
+            E = {translate(solid.cone (D / 2, 0, D / 2 / tand (59)), ...
+                           [0, 0, DEPTH])};
+          else
+            continue;
           endif
+          E = aim (E, opt.Direction);
+          for j = 1:numel (E)
+            tools{end+1} = translate (E{j}, P(i,:));
+          endfor
         endfor
       endif
       this = subtract (this, tools{:});
@@ -3943,9 +3963,15 @@ endfunction
 %! assert_equal (isvalid (S), true);
 
 %!test  # a blind tapped M6 hole, countersunk at its entry to 6.3 at 120
-%! S = hole (solid.box (80, 40, 12), [20, 20, 12], 'M6', 8);
+%! S = hole (solid.box (80, 40, 12), [20, 20, 12], 'M6', 8, 'Tip', false);
 %! h = 0.65 / sqrt (3);
 %! V = pi * (h / 3 * (3.15 ^ 2 + 3.15 * 2.5 + 2.5 ^ 2) + 2.5 ^ 2 * (8 - h));
+%! assert_equal (volume (S), 38400 - V, 1e-9);
+
+%!test  # a blind tapped hole ends in the point of a 118 degree drill
+%! S = hole (solid.box (80, 40, 12), [20, 20, 12], 'M6', 8, ...
+%!           'Countersink', false);
+%! V = pi * 2.5 ^ 2 * (8 + 2.5 / tand (59) / 3);
 %! assert_equal (volume (S), 38400 - V, 1e-9);
 
 %!test  # a tapped hole drilled through is countersunk at both ends
@@ -3968,7 +3994,7 @@ endfunction
 
 %!test  # straight up from underneath
 %! S = hole (solid.box (80, 40, 12), [20, 20, 0], 'M2.5', 3, ...
-%!           'Direction', [0, 0, 1], 'Countersink', false);
+%!           'Direction', [0, 0, 1], 'Countersink', false, 'Tip', false);
 %! assert_equal (volume (S), 38400 - 1.025 ^ 2 * pi * 3, 1e-9);
 
 %!test  # drilling the empty shape
@@ -4947,7 +4973,7 @@ endfunction
 %!error<solid.Shape.hole: Counterbore and Countersink cannot both be given.> ...
 %! hole (solid.Shape (), [0, 0, 0], 5, 10, 'Counterbore', [8, 2], ...
 %!       'Countersink', 8)
-%!error<solid.Shape.hole: Tip must be an angle in the range \(0, 180\).> ...
+%!error<solid.Shape.hole: Tip must be false or an angle in the range \(0, 180\).> ...
 %! hole (solid.Shape (), [0, 0, 0], 5, 10, 'Tip', 0)
 %!error<solid.Shape.hole: Tip applies to blind holes only.> ...
 %! hole (solid.Shape (), [0, 0, 0], 5, Inf, 'Tip', 118)

@@ -71,11 +71,13 @@ S = hole (S, [45, 0, 32], 25, Inf, 'Direction', [0, 1, 0], ...
 ## Two clearance holes for M6 screws through the base, with a countersunk
 ## seat for flat heads, and a blind hole on top of the boss for a grease
 ## nipple. Naming a thread, `'M6'`, drills at its tapping size, 5
-## millimetres, and countersinks the entry for the tap; `'Tip'` leaves the
-## cone of a 118 degree twist drill at the bottom of the blind hole.
+## millimetres, and countersinks the entry for the tap. A tapping hole is
+## expected to be drilled, not milled, so the blind one ends in the cone of
+## a 118 degree twist drill; `'Tip'` gives another angle, and
+## `'Tip', false` a flat bottom, as an end mill leaves.
 
 S = hole (S, [9, 15, 12; 81, 15, 12], 6.6, Inf, 'Countersink', 13);
-S = hole (S, [45, 15, 52], 'M6', 10, 'Tip', 118);
+S = hole (S, [45, 15, 52], 'M6', 10);
 
 ## ## Choosing faces
 ##

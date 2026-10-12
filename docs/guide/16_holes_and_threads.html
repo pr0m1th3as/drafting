@@ -94,6 +94,7 @@
 block = hole (block, [15, 15, 20], 'M6', 16);
 block = hole (block, [45, 15, 20], 'M10x1.25', 16);</code></pre>
 <p>Every tapped hole is countersunk at its entry, as DIN 76-1 draws it: 120 degrees, 1.05 times the nominal diameter across, 6.3 for M6, so that the tap starts square and the thread starts clean. A hole drilled through is countersunk at its exit too. <code>'Countersink', false</code> leaves both out, and numbers give another, as <code>[6.3, 90]</code> for the 90 degree countersink many workshops use. <a href="../solid.holespec.html"><code>solid.holespec</code></a> shows the countersink with the drill.</p>
+<p>A tapping hole is expected to be drilled, not milled, so a blind one ends in the cone of a 118 degree twist drill, beyond its depth, which is measured to the full diameter. <code>'Tip'</code> gives another angle, and <code>'Tip', false</code> a flat bottom, as an end mill leaves.</p>
 <pre class="code-in"><code>H = solid.holespec ('M6')</code></pre>
 <pre class="code-out"><code>H =
 
