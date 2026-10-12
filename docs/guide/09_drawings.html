@@ -250,7 +250,7 @@ printf ("%s\n", L{1:5});</code></pre>
 % Drawing: bracket
 % Plot scale 1:1. Coordinates are model millimetres.
 \tikzset{
-  drCENTRE/.style={red, dash pattern=on 1.25mm off 0.25mm on 0.25mm off 0.25mm, line width=0.25mm}, % layer 'CENTRE'</code></pre>
+  drCENTRE/.style={red, dash pattern=on 31.75mm off 6.35mm on 6.35mm off 6.35mm, line width=0.25mm}, % layer 'CENTRE'</code></pre>
 <p><code>write</code> saves the drawing as a DXF file for a CAD program, every entity on its layer with its line type and colour, and <a href="../draw.read.html"><code>draw.read</code></a> reads one back. Dimensions come back as dimensions, measuring again. Centre marks and leaders, which DXF has no entity for, come back as the lines and text they are drawn with, which is why the count grows. How each entity is written and read is set out in <a href="dxf.html">DXF and the classes</a>.</p>
 <pre class="code-in"><code>write (sheet, 'sheet.dxf');
 E = draw.read ('sheet.dxf')</code></pre>

@@ -1488,10 +1488,10 @@
 %! unwind_protect
 %!   D = draw.Drawing ();
 %!   D.Linetype = 'DASHED';
-%!   H = plot (D.line ([0, 0], [30, 0]), 'Axes', axes ('parent', f));
+%!   H = plot (D.line ([0, 0], [600, 0]), 'Axes', axes ('parent', f));
 %!   L = sum (__runlengths__ (H));
 %!   pat = draw.linetype ('DASHED');
-%!   assert_equal (L / 30, sum (pat(pat > 0)) / sum (abs (pat)), 0.05);
+%!   assert_equal (L / 600, sum (pat(pat > 0)) / sum (abs (pat)), 0.05);
 %! unwind_protect_cleanup
 %!   close (f);
 %! end_unwind_protect
@@ -1677,20 +1677,27 @@
 %! end_unwind_protect
 
 ## The dashes reach the sheet at their nominal length: a 1000 mm HIDDEN
-## line at 1:50 is 20 mm on paper, 54 dashes of 0.25 and gaps of 0.125
+## line at 1:50 is 20 mm on paper, three dashes of 6.35 and gaps of 3.175,
+## the last cut short
 %!testif ; any (strcmp (graphics_toolkit (), {'qt', 'gnuplot'}))
-%! fn = [tempname(), '.svg'];
+%! fn = [tempname(), '.png'];
 %! D = draw.Drawing ();
 %! D.Linetype = 'HIDDEN';
 %! D = D.line ([0, 0], [1000, 0]);
 %! unwind_protect
-%!   [~, S] = print (D, fn, 'Paper', 'A4', 'Scale', 50);
-%!   t = fileread (fn);
+%!   [~, S] = print (D, fn, 'Paper', 'A4', 'Scale', 50, 'Resolution', 100);
+%!   I = imread (fn);
 %! unwind_protect_cleanup
 %!   [~] = unlink (fn);
 %! end_unwind_protect
+%! if (islogical (I))
+%!   I = uint8 (I) * 255;
+%! endif
+%! ink = min (I, [], 3) < 200;
+%! [r, ~] = find (ink);
+%! row = ink(round (median (r)),:);
 %! assert_equal (S, 50);
-%! assert_equal (numel (strfind (t, '<polyline')), 54);
+%! assert_equal (nnz (diff ([false, row]) == 1), 3);
 
 ## Portrait swaps the sheet
 %!testif ; any (strcmp (graphics_toolkit (), {'qt', 'gnuplot'}))
@@ -2299,20 +2306,20 @@
 %! L = D.line ([0, 0], [1, 0]);
 %! S1 = tikz (L, 'scale', 1);
 %! S50 = tikz (L, 'scale', 50);
-%! assert_equal (! isempty (strfind (S1, 'on 0.5mm off 0.25mm')), true);
-%! assert_equal (! isempty (strfind (S50, 'on 0.5mm off 0.25mm')), true);
+%! assert_equal (! isempty (strfind (S1, 'on 12.7mm off 6.35mm')), true);
+%! assert_equal (! isempty (strfind (S50, 'on 12.7mm off 6.35mm')), true);
 
 %!test  # an explicit LTScale multiplies the pattern, as CAD's LTSCALE does
 %! D = draw.Drawing ();
 %! D.Linetype = 'DASHED';
 %! S = tikz (D.line ([0, 0], [1, 0]), 'scale', 50, 'ltscale', 100);
-%! assert_equal (! isempty (strfind (S, 'on 1mm off 0.5mm')), true);
+%! assert_equal (! isempty (strfind (S, 'on 25.4mm off 12.7mm')), true);
 
 %!test  # the rule is one rule: pattern times LTScale over scale
 %! D = draw.Drawing ();
 %! D.Linetype = 'DASHED';
 %! S = tikz (D.line ([0, 0], [1, 0]), 'scale', 10, 'ltscale', 5);
-%! assert_equal (! isempty (strfind (S, 'on 0.25mm off 0.125mm')), true);
+%! assert_equal (! isempty (strfind (S, 'on 6.35mm off 3.175mm')), true);
 
 %!error<draw.Drawing.tikz: LTScale must be a real positive finite scalar.> ...
 %! tikz (draw.Drawing (), 'ltscale', 0)
