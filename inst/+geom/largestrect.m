@@ -117,12 +117,9 @@ function [R, B] = largestrect (P, MARGINS = 0)
   [xGrid, yGrid] = ndgrid (xMid, yMid);
   inside = inpolygon (xGrid, yGrid, P(:,1), P(:,2));
 
-  ## Summed-area table, so that testing a block of cells costs four lookups
-  ## rather than a scan.
-  total = zeros (nx, ny);
-  total(2:end, 2:end) = cumsum (cumsum (inside, 1), 2);
-
-  ## Search every pair of x bounds against every pair of y bounds
+  ## Search every pair of x bounds.  For each, the y cells inside P across
+  ## all its columns form one row, and the best y bounds are the tallest run
+  ## of such cells.
   bestArea = 0;
   B = [];
   ## A rectangle stands off every wall of P by MARGINS exactly when the
@@ -130,30 +127,26 @@ function [R, B] = largestrect (P, MARGINS = 0)
   ## the grown rectangle, and what is scored and returned is that block less
   ## the margins.
   for i1 = 1:nx-1
+    strip = true (1, ny - 1);
     for i2 = i1+1:nx
+      strip &= inside(i2-1,:);
+      if (! any (strip))
+        break;
+      endif
       wide = xs(i2) - xs(i1) - MARGINS(1) - MARGINS(3);
       if (wide <= 0)
         continue;
       endif
-      for j1 = 1:ny-1
-        for j2 = j1+1:ny
-          high = ys(j2) - ys(j1) - MARGINS(2) - MARGINS(4);
-          if (high <= 0)
-            continue;
-          endif
-          area = wide * high;
-          if (area <= bestArea)
-            continue;
-          endif
-          ## Every cell spanned must be inside P
-          nIn = total(i2,j2) - total(i1,j2) - total(i2,j1) + total(i1,j1);
-          if (nIn == (i2 - i1) * (j2 - j1))
-            bestArea = area;
-            B = [xs(i1) + MARGINS(1), ys(j1) + MARGINS(2), ...
-                 xs(i2) - MARGINS(3), ys(j2) - MARGINS(4)];
-          endif
-        endfor
-      endfor
+      d = diff ([false, strip, false]);
+      j1 = find (d == 1);
+      j2 = find (d == -1);
+      [high, k] = max (ys(j2) - ys(j1));
+      high -= MARGINS(2) + MARGINS(4);
+      if (high > 0 && wide * high > bestArea)
+        bestArea = wide * high;
+        B = [xs(i1) + MARGINS(1), ys(j1(k)) + MARGINS(2), ...
+             xs(i2) - MARGINS(3), ys(j2(k)) - MARGINS(4)];
+      endif
     endfor
   endfor
 
