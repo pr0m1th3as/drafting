@@ -2072,7 +2072,8 @@ mapstr (const octave_map& m, const char *f, octave_idx_type i,
 {
   if (! m.isfield (f))
     return dflt;
-  octave_value v = m.contents (f)(i);
+  const Cell c = m.contents (f);
+  octave_value v = c(i);
   return v.is_string () ? v.string_value () : dflt;
 }
 
@@ -2081,7 +2082,8 @@ mapmat (const octave_map& m, const char *f, octave_idx_type i)
 {
   if (! m.isfield (f))
     return Matrix ();
-  octave_value v = m.contents (f)(i);
+  const Cell c = m.contents (f);
+  octave_value v = c(i);
   if (v.isempty () || ! (v.isnumeric () || v.islogical ()))
     return Matrix ();
   return v.matrix_value ();
