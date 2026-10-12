@@ -1249,13 +1249,57 @@
 %! transform (draw.Drawing ().ordinate ([0, 0], [1, 1], 'x', [1, 0]), ...
 %!            'rotate', 30)
 
-%!test  # a drawing renders one object per entity
+%!test  # entities of one layer and appearance are one object, split by NaN
 %! f = figure ('visible', 'off');
 %! unwind_protect
 %!   D = draw.Drawing ().line ([0, 0], [1, 0]).circle ([0, 0], 2);
 %!   H = plot (D, 'Axes', axes ('parent', f));
+%!   assert_equal (numel (H), 1);
+%!   assert_equal (nnz (isnan (get (H, 'xdata'))), 1);
+%! unwind_protect_cleanup
+%!   close (f);
+%! end_unwind_protect
+
+%!test  # another colour is another object
+%! f = figure ('visible', 'off');
+%! unwind_protect
+%!   D = draw.Drawing ().line ([0, 0], [1, 0]);
+%!   D.Colour = 'red';
+%!   H = plot (D.line ([0, 1], [1, 1]), 'Axes', axes ('parent', f));
 %!   assert_equal (numel (H), 2);
-%!   assert_equal (all (ishandle (H)), true);
+%! unwind_protect_cleanup
+%!   close (f);
+%! end_unwind_protect
+
+%!test  # another layer is another object, tagged with the layer's name
+%! f = figure ('visible', 'off');
+%! unwind_protect
+%!   D = draw.Drawing ().layer ('A').layer ('B');
+%!   D.Layer = 'A';
+%!   D = D.line ([0, 0], [1, 0]);
+%!   D.Layer = 'B';
+%!   H = plot (D.line ([0, 1], [1, 1]), 'Axes', axes ('parent', f));
+%!   assert_equal (get (H, 'tag'), {'A'; 'B'});
+%! unwind_protect_cleanup
+%!   close (f);
+%! end_unwind_protect
+
+%!test  # a piece starting where the last one ends continues it unbroken
+%! f = figure ('visible', 'off');
+%! unwind_protect
+%!   D = draw.Drawing ().line ([0, 0; 1, 0], [1, 0; 1, 1]);
+%!   H = plot (D, 'Axes', axes ('parent', f));
+%!   assert_equal (get (H, 'xdata')(:)', [0, 1, 1]);
+%! unwind_protect_cleanup
+%!   close (f);
+%! end_unwind_protect
+
+%!test  # text is an object of its own, drawn after the lines
+%! f = figure ('visible', 'off');
+%! unwind_protect
+%!   D = draw.Drawing ().text ([0, 0], 'A').line ([0, 0], [1, 0]);
+%!   H = plot (D, 'Axes', axes ('parent', f));
+%!   assert_equal (get (H, 'type'), {'line'; 'text'});
 %! unwind_protect_cleanup
 %!   close (f);
 %! end_unwind_protect
@@ -1371,14 +1415,25 @@
 %!   close (f);
 %! end_unwind_protect
 
+%!function L = __runlengths__ (H)
+%!  ## The distance from start to end of each run of the line object H, its
+%!  ## runs split by NaN
+%!  x = get (H, 'xdata')(:);
+%!  y = get (H, 'ydata')(:);
+%!  b = find (isnan (x));
+%!  s = [1; b + 1];
+%!  e = [b - 1; numel(x)];
+%!  L = hypot (x(e) - x(s), y(e) - y(s));
+%!endfunction
+
 %!test  # true line types cut the run into dashes, each drawn solid
 %! f = figure ('visible', 'off');
 %! unwind_protect
 %!   D = draw.Drawing ();
 %!   D.Linetype = 'DASHED';
 %!   H = plot (D.line ([0, 0], [20, 0]), 'Axes', axes ('parent', f));
-%!   assert_equal (numel (H) > 1, true);
-%!   assert_equal (all (strcmp (get (H, 'linestyle'), '-')), true);
+%!   assert_equal (numel (__runlengths__ (H)) > 1, true);
+%!   assert_equal (get (H, 'linestyle'), '-');
 %! unwind_protect_cleanup
 %!   close (f);
 %! end_unwind_protect
@@ -1389,8 +1444,7 @@
 %!   D = draw.Drawing ();
 %!   D.Linetype = 'DASHED';
 %!   H = plot (D.line ([0, 0], [30, 0]), 'Axes', axes ('parent', f));
-%!   x = arrayfun (@(h) get (h, 'xdata'), H, 'UniformOutput', false);
-%!   L = sum (cellfun (@(v) abs (v(end) - v(1)), x));
+%!   L = sum (__runlengths__ (H));
 %!   pat = draw.linetype ('DASHED');
 %!   assert_equal (L / 30, sum (pat(pat > 0)) / sum (abs (pat)), 0.05);
 %! unwind_protect_cleanup
@@ -1422,8 +1476,8 @@
 %!   D = draw.Drawing ();
 %!   D.Linetype = 'DASHED';
 %!   L = D.line ([0, 0], [40, 0]);
-%!   n1 = numel (plot (L, 'Axes', ax, 'LTScale', 1));
-%!   n4 = numel (plot (L, 'Axes', ax, 'LTScale', 4));
+%!   n1 = numel (__runlengths__ (plot (L, 'Axes', ax, 'LTScale', 1)));
+%!   n4 = numel (__runlengths__ (plot (L, 'Axes', ax, 'LTScale', 4)));
 %!   assert_equal (n4 < n1, true);
 %! unwind_protect_cleanup
 %!   close (f);
@@ -1456,8 +1510,9 @@
 %! unwind_protect
 %!   ax = axes ('parent', f);
 %!   D = draw.Drawing ().hatch (geom.Region ([0, 0; 20, 0; 20, 20; 0, 20]));
-%!   nfill = numel (plot (D, 'Axes', ax));
-%!   nline = numel (plot (D, 'Axes', ax, 'Hatch', 'boundary'));
+%!   nfill = numel (__runlengths__ (plot (D, 'Axes', ax)));
+%!   H = plot (D, 'Axes', ax, 'Hatch', 'boundary');
+%!   nline = numel (__runlengths__ (H));
 %!   assert_equal (nline, 1);
 %!   assert_equal (nfill > 1, true);
 %! unwind_protect_cleanup
@@ -2249,14 +2304,10 @@
 %!   D = draw.Drawing ().dim ([0, 0], [100, 0], -15, 'horizontal');
 %!   ax = axes ('parent', f);
 %!   H = plot (D, 'Axes', ax, 'DimScale', 1);
-%!   L = H(strcmp (get (H, 'type'), 'line'));
-%!   n1 = min (cellfun (@(x, y) hypot (x(end) - x(1), y(end) - y(1)), ...
-%!                      get (L, 'xdata'), get (L, 'ydata')));
+%!   n1 = min (__runlengths__ (H(strcmp (get (H, 'type'), 'line'))));
 %!   cla (ax);
 %!   H = plot (D, 'Axes', ax, 'DimScale', 5);
-%!   L = H(strcmp (get (H, 'type'), 'line'));
-%!   n5 = min (cellfun (@(x, y) hypot (x(end) - x(1), y(end) - y(1)), ...
-%!                      get (L, 'xdata'), get (L, 'ydata')));
+%!   n5 = min (__runlengths__ (H(strcmp (get (H, 'type'), 'line'))));
 %!   assert_equal (n5 / n1, 5, 1e-9);
 %! unwind_protect_cleanup
 %!   close (f);
@@ -2441,7 +2492,6 @@
 %! unwind_protect
 %!   D = __allentities__ ();
 %!   H = plot (D, 'Axes', axes ('parent', f));
-%!   assert_equal (numel (H) >= numentities (D), true);
 %!   assert_equal (all (ishandle (H)), true);
 %!   assert_equal (strjoin (sort (unique (get (H, 'type'))'), ' '), ...
 %!                 'line text');

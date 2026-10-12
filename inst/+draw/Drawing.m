@@ -2377,8 +2377,13 @@ classdef Drawing
     ## and is equivalent.
     ##
     ## @code{@var{H} = draw.Drawing.plot (@dots{})} returns a column of graphics
-    ## handles,
-    ## one per object created, so that a caller can restyle or delete them.
+    ## handles, one per object created.  Every line of one layer, colour, line
+    ## style and width is one line object, its pieces split by @code{NaN};
+    ## points are markers of one line object per layer and colour; each text
+    ## is an object of its own, drawn on top.  The @qcode{'Tag'} of every
+    ## object is its layer's name, so
+    ## @code{findobj (@var{HAX}, 'Tag', @var{NAME})} finds what the layer
+    ## @var{NAME} drew, to restyle, hide or delete it.
     ##
     ## @subheading Name/Value pairs
     ##
@@ -2602,13 +2607,26 @@ classdef Drawing
       H = [];
 
       unwind_protect
+        ## Every line of one layer, colour, line style and width is one
+        ## graphics object, its pieces split by NaN, since a figure slows with
+        ## each object it holds; a piece that starts where the last piece of
+        ## its object ends continues it.  Each text is an object of its own,
+        ## drawn last so that it stays on top.
+        keys = {};
+        look = struct ('layer', {}, 'colour', {}, 'style', {}, ...
+                       'width', {}, 'marker', {});
+        last = zeros (0, 2);
+        pieces = {};
+        gid = [];
+        joined = false (1, 0);
+        texts = [];
         for ii = 1:numel (E)
           e = E(ii);
           col = draw.colour (e.colour);
           ## A weight of its own or its layer's, in millimetres of paper
-          po = opt;
+          lw = opt.LineWidth;
           if (! isempty (e.lineweight))
-            po.LineWidth = e.lineweight * 72 / 25.4;
+            lw = e.lineweight * 72 / 25.4;
           endif
 
           switch (e.type)
@@ -2617,7 +2635,6 @@ classdef Drawing
               if (e.closed)
                 P = [P; P(1,:)];
               endif
-              H = [H; polydraw(ax, P, e.linetype, col, po)];
 
             case {'CIRCLE', 'ARC'}
               if (strcmp (e.type, 'CIRCLE'))
@@ -2632,36 +2649,97 @@ classdef Drawing
               endif
               P = [e.pts(1) + e.radius * cosd(a)', ...
                    e.pts(2) + e.radius * sind(a)'];
-              H = [H; polydraw(ax, P, e.linetype, col, po)];
 
             case 'ELLIPSE'
               t = linspace (0, 2*pi, opt.Arc + 1)';
               P = ellipsepts (t, e.pts, e.radius(1), e.radius(2), ...
                               cosd (e.rotation), sind (e.rotation));
-              H = [H; polydraw(ax, P, e.linetype, col, po)];
 
             case 'TEXT'
-              ## With a FontScale the entity's own height decides the size,
-              ## which
-              ## is what a plotted sheet needs; without one every string is
-              ## drawn
-              ## at the same fixed point size, which is what a screen needs.
-              if (isempty (opt.FontScale))
-                fsize = opt.FontSize;
-              else
-                fsize = e.height * opt.FontScale;
-              endif
-              H(end+1, 1) = text (e.pts(1), e.pts(2), plainsymbols (e.text), ...
-                                  'parent', ax, ...
-                                  'color', col, 'fontsize', fsize, ...
-                                  'rotation', e.rotation, ...
-                                  'horizontalalignment', 'left', ...
-                                  'verticalalignment', 'baseline');
+              texts(end+1) = ii;
+              continue;
 
             case 'POINT'
-              H(end+1, 1) = line (ax, e.pts(1), e.pts(2), 'color', col, ...
-                                  'marker', '+', 'linestyle', 'none');
+              P = [];
+              runs = {};
+              dots = e.pts(1,1:2);
+              mk = '+';
+
+            otherwise
+              continue;
           endswitch
+
+          if (! isempty (P))
+            [runs, dots, style] = polypieces (P, e.linetype, opt);
+            mk = '.';
+          endif
+          for k = 1:numel (runs)
+            [k1, keys, look, last] = lookgroup (keys, look, last, e.layer, ...
+                                                col, style, lw, 'none');
+            pieces{end+1} = runs{k};
+            joined(end+1) = isequal (runs{k}(1,:), last(k1,:));
+            if (joined(end))
+              pieces{end} = runs{k}(2:end,:);
+            endif
+            gid(end+1) = k1;
+            last(k1,:) = runs{k}(end,:);
+          endfor
+          if (! isempty (dots))
+            [k1, keys, look, last] = lookgroup (keys, look, last, e.layer, ...
+                                                col, 'none', 0, mk);
+            pieces{end+1} = dots;
+            joined(end+1) = false;
+            gid(end+1) = k1;
+            last(k1,:) = NaN;
+          endif
+        endfor
+
+        H = zeros (numel (look) + numel (texts), 1);
+        for k = 1:numel (look)
+          j = find (gid == k);
+          L = look(k);
+          if (! strcmp (L.marker, 'none'))
+            X = vertcat (pieces{j});
+          else
+            gap = repmat ({[NaN, NaN]}, 1, numel (j));
+            gap(joined(j)) = {zeros(0, 2)};
+            X = [gap; pieces(j)];
+            X = vertcat (X{:});
+            X = X(2:end,:);
+          endif
+          if (strcmp (L.marker, 'none'))
+            H(k) = line (ax, X(:,1), X(:,2), 'color', L.colour, ...
+                         'linestyle', L.style, 'linewidth', L.width, ...
+                         'tag', L.layer);
+          elseif (strcmp (L.marker, '.'))
+            H(k) = line (ax, X(:,1), X(:,2), 'color', L.colour, ...
+                         'marker', '.', 'markersize', 2, ...
+                         'linestyle', 'none', 'tag', L.layer);
+          else
+            H(k) = line (ax, X(:,1), X(:,2), 'color', L.colour, ...
+                         'marker', '+', 'linestyle', 'none', ...
+                         'tag', L.layer);
+          endif
+        endfor
+        for k = 1:numel (texts)
+          e = E(texts(k));
+          ## With a FontScale the entity's own height decides the size, which
+          ## is what a plotted sheet needs; without one every string is drawn
+          ## at the same fixed point size, which is what a screen needs.
+          if (isempty (opt.FontScale))
+            fsize = opt.FontSize;
+          else
+            fsize = e.height * opt.FontScale;
+          endif
+          H(numel (look) + k) = text (e.pts(1), e.pts(2), ...
+                                      plainsymbols (e.text), ...
+                                      'parent', ax, ...
+                                      'color', draw.colour (e.colour), ...
+                                      'fontsize', fsize, ...
+                                      'rotation', e.rotation, ...
+                                      'horizontalalignment', 'left', ...
+                                      'verticalalignment', 'baseline', ...
+                                      'tag', e.layer);
         endfor
 
         axis (ax, 'equal');
@@ -3816,16 +3894,20 @@ function [xl, yl] = contentlimits (H)
 
 endfunction
 
-function H = polydraw (ax, P, lt, col, opt)
+## The drawn pieces of the polyline P in the line type LT: the runs, each
+## drawn in the figure line style STYLE, and the dots of a pattern
+function [runs, dots, style] = polypieces (P, lt, opt)
 
-  H = [];
+  runs = {};
+  dots = zeros (0, 2);
+  style = '-';
   if (rows (P) < 2)
     return;
   endif
 
   if (strcmpi (opt.Linetypes, 'approximate') || strcmpi (lt, 'CONTINUOUS'))
-    H = line (ax, P(:,1), P(:,2), 'color', col, ...
-              'linestyle', linestyle (lt), 'linewidth', opt.LineWidth);
+    runs = {P};
+    style = linestyle (lt);
     return;
   endif
 
@@ -3835,21 +3917,32 @@ function H = polydraw (ax, P, lt, col, opt)
     pat = [];
   end_try_catch
   if (isempty (pat))
-    H = line (ax, P(:,1), P(:,2), 'color', col, 'linestyle', '-', ...
-              'linewidth', opt.LineWidth);
+    runs = {P};
     return;
   endif
 
-  for seg = dashes(P, pat)'
-    d = seg{1};
-    if (rows (d) == 1)
-      H(end+1, 1) = line (ax, d(1,1), d(1,2), 'color', col, 'marker', '.', ...
-                          'markersize', 2, 'linestyle', 'none');
-    else
-      H(end+1, 1) = line (ax, d(:,1), d(:,2), 'color', col, ...
-                          'linestyle', '-', 'linewidth', opt.LineWidth);
-    endif
-  endfor
+  C = dashes (P, pat);
+  isdot = cellfun (@rows, C) == 1;
+  runs = C(! isdot)';
+  dots = vertcat (zeros (0, 2), C{isdot});
+
+endfunction
+
+## The index K of the group of a layer, colour, line style, width and marker,
+## made when it is new
+function [k, keys, look, last] = lookgroup (keys, look, last, layer, col, ...
+                                            style, width, marker)
+
+  key = sprintf ('%s|%.17g %.17g %.17g|%s|%.17g|%s', layer, col, style, ...
+                 width, marker);
+  k = find (strcmp (key, keys), 1);
+  if (isempty (k))
+    keys{end+1} = key;
+    look(end+1) = struct ('layer', layer, 'colour', col, 'style', style, ...
+                          'width', width, 'marker', marker);
+    last(end+1,:) = NaN;
+    k = numel (keys);
+  endif
 
 endfunction
 
@@ -3865,54 +3958,47 @@ function C = dashes (P, pat)
   if (total <= 0)
     return;
   endif
-
-  at = 0;
-  k = 0;
-  guard = 0;
-  while (at < total && guard < 1e5)
-    guard++;
-    k = mod (k, numel (pat)) + 1;
-    L = abs (pat(k));
-    if (pat(k) < 0)
-      at += max (L, eps);            # a gap
-      continue;
-    endif
-    if (L == 0)
-      C{end+1, 1} = interpat (P, cum, at);
-      at += eps;                     # a dot has no length; the gap follows
-      continue;
-    endif
-    stop = min (at + L, total);
-    C{end+1, 1} = runbetween (P, cum, at, stop);
-    at = stop;
-  endwhile
+  ## Where each element of the repeated pattern starts: a gap or a dot
+  ## steps on by at least eps, so the walk always ends
+  L = abs (pat(:));
+  step = L;
+  step(pat(:) <= 0) = max (L(pat(:) <= 0), eps);
+  nc = min (ceil (total / sum (step)) + 1, ceil (1e5 / numel (pat)));
+  L = repmat (L, nc, 1);
+  step = repmat (step, nc, 1);
+  kind = repmat (sign (pat(:)), nc, 1);
+  at = [0; cumsum(step(1:end-1))];
+  keep = find (at < total, 1e5);
+  keep = keep(kind(keep) >= 0);
+  at = at(keep);
+  dot = kind(keep) == 0;
+  stop = min (at + L(keep), total);
+  ## Each dash from its start to its stop through the vertices between, a
+  ## dot the one point at its start
+  nmid = zeros (numel (at), 1);
+  lo = lookup (cum, at);
+  nmid(! dot) = numel (cum) - lookup (sort (-cum), -stop(! dot)) - lo(! dot);
+  nmid = max (nmid, 0);
+  n = ! dot + 1 + nmid;
+  first = cumsum ([1; n(1:end-1)]);
+  M = zeros (sum (n), 2);
+  M(first,:) = interpat (P, cum, at);
+  M(first(! dot) + n(! dot) - 1,:) = interpat (P, cum, stop(! dot));
+  if (any (nmid))
+    d = find (nmid);
+    k = (1:sum (nmid))' - repelem (cumsum ([0; nmid(d(1:end-1))]), nmid(d));
+    M(repelem (first(d), nmid(d)) + k,:) = P(repelem (lo(d), nmid(d)) + k,:);
+  endif
+  C = mat2cell (M, n, 2);
 
 endfunction
 
-## The point at arc length T along the polyline
+## The points at arc lengths T along the polyline
 function q = interpat (P, cum, t)
-
-  i = max (1, min (numel (cum) - 1, find (cum <= t, 1, 'last')));
+  i = max (1, min (numel (cum) - 1, lookup (cum, t)));
   span = cum(i+1) - cum(i);
-  if (span <= 0)
-    q = P(i,:);
-  else
-    q = P(i,:) + (t - cum(i)) / span * (P(i+1,:) - P(i,:));
-  endif
-
-endfunction
-
-## The piece of the polyline between two arc lengths, with any original
-## vertices in between kept so that corners are not cut
-function Q = runbetween (P, cum, t0, t1)
-
-  Q = interpat (P, cum, t0);
-  mid = find (cum > t0 & cum < t1);
-  if (! isempty (mid))
-    Q = [Q; P(mid,:)];
-  endif
-  Q = [Q; interpat(P, cum, t1)];
-
+  q = P(i,:) + (t - cum(i)) ./ span .* (P(i+1,:) - P(i,:));
+  q(span <= 0,:) = P(i(span <= 0),:);
 endfunction
 
 ## Drawing symbols as characters a figure font is likely to hold.  A capital O
