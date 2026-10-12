@@ -115,6 +115,9 @@ without buying the standard.</p>
   2.</td><td>IS 10952:1984</td></tr>
   <tr><td>ISO 3:1973</td><td>The R 40 series of preferred numbers.</td>
   <td>IS 1076 (Part 1):1985</td></tr>
+  <tr><td>IS 1369 (Part 3):1995</td><td>The countersink at the entry of an
+  internal thread, in its table 1. Prepared from DIN 76-1:1983.</td>
+  <td>The standard itself</td></tr>
   <tr><td>RUKO, chapter 1.01 <i>Twist drills</i> (2014)</td><td>The drill
   sizes a maker sells: DIN 338 type N, HSS ground, article 214, 0.3 to 20
   millimetres, pages 54 to 56; DIN 345 type N, HSS, article 204, 10 to 60
@@ -257,6 +260,26 @@ the steps of 0.05 inside the band instead: 15.3 for M16x0.8 in stainless,
   <tr><td>M8</td><td>6.9</td><td>6.7</td></tr>
 </table>
 
+<h2 id="entry">The countersink at the entry</h2>
+
+<p>A tapped hole is countersunk at its entry, so that the tap starts square
+and the first turn of the thread raises no burr. On a tapped hole,
+<code>'Countersink', true</code> takes the countersink IS 1369 (Part 3)
+draws there: 120 degrees, at most 10 less, and from the nominal diameter
+up to 1.05 times it across at the surface. The package takes the top of the
+band, 1.05 times the nominal diameter. The standard asks for a 90 or 60
+degree countersink to be shown on the drawing as a special design; either
+is given by its numbers, as <code>'Countersink', [6.3, 90]</code>. It
+gives no counterbore for a tapped hole, and none is taken.</p>
+
+<table class="guide">
+  <tr><th>Thread</th><th>Across</th><th>Cone deep</th></tr>
+  <tr><td>M6</td><td>6.3</td><td>0.38</td></tr>
+  <tr><td>M8</td><td>8.4</td><td>0.46</td></tr>
+  <tr><td>M10</td><td>10.5</td><td>0.58</td></tr>
+  <tr><td>M12</td><td>12.6</td><td>0.69</td></tr>
+</table>
+
 <h2 id="external">External threads and the turned blank</h2>
 
 <p>A thread is external where its axis runs into a solid cylinder from
@@ -330,6 +353,10 @@ deviations, the tolerances and the rounding as they were. The texts of 2013
 and 2026 were not read, and DIN's notes on its edition of 2026 list a
 revision of the calculation formulae, so the package follows the 1998
 edition until the 2026 one has been read.</p>
+
+<p>IS 1369 (Part 3):1995 was reaffirmed in 2005. DIN 76-1, from whose
+edition of 1983 it was prepared, is current in its edition of October
+2025, which was not read.</p>
 
         </main>
       </div>

@@ -49,7 +49,8 @@
 ## @qcode{'Engagement'} chooses inside the 6H band of its minor diameter,
 ## as @code{solid.Shape.hole} describes.  With @qcode{'Clearance'} it is
 ## the clearance hole for a screw of that thread, and only then can it take
-## a counterbore or a countersink.
+## a counterbore or the countersink of a screw head.  A tapped hole can take
+## a countersink at its entry.
 ##
 ## Name/Value pairs:
 ##
@@ -66,7 +67,7 @@
 ## for M6.  @qcode{'washer'} for its type K2, for the same screw on a plain
 ## washer, from M3 to M36: 13 wide and 8.5 deep for M6.  Or
 ## @code{[@var{CD}, @var{CDEPTH}]}, taken as given.  Both standard ones are
-## for a fine or a medium clearance hole.
+## for a fine or a medium clearance hole, and a tapped hole takes none.
 ##
 ## @item @qcode{'Countersink'}
 ## True for the countersink of IS 3406 (Part 1):1986, type A, for the
@@ -80,6 +81,12 @@
 ## @var{CD}, @code{[@var{CD}, @var{ANGLE}]} or @code{[@var{CD},
 ## @var{ANGLE}, @var{CDEPTH}]}, taken as given, with an angle of 90 and no
 ## cylinder by default.
+##
+## On a tapped hole, true gives the countersink at the entry of an internal
+## thread of IS 1369 (Part 3):1995, prepared from DIN 76-1:1983: 120
+## degrees, and 1.05 times the nominal diameter across at the surface, the
+## largest its band from the nominal diameter allows, 6.3 for M6.  The
+## numbers are taken as given there too, and @qcode{'socket'} is refused.
 ##
 ## @item @qcode{'Material'}
 ## @itemx @qcode{'Engagement'}
@@ -198,10 +205,12 @@ function H = holespec (NAME, varargin)
     error (strcat ("solid.holespec: 'Counterbore' and 'Countersink'", ...
                    " cannot both be given."));
   endif
-  if (isempty (clearance) && (! isempty (counterbore)
-                              || ! isempty (countersink)))
-    error (strcat ("solid.holespec: 'Counterbore' and 'Countersink'", ...
-                   " apply only to a clearance hole."));
+  if (isempty (clearance) && ! isempty (counterbore))
+    error ("solid.holespec: 'Counterbore' applies only to a clearance hole.");
+  endif
+  if (isempty (clearance) && ischar (countersink))
+    error (strcat ("solid.holespec: 'Countersink', 'socket' applies only", ...
+                   " to a clearance hole."));
   endif
   if (! isempty (clearance) && (! isempty (material)
                                 || ! isempty (engagement)))
@@ -271,8 +280,11 @@ function H = holespec (NAME, varargin)
     endif
   endif
 
-  ## The standard countersink, IS 3406 (Part 1), type A or B
-  if (islogical (countersink) || ischar (countersink))
+  ## The standard countersink: at the entry of a tapped hole, IS 1369
+  ## (Part 3), the top of its band; else IS 3406 (Part 1), type A or B
+  if (islogical (countersink) && isempty (clearance))
+    countersink = [1.05 * T.d, 120, 0];
+  elseif (islogical (countersink) || ischar (countersink))
     socket = ischar (countersink);
     countersink = [];
     if (! strcmp (clearance, 'coarse'))
@@ -453,6 +465,17 @@ endfunction
 %! H = solid.holespec ('M24', 'Clearance', 'fine', 'Countersink', 'socket');
 %! assert_equal (H.countersink, [52, 90, 1]);
 
+%!test  # the countersink at the entry of a tapped hole, IS 1369 (Part 3)
+%! H = solid.holespec ('M6', 'Countersink', true);
+%! assert_equal (H.drill, 5);
+%! assert_equal (H.countersink, [6.3, 120, 0], 1e-12);
+%! H = solid.holespec ('M10x1.25', 'Countersink', true);
+%! assert_equal (H.countersink, [10.5, 120, 0], 1e-12);
+
+%!test  # a countersink given by numbers on a tapped hole
+%! H = solid.holespec ('M6', 'Countersink', [6.5, 90]);
+%! assert_equal (H.countersink, [6.5, 90, 0]);
+
 %!test  # a countersink given by numbers, completed to three
 %! H = solid.holespec ('M6', 'Clearance', 'coarse', 'Countersink', 13);
 %! assert_equal (H.countersink, [13, 90, 0]);
@@ -485,8 +508,12 @@ endfunction
 %!error<solid.holespec: 'Counterbore' and 'Countersink' cannot both be given.> ...
 %! solid.holespec ('M6', 'Clearance', 'fine', 'Counterbore', true, ...
 %!                 'Countersink', true)
-%!error<solid.holespec: 'Counterbore' and 'Countersink' apply only to a clearance hole.> ...
+%!error<solid.holespec: 'Counterbore' applies only to a clearance hole.> ...
 %! solid.holespec ('M6', 'Counterbore', true)
+%!error<solid.holespec: 'Counterbore' applies only to a clearance hole.> ...
+%! solid.holespec ('M6', 'Counterbore', [11, 6])
+%!error<solid.holespec: 'Countersink', 'socket' applies only to a clearance hole.> ...
+%! solid.holespec ('M6', 'Countersink', 'socket')
 %!error<solid.holespec: 'Material' and 'Engagement' apply only to a tapped hole.> ...
 %! solid.holespec ('M6', 'Clearance', 'fine', 'Material', 'steel')
 %!error<solid.holespec: 'Material' and 'Engagement' cannot both be given.> ...

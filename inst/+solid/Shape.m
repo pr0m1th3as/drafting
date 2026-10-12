@@ -1827,7 +1827,7 @@ classdef Shape
     ## hole, for the head of a cap screw.  With a named thread and
     ## @qcode{'Clearance'}, true takes the counterbore of IS 3406 (Part 2)
     ## for a socket head cap screw of ISO 4762, and @qcode{'washer'} the one
-    ## for the same screw on a plain washer.
+    ## for the same screw on a plain washer.  A tapped hole takes none.
     ##
     ## @item @qcode{'Countersink'}
     ## @var{CD}, @code{[@var{CD}, @var{ANGLE}]} or @code{[@var{CD},
@@ -1838,7 +1838,10 @@ classdef Shape
     ## shallower than the hole.  With a named thread and @qcode{'Clearance'},
     ## true takes the countersink of IS 3406 (Part 1) for the countersunk
     ## heads of ISO 7721, and @qcode{'socket'} the one for a hexagon socket
-    ## countersunk screw of ISO 10642.
+    ## countersunk screw of ISO 10642.  On a tapped hole, true takes the
+    ## countersink at the entry of an internal thread of IS 1369 (Part 3),
+    ## 120 degrees and 1.05 times the nominal diameter across, 6.3 for M6,
+    ## so that the thread starts clean.
     ##
     ## @item @qcode{'Tip'}
     ## The included angle in degrees of the cone a twist drill leaves at the
@@ -1848,10 +1851,11 @@ classdef Shape
     ## @end table
     ##
     ## A counterbore and a countersink cannot both be given, and a tip applies
-    ## only to a blind hole.  The standard ones need a named thread and
-    ## @qcode{'Clearance'}, fine or medium; @code{solid.holespec} gives their
-    ## sizes, and the sizes of every hole for a named thread, before it is
-    ## drilled.  Drilling the empty shape leaves it empty.
+    ## only to a blind hole.  The standard ones need a named thread, and
+    ## those for a screw head @qcode{'Clearance'}, fine or medium;
+    ## @code{solid.holespec} gives their sizes, and the sizes of every hole
+    ## for a named thread, before it is drilled.  Drilling the empty shape
+    ## leaves it empty.
     ##
     ## @example
     ## @group
@@ -3882,6 +3886,13 @@ endfunction
 %! assert_equal (volume (S), 38400 - 6.25 * pi * 80, 1e-9);
 %! assert_equal (isvalid (S), true);
 
+%!test  # a tapped M6 hole countersunk at its entry, 120 degrees to 6.3
+%! S = hole (solid.box (80, 40, 12), [20, 20, 12], 'M6', Inf, ...
+%!           'Countersink', true);
+%! h = 0.65 / sqrt (3);
+%! V = pi * (h / 3 * (3.15 ^ 2 + 3.15 * 2.5 + 2.5 ^ 2) + 2.5 ^ 2 * (12 - h));
+%! assert_equal (volume (S), 38400 - V, 1e-9);
+
 %!test  # straight up from underneath
 %! S = hole (solid.box (80, 40, 12), [20, 20, 0], 'M2.5', 3, ...
 %!           'Direction', [0, 0, 1]);
@@ -3989,6 +4000,13 @@ endfunction
 %! S = hole (solid.box (20, 20, 20), [10, 10, 20], 'M6', 15);
 %! G = subtract (S, thread (S, [10, 10, 20], 'M6', 12));
 %! assert_equal (bbox (G), [7, 7, 8, 13, 13, 20], 1e-3);
+
+%!test  # a thread below the countersink at the entry of its hole
+%! S = hole (solid.box (20, 20, 6), [10, 10, 6], 'M6', Inf, ...
+%!           'Countersink', true);
+%! T = thread (S, [10, 10, 6], 'M6', Inf);
+%! assert_equal (numsolids (T), 1);
+%! assert_equal (volume (S) - volume (T) > 0, true);
 
 %!test  # a depth whose cut Open CASCADE fails is cut whole
 %! S = hole (solid.box (30, 30, 40), [15, 15, 40], 'M6', 32);
