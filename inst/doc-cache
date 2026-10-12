@@ -1193,7 +1193,7 @@ draw.Drawing.plot
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 3996
+# length: 4299
 draw.Drawing: plot (D)
 draw.Drawing: plot (HAX, D)
 draw.Drawing: plot (..., Name, Value)
@@ -1212,8 +1212,13 @@ thing
 and is equivalent.
 
 H = draw.Drawing.plot (...) returns a column of graphics
-handles,
-one per object created, so that a caller can restyle or delete them.
+handles, one per object created. Every line of one layer, colour, line
+style and width is one line object, its pieces split by NaN;
+points are markers of one line object per layer and colour; each text
+is an object of its own, drawn on top. The 'Tag' of every
+object is its layer's name, so
+findobj (HAX, 'Tag', NAME) finds what the layer
+NAME drew, to restyle, hide or delete it.
 
 Name/Value pairs
 
