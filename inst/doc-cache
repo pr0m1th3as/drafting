@@ -1096,7 +1096,7 @@ draw.Drawing.ordinate
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1463
+# length: 1479
 draw.Drawing: D = ordinate (D, O, P, AXIS, L)
 draw.Drawing: D = ordinate (..., LABEL)
 Append an ordinate dimension, the distance of a point from a datum.
@@ -1115,9 +1115,9 @@ and a row of y values along the other. A machinist or a program
 reads each position straight off the datum, and no error adds up along a
 chain of dimensions.
 
-The label is the distance, without sign, to a micron, measured when the
-drawing is lowered, so it follows the geometry; LABEL gives
-literal text instead.
+The label is the distance, without sign, to a micron, measured each time
+the drawing is plotted or written, so it follows the geometry;
+LABEL gives literal text instead.
 
 ## A plate with two holes, dimensioned from its lower left corner
 D = draw.Drawing ();
