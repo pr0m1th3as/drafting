@@ -771,9 +771,9 @@ classdef Drawing
       if (nargin != 2)
         error ("draw.Drawing.__entities__: invalid number of input arguments.");
       endif
-      if (! isstruct (E) || ! isequal (sort (fieldnames (E)),
-                                       sort (fieldnames (D.Entities))))
-        error ("draw.Drawing.__entities__: E must be entity records.");
+      if (! isstruct (E) || ! (isrow (E) || isempty (E))
+          || ! isequal (sort (fieldnames (E)), sort (fieldnames (D.Entities))))
+        error ("draw.Drawing.__entities__: E must be a row of entity records.");
       endif
       D.Entities = E;
 

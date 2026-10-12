@@ -712,7 +712,8 @@ endfunction
 function TF = same (X, Y)
 
   if (isa (X, 'solid.Shape') && isa (Y, 'solid.Shape'))
-    TF = isequal (X.Data, Y.Data) && isequaln (X.Colour, Y.Colour);
+    TF = (isequal (X.Data, Y.Data) && isequaln (X.Colour, Y.Colour)
+          && isequal (X.Name, Y.Name));
   elseif (isa (X, 'polymesh.Mesh') && isa (Y, 'polymesh.Mesh'))
     TF = (isequal (X.Vertices, Y.Vertices) && isequal (X.Faces, Y.Faces) &&
           isequal (X.FaceColour, Y.FaceColour) &&
@@ -1003,6 +1004,12 @@ endfunction
 %! add (model.Assembly (), 'pin', solid.Shape (), 1)
 %!error<model.Assembly.add: X must be a solid.Shape, a polymesh.Mesh or a model.Assembly object, or empty.> ...
 %! add (model.Assembly (), 'pin', 1, geom.UCS ())
+%!error<model.Assembly.add: a part named 'pin' is already defined, as another shape.> ...
+%! S = solid.box (1, 1, 1);
+%! S.Name = {'left'};
+%! A = add (model.Assembly (), 'pin', S, geom.UCS ());
+%! S.Name = {'right'};
+%! add (A, 'pin', S, geom.UCS ([0, 0, 1], [5, 0, 0]))
 %!error<model.Assembly.add: the part 'pin' is empty.> ...
 %! add (model.Assembly (), 'pin', solid.Shape (), geom.UCS ())
 %!error<model.Assembly.add: the assembly 'sub' is empty.> ...
