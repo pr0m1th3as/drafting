@@ -3329,6 +3329,12 @@ readply (const string& file, const string& caller)
       bad ();
     }
     const bool hascolour = at[3] >= 0 && at[4] >= 0 && at[5] >= 0;
+    // An element without properties takes no bytes, so there is nothing of
+    // it to read past, however many of it the header counts
+    if (el.props.empty ())
+    {
+      continue;
+    }
     for (size_t i = 0; i < el.n; i++)
     {
       double got[6] = {0, 0, 0, 0, 0, 0};
@@ -3481,6 +3487,13 @@ unzipped (const vector<char>& buf, const std::function<void ()>& bad)
     }
     else
     {
+      // Deflate cannot make data more than 1032 times larger, so a larger
+      // size claimed by the directory is false; it is checked before the
+      // buffer of that size is made
+      if (usize > 1032 * static_cast<size_t> (csize) + 1024)
+      {
+        bad ();
+      }
       out.resize (usize);
       z_stream z = {};
       if (inflateInit2 (&z, -15) != Z_OK)
@@ -4028,6 +4041,43 @@ read3mf (const string& file, const string& caller)
     }
   };
   const package3mf::model& top = pk.load (pk.root);
+  // The triangles the build places, counted before any is placed: objects
+  // may place one another many times over, and a small file can ask for
+  // more triangles than memory holds
+  std::map<std::pair<string, int>, double> tallied;
+  std::function<double (const string&, int, int)> tally;
+  tally = [&] (const string& path, int id, int depth) -> double
+  {
+    if (depth > 64)
+    {
+      pk.bad ();
+    }
+    const auto key = std::make_pair (path, id);
+    const auto it = tallied.find (key);
+    if (it != tallied.end ())
+    {
+      return it->second;
+    }
+    const package3mf::model *m;
+    const package3mf::object& o = pk.find (path, id, m);
+    double n = o.t.size () / 3;
+    for (const package3mf::component& k : o.comps)
+    {
+      n += tally (k.path, k.id, depth + 1);
+    }
+    tallied[key] = n;
+    return n;
+  };
+  double total = 0;
+  for (const package3mf::component& item : top.items)
+  {
+    total += tally (item.path, item.id, 0);
+  }
+  if (total > 5e7)
+  {
+    error ("%s: FILE places %.0f triangles; at most 50 million are read.",
+           caller.c_str (), total);
+  }
   for (const package3mf::component& item : top.items)
   {
     place (item.path, item.id, item.m, 0);

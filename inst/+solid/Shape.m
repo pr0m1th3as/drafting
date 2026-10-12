@@ -191,10 +191,11 @@ classdef Shape
     ## nothing.
     ##
     ## @code{@var{S} = solid.Shape (@var{DATA})} wraps @var{DATA}, the bytes of
-    ## a shape in Open CASCADE's binary format.  This is how the functions of
-    ## the @code{solid} namespace return what Open CASCADE computed, and it is
-    ## not for direct use: bytes that do not begin with that format's signature
-    ## are refused.
+    ## a shape in Open CASCADE's binary format followed by a check of 16 bytes.
+    ## This is how the functions of the @code{solid} namespace return what Open
+    ## CASCADE computed, and it is not for direct use: bytes that do not begin
+    ## with that format's signature are refused here, and bytes whose check
+    ## does not match them are refused by the first function that reads them.
     ##
     ## The empty shape is where a shape built up in a loop starts: it adds
     ## nothing to a union, so the first pass needs no case of its own.
@@ -4551,6 +4552,15 @@ endfunction
 %! solid.Shape (uint8 ([1, 2, 3]))
 %!error<solid.Shape: DATA is not an Open CASCADE shape.> ...
 %! solid.Shape (uint8 (sprintf ("\nOpen CASCADE Topology X, (c)")))
+%!error<solid.Shape.isvalid: shape data is damaged, or was not made by this version of the package.> ...
+%! B = solid.box (1, 2, 3);
+%! d = B.Data;
+%! d(end-100) = bitxor (d(end-100), uint8 (255));
+%! isvalid (solid.Shape (d))
+%!error<solid.Shape.isvalid: shape data is damaged, or was not made by this version of the package.> ...
+%! B = solid.box (1, 2, 3);
+%! d = B.Data;
+%! isvalid (solid.Shape (d(1:end-16)))
 %!error<solid.Shape.union: every operand must be a solid.Shape object.> ...
 %! union (solid.Shape (), 1)
 %!error<solid.Shape.union: every operand must be a solid.Shape object.> ...

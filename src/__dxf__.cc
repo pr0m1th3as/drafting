@@ -51,6 +51,8 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <string>
 #include <vector>
 
+#include <sys/stat.h>
+
 using namespace std;
 
 static string g_caller = "__dxf__";
@@ -2872,6 +2874,13 @@ void
 Reader::load (const string& f)
 {
   file = f;
+  // A directory opens as a stream but fails when read, which the standard
+  // library reports by an exception that would end Octave
+  struct stat st;
+  if (stat (f.c_str (), &st) != 0)
+    error ("%s: cannot find file '%s'.", g_caller.c_str (), f.c_str ());
+  if (! S_ISREG (st.st_mode))
+    error ("%s: '%s' is not a file.", g_caller.c_str (), f.c_str ());
   ifstream in (f.c_str (), ios::in | ios::binary);
   if (! in)
     error ("%s: cannot find file '%s'.", g_caller.c_str (), f.c_str ());
@@ -3129,6 +3138,16 @@ static octave_value
 ellipsespline (const V3& c, const V3& X, const V3& Y, double a, double b,
                double u0, double u1)
 {
+  // A parameter past a few turns is reduced to one turn first, or the loop
+  // below would add 2 pi to it for ever and the arc would take more pieces
+  // than memory holds
+  if (! std::isfinite (u0) || ! std::isfinite (u1))
+    throw Bad {"invalid"};
+  if (fabs (u0) > 4 * M_PI || fabs (u1) > 4 * M_PI)
+  {
+    u0 = fmod (u0, 2 * M_PI);
+    u1 = fmod (u1, 2 * M_PI);
+  }
   while (u1 <= u0)
     u1 += 2 * M_PI;
   int nseg = max (1, static_cast<int> (ceil ((u1 - u0) / (M_PI / 2) - 1e-9)));
@@ -3206,7 +3225,14 @@ static void
 clampspline (int p, vector<double>& K, vector<V3>& C, vector<double>& W)
 {
   size_t n = C.size ();
-  if (K.size () != n + p + 1 || n < static_cast<size_t> (p + 1))
+  if (p < 1 || K.size () != n + p + 1 || n < static_cast<size_t> (p + 1))
+    throw Bad {"invalid"};
+  // The knots must be finite and never decrease, and the domain from K[p]
+  // to K[n] must have a length; the clamping below indexes by them
+  for (size_t k = 0; k < K.size (); k++)
+    if (! std::isfinite (K[k]) || (k > 0 && K[k] < K[k-1]))
+      throw Bad {"invalid"};
+  if (! (K[p] < K[n]))
     throw Bad {"invalid"};
   bool clamped = true;
   for (int i = 1; i <= p; i++)
@@ -3465,8 +3491,10 @@ hatchtags (const Rec& r, double sc)
   }
   if (i >= N)
     return h;
-  int nloops = static_cast<int> (tonum (t[i].second));
+  double nl = tonum (t[i].second);
   i++;
+  int nloops = nl > 0 ? static_cast<int> (min (nl, static_cast<double> (N - i)))
+                      : 0;
   auto next = [&] (int code) -> double {
     while (i < N && t[i].first != code)
       i++;
@@ -3477,6 +3505,14 @@ hatchtags (const Rec& r, double sc)
       return tonum (t[i++].second);
     return dflt;
   };
+  // A count read from the file, at most the tags left, since each item it
+  // counts takes at least one; a count past them would only fill memory
+  auto count = [&] (int code) -> int {
+    double v = get (code, 0);
+    if (! (v > 0))
+      return 0;
+    return static_cast<int> (min (v, static_cast<double> (N - i)));
+  };
   for (int L = 0; L < nloops && i < N; L++)
   {
     HLoop lp;
@@ -3486,7 +3522,7 @@ hatchtags (const Rec& r, double sc)
       bool hasb = get (72, 0) != 0;
       bool closed = get (73, 1) != 0;
       (void) closed;
-      int nv = static_cast<int> (get (93, 0));
+      int nv = count (93);
       vector<PV> v;
       for (int k = 0; k < nv && i < N; k++)
       {
@@ -3499,7 +3535,7 @@ hatchtags (const Rec& r, double sc)
     }
     else
     {
-      int ne = static_cast<int> (get (93, 0));
+      int ne = count (93);
       Frame f = ocsframe (h.n);
       for (int k = 0; k < ne && i < N; k++)
       {
@@ -3570,8 +3606,8 @@ hatchtags (const Rec& r, double sc)
             int p = static_cast<int> (get (94, 3));
             bool rat = get (73, 0) != 0;
             get (74, 0);
-            int nk = static_cast<int> (get (95, 0));
-            int nc = static_cast<int> (get (96, 0));
+            int nk = count (95);
+            int nc = count (96);
             vector<double> K, W;
             vector<V3> C;
             for (int j = 0; j < nk; j++)
@@ -3585,7 +3621,7 @@ hatchtags (const Rec& r, double sc)
             // Fit data, which R2010 on adds to a spline edge
             if (i < N && t[i].first == 97)
             {
-              int nf = static_cast<int> (get (97, 0));
+              int nf = count (97);
               for (int j = 0; j < nf; j++)
               {
                 get (11, 0);
@@ -3603,7 +3639,7 @@ hatchtags (const Rec& r, double sc)
         }
       }
       // The boundary objects a hatch may name
-      int ns = static_cast<int> (get (97, 0));
+      int ns = count (97);
       for (int k = 0; k < ns; k++)
         get (330, 0);
       h.loops.push_back (lp);
@@ -4628,14 +4664,37 @@ Read and write ASCII DXF for the drafting package.  Internal.\n\
     error ("__dxf__: invalid number of input arguments.");
   string cmd = args(0).string_value ();
   octave_value_list out;
-  if (cmd == "write")
-    cmdwrite (args);
-  else if (cmd == "readgeom")
-    cmdreadgeom (args, out);
-  else if (cmd == "readdraw")
-    cmdreaddraw (args, out);
-  else
-    error ("__dxf__: unknown command '%s'.", cmd.c_str ());
+  g_caller.clear ();
+  // Octave's own errors and interrupts pass through; any other exception of
+  // the standard library becomes an error rather than ending Octave
+  try
+  {
+    if (cmd == "write")
+      cmdwrite (args);
+    else if (cmd == "readgeom")
+      cmdreadgeom (args, out);
+    else if (cmd == "readdraw")
+      cmdreaddraw (args, out);
+    else
+      error ("__dxf__: unknown command '%s'.", cmd.c_str ());
+  }
+  catch (const octave::execution_exception&)
+  {
+    throw;
+  }
+  catch (const octave::interrupt_exception&)
+  {
+    throw;
+  }
+  catch (const std::bad_alloc&)
+  {
+    throw;
+  }
+  catch (const std::exception& e)
+  {
+    error ("%s: %s", g_caller.empty () ? "__dxf__" : g_caller.c_str (),
+           e.what ());
+  }
   (void) nargout;
   return out;
 }

@@ -39,6 +39,8 @@
 #include <TopoDS_Shape.hxx>
 #include <gp_Trsf.hxx>
 
+#include "shapebytes.h"
+
 using std::string;
 
 // The message of an Open CASCADE exception, which 8.0 made a std::exception
@@ -138,7 +140,8 @@ Undocumented internal function.\n\
       std::ostringstream os;
       BinTools::Write (s, os, false, false,
                        BinTools_FormatVersion_CURRENT);
-      const string bytes = os.str ();
+      string bytes = os.str ();
+      sealshape (bytes);
       data = uint8NDArray (dim_vector (1, bytes.size ()));
       for (size_t i = 0; i < bytes.size (); i++)
       {

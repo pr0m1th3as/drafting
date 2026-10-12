@@ -328,6 +328,72 @@ endfunction
 %!   [~] = unlink (tmpf);
 %! end_unwind_protect
 
+%!warning<draw.read: skipped 1 invalid SPLINE.> ...
+%! txt = ["0\nSECTION\n2\nENTITIES\n" ...
+%!        "0\nSPLINE\n8\n0\n70\n0\n71\n2\n" ...
+%!        "40\n5\n40\n4\n40\n3\n40\n2\n40\n1\n40\n0\n" ...
+%!        "10\n0\n20\n0\n30\n0\n10\n1\n20\n1\n30\n0\n" ...
+%!        "10\n2\n20\n0\n30\n0\n" ...
+%!        "0\nLINE\n8\n0\n10\n0\n20\n0\n11\n1\n21\n1\n" ...
+%!        "0\nENDSEC\n0\nEOF\n"];
+%! fid = fopen (tmpf, 'w');
+%! fputs (fid, txt);
+%! fclose (fid);
+%! unwind_protect
+%!   R = draw.read (tmpf);
+%!   assert_equal (numentities (R), 1);
+%! unwind_protect_cleanup
+%!   [~] = unlink (tmpf);
+%! end_unwind_protect
+
+%!warning<draw.read: skipped 1 invalid ELLIPSE.> ...
+%! txt = ["0\nSECTION\n2\nENTITIES\n" ...
+%!        "0\nELLIPSE\n8\n0\n10\n0\n20\n0\n30\n0\n" ...
+%!        "11\n10\n21\n0\n31\n0\n40\n0.5\n41\ninf\n42\n0\n" ...
+%!        "0\nLINE\n8\n0\n10\n0\n20\n0\n11\n1\n21\n1\n" ...
+%!        "0\nENDSEC\n0\nEOF\n"];
+%! fid = fopen (tmpf, 'w');
+%! fputs (fid, txt);
+%! fclose (fid);
+%! unwind_protect
+%!   R = draw.read (tmpf);
+%!   assert_equal (numentities (R), 1);
+%! unwind_protect_cleanup
+%!   [~] = unlink (tmpf);
+%! end_unwind_protect
+
+%!test  # an ELLIPSE whose end parameter is many turns on is one turn
+%! txt = ["0\nSECTION\n2\nENTITIES\n" ...
+%!        "0\nELLIPSE\n8\n0\n10\n0\n20\n0\n30\n0\n" ...
+%!        "11\n10\n21\n0\n31\n0\n40\n0.5\n41\n0\n42\n1e8\n" ...
+%!        "0\nENDSEC\n0\nEOF\n"];
+%! fid = fopen (tmpf, 'w');
+%! fputs (fid, txt);
+%! fclose (fid);
+%! unwind_protect
+%!   R = draw.read (tmpf);
+%!   assert_equal (numentities (R), 1);
+%! unwind_protect_cleanup
+%!   [~] = unlink (tmpf);
+%! end_unwind_protect
+
+%!warning<draw.read: skipped 1 invalid HATCH.> ...
+%! txt = ["0\nSECTION\n2\nENTITIES\n" ...
+%!        "0\nHATCH\n8\n0\n10\n0\n20\n0\n30\n0\n2\nSOLID\n" ...
+%!        "70\n1\n71\n0\n91\n1\n92\n2\n72\n0\n73\n1\n" ...
+%!        "93\n2000000000\n10\n0\n20\n0\n97\n0\n75\n0\n" ...
+%!        "0\nLINE\n8\n0\n10\n0\n20\n0\n11\n1\n21\n1\n" ...
+%!        "0\nENDSEC\n0\nEOF\n"];
+%! fid = fopen (tmpf, 'w');
+%! fputs (fid, txt);
+%! fclose (fid);
+%! unwind_protect
+%!   R = draw.read (tmpf);
+%!   assert_equal (numentities (R), 1);
+%! unwind_protect_cleanup
+%!   [~] = unlink (tmpf);
+%! end_unwind_protect
+
 ## The drawing in a file whose layer table makes HIDDEN yellow and dashed
 ## and OFF red and switched off, its entities ENT
 %!function D = readlayers (f, ent)
@@ -389,6 +455,7 @@ endfunction
 %!error<draw.read: FILE must be a non-empty character vector.> draw.read (1)
 %!error<draw.read: cannot find file 'no-such-file.dxf'.> ...
 %! draw.read ('no-such-file.dxf')
+%!error<draw.read: '.*' is not a file.> draw.read (tempdir ())
 %!error<draw.read: '.*' is empty.> ...
 %! fn = [tempname(), '.dxf'];
 %! fclose (fopen (fn, 'w'));

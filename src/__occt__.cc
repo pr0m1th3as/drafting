@@ -163,6 +163,8 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <gp_Mat.hxx>
 #include <gp_Trsf.hxx>
 
+#include "shapebytes.h"
+
 using namespace std;
 
 // The message and the type of an Open CASCADE exception, which 8.0 made a
@@ -261,6 +263,11 @@ toshape (const octave_value& v, const string& caller)
   {
     error ("%s: shape data is not an Open CASCADE shape.", caller.c_str ());
   }
+  if (! unsealshape (bytes))
+  {
+    error ("%s: shape data is damaged, or was not made by this version of"
+           " the package.", caller.c_str ());
+  }
   istringstream is (bytes);
   BinTools::Read (s, is);
   return s;
@@ -278,7 +285,8 @@ todata (const TopoDS_Shape& s)
   ostringstream os;
   BinTools::Write (s, os, false, false,
                    BinTools_FormatVersion_CURRENT);
-  const string bytes = os.str ();
+  string bytes = os.str ();
+  sealshape (bytes);
   uint8NDArray a (dim_vector (1, bytes.size ()));
   for (size_t i = 0; i < bytes.size (); i++)
   {
@@ -3125,7 +3133,36 @@ readassembly (const string& file, const string& name, const string& caller)
   return out;
 }
 
-DEFUN_DLD (__occt__, args, ,
+// The arguments of a call, read by position.  Each command reads the ones it
+// needs without counting them first; one past the end of the list raises an
+// error instead of reading beyond it.
+class arglist
+{
+public:
+  arglist (const octave_value_list& a, const string& cmd)
+    : m_a (a), m_cmd (cmd)
+  { }
+
+  const octave_value& operator () (octave_idx_type k) const
+  {
+    if (k >= m_a.length ())
+    {
+      error ("__occt__: too few arguments for '%s'.", m_cmd.c_str ());
+    }
+    return m_a(k);
+  }
+
+  octave_idx_type length () const
+  {
+    return m_a.length ();
+  }
+
+private:
+  const octave_value_list& m_a;
+  const string m_cmd;
+};
+
+DEFUN_DLD (__occt__, given, ,
            "-*- texinfo -*-\n\
  @deftypefn {} {@var{out} =} __occt__ (@var{cmd}, @var{caller}, @dots{})\n\
 \n\
@@ -3143,12 +3180,14 @@ function directly. \n\
 @end deftypefn")
 {
   // Validate input
-  if (args.length () < 2 || ! args(0).is_string () || ! args(1).is_string ())
+  if (given.length () < 2 || ! given(0).is_string ()
+      || ! given(1).is_string ())
   {
     error ("__occt__: invalid number of input arguments.");
   }
-  const string cmd = args(0).string_value ();
-  const string caller = args(1).string_value ();
+  const string cmd = given(0).string_value ();
+  const string caller = given(1).string_value ();
+  const arglist args (given, cmd);
 
   quiet ();
 

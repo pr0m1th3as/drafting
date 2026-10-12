@@ -82,16 +82,16 @@ __mesh__.oct: __mesh__.cc
 __dxf__.oct: __dxf__.cc
 	$(MKOCTFILE) -O2 __dxf__.cc
 
-__occtfont__.oct: __occtfont__.cc
+__occtfont__.oct: __occtfont__.cc shapebytes.h
 	$(MKOCTFILE) -I$(OCCT_INC) __occtfont__.cc $(LIB_DIRS) $(FONT_LIBS)
 
 # Never unloaded: Open CASCADE's worker threads outlive the calls that start
 # them, and would crash Octave at exit if their libraries went first
-__occt__.oct: __occt__.cc
+__occt__.oct: __occt__.cc shapebytes.h
 	$(MKOCTFILE) -I$(OCCT_INC) __occt__.cc $(LIB_DIRS) $(OCCT_LIBS) \
 	  -Wl,-z,nodelete
 
-__occtview__: __occtview__.cc
+__occtview__: __occtview__.cc shapebytes.h
 	$(shell $(MKOCTFILE) -p CXX) -O2 -I$(OCCT_INC) -I$(X11_INC) \
 	  -o __occtview__ __occtview__.cc $(LIB_DIRS) $(VIEW_LIBS)
 

@@ -178,6 +178,8 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <Aspect_DisplayConnection.hxx>
 #include <Xw_Window.hxx>
 
+#include "shapebytes.h"
+
 using namespace std;
 
 // The message of an Open CASCADE exception, which 8.0 made a std::exception
@@ -482,7 +484,12 @@ public:
       TopoDS_Shape s;
       if (n > 0)
       {
-        istringstream is (data.substr (0, n));
+        string bytes = data.substr (0, n);
+        if (! unsealshape (bytes))
+        {
+          throw Standard_Failure ("the shape data is damaged");
+        }
+        istringstream is (bytes);
         BinTools::Read (s, is);
       }
       m_solidcolours.clear ();
@@ -1731,7 +1738,14 @@ main (int argc, char **argv)
   bool open = true;
   while (open && ! v->done ())
   {
-    v->events ();
+    // A failure while handling the mouse or a redraw loses that one event;
+    // left to propagate, it would end the viewer
+    try
+    {
+      v->events ();
+    }
+    catch (const Standard_Failure&)
+    { }
 
     fd_set fds;
     FD_ZERO (&fds);
