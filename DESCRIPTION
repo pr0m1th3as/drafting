@@ -16,6 +16,7 @@ Categories: Graphics
 Depends: octave (>= 11.1.0)
 BuildRequires: libocct-foundation-dev (>= 7.8.0), libocct-modeling-data-dev,
  libocct-modeling-algorithms-dev, libocct-data-exchange-dev,
- libocct-visualization-dev, libx11-dev
+ libocct-visualization-dev, libx11-dev, zlib1g-dev
+License: GPLv3+
 Url: https://github.com/pr0m1th3as/drafting
 Tracker: https://github.com/pr0m1th3as/drafting/issues

@@ -17,8 +17,9 @@ millimetres.
 - **Solids:** primitives, and extrusions, revolutions, lofts, sweeps and
   helices of regions; booleans; holes, pockets, fillets, chamfers and shells
   on edges and faces chosen by what they are; tapped holes and ISO metric
-  threads, internal and external; sections and projections that are regions
-  again; STEP in and out.
+  threads, internal and external, and clearance holes with the counterbores
+  and countersinks of the standards; sections and projections that are
+  regions again; STEP in and out.
 - **Meshes:** STL, OBJ, PLY and 3MF read and written with their colours, cut
   into regions and fitted back to lines and arcs, and taken into booleans.
 - **Assemblies:** named parts placed together, written to STEP and 3MF with
@@ -26,8 +27,9 @@ millimetres.
 - **Technical drawings:** a drawing model with a layer table of colours, line
   types and line weights, dimensions, hatches, blocks and an ISO title block;
   plotted, printed to scale, set in TikZ and written to DXF.
-- **A viewer:** Open CASCADE's own window, to turn a part, pick its edges and
-  faces, and pick a coordinate system with the mouse.
+- **A viewer:** Open CASCADE's own window, to turn a part, pick its edges,
+  faces and solids, pick a coordinate system with the mouse, hide solids or
+  show them through, set the view, and capture what it shows as a picture.
 
 ## Layout
 
@@ -58,14 +60,17 @@ back is set out in the guide's
 
 Where the package follows a standard, the guide's Standards pages set out
 which edition, where each number comes from and how it is computed, and what
-the package decides where the standard leaves the choice open. The first,
-[Threads and tapped holes](https://pr0m1th3as.github.io/drafting/guide/standards_threads.html),
-covers ISO 261, ISO 68-1, ISO 965-1 and ISO 2306, each read in the Indian
-Standard that adopts it unchanged and that anyone can download free.
+the package decides where the standard leaves the choice open.
+[Threads and tapped holes](https://pr0m1th3as.github.io/drafting/guide/standards_threads.html)
+covers ISO 261, ISO 68-1, ISO 965-1 and ISO 2306, and the countersink of a
+tapped hole from IS 1369 (Part 3), prepared from DIN 76-1;
+[Clearance holes, counterbores and countersinks](https://pr0m1th3as.github.io/drafting/guide/standards_holes.html)
+covers ISO 273 and IS 3406, prepared from DIN 74. Each is read in an Indian
+Standard that anyone can download free.
 
 ## Tutorials
 
-The [guide](https://pr0m1th3as.github.io/drafting/guide/) has sixteen tutorials
+The [guide](https://pr0m1th3as.github.io/drafting/guide/) has eighteen tutorials
 that build parts and drawings step by step. Every output and every picture on
 them is made by the code above it. New to Octave? Start with
 [A brief Octave primer](https://pr0m1th3as.github.io/drafting/guide/primer.html),
@@ -103,6 +108,10 @@ the Octave the tutorials use.
     `%!test` blocks that check a part's volume and fit, run with `test`.
 16. [Holes and threads](https://pr0m1th3as.github.io/drafting/guide/16_holes_and_threads.html):
     tapped holes and a threaded rod, and a bolt circle on a picked face.
+17. [Clearance holes, counterbores and countersinks](https://pr0m1th3as.github.io/drafting/guide/17_clearance_holes.html):
+    the holes a screw passes through, and the seats that sink its head.
+18. [Looking inside a model](https://pr0m1th3as.github.io/drafting/guide/18_looking_inside.html):
+    solids hidden or shown through in the viewer, chosen by name.
 
 The scripts the pages are built from are in [`docs/guide/src`](docs/guide/src).
 
@@ -157,16 +166,20 @@ If you need to install a specific release, for example `0.2.0`, type:
   `pkg install "https://github.com/pr0m1th3as/drafting/archive/refs/tags/release-0.2.0.tar.gz"`
 
 The package needs Open CASCADE 7.8 or later, with its visualization
-libraries, and the X11 headers at build time, by default in
-`/usr/include/opencascade` and `/usr/include`. On Debian or Ubuntu, where the
-packaged version is 7.8 or later, install them before the package with:
+libraries, the X11 headers and zlib at build time. The headers are looked for
+in `/usr/local/include/opencascade` and `/usr/include/opencascade`, and the
+libraries next to them. On Debian or Ubuntu, where the packaged version is 7.8
+or later, install them before the package with:
 
-  `sudo apt install libocct-foundation-dev libocct-modeling-data-dev libocct-modeling-algorithms-dev libocct-data-exchange-dev libocct-visualization-dev libx11-dev`
+  `sudo apt install libocct-foundation-dev libocct-modeling-data-dev libocct-modeling-algorithms-dev libocct-data-exchange-dev libocct-visualization-dev libx11-dev zlib1g-dev`
 
-If the headers are elsewhere, name their directories before installing, for
-example `setenv ("OCCT_INC", "/opt/occt/include/opencascade")` or `X11_INC`;
-the libraries must be where the linker finds them. The package builds on
-Linux; ports to Windows and macOS are not planned.
+If they are elsewhere, name their directories before installing, for example
+`setenv ("OCCT_INC", "/opt/occt/include/opencascade")` and
+`setenv ("OCCT_LIB", "/opt/occt/lib")`, or `X11_INC` and `X11_LIB`.
+
+The package builds on Linux and FreeBSD. Its Makefile is GNU make's, so on
+FreeBSD install `gmake` and type `setenv ("MAKE", "gmake")` before
+`pkg install`. Ports to Windows and macOS are not planned.
 
 After installation, type:
 - `pkg load drafting` to load the **drafting** package.
