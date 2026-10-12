@@ -328,6 +328,29 @@ the crest of a rod, and that tool is cut instead. The surfaces are splines
 fitted to the helix, so a thread's volume agrees with the area of its
 profile swept round the axis to about one part in ten thousand.</p>
 
+<p>The tool clears a little more than the thread: beside the profile, from
+a pitch before the point to the corner of the groove, 0.03 pitches past the
+depth. So a bore must keep its full diameter that far past the thread, the
+point of the drill not counting, and a cylinder must reach that far before
+any shoulder; a thread that would cut beyond its bore or its cylinder is
+refused, as the tutorial shows for a thread deeper than its bore. A tapping
+hole drilled only as deep as its thread is refused for the same reason: it
+is drilled deeper than it is threaded, as in the workshop.</p>
+
+<p>Even the joined tool fails at some depths, with no rule that predicts
+which. Open CASCADE 7.8, 7.9 and 8.0 alike fail at 16 or 17 of 180 depths
+of M4 to M10 in a block, from 3 to 25 by steps of 0.5, nearly the same
+depths on each: the part comes back with the groove as a solid of its own,
+and at none of them was it cut wrong in silence. Open CASCADE can also
+raise an error instead. Where either happens each thread is cut again on
+its own, and where it fails again it is cut by a tool whose cylinder ends
+half a pitch sooner. That cut is kept only when it removes the volume the
+groove holds inside the part, to one part in a thousand, measured from the
+groove cut clear of a long cylinder, which Open CASCADE measured right at
+all 180 depths. On 7.8 it cured 16 of the 17; a thread it cannot cure is
+refused, naming the thread and its point, and a depth a little different
+cuts.</p>
+
 <h2 id="not-done">What is not done</h2>
 
 <ul>
