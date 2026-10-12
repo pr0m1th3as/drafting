@@ -80,8 +80,13 @@ classdef Shape
   ## and leaves its operands unchanged, and a copy is independent of the
   ## original.  The empty shape adds nothing to a union and empties an
   ## intersection, and a boolean whose result holds no material, such as the
-  ## intersection of two solids that do not meet, returns it.  A shape is
-  ## saved and loaded with @code{save} and @code{load} like any other value.
+  ## intersection of two solids that do not meet, returns it.
+  ##
+  ## Octave's @code{save} does not keep a classdef object, so a shape is not
+  ## saved as a value.  Save its @code{Data}, and make it again with
+  ## @code{solid.Shape (@var{DATA})}, its @code{Colour} and @code{Name} set
+  ## again; or write it to a STEP file with @code{solid.Shape.write}, which
+  ## keeps both, and read it back with @code{solid.read}.
   ##
   ## @seealso{solid.box, solid.read, solid.Shape.write, solid.Shape.show}
   ## @end deftp
@@ -2600,6 +2605,9 @@ classdef Shape
     ## @var{TOL}; where the exact hull is flat, as between boxes, it is exact
     ## and its triangles meet as whole faces.  Open CASCADE has no exact hull
     ## of curved faces.
+    ##
+    ## The hull is a new solid, no one operand's material, so it takes no
+    ## @code{Colour} and no @code{Name} from them.
     ##
     ## @example
     ## @group
@@ -5360,6 +5368,14 @@ endfunction
 %! H = hull (solid.Shape (), [0, 0, 0; 6, 0, 0; 0, 6, 0; 0, 0, 6]);
 %! assert_equal (volume (H), 36, -1e-12);
 %! assert_equal (isempty (hull (solid.Shape (), zeros (0, 3))), true);
+
+%!test  # the hull takes no colour or name from its operands
+%! A = solid.box (1, 1, 1);
+%! A.Colour = [1, 0, 0];
+%! A.Name = {'block'};
+%! H = hull (A, translate (A, [3, 0, 0]));
+%! assert_equal (H.Colour, []);
+%! assert_equal (H.Name, {});
 
 %!test  # a slot: inside the exact hull, within TOL
 %! C = solid.cylinder (5, 4);

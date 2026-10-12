@@ -1986,11 +1986,11 @@ classdef Drawing
     ## @subheading What is refused, and why
     ##
     ## @strong{A non-uniform scaling that would turn a circle into an ellipse}
-    ## raises.  There is no ellipse entity to put the result in, and quietly
-    ## scaling the radius by one of the two factors would move the geometry off
-    ## the part.  A spline, path, region or hatch refuses it too.  A drawing
-    ## of lines and polylines without arcs scales anisotropically without
-    ## complaint.
+    ## raises.  @code{transform} makes no ellipse out of a circle or an arc,
+    ## and quietly scaling the radius by one of the two factors would move the
+    ## geometry off the part.  A spline, path, region or hatch refuses it
+    ## too.  A drawing of lines and polylines without arcs scales
+    ## anisotropically without complaint.
     ##
     ## @strong{A rotation that would leave an axis-locked dimension off its
     ## axis} raises, naming the entity.  A @qcode{'horizontal'} dimension
@@ -3127,29 +3127,23 @@ classdef Drawing
     ## visible and adjustable.
     ## @end multitable
     ##
-    ## @subheading Dimensions
+    ## @subheading Dimensions and hatches
     ##
-    ## Dimensions are rendered here from what they measure, which is the point
-    ## of storing them semantically.  A TikZ node anchors itself, so the label
-    ## is positioned by naming the side it should sit on and letting TikZ
-    ## measure the text, where a figure or a CAD file has to estimate the width
-    ## of a string from its character count.  The same drawing therefore gets
-    ## properly centred labels on the report figure, from one model and without
-    ## a flag anywhere.
-    ##
-    ## Labels are unidirectional, as @code{draw.Drawing.plot} draws them, and
-    ## ticks are the 45-degree architectural obliques.
+    ## A dimension, a centre mark and a leader are drawn as the lines and text
+    ## @code{draw.Drawing.entities} breaks them into, as
+    ## @code{draw.Drawing.plot} draws them: labels unidirectional, ticks the
+    ## 45-degree architectural obliques.  A label is a node anchored at the
+    ## start of its baseline, where @code{draw.Drawing.entities} places it
+    ## from an estimate of its width.  A hatch is drawn as its outline and its
+    ## fill lines.
     ##
     ## @subheading What the document needs
     ##
-    ## A hatch is emitted as @code{\path[pattern=@dots{}]}, which requires
-    ## @code{\usetikzlibrary@{patterns@}}.  Nothing else in the output needs a
-    ## library beyond TikZ itself.
-    ##
-    ## Text is written through as UTF-8 and LaTeX's special characters are
-    ## escaped.  Greek text needs a Unicode-aware engine, @code{xelatex} or
-    ## @code{lualatex}, or @code{babel} configured for Greek; that is a
-    ## property of the document, not of this output.
+    ## The output needs no library beyond TikZ itself.  Text is written
+    ## through as UTF-8 and LaTeX's special characters are escaped.  Greek
+    ## text needs a Unicode-aware engine, @code{xelatex} or @code{lualatex},
+    ## or @code{babel} configured for Greek; that is a property of the
+    ## document, not of this output.
     ##
     ## @seealso{draw.Drawing, draw.Drawing.plot, draw.Drawing.write}
     ## @end deftypefn
@@ -4766,87 +4760,6 @@ function lines = render (e, scale, ltscale)
 
 endfunction
 
-## Render a semantic dimension.  The construction of the dimension line is the
-## same as in draw.Drawing.entities -- it has to be, or the two outputs would
-## disagree
-## about where the dimension sits -- but the label is placed by anchoring a
-## node, so nothing here estimates the width of a string.
-function lines = renderdim (e, scale)
-
-  P1 = e.pts(1,:);
-  P2 = e.pts(2,:);
-  d = P2 - P1;
-
-  switch (e.direction)
-    case 'horizontal'
-      U = [1, 0];
-    case 'vertical'
-      U = [0, 1];
-    otherwise
-      U = d / norm (d);
-  endswitch
-  N = [-U(2), U(1)];
-
-  A1 = P1 + e.offset * N;
-  A2 = P2 + (e.offset - dot (d, N)) * N;
-
-  ## Ornament in model units, so that it comes out at a fixed size on paper
-  gap = 1.0 * scale;
-  over = 1.25 * scale;
-  tick = 1.25 * scale;
-
-  E1 = unitor (A1 - P1, N);
-  E2 = unitor (A2 - P2, N);
-
-  lines = {};
-  lines{end+1} = sprintf ('\\draw %s -- %s;', pt (P1 + gap * E1), ...
-                          pt (A1 + over * E1));
-  lines{end+1} = sprintf ('\\draw %s -- %s;', pt (P2 + gap * E2), ...
-                          pt (A2 + over * E2));
-  lines{end+1} = sprintf ('\\draw %s -- %s;', pt (A1), pt (A2));
-
-  T = (U + N) / sqrt (2);
-  lines{end+1} = sprintf ('\\draw %s -- %s;', pt (A1 - tick * T), ...
-                          pt (A1 + tick * T));
-  lines{end+1} = sprintf ('\\draw %s -- %s;', pt (A2 - tick * T), ...
-                          pt (A2 + tick * T));
-
-  if (isempty (e.text))
-    m = abs (dot (d, U));
-    if (abs (m - round (m)) < 1e-9)
-      label = sprintf ('%d', round (m));
-    else
-      label = sprintf ('%.1f', m);
-    endif
-  else
-    label = e.text;
-  endif
-
-  ## The node anchors itself against the side the dimension line was offset
-  ## to, so TikZ does the centring and the measuring.
-  side = sign0 (e.offset) * N;
-  if (abs (side(2)) >= abs (side(1)))
-    if (side(2) >= 0)
-      anchor = 'south';
-    else
-      anchor = 'north';
-    endif
-  else
-    if (side(1) >= 0)
-      anchor = 'west';
-    else
-      anchor = 'east';
-    endif
-  endif
-
-  mid = (A1 + A2) / 2;
-  lines{end+1} = sprintf (strcat ('\\node[anchor=%s, inner sep=0.8mm,', ...
-                                  ' font=%s] at %s {%s};'), anchor, ...
-                          fontfor (2.5 * scale, scale), pt (mid), ...
-                          texescape (label));
-
-endfunction
-
 ## A coordinate, in model millimetres.
 function s = pt (P)
 
@@ -4870,8 +4783,6 @@ function s = fontfor (H, scale)
 
 endfunction
 
-## Map a CAD hatch pattern onto a TikZ one.  Only the patterns an engineering
-## drawing actually uses are worth naming; anything else falls back rather than
 ## Escape the characters LaTeX would otherwise act on.  The backslash has to go
 ## first, or the escapes introduced for everything else get escaped in turn.
 function s = texescape (t)
