@@ -2718,6 +2718,40 @@ iscolour (const double *c)
          && c[2] <= 1;
 }
 
+// "N things", or "1 thing"
+static string
+howmany (size_t n, const char *one, const char *many)
+{
+  return std::to_string (n) + " " + (n == 1 ? one : many);
+}
+
+// Warn that FILE holds LINES lines and POINTS points, which a mesh leaves
+// out; where it holds no face, it holds nothing a mesh keeps, an error
+static void
+leftout (size_t lines, size_t points, bool faces, const string& caller)
+{
+  if (lines == 0 && points == 0)
+  {
+    return;
+  }
+  string what;
+  if (lines > 0)
+  {
+    what = howmany (lines, "line", "lines");
+  }
+  if (points > 0)
+  {
+    what += (what.empty () ? "" : " and ");
+    what += howmany (points, "point", "points");
+  }
+  if (! faces)
+  {
+    error ("%s: FILE holds %s and no faces.", caller.c_str (), what.c_str ());
+  }
+  warning ("%s: FILE holds %s, which %s left out.", caller.c_str (),
+           what.c_str (), (lines + points == 1) ? "is" : "are");
+}
+
 // The mesh of the faces of an OBJ or PLY file: V the vertices, x, y and z
 // of each in turn, and VC their colours or nothing; face F the vertices
 // IDX(START(F)) to IDX(START(F+1)-1), from 0, and FC the colours of the
@@ -2922,13 +2956,22 @@ readobj (const string& file, const string& caller)
   vector<int> fmat;
   bool coloured = false;
   int current = -1;
+  size_t lines = 0, points = 0;
   string line, rest;
   while (p < end)
   {
     nextline (p, end, line);
     const string key = keyword (line, rest);
     const char *s = rest.c_str ();
-    if (key == "v")
+    if (key == "l")
+    {
+      lines++;
+    }
+    else if (key == "p")
+    {
+      points++;
+    }
+    else if (key == "v")
     {
       double x[6];
       int n = 0;
@@ -3067,6 +3110,7 @@ readobj (const string& file, const string& caller)
       }
     }
   }
+  leftout (lines, points, start.size () > 1, caller);
   return facemesh (V, VC, idx, start, FC, caller);
 }
 
@@ -3409,6 +3453,12 @@ readply (const string& file, const string& caller)
   {
     FC.clear ();
   }
+  size_t edges = 0;
+  for (const plyelement& el : elems)
+  {
+    edges += (el.name == "edge") ? el.n : 0;
+  }
+  leftout (edges, 0, start.size () > 1, caller);
   return facemesh (V, VC, idx, start, FC, caller);
 }
 

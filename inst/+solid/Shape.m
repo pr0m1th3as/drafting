@@ -194,8 +194,12 @@ classdef Shape
     ## a shape in Open CASCADE's binary format followed by a check of 16 bytes.
     ## This is how the functions of the @code{solid} namespace return what Open
     ## CASCADE computed, and it is not for direct use: bytes that do not begin
-    ## with that format's signature are refused here, and bytes whose check
-    ## does not match them are refused by the first function that reads them.
+    ## with that format's signature, or whose check does not match them, are
+    ## refused here.
+    ##
+    ## A shape holds solids and nothing else: bytes that hold a surface, a
+    ## curve or a point outside a solid are refused.  An open surface is a
+    ## @code{polymesh.Mesh}.
     ##
     ## The empty shape is where a shape built up in a loop starts: it adds
     ## nothing to a union, so the first pass needs no case of its own.
@@ -228,6 +232,13 @@ classdef Shape
       if (! isempty (DATA) && (numel (DATA) < numel (sig)
                                || ! strcmp (char (DATA(1:numel (sig))), sig)))
         error ("solid.Shape: DATA is not an Open CASCADE shape.");
+      endif
+      if (! isempty (DATA))
+        left = occt ('solid.Shape', 'strays', DATA);
+        if (! isempty (left))
+          error (strcat ("solid.Shape: DATA holds %s outside a solid,", ...
+                         " and a shape holds solids only."), left);
+        endif
       endif
 
       this.Data = DATA;
@@ -4900,12 +4911,12 @@ endfunction
 %! solid.Shape (uint8 ([1, 2, 3]))
 %!error<solid.Shape: DATA is not an Open CASCADE shape.> ...
 %! solid.Shape (uint8 (sprintf ("\nOpen CASCADE Topology X, (c)")))
-%!error<solid.Shape.isvalid: shape data is damaged, or was not made by this version of the package.> ...
+%!error<solid.Shape: shape data is damaged, or was not made by this version of the package.> ...
 %! B = solid.box (1, 2, 3);
 %! d = B.Data;
 %! d(end-100) = bitxor (d(end-100), uint8 (255));
 %! isvalid (solid.Shape (d))
-%!error<solid.Shape.isvalid: shape data is damaged, or was not made by this version of the package.> ...
+%!error<solid.Shape: shape data is damaged, or was not made by this version of the package.> ...
 %! B = solid.box (1, 2, 3);
 %! d = B.Data;
 %! isvalid (solid.Shape (d(1:end-16)))

@@ -2585,7 +2585,7 @@ endfunction
 %! unwind_protect
 %!   setenv ('DISPLAY', '');
 %!   V = model.Viewer ();
-%!   V.Model = solid.Shape (uint8 (sprintf ("\nOpen CASCADE Topology V3")));
+%!   V.Model = solid.box (1, 1, 1);
 %! unwind_protect_cleanup
 %!   setenv ('DISPLAY', d);
 %! end_unwind_protect

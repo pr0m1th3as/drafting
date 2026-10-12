@@ -79,6 +79,7 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <BRepTools.hxx>
 #include <BRepTools_WireExplorer.hxx>
 #include <BRepTools_ReShape.hxx>
+#include <BRepBuilderAPI_MakeSolid.hxx>
 #include <BRepLib.hxx>
 #include <BRepMesh_IncrementalMesh.hxx>
 #include <BRepOffset_MakeOffset.hxx>
@@ -2134,6 +2135,110 @@ gather (const vector<TopoDS_Shape>& v)
   return c;
 }
 
+// What a shape holds besides solids: surfaces, the open shells and the
+// faces outside a shell; curves, the wires outside a face and the edges
+// outside a wire; points, the vertices outside an edge
+struct strays
+{
+  int surfaces = 0;
+  int curves = 0;
+  int points = 0;
+};
+
+// The solids of S, each closed shell outside a solid made a solid when MAKE
+// is true, a null shape when there are none, and in X what else S holds, a
+// closed shell among its surfaces when MAKE is false
+static TopoDS_Shape
+keepsolids (const TopoDS_Shape& s, bool make, strays& x)
+{
+  vector<TopoDS_Shape> keep;
+  for (TopExp_Explorer e (s, TopAbs_SOLID); e.More (); e.Next ())
+  {
+    keep.push_back (e.Current ());
+  }
+  for (TopExp_Explorer e (s, TopAbs_SHELL, TopAbs_SOLID); e.More (); e.Next ())
+  {
+    if (make && BRep_Tool::IsClosed (e.Current ()))
+    {
+      BRepBuilderAPI_MakeSolid ms (TopoDS::Shell (e.Current ()));
+      if (ms.IsDone ())
+      {
+        TopoDS_Solid so = ms.Solid ();
+        BRepLib::OrientClosedSolid (so);
+        keep.push_back (so);
+        continue;
+      }
+    }
+    x.surfaces++;
+  }
+  for (TopExp_Explorer e (s, TopAbs_FACE, TopAbs_SHELL); e.More (); e.Next ())
+  {
+    x.surfaces++;
+  }
+  for (TopExp_Explorer e (s, TopAbs_WIRE, TopAbs_FACE); e.More (); e.Next ())
+  {
+    x.curves++;
+  }
+  for (TopExp_Explorer e (s, TopAbs_EDGE, TopAbs_WIRE); e.More (); e.Next ())
+  {
+    x.curves++;
+  }
+  for (TopExp_Explorer e (s, TopAbs_VERTEX, TopAbs_EDGE); e.More (); e.Next ())
+  {
+    x.points++;
+  }
+  return keep.empty () ? TopoDS_Shape () : gather (keep);
+}
+
+// X in words, as "3 surfaces, 2 curves and 1 point", empty for nothing
+static string
+describe (const strays& x)
+{
+  vector<string> w;
+  auto add = [&w] (int n, const char *one, const char *many)
+  {
+    if (n > 0)
+    {
+      w.push_back (std::to_string (n) + " " + (n == 1 ? one : many));
+    }
+  };
+  add (x.surfaces, "surface", "surfaces");
+  add (x.curves, "curve", "curves");
+  add (x.points, "point", "points");
+  string out;
+  for (size_t k = 0; k < w.size (); k++)
+  {
+    out += (k == 0 ? "" : (k + 1 == w.size () ? " and " : ", ")) + w[k];
+  }
+  return out;
+}
+
+// The error that FILE holds no solid, saying what it holds instead
+static void
+nosolid (const strays& x, const string& file, const string& caller)
+{
+  const string left = describe (x);
+  if (left.empty ())
+  {
+    error ("%s: '%s' holds no shape.", caller.c_str (), file.c_str ());
+  }
+  error ("%s: '%s' holds no solid, only %s.", caller.c_str (), file.c_str (),
+         left.c_str ());
+}
+
+// The warning that FILE holds X besides its solids, which are left out
+static void
+leftout (const strays& x, const string& file, const string& caller)
+{
+  const string left = describe (x);
+  if (! left.empty ())
+  {
+    warning ("%s: '%s' holds %s besides its solids, which %s left out.",
+             caller.c_str (), file.c_str (), left.c_str (),
+             (x.surfaces + x.curves + x.points == 1) ? "is" : "are");
+  }
+}
+
 // The solids each solid of a result came from, as indices from 1 into the
 // solids of the operands, those of each in turn in the order a map of them
 // gives
@@ -2953,10 +3058,13 @@ readstep (const string& file, const string& caller)
     }
     s = c;
   }
-  if (count (s, TopAbs_FACE) == 0)
+  strays x;
+  s = keepsolids (s, true, x);
+  if (s.IsNull ())
   {
-    error ("%s: '%s' holds no shape.", caller.c_str (), file.c_str ());
+    nosolid (x, file, caller);
   }
+  leftout (x, file, caller);
   ShapeMap solids;
   TopExp::MapShapes (s, TopAbs_SOLID, solids);
   const vector<std::pair<TopoDS_Shape, string>> names = solidnames (r);
@@ -3043,6 +3151,8 @@ readassembly (const string& file, const string& name, const string& caller)
   const vector<std::pair<TopoDS_Shape, string>> own = solidnames (r);
   vector<octave_value> names, data, colours, solids, children, instances;
   std::map<string, int> seen;
+  // A part with no solid is left out, and an assembly left with no part
+  strays x;
   std::function<int (const TDF_Label&)> visit;
   visit = [&] (const TDF_Label& l) -> int
   {
@@ -3058,21 +3168,38 @@ readassembly (const string& file, const string& name, const string& caller)
     {
       NCollection_Sequence<TDF_Label> comps;
       XCAFDoc_ShapeTool::GetComponents (l, comps);
-      Matrix C (comps.Length (), 13);
-      Cell inst (1, comps.Length ());
+      vector<int> kept;
+      vector<TDF_Label> refs;
       for (int k = 1; k <= comps.Length (); k++)
       {
         TDF_Label ref;
         XCAFDoc_ShapeTool::GetReferredShape (comps (k), ref);
-        C(k-1,0) = visit (ref) + 1;
+        const int v = visit (ref);
+        if (v >= 0)
+        {
+          kept.push_back (k);
+          refs.push_back (ref);
+        }
+      }
+      if (kept.empty ())
+      {
+        seen[entry.ToCString ()] = -1;
+        return -1;
+      }
+      Matrix C (kept.size (), 13);
+      Cell inst (1, kept.size ());
+      for (size_t q = 0; q < kept.size (); q++)
+      {
+        const int k = kept[q];
+        C(q,0) = visit (refs[q]) + 1;
         double f[12];
         frameof (XCAFDoc_ShapeTool::GetLocation (comps (k)), f, caller);
         for (int j = 0; j < 12; j++)
         {
-          C(k-1,j+1) = f[j];
+          C(q,j+1) = f[j];
         }
         const string in = labelname (comps (k));
-        inst(k-1) = in.empty () ? labelname (ref) : in;
+        inst(q) = in.empty () ? labelname (refs[q]) : in;
       }
       names.push_back (nm.empty () ? "assembly" : nm);
       data.push_back (uint8NDArray (dim_vector (0, 0)));
@@ -3083,7 +3210,13 @@ readassembly (const string& file, const string& name, const string& caller)
     }
     else
     {
-      const TopoDS_Shape s = XCAFDoc_ShapeTool::GetShape (l);
+      const TopoDS_Shape s = keepsolids (XCAFDoc_ShapeTool::GetShape (l),
+                                         true, x);
+      if (s.IsNull ())
+      {
+        seen[entry.ToCString ()] = -1;
+        return -1;
+      }
       const ShapeMap sm = solidsof (s);
       Matrix C (sm.Extent (), 3, octave_NaN);
       Cell N (sm.Extent (), 1, octave_value (""));
@@ -3129,8 +3262,17 @@ readassembly (const string& file, const string& name, const string& caller)
   vector<int> top;
   for (int i = 1; i <= roots.Length (); i++)
   {
-    top.push_back (visit (roots (i)));
+    const int v = visit (roots (i));
+    if (v >= 0)
+    {
+      top.push_back (v);
+    }
   }
+  if (top.empty ())
+  {
+    nosolid (x, file, caller);
+  }
+  leftout (x, file, caller);
   if (top.size () > 1)
   {
     // The shapes at the top of the file, placed where they are
@@ -4122,6 +4264,13 @@ function directly. \n\
     else if (cmd == "loopcheck")
     {
       out = loopcheck (args(2).cell_value (), args(3).matrix_value ());
+    }
+    // What the shape holds besides solids, in words, empty for nothing
+    else if (cmd == "strays")
+    {
+      strays x;
+      keepsolids (toshape (args(2), caller), false, x);
+      out = describe (x);
     }
     else if (cmd == "valid")
     {

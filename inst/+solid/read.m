@@ -35,6 +35,12 @@
 ## either case, and open with the keyword @qcode{ISO-10303-21;}, which may
 ## follow white space and comments.
 ##
+## Only solids are read, since a @code{solid.Shape} holds solids only.  A
+## closed shell, which some programs write in place of a solid, is read as
+## the solid it bounds.  Surfaces, curves and points, such as sketches,
+## axes and construction surfaces, are left out with a warning that counts
+## them, and a file that holds no solid is an error.
+##
 ## @code{model.read} reads the same file as a @code{model.Assembly}, its
 ## parts named and placed as the file has them.  A triangle mesh, from an
 ## STL, OBJ or PLY file, is read by @code{polymesh.read} and made a solid by
@@ -53,7 +59,9 @@ function S = read (FILE)
     error ("solid.read: FILE must be a non-empty character vector.");
   endif
   [~, ~, ext] = fileparts (FILE);
-  if (! strcmpi (ext, '.step'))
+  if (any (strcmpi (ext, {'.stl', '.obj', '.ply', '.3mf'})))
+    error ("solid.read: '%s' is a mesh: polymesh.read reads it.", FILE);
+  elseif (! strcmpi (ext, '.step'))
     error ("solid.read: FILE must end in .step.");
   endif
   if (! isfile (FILE))
@@ -224,10 +232,26 @@ endfunction
 %!   [~] = unlink (f);
 %! end_unwind_protect
 
+%!test  # a closed shell is read as the solid it bounds
+%! S = solid.read (fullfile (fileparts (fileparts (which ('solid.read'))), ...
+%!                           'tests', 'fixtures', 'closed_shell.step'));
+%! assert_equal (numsolids (S), 1);
+%! assert_equal (volume (S), 1000, 1e-9);
+%! assert_equal (isvalid (S), true);
+
+%!warning<solid.read: '.*solid_and_surface.step' holds 1 surface besides its solids, which is left out.> ...
+%! S = solid.read (fullfile (fileparts (fileparts (which ('solid.read'))), ...
+%!                           'tests', 'fixtures', 'solid_and_surface.step'));
+%! assert_equal (volume (S), 1000, 1e-9);
+
 %!error<solid.read: invalid number of input arguments.> solid.read ()
+%!error<solid.read: '.*open_shell.step' holds no solid, only 1 surface.> ...
+%! solid.read (fullfile (fileparts (fileparts (which ('solid.read'))), ...
+%!                       'tests', 'fixtures', 'open_shell.step'))
 %!error<solid.read: FILE must be a non-empty character vector.> solid.read ('')
 %!error<solid.read: FILE must be a non-empty character vector.> solid.read (1)
-%!error<solid.read: FILE must end in .step.> solid.read ('part.stl')
+%!error<solid.read: 'part.stl' is a mesh: polymesh.read reads it.> ...
+%! solid.read ('part.stl')
 %!error<solid.read: FILE must end in .step.> solid.read ('part')
 %!error<solid.read: FILE must end in .step.> solid.read ('part.stp')
 %!error<solid.read: cannot find file 'no_such_part_9f2c.step'.> ...

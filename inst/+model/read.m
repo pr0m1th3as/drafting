@@ -31,6 +31,12 @@
 ## a single part gives an assembly placing it once; either is named after
 ## the base name of @var{FILE}.
 ##
+## A part of a STEP file is its solids, a closed shell read as the solid it
+## bounds.  Surfaces, curves and points are left out with a warning that
+## counts them, a part that holds nothing else is left out of the assembly,
+## and so is a sub-assembly left with no part; a file that holds no solid
+## is an error.
+##
 ## @code{@var{A} = model.read (@var{FILE})} reads a 3MF file, @file{.3mf},
 ## the same way: each object a @code{polymesh.Mesh} part, in the colours
 ## of its triangles, each object made of others an assembly of them, and
@@ -57,7 +63,9 @@ function A = read (FILE)
     error ("model.read: FILE must be a non-empty character vector.");
   endif
   [~, base, ext] = fileparts (FILE);
-  if (! any (strcmpi (ext, {'.step', '.3mf'})))
+  if (any (strcmpi (ext, {'.stl', '.obj', '.ply'})))
+    error ("model.read: '%s' is a mesh: polymesh.read reads it.", FILE);
+  elseif (! any (strcmpi (ext, {'.step', '.3mf'})))
     error ("model.read: FILE must end in .step or .3mf.");
   endif
   if (! isfile (FILE))
@@ -222,9 +230,14 @@ endfunction
 %!   [~] = unlink (f);
 %! end_unwind_protect
 
+%!warning<model.read: '.*assembly_with_curve.step' holds 1 curve besides its solids, which is left out.> ...
+%! A = model.read (fullfile (fileparts (fileparts (which ('model.read'))), ...
+%!                           'tests', 'fixtures', 'assembly_with_curve.step'));
+%! assert_equal ({A.Parts.name}, {'block'});
+
 %!error<model.read: invalid number of input arguments.> model.read ()
 %!error<model.read: FILE must be a non-empty character vector.> model.read (1)
-%!error<model.read: FILE must end in .step or .3mf.> model.read ('a.stl')
+%!error<model.read: 'a.stl' is a mesh: polymesh.read reads it.> model.read ('a.stl')
 %!error<model.read: FILE must end in .step or .3mf.> model.read ('a.stp')
 %!error<model.read: cannot find file 'no_such_part_7e1a.step'.> ...
 %! model.read ('no_such_part_7e1a.step')
