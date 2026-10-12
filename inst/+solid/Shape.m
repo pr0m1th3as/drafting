@@ -1749,7 +1749,10 @@ classdef Shape
     ## cleared too, at the widest diameter of the hole, so a hole entering a
     ## sloping or curved face is clean all round.  A hole started under
     ## material that its axis passes through first cuts that material as
-    ## well.  All the holes are cut in one operation.
+    ## well.  All the holes are cut in one operation.  A hole that would
+    ## remove nothing, its axis missing the part or its point too far from
+    ## it for @var{DEPTH} to reach, is an error naming the point, as a thread
+    ## whose axis meets no bore or cylinder is for @code{solid.Shape.thread}.
     ##
     ## @var{P} may instead be a @code{geom.UCS}, such as @code{geom.UCS
     ## (@var{V})} picks off a face in the viewer: the hole starts at its origin
@@ -2064,6 +2067,19 @@ classdef Shape
         for j = 1:numel (T)
           tools{(i - 1) * numel (T) + j} = translate (T{j}, P(i,:));
         endfor
+      endfor
+
+      ## A hole that would remove nothing misses the part
+      for i = 1:rows (P)
+        k = (i - 1) * numel (T);
+        j = 1;
+        while (j <= numel (T) && isempty (intersect (this, tools{k + j})))
+          j++;
+        endwhile
+        if (j > numel (T))
+          error ("solid.Shape.hole: the hole at (%s) misses the part.", ...
+                 pointstr (P(i,:)));
+        endif
       endfor
 
       ## A tapped hole drilled through is countersunk alike where its axis
@@ -5078,6 +5094,12 @@ endfunction
 %!       'Countersink', 8)
 %!error<solid.Shape.hole: Tip must be false or an angle in the range \(0, 180\).> ...
 %! hole (solid.Shape (), [0, 0, 0], 5, 10, 'Tip', 0)
+%!error<solid.Shape.hole: the hole at \(30, 30, 10\) misses the part.> ...
+%! hole (solid.box (20, 20, 10), [30, 30, 10], 5, Inf)
+%!error<solid.Shape.hole: the hole at \(10, 10, 15\) misses the part.> ...
+%! hole (solid.box (20, 20, 10), [10, 10, 15], 5, 3)
+%!error<solid.Shape.hole: the hole at \(50, 10, 10\) misses the part.> ...
+%! hole (solid.box (20, 20, 10), [10, 10, 10; 50, 10, 10], 5, Inf)
 %!error<solid.Shape.hole: Tip applies to blind holes only.> ...
 %! hole (solid.Shape (), [0, 0, 0], 5, Inf, 'Tip', 118)
 %!error<solid.Shape.thread: invalid number of input arguments.> ...
