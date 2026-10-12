@@ -2206,14 +2206,16 @@ classdef Shape
 
       ## Open CASCADE fails to cut some threads, returning the groove as a
       ## solid of its own or raising an error, so on failure each thread is
-      ## cut on its own, and again another way where it fails
+      ## cut on its own, and again another way where it fails.  A single
+      ## thread goes straight to its own cut, which is the same cut.
       N = numsolids (this);
-      try
-        S = subtract (this, tools{:});
-        ok = numsolids (S) <= N;
-      catch
-        ok = false;
-      end_try_catch
+      ok = false;
+      if (n > 1)
+        try
+          S = subtract (this, tools{:});
+          ok = numsolids (S) <= N;
+        end_try_catch
+      endif
       if (ok)
         this = S;
       else
