@@ -139,7 +139,9 @@ function M = read (FILE, varargin)
 
   [V, F, VC, FC] = __mesh__ ('read', 'polymesh.read', FILE, double (T), ...
                              fmt(2:end));
-  M = polymesh.Mesh (V, F, 'VertexColour', VC, 'FaceColour', FC);
+  M = polymesh.Mesh (V, F);
+  M.VertexColour = VC;
+  M.FaceColour = FC;
 
 endfunction
 

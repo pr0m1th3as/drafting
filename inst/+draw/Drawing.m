@@ -2528,12 +2528,18 @@ classdef Drawing
         endif
         switch (lower (name))
           case 'axes'
+            if (isempty (val))
+              error ("draw.Drawing.plot: Axes must not be empty.");
+            endif
             opt.Axes = val;
           case 'linewidth'
             opt.LineWidth = val;
           case 'fontsize'
             opt.FontSize = val;
           case 'layers'
+            if (isempty (val))
+              error ("draw.Drawing.plot: Layers must not be empty.");
+            endif
             opt.Layers = val;
           case 'arc'
             opt.Arc = val;
@@ -2546,6 +2552,9 @@ classdef Drawing
           case 'margin'
             opt.Margin = val;
           case 'fontscale'
+            if (isempty (val))
+              error ("draw.Drawing.plot: FontScale must not be empty.");
+            endif
             opt.FontScale = val;
           case 'dimscale'
             opt.DimScale = val;
@@ -2583,13 +2592,13 @@ classdef Drawing
         error (strcat ("draw.Drawing.plot: Margin must be a non-negative", ...
                        " real finite scalar."));
       endif
-      ## FontScale is empty for the fixed point size, or points per model unit.
+      ## FontScale is points per model unit, or left out for a fixed size.
       if (! isempty (opt.FontScale)
           && (! isfloat (opt.FontScale) || ! isreal (opt.FontScale)
               || ! isscalar (opt.FontScale) || ! isfinite (opt.FontScale)
               || opt.FontScale <= 0))
-        error (strcat ("draw.Drawing.plot: FontScale must be empty or a", ...
-                       " positive real finite scalar."));
+        error (strcat ("draw.Drawing.plot: FontScale must be a positive", ...
+                       " real finite scalar."));
       endif
 
       if (isempty (opt.Axes))
@@ -2913,6 +2922,9 @@ classdef Drawing
           case 'orientation'
             opt.Orientation = val;
           case 'scale'
+            if (isempty (val))
+              error ("draw.Drawing.print: Scale must not be empty.");
+            endif
             opt.Scale = val;
           case 'margin'
             opt.Margin = val;
@@ -2948,8 +2960,8 @@ classdef Drawing
       if (! isempty (opt.Scale) && (! isfloat (opt.Scale)
           || ! isreal (opt.Scale) || ! isscalar (opt.Scale)
           || ! isfinite (opt.Scale) || opt.Scale <= 0))
-        error (strcat ("draw.Drawing.print: Scale must be empty or a", ...
-                       " positive real finite scalar."));
+        error (strcat ("draw.Drawing.print: Scale must be a positive", ...
+                       " real finite scalar."));
       endif
       if (isempty (D) || D.numentities () == 0)
         error ("draw.Drawing.print: D is empty, so there is nothing to plot.");

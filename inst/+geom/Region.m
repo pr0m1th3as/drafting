@@ -366,14 +366,15 @@ classdef Region
           error ("geom.Region.fit: option names must be character vectors.");
         endif
         switch (lower (name))
-          case 'reltol'
-            opt.RelTol = val;
-          case 'abstol'
-            opt.AbsTol = val;
+          case {'reltol', 'abstol', 'window'}
+            keys = {'RelTol', 'AbsTol', 'Window'};
+            key = keys{strcmpi (name, keys)};
+            if (isempty (val))
+              error ("geom.Region.fit: %s must not be empty.", key);
+            endif
+            opt.(key) = val;
           case 'corner'
             opt.Corner = val;
-          case 'window'
-            opt.Window = val;
           otherwise
             error ("geom.Region.fit: unknown option '%s'.", name);
         endswitch
@@ -2004,6 +2005,12 @@ endfunction
 %! fit (geom.Region ([0, 0; 1, 0; 1, 1]), 'arcs', 'AbsTol')
 %!error<geom.Region.fit: unknown option 'Tol'.> ...
 %! fit (geom.Region ([0, 0; 1, 0; 1, 1]), 'arcs', 'Tol', 1)
+%!error<geom.Region.fit: RelTol must not be empty.> ...
+%! fit (geom.Region ([0, 0; 1, 0; 1, 1]), 'arcs', 'RelTol', [])
+%!error<geom.Region.fit: AbsTol must not be empty.> ...
+%! fit (geom.Region ([0, 0; 1, 0; 1, 1]), 'arcs', 'AbsTol', '')
+%!error<geom.Region.fit: Window must not be empty.> ...
+%! fit (geom.Region ([0, 0; 1, 0; 1, 1]), 'arcs', 'Window', [])
 %!error<geom.Region.fit: option names must be character vectors.> ...
 %! fit (geom.Region ([0, 0; 1, 0; 1, 1]), 'arcs', 1, 1)
 %!test  # option names ignore case

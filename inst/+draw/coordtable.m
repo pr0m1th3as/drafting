@@ -94,6 +94,9 @@ function D = coordtable (P, ORIGIN, varargin)
       case 'decimals'
         opt.Decimals = val;
       case 'labels'
+        if (isempty (val))
+          error ("draw.coordtable: Labels must not be empty.");
+        endif
         opt.Labels = val;
       case 'heading'
         opt.Heading = val;
@@ -252,6 +255,8 @@ endfunction
 %! draw.coordtable ([0, 0; 1, 1], [0, 0], 'Labels', {'A'})
 %!error<draw.coordtable: unknown option 'Columns'.> ...
 %! draw.coordtable ([0, 0], [0, 0], 'Columns', 3)
+%!error<draw.coordtable: Labels must not be empty.> ...
+%! draw.coordtable ([0, 0], [0, 0], 'Labels', {})
 %!error<draw.coordtable: option names must be character vectors.> ...
 %! draw.coordtable ([0, 0], [0, 0], 1, 3)
 %!error<draw.coordtable: Name/Value arguments must come in pairs.> ...

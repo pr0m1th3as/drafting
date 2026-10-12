@@ -220,6 +220,11 @@ classdef Mesh
         if (! ischar (name) || ! isrow (name))
           error ("polymesh.Mesh: option names must be character vectors.");
         endif
+        keys = {'VertexColour', 'FaceColour'};
+        if (any (strcmpi (name, keys)) && isempty (val))
+          error ("polymesh.Mesh: %s must not be empty.", ...
+                 keys{strcmpi (name, keys)});
+        endif
         switch (lower (name))
           case 'vertexcolour'
             this.VertexColour = val;
@@ -1202,6 +1207,10 @@ endfunction
 %! polymesh.Mesh ([0, 0, 0; 1, 0, 0; 0, 1, 0], [1, 2, 3], 'FaceColour')
 %!error<polymesh.Mesh: unknown option 'Colour'.> ...
 %! polymesh.Mesh ([0, 0, 0; 1, 0, 0; 0, 1, 0], [1, 2, 3], 'Colour', [1, 0, 0])
+%!error<polymesh.Mesh: VertexColour must not be empty.> ...
+%! polymesh.Mesh ([0, 0, 0; 1, 0, 0; 0, 1, 0], [1, 2, 3], 'VertexColour', [])
+%!error<polymesh.Mesh: FaceColour must not be empty.> ...
+%! polymesh.Mesh ([0, 0, 0; 1, 0, 0; 0, 1, 0], [1, 2, 3], 'FaceColour', '')
 %!error<polymesh.Mesh: option names must be character vectors.> ...
 %! polymesh.Mesh ([0, 0, 0; 1, 0, 0; 0, 1, 0], [1, 2, 3], 1, [1, 0, 0])
 %!test  # option names ignore case

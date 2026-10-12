@@ -401,7 +401,8 @@ classdef Assembly
         bare = isnan (C(:,1));
         C(bare,:) = repmat ([0.72, 0.74, 0.78], nnz (bare), 1);
       endif
-      M = polymesh.Mesh (vertcat (V{:}), vertcat (F{:}), 'FaceColour', C);
+      M = polymesh.Mesh (vertcat (V{:}), vertcat (F{:}));
+      M.FaceColour = C;
 
     endfunction
 
@@ -637,7 +638,8 @@ classdef Assembly
       D = cell (1, n);
       for i = 1:n
         if (isempty (T{5}{i}))
-          D{i} = polymesh.Mesh (T{2}{i}, T{3}{i}, 'FaceColour', T{4}{i});
+          D{i} = polymesh.Mesh (T{2}{i}, T{3}{i});
+          D{i}.FaceColour = T{4}{i};
           continue;
         endif
         A = model.Assembly (T{1}{i});
@@ -660,8 +662,9 @@ classdef Assembly
             if (det (R) < 0)
               F = F(:,[1, 3, 2]);
             endif
-            X = polymesh.Mesh (X.Vertices * R + O, F, ...
-                               'FaceColour', X.FaceColour);
+            C = X.FaceColour;
+            X = polymesh.Mesh (X.Vertices * R + O, F);
+            X.FaceColour = C;
             used = {A.Parts.name};
             name = [name, ' (placed)'];
             m = 1;

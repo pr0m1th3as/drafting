@@ -119,6 +119,9 @@ function R = text (STR, varargin)
         opt.Height = val;
         fixed = true;
       case 'font'
+        if (isempty (val))
+          error ("geom.text: Font must not be empty.");
+        endif
         opt.Font = val;
       case 'style'
         opt.Style = val;
@@ -129,6 +132,9 @@ function R = text (STR, varargin)
       case 'ucs'
         opt.UCS = val;
       case 'box'
+        if (isempty (val))
+          error ("geom.text: Box must not be empty.");
+        endif
         opt.Box = val;
       otherwise
         error ("geom.text: unknown option '%s'.", name);
@@ -300,6 +306,8 @@ endfunction
 %!error<geom.text: Name/Value arguments must come in pairs.> ...
 %! geom.text ('A', 'Height')
 %!error<geom.text: unknown option 'Size'.> geom.text ('A', 'Size', 5)
+%!error<geom.text: Font must not be empty.> geom.text ('A', 'Font', '')
+%!error<geom.text: Box must not be empty.> geom.text ('A', 'Box', [])
 %!error<geom.text: option names must be character vectors.> geom.text ('A', 1, 5)
 %!test  # option names ignore case
 %! T1 = geom.text ('H', 'height', 5);
