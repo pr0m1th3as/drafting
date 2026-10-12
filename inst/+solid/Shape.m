@@ -2068,14 +2068,20 @@ classdef Shape
     ## its table 1 is, to the R 40 series of ISO 3 and then to a whole
     ## number.  M6 is turned to 5.974.  A blank of another diameter is turned
     ## in the design.  An axis that meets neither is an error naming the
-    ## thread and the point, and so is an internal thread deeper than its
-    ## bore.
+    ## thread and the point, and so is a thread that would cut beyond its
+    ## bore or cylinder: the bore must run on 0.03 pitches past the thread,
+    ## and a cylinder must reach as far before any shoulder.
     ##
     ## The profile is the basic profile of ISO 68-1, its 60 degree flanks
     ## swept round the axis by @code{solid.helix}: an internal thread's root
     ## is flat at the nominal diameter, an external thread's flat at
     ## @math{D_1}.  The thread is right-handed, and starts a pitch before the
     ## point so that it runs out of the surface clean.
+    ##
+    ## Open CASCADE fails to cut some threads, at depths no rule predicts.
+    ## Such a thread is cut again by a tool built another way, and kept only
+    ## when it removes the volume its groove holds inside the part; otherwise
+    ## it is an error naming the thread and the point.
     ##
     ## Name/Value pairs place the threads as for @code{solid.Shape.hole}:
     ##
@@ -2161,39 +2167,60 @@ classdef Shape
       [X, Y, Z] = ndgrid (B([1, 4]), B([2, 5]), B([3, 6]));
       C = [X(:), Y(:), Z(:)];
       tol = 1e-6;
-      tools = {};
-      for i = 1:rows (P)
+      n = rows (P);
+      specs = cell (1, n);
+      tools = cell (1, n);
+      for i = 1:n
         far = max ((C - P(i,:)) * v');
         L = max (min (DEPTH, far + p), p);
         [kind, r] = axisring (this, P(i,:), v, min (L / 2, p));
+        ## The space the cutter clears beside the profile, from a pitch
+        ## before the point to the groove's far corner, must hold no material
+        ## or the thread would cut beyond its bore or cylinder
+        len = L + p + p / 20 * tand (30);
         if (strcmp (kind, 'bore') && 2 * r >= D1 - tol && 2 * r < d - tol)
-          ## The cutter fills the bore, so the bore must reach the full depth
-          ## or the thread would drill it deeper
-          z = min (L, far) - min (min (L, far) / 2, p);
-          [kind, rend] = axisring (this, P(i,:), v, z);
-          if (! strcmp (kind, 'bore') || abs (rend - r) > tol)
-            error (strcat ("solid.Shape.thread: %s at (%s): the bore is", ...
-                           " shallower than the thread."), ...
-                   t.name, pointstr (P(i,:)));
-          endif
-          T = {cutter(p, r, d / 2, true, L)};
+          specs{i} = {p, r, d / 2, true, L};
+          K = solid.cylinder (r, len);
+          beyond = "the bore is shallower than the thread";
         elseif (strcmp (kind, 'rod') && 2 * r >= d0 - tol && 2 * r <= d + tol)
+          K = subtract (solid.cylinder (r + p / 10, len), ...
+                        solid.cylinder (r, len));
           if (2 * r > d - tol)
             r = t.major / 2;
           endif
-          T = {cutter(p, D1 / 2, r, false, L)};
+          specs{i} = {p, D1 / 2, r, false, L};
+          beyond = "the thread runs past the end of the cylinder";
         else
           error (strcat ("solid.Shape.thread: %s at (%s): the axis meets", ...
                          " neither a bore from %.3f up to %g nor a", ...
                          " cylinder from %.3f to %g."), t.name, ...
                  pointstr (P(i,:)), D1, d, d0, d);
         endif
-        T = aim (T, v);
-        for j = 1:numel (T)
-          tools{end+1} = translate (T{j}, P(i,:));
-        endfor
+        K = place (translate (K, [0, 0, -p]), v, P(i,:));
+        if (volume (intersect (this, K)) > 1e-6 * volume (K))
+          error ("solid.Shape.thread: %s at (%s): %s.", t.name, ...
+                 pointstr (P(i,:)), beyond);
+        endif
+        tools{i} = place (cutter (specs{i}{:}), v, P(i,:));
       endfor
-      this = subtract (this, tools{:});
+
+      ## Open CASCADE fails to cut some threads, returning the groove as a
+      ## solid of its own or raising an error, so on failure each thread is
+      ## cut on its own, and again another way where it fails
+      N = numsolids (this);
+      try
+        S = subtract (this, tools{:});
+        ok = numsolids (S) <= N;
+      catch
+        ok = false;
+      end_try_catch
+      if (ok)
+        this = S;
+      else
+        for i = 1:n
+          this = cutthread (this, tools{i}, specs{i}, v, P(i,:), t.name);
+        endfor
+      endif
 
     endfunction
 
@@ -3235,6 +3262,14 @@ function T = aim (T, V)
 
 endfunction
 
+## The tool T, made along the z axis, turned to run along V from the point P
+function T = place (T, V, P)
+
+  T = aim ({T}, V);
+  T = translate (T{1}, P);
+
+endfunction
+
 ## The smallest circle about the axis at P along V in the section of S a
 ## distance Z along it: KIND is 'bore' when it bounds a hole of the section,
 ## 'rod' when it is the outline of the material round the axis, and empty,
@@ -3286,6 +3321,38 @@ function s = pointstr (P)
 
 endfunction
 
+## The thread of the spec SPEC, the arguments of cutter, cut from S along V
+## from the point P by the tool T, or, where Open CASCADE fails on it, by
+## the tool with the shorter core, kept only when it removes what the groove
+## alone and the core or sleeve alone remove; NAME names the thread
+function S = cutthread (S, T, SPEC, V, P, NAME)
+
+  N = numsolids (S);
+  try
+    C = subtract (S, T);
+    if (numsolids (C) <= N)
+      S = C;
+      return;
+    endif
+  end_try_catch
+  want = volume (intersect (S, place (cutter (SPEC{:}, 'groove'), V, P))) ...
+         + volume (intersect (S, place (cutter (SPEC{:}, 'body'), V, P)));
+  try
+    C = subtract (S, place (cutter (SPEC{:}, 'short'), V, P));
+    ok = (numsolids (C) <= N
+          && abs (volume (S) - volume (C) - want) <= 1e-3 * want);
+  catch
+    ok = false;
+  end_try_catch
+  if (! ok)
+    error (strcat ("solid.Shape.thread: %s at (%s): Open CASCADE could", ...
+                   " not cut the thread; a slightly different DEPTH may", ...
+                   " cut."), NAME, pointstr (P));
+  endif
+  S = C;
+
+endfunction
+
 ## The cutter of a thread of pitch P, along the z axis from a pitch before
 ## the origin until the thread's full profile reaches L: the groove of the
 ## basic profile swept round the axis, fused with the cylinder of the bore
@@ -3293,29 +3360,48 @@ endfunction
 ## the fused tool reliably where it can fail on the bare groove.  For an
 ## INTERNAL thread the bore has the radius INNER and the root, flat P/8
 ## wide, lies at OUTER; for an external one the root, flat P/4 wide, lies at
-## INNER and the crest at OUTER.
-function G = cutter (P, INNER, OUTER, INTERNAL, L)
+## INNER and the crest at OUTER.  KIND 'short' ends the cylinder or sleeve
+## half a pitch sooner, 'groove' gives the groove alone clear of them, and
+## 'body' the cylinder or sleeve alone.
+function G = cutter (P, INNER, OUTER, INTERNAL, L, KIND = 'tool')
 
   c = tand (30);
   e = P / 20;
+  len = L + P / (1 + strcmp (KIND, 'short'));
   if (INTERNAL)
     r = INNER - e;
     w = P / 8 + 2 * (OUTER - r) * c;
     Q = [r, -w/2; OUTER, -P/16; OUTER, P/16; r, w/2];
-    B = solid.cylinder (INNER, L + P);
+    B = solid.cylinder (INNER, len);
   else
     r = OUTER + e;
     w = P / 4 + 2 * (r - INNER) * c;
     Q = [INNER, -P/8; r, -w/2; r, w/2; INNER, P/8];
-    B = subtract (solid.cylinder (OUTER + 2 * e, L + P), ...
-                  solid.cylinder (OUTER, L + P));
+    B = subtract (solid.cylinder (OUTER + 2 * e, len), ...
+                  solid.cylinder (OUTER, len));
+  endif
+  if (strcmp (KIND, 'body'))
+    G = translate (B, [0, 0, -P]);
+    return;
   endif
   ## The groove ends where its width at the bore or the crest reaches L
   w = P / 8 * (1 + ! INTERNAL) + 2 * (OUTER - INNER) * c;
   R = geom.Region (Q);
   R.UCS = geom.UCS ([0, -1, 0], [0, 0, 0]);
-  G = translate (union (solid.helix (R, P, (L + P - w / 2) / P), B), ...
-                 [0, 0, -P]);
+  G = solid.helix (R, P, (L + P - w / 2) / P);
+  if (strcmp (KIND, 'groove'))
+    ## The cylinder that bounds the groove runs a pitch clear of both its ends
+    if (INTERNAL)
+      G = subtract (G, translate (solid.cylinder (INNER, L + 3 * P), ...
+                                  [0, 0, -P]));
+    else
+      G = intersect (G, translate (solid.cylinder (OUTER, L + 3 * P), ...
+                                   [0, 0, -P]));
+    endif
+  else
+    G = union (G, B);
+  endif
+  G = translate (G, [0, 0, -P]);
 
 endfunction
 
@@ -3901,6 +3987,12 @@ endfunction
 %! S = hole (solid.box (20, 20, 20), [10, 10, 20], 'M6', 15);
 %! G = subtract (S, thread (S, [10, 10, 20], 'M6', 12));
 %! assert_equal (bbox (G), [7, 7, 8, 13, 13, 20], 1e-3);
+
+%!test  # a depth whose cut Open CASCADE fails is cut whole
+%! S = hole (solid.box (30, 30, 40), [15, 15, 40], 'M6', 32);
+%! T = thread (S, [15, 15, 40], 'M6', 11.5);
+%! assert_equal (numsolids (T), 1);
+%! assert_equal (volume (S) - volume (T), 39.002033, -1e-5);
 
 %!test  # an external thread on a rod below nominal is cut as turned
 %! S = solid.cylinder (4.95, 20);
@@ -4784,6 +4876,15 @@ endfunction
 %!error<solid.Shape.thread: M6 at \(10, 10, 20\): the bore is shallower than the thread.> ...
 %! thread (hole (solid.box (20, 20, 20), [10, 10, 20], 'M6', 8), ...
 %!         [10, 10, 20], 'M6', 12)
+%!error<solid.Shape.thread: M6 at \(10, 10, 20\): the bore is shallower than the thread.> ...
+%! thread (hole (solid.box (20, 20, 20), [10, 10, 20], 'M6', 12), ...
+%!         [10, 10, 20], 'M6', 12)
+%!error<solid.Shape.thread: M6 at \(10, 10, 20\): the bore is shallower than the thread.> ...
+%! thread (hole (solid.box (20, 20, 20), [10, 10, 20], 'M6', 19.5), ...
+%!         [10, 10, 20], 'M6', Inf)
+%!error<solid.Shape.thread: M10 at \(0, 0, 40\): the thread runs past the end of the cylinder.> ...
+%! thread (union (solid.cylinder (5, 40), solid.cylinder (8, 20)), ...
+%!         [0, 0, 40], 'M10', 25)
 %!error<solid.Shape.pocket: invalid number of input arguments.> ...
 %! pocket (solid.Shape (), geom.Region ([0, 0; 1, 0; 1, 1]))
 %!error<solid.Shape.pocket: R must be a geom.Region object.> ...
