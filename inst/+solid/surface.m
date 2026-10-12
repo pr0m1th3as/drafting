@@ -81,7 +81,7 @@ function S = surface (X, Y, Z, H)
     error (strcat ("solid.surface: X, Y and Z must be real finite", ...
                    " matrices of one size, at least 2 by 2."));
   endif
-  if (! isnumeric (H) || ! isreal (H) || ! isvector (H) || numel (H) > 2
+  if (! isfloat (H) || ! isreal (H) || ! isvector (H) || numel (H) > 2
       || ! all (isfinite (H)) || any (H == 0)
       || (numel (H) == 2 && any (H < 0)))
     error (strcat ("solid.surface: H must be a nonzero finite real", ...
@@ -115,7 +115,7 @@ endfunction
 ## Whether A can hold one coordinate of a grid
 function TF = isgrid (A)
 
-  TF = isnumeric (A) && isreal (A) && ismatrix (A) && all (isfinite (A(:)));
+  TF = isfloat (A) && isreal (A) && ismatrix (A) && all (isfinite (A(:)));
 
 endfunction
 

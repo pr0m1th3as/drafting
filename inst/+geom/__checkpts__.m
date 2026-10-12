@@ -25,8 +25,8 @@ function [errmsg, P] = __checkpts__ (P)
 
   errmsg = '';
 
-  if (! isnumeric (P) || ! isreal (P))
-    errmsg = "P must be a real numeric matrix.";
+  if (! isfloat (P) || ! isreal (P))
+    errmsg = "P must be a real floating-point matrix.";
     return;
   endif
   if (ndims (P) != 2 || columns (P) != 2)
@@ -55,11 +55,11 @@ endfunction
 
 %!test
 %! errmsg = geom.__checkpts__ ('abc');
-%! assert_equal (errmsg, "P must be a real numeric matrix.");
+%! assert_equal (errmsg, "P must be a real floating-point matrix.");
 
 %!test
 %! errmsg = geom.__checkpts__ ([1, 2] + 1i);
-%! assert_equal (errmsg, "P must be a real numeric matrix.");
+%! assert_equal (errmsg, "P must be a real floating-point matrix.");
 
 %!test
 %! errmsg = geom.__checkpts__ ([1, 2, 3]);

@@ -135,7 +135,7 @@ function R = text (STR, varargin)
     endswitch
   endfor
   H = opt.Height;
-  if (! isnumeric (H) || ! isreal (H) || ! isscalar (H) || ! isfinite (H)
+  if (! isfloat (H) || ! isreal (H) || ! isscalar (H) || ! isfinite (H)
       || ! (H > 0))
     error ("geom.text: Height must be a positive and finite real scalar.");
   endif
@@ -161,7 +161,7 @@ function R = text (STR, varargin)
     error ("geom.text: UCS must be a geom.UCS object.");
   endif
   box = opt.Box;
-  if (! isempty (box) && (! isnumeric (box) || ! isreal (box)
+  if (! isempty (box) && (! isfloat (box) || ! isreal (box)
                           || numel (box) != 2 || ! all (isfinite (box))
                           || any (box < 0) || all (box == 0)))
     error (strcat ("geom.text: Box must be two non-negative finite sizes,", ...

@@ -310,7 +310,7 @@ classdef UCS
       if (nargin != 2)
         error ("geom.UCS.toworld: invalid number of input arguments.");
       endif
-      if (! isnumeric (P) || ! isreal (P) || ! ismatrix (P)
+      if (! isfloat (P) || ! isreal (P) || ! ismatrix (P)
           || ! any (columns (P) == [2, 3]) || ! all (isfinite (P(:))))
         error (strcat ("geom.UCS.toworld: P must be an N-by-2 or N-by-3", ...
                        " real matrix of finite values."));
@@ -342,7 +342,7 @@ classdef UCS
       if (nargin != 2)
         error ("geom.UCS.tolocal: invalid number of input arguments.");
       endif
-      if (! isnumeric (W) || ! isreal (W) || ! ismatrix (W)
+      if (! isfloat (W) || ! isreal (W) || ! ismatrix (W)
           || columns (W) != 3 || ! all (isfinite (W(:))))
         error (strcat ("geom.UCS.tolocal: W must be an N-by-3 real", ...
                        " matrix of finite values."));
@@ -359,7 +359,7 @@ endclassdef
 ## True for a real 3-element vector of finite values
 function TF = isvec3 (V)
 
-  TF = isnumeric (V) && isreal (V) && isvector (V) && numel (V) == 3 ...
+  TF = isfloat (V) && isreal (V) && isvector (V) && numel (V) == 3 ...
        && all (isfinite (V));
 
 endfunction

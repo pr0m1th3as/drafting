@@ -110,8 +110,8 @@ function [Q, S] = resample (P, varargin)
   if (rows (P) < 2)
     error ("geom.resample: P must contain at least two points.");
   endif
-  if (! isnumeric (val) || ! isreal (val) || ! isscalar (val)
-      || ! isfinite (val) || val <= 0)
+  if (! (isfloat (val) || (! bySpacing && isnumeric (val)))
+      || ! isreal (val) || ! isscalar (val) || ! isfinite (val) || val <= 0)
     if (bySpacing)
       error ("geom.resample: D must be a positive real finite scalar.");
     else
@@ -189,6 +189,10 @@ endfunction
 %! D = D.polyline (geom.Polyline (geom.resample (P, 6)));
 %! plot (D);
 %! title ('the corner is cut when the samples straddle it');
+
+%!test  # N is a count, so it may be an integer
+%! P = geom.resample ([0, 0; 10, 0], int8 (5));
+%! assert_equal (P(:,1)', 0:2.5:10, 1e-12);
 
 %!test  # N points along a straight line are evenly spaced
 %! Q = geom.resample ([0, 0; 10, 0], 5);
@@ -269,7 +273,7 @@ endfunction
 %! geom.resample ([0, 0; 1, 0], 'every', 2)
 %!error<geom.resample: P must contain at least two points.> ...
 %! geom.resample ([3, 4], 5)
-%!error<geom.resample: P must be a real numeric matrix.> ...
+%!error<geom.resample: P must be a real floating-point matrix.> ...
 %! geom.resample ({1, 2}, 5)
 %!error<geom.resample: P must be an N-by-2 matrix of point coordinates.> ...
 %! geom.resample (ones (3, 3), 5)

@@ -101,7 +101,7 @@ endfunction
 %! assert_equal (geom.signedarea ([0, 0; 1, 0; 2, 0]), 0);
 
 %!error<geom.signedarea: invalid number of input arguments.> geom.signedarea ()
-%!error<geom.signedarea: P must be a real numeric matrix.> geom.signedarea ('a')
+%!error<geom.signedarea: P must be a real floating-point matrix.> geom.signedarea ('a')
 %!error<geom.signedarea: P must be an N-by-2 matrix of point coordinates.> ...
 %! geom.signedarea ([1, 2, 3])
 %!error<geom.signedarea: P must not contain NaN or Inf values.> ...

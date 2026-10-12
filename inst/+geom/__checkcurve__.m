@@ -65,7 +65,7 @@ endfunction
 
 %!test
 %! errmsg = geom.__checkcurve__ ('abc', false);
-%! assert_equal (errmsg, "P must be a real numeric matrix.");
+%! assert_equal (errmsg, "P must be a real floating-point matrix.");
 
 %!test
 %! errmsg = geom.__checkcurve__ ([0, 0; 1, 0; NaN, 1], false);

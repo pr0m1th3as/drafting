@@ -157,7 +157,7 @@ classdef Polyline
       if (nargin < 1)
         error ("geom.Polyline: invalid number of input arguments.");
       endif
-      if (! isnumeric (P) || ! isreal (P) || ! ismatrix (P)
+      if (! isfloat (P) || ! isreal (P) || ! ismatrix (P)
           || ! any (columns (P) == [2, 3]) || rows (P) < 2
           || ! all (isfinite (P(:))))
         error (strcat ("geom.Polyline: P must be an N-by-2 or N-by-3 real", ...
@@ -255,7 +255,7 @@ classdef Polyline
       if (nargin < 2)
         error ("geom.Polyline.fillet: invalid number of input arguments.");
       endif
-      if (! isnumeric (RADIUS) || ! isreal (RADIUS) || ! isscalar (RADIUS)
+      if (! isfloat (RADIUS) || ! isreal (RADIUS) || ! isscalar (RADIUS)
           || ! isfinite (RADIUS) || ! (RADIUS > 0))
         error (strcat ("geom.Polyline.fillet: RADIUS must be a positive", ...
                        " and finite real scalar."));
@@ -327,7 +327,7 @@ classdef Polyline
       if (nargin < 2)
         error ("geom.Polyline.chamfer: invalid number of input arguments.");
       endif
-      if (! isnumeric (D) || ! isreal (D) || ! isvector (D)
+      if (! isfloat (D) || ! isreal (D) || ! isvector (D)
           || numel (D) > 2 || ! all (isfinite (D)) || ! all (D > 0))
         error (strcat ("geom.Polyline.chamfer: D must be one positive", ...
                        " finite distance, or two."));
@@ -348,7 +348,7 @@ classdef Polyline
         switch (lower (name))
           case 'angle'
             A = val;
-            if (! isnumeric (A) || ! isreal (A) || ! isscalar (A)
+            if (! isfloat (A) || ! isreal (A) || ! isscalar (A)
                 || ! (A > 0) || ! (A < 180))
               error (strcat ("geom.Polyline.chamfer: Angle must be in the", ...
                              " range (0, 180) degrees."));
@@ -651,6 +651,8 @@ endfunction
 %!error<geom.Polyline: invalid number of input arguments.> geom.Polyline ()
 %!error<geom.Polyline: P must be an N-by-2 or N-by-3 real matrix of finite values with at least two rows.> ...
 %! geom.Polyline ([0, 0])
+%!error<geom.Polyline: P must be an N-by-2 or N-by-3 real matrix of finite values with at least two rows.> ...
+%! geom.Polyline (int32 ([0, 0; 1, 0]))
 %!error<geom.Polyline: P must be an N-by-2 or N-by-3 real matrix of finite values with at least two rows.> ...
 %! geom.Polyline ([0, 0, 0, 0; 1, 0, 0, 0])
 %!error<geom.Polyline: P must be an N-by-2 or N-by-3 real matrix of finite values with at least two rows.> ...

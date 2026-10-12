@@ -93,9 +93,6 @@ endfunction
 %! assert_equal (numfaces (S), 6);
 %! assert_equal (isvalid (S), true);
 
-%!test  # integer-valued input
-%! assert_equal (volume (solid.box (int16 (2), 3, 4)), 24, 1e-9);
-
 %!test  # in a UCS turned onto the yz plane
 %! U = geom.UCS ([1, 0, 0], [5, 0, 0], [5, 1, 0]);
 %! S = solid.box (10, 20, 30, U);
@@ -121,6 +118,8 @@ endfunction
 %! solid.box (1, 2, 3, geom.UCS (), 'Anchor', 'base', 4)
 %!error<solid.box: DX must be a positive and finite real scalar.> ...
 %! solid.box (0, 2, 3)
+%!error<solid.box: DX must be a positive and finite real scalar.> ...
+%! solid.box (int8 (10), 2.5, 3)
 %!error<solid.box: DY must be a positive and finite real scalar.> ...
 %! solid.box (1, -2, 3)
 %!error<solid.box: DZ must be a positive and finite real scalar.> ...

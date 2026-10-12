@@ -980,7 +980,7 @@ classdef Viewer < handle
       if (nargin != 3)
         error ("model.Viewer.opacity: invalid number of input arguments.");
       endif
-      if (! isnumeric (A) || ! isreal (A) || ! isscalar (A)
+      if (! isfloat (A) || ! isreal (A) || ! isscalar (A)
           || ! (A >= 0 && A <= 1))
         error ("model.Viewer.opacity: A must be a real scalar from 0 to 1.");
       endif
@@ -1113,18 +1113,18 @@ classdef Viewer < handle
         endif
         AZ = varargin{1};
         EL = varargin{2};
-        if (! isnumeric (AZ) || ! isreal (AZ) || ! isscalar (AZ)
+        if (! isfloat (AZ) || ! isreal (AZ) || ! isscalar (AZ)
             || ! isfinite (AZ))
           error ("model.Viewer.view: AZ must be a finite real scalar.");
         endif
-        if (! isnumeric (EL) || ! isreal (EL) || ! isscalar (EL)
+        if (! isfloat (EL) || ! isreal (EL) || ! isscalar (EL)
             || ! (EL >= -90 && EL <= 90))
           error (strcat ("model.Viewer.view: EL must be a real scalar in", ...
                          " the range [-90, 90] degrees."));
         endif
         if (numel (varargin) > 2)
           ZOOM = varargin{3};
-          if (! isnumeric (ZOOM) || ! isreal (ZOOM) || ! isscalar (ZOOM)
+          if (! isfloat (ZOOM) || ! isreal (ZOOM) || ! isscalar (ZOOM)
               || ! isfinite (ZOOM) || ! (ZOOM > 0))
             error (strcat ("model.Viewer.view: ZOOM must be a positive and", ...
                            " finite real scalar."));
@@ -1132,7 +1132,7 @@ classdef Viewer < handle
         endif
         if (numel (varargin) > 3)
           TARGET = varargin{4};
-          if (! isnumeric (TARGET) || ! isreal (TARGET) || numel (TARGET) != 3
+          if (! isfloat (TARGET) || ! isreal (TARGET) || numel (TARGET) != 3
               || ! isvector (TARGET) || ! all (isfinite (TARGET)))
             error (strcat ("model.Viewer.view: TARGET must be a real", ...
                            " 3-element vector of finite values."));

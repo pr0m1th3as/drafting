@@ -71,7 +71,7 @@ function Q = offset (P, D)
   if (! isempty (errmsg))
     error ("geom.offset: %s", errmsg);
   endif
-  if (! isnumeric (D) || ! isreal (D) || ! isscalar (D) || ! isfinite (D))
+  if (! isfloat (D) || ! isreal (D) || ! isscalar (D) || ! isfinite (D))
     error ("geom.offset: D must be a real finite scalar.");
   endif
   if (! geom.isrectilinear (P))
@@ -232,6 +232,8 @@ endfunction
 %! geom.offset ([0, 0; 1, 0; 1, 1])
 %!error<geom.offset: P must be a polygon with at least 3 vertices.> ...
 %! geom.offset ([0, 0; 1, 1], 1)
+%!error<geom.offset: P must be a real floating-point matrix.> ...
+%! geom.offset (int8 ([0, 0; 10, 0; 10, 10]), 1)
 %!error<geom.offset: D must be a real finite scalar.> ...
 %! geom.offset ([0, 0; 1, 0; 1, 1; 0, 1], [1, 2])
 %!error<geom.offset: D must be a real finite scalar.> ...
@@ -246,7 +248,7 @@ endfunction
 %! geom.offset ([0, 0; 10, 0; 10, 10; 0, 10], 8)
 %!error<geom.offset: D is too large for P; the offset outline would be degenerate.> ...
 %! geom.offset ([0, 0; 20, 0; 20, 8; 8, 8; 8, 20; 0, 20], 4)
-%!error<geom.offset: P must be a real numeric matrix.> ...
+%!error<geom.offset: P must be a real floating-point matrix.> ...
 %! geom.offset ({1, 2}, 1)
 %!error<geom.offset: P must be an N-by-2 matrix of point coordinates.> ...
 %! geom.offset (ones (3, 3), 1)

@@ -197,7 +197,7 @@ classdef Mesh
       if (isempty (F))
         F = zeros (0, 3);
       endif
-      if (! isnumeric (V) || ! isreal (V) || ! ismatrix (V) ||
+      if (! isfloat (V) || ! isreal (V) || ! ismatrix (V) ||
           columns (V) != 3 || ! all (isfinite (V(:))))
         error (strcat ("polymesh.Mesh: V must be an N-by-3 matrix of", ...
                        " finite real values."));
@@ -304,7 +304,7 @@ classdef Mesh
         switch (lower (name))
           case 'tolerance'
             T = val;
-            if (! isnumeric (T) || ! isreal (T) || ! isscalar (T)
+            if (! isfloat (T) || ! isreal (T) || ! isscalar (T)
                 || ! isfinite (T) || T < 0)
               error (strcat ("polymesh.Mesh.section: Tolerance must be a", ...
                              " non-negative finite real scalar."));
@@ -517,7 +517,7 @@ classdef Mesh
       if (nargin < 3 || nargin > 4)
         error ("polymesh.Mesh.rotate: invalid number of input arguments.");
       endif
-      if (! isnumeric (ANGLE) || ! isreal (ANGLE) || ! isscalar (ANGLE) ||
+      if (! isfloat (ANGLE) || ! isreal (ANGLE) || ! isscalar (ANGLE) ||
           ! isfinite (ANGLE))
         error ("polymesh.Mesh.rotate: ANGLE must be a finite real scalar.");
       endif
@@ -591,7 +591,7 @@ classdef Mesh
       if (nargin < 2 || nargin > 3)
         error ("polymesh.Mesh.scale: invalid number of input arguments.");
       endif
-      if (! isnumeric (F) || ! isreal (F) || ! isscalar (F) ||
+      if (! isfloat (F) || ! isreal (F) || ! isscalar (F) ||
           ! isfinite (F) || F <= 0)
         error (strcat ("polymesh.Mesh.scale: F must be a positive and", ...
                        " finite real scalar."));
@@ -783,7 +783,7 @@ endfunction
 function errmsg = checkvec (V, name, nonzero = false)
 
   errmsg = '';
-  if (! isnumeric (V) || ! isreal (V) || numel (V) != 3 ||
+  if (! isfloat (V) || ! isreal (V) || numel (V) != 3 ||
       ! isvector (V) || ! all (isfinite (V)))
     errmsg = sprintf (strcat ("%s must be a real 3-element vector of", ...
                               " finite values."), name);
@@ -1186,6 +1186,8 @@ endfunction
 %! polymesh.Mesh (struct ('vertices', zeros (0, 3)))
 %!error<polymesh.Mesh: V must be an N-by-3 matrix of finite real values.> ...
 %! polymesh.Mesh ([0, 0; 1, 0; 0, 1], [1, 2, 3])
+%!error<polymesh.Mesh: V must be an N-by-3 matrix of finite real values.> ...
+%! polymesh.Mesh (int32 ([0, 0, 0; 1, 0, 0; 0, 1, 0]), [1, 2, 3])
 %!error<polymesh.Mesh: V must be an N-by-3 matrix of finite real values.> ...
 %! polymesh.Mesh ([0, 0, 0; 1, 0, 0; 0, NaN, 0], [1, 2, 3])
 %!error<polymesh.Mesh: F must be a K-by-3 matrix of indices into the rows of V.> ...

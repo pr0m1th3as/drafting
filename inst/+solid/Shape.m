@@ -721,7 +721,7 @@ classdef Shape
       if (nargin < 3 || nargin > 4)
         error ("solid.Shape.rotate: invalid number of input arguments.");
       endif
-      if (! isnumeric (ANGLE) || ! isreal (ANGLE) || ! isscalar (ANGLE)
+      if (! isfloat (ANGLE) || ! isreal (ANGLE) || ! isscalar (ANGLE)
           || ! isfinite (ANGLE))
         error ("solid.Shape.rotate: ANGLE must be a finite real scalar.");
       endif
@@ -1560,12 +1560,12 @@ classdef Shape
         error ("solid.Shape.chamfer: %s", errmsg);
       endif
       A = opt.Angle;
-      if (! isempty (A) && (! isnumeric (A) || ! isreal (A)
+      if (! isempty (A) && (! isfloat (A) || ! isreal (A)
                             || ! isscalar (A) || ! (A > 0) || ! (A < 90)))
         error (strcat ("solid.Shape.chamfer: Angle must be in the range", ...
                        " (0, 90) degrees."));
       endif
-      if (! isnumeric (D) || ! isreal (D) || ! isvector (D)
+      if (! isfloat (D) || ! isreal (D) || ! isvector (D)
           || numel (D) > 2 || ! all (isfinite (D)) || ! all (D > 0))
         error (strcat ("solid.Shape.chamfer: D must be one positive finite", ...
                        " distance, or two with a face F."));
@@ -1972,12 +1972,12 @@ classdef Shape
                        " real scalar or the name of an ISO metric thread", ...
                        " such as 'M6' or 'M10x1.25'."));
       endif
-      if (! isnumeric (DEPTH) || ! isreal (DEPTH) || ! isscalar (DEPTH)
+      if (! isfloat (DEPTH) || ! isreal (DEPTH) || ! isscalar (DEPTH)
           || ! (DEPTH > 0))
         error (strcat ("solid.Shape.hole: DEPTH must be positive, or Inf", ...
                        " for a through hole."));
       endif
-      if (! isempty (cb) && (! isnumeric (cb) || ! isreal (cb)
+      if (! isempty (cb) && (! isfloat (cb) || ! isreal (cb)
                              || numel (cb) != 2 || ! all (isfinite (cb))
                              || ! (cb(1) > D) || ! (cb(2) > 0)
                              || ! (cb(2) < DEPTH)))
@@ -1992,7 +1992,7 @@ classdef Shape
         if (isnumeric (cs) && numel (cs) == 2)
           cs(3) = 0;
         endif
-        if (! isnumeric (cs) || ! isreal (cs) || numel (cs) != 3
+        if (! isfloat (cs) || ! isreal (cs) || numel (cs) != 3
             || ! all (isfinite (cs)) || ! (cs(1) > D) || ! (cs(2) > 0)
             || ! (cs(2) < 180) || ! (cs(3) >= 0)
             || ! (cs(3) + (cs(1) - D) / 2 / tand (cs(2) / 2) < DEPTH))
@@ -2013,7 +2013,7 @@ classdef Shape
       if (islogical (tip) && isscalar (tip) && ! tip)
         tip = [];
       elseif (! isempty (tip))
-        if (! isnumeric (tip) || ! isreal (tip) || ! isscalar (tip)
+        if (! isfloat (tip) || ! isreal (tip) || ! isscalar (tip)
             || ! (tip > 0) || ! (tip < 180))
           error (strcat ("solid.Shape.hole: Tip must be false or an angle", ...
                          " in the range (0, 180)."));
@@ -2231,7 +2231,7 @@ classdef Shape
       else
         t = solid.threadspec (NAME, 'Custom', opt.Custom);
       endif
-      if (! isnumeric (DEPTH) || ! isreal (DEPTH) || ! isscalar (DEPTH)
+      if (! isfloat (DEPTH) || ! isreal (DEPTH) || ! isscalar (DEPTH)
           || ! (DEPTH > 0))
         error (strcat ("solid.Shape.thread: DEPTH must be positive, or Inf", ...
                        " to thread right through."));
@@ -2385,13 +2385,13 @@ classdef Shape
       if (! isa (R, 'geom.Region') || ! isscalar (R))
         error ("solid.Shape.pocket: R must be a geom.Region object.");
       endif
-      if (! isnumeric (DEPTH) || ! isreal (DEPTH) || ! isscalar (DEPTH)
+      if (! isfloat (DEPTH) || ! isreal (DEPTH) || ! isscalar (DEPTH)
           || ! (DEPTH > 0))
         error (strcat ("solid.Shape.pocket: DEPTH must be positive, or Inf", ...
                        " for a pocket right through."));
       endif
       [errmsg, opt] = options (varargin, struct ('Taper', 0));
-      if (isempty (errmsg) && (! isnumeric (opt.Taper)
+      if (isempty (errmsg) && (! isfloat (opt.Taper)
                                || ! isreal (opt.Taper)
                                || ! isscalar (opt.Taper)
                                || ! (abs (opt.Taper) < 90)))
@@ -2633,7 +2633,7 @@ classdef Shape
       endfor
       isshape = cellfun (@(x) isa (x, 'solid.Shape') && isscalar (x), ...
                          varargin);
-      ispoints = cellfun (@(x) isnumeric (x) && isreal (x) && ismatrix (x) ...
+      ispoints = cellfun (@(x) isfloat (x) && isreal (x) && ismatrix (x) ...
                                && columns (x) == 3 && all (isfinite (x(:))), ...
                           varargin);
       if (! all (isshape | ispoints))
@@ -2708,7 +2708,7 @@ classdef Shape
       if (nargin != 2 && nargin != 4)
         error ("solid.Shape.resize: invalid number of input arguments.");
       endif
-      if (! isnumeric (SZ) || ! isreal (SZ) || numel (SZ) != 3
+      if (! isfloat (SZ) || ! isreal (SZ) || numel (SZ) != 3
           || ! all (isfinite (SZ)) || any (SZ < 0) || ! any (SZ > 0))
         error (strcat ("solid.Shape.resize: SZ must be a 3-element vector", ...
                        " of nonnegative finite sizes, not all zero."));
@@ -2772,7 +2772,7 @@ classdef Shape
       if (nargin != 2)
         error ("solid.Shape.copy: invalid number of input arguments.");
       endif
-      if (! isnumeric (D) || ! isreal (D) || ! ismatrix (D)
+      if (! isfloat (D) || ! isreal (D) || ! ismatrix (D)
           || columns (D) != 3 || rows (D) < 1 || ! all (isfinite (D(:))))
         error (strcat ("solid.Shape.copy: D must be an N-by-3 real matrix", ...
                        " of finite offsets."));
@@ -3195,7 +3195,7 @@ endfunction
 function errmsg = checkvec (V, name, nonzero = false)
 
   errmsg = '';
-  if (! isnumeric (V) || ! isreal (V) || numel (V) != 3
+  if (! isfloat (V) || ! isreal (V) || numel (V) != 3
       || ! isvector (V) || ! all (isfinite (V)))
     errmsg = sprintf (strcat ("%s must be a real 3-element vector of", ...
                               " finite values."), name);
@@ -3240,7 +3240,7 @@ function [errmsg, TOL] = reltol (ARGS)
 
   [errmsg, opt] = options (ARGS, struct ('RelTol', 1e-9));
   TOL = opt.RelTol;
-  if (isempty (errmsg) && (! isnumeric (TOL) || ! isreal (TOL)
+  if (isempty (errmsg) && (! isfloat (TOL) || ! isreal (TOL)
                            || ! isscalar (TOL) || ! (TOL > 0)
                            || ! (TOL <= 1e-3)))
     errmsg = "RelTol must be a positive real scalar no larger than 1e-3.";
@@ -3274,7 +3274,7 @@ endfunction
 function errmsg = checkbox (W)
 
   errmsg = '';
-  if (! isempty (W) && (! isnumeric (W) || ! isreal (W) || numel (W) != 6
+  if (! isempty (W) && (! isfloat (W) || ! isreal (W) || numel (W) != 6
                         || ! isvector (W) || any (isnan (W))
                         || any (W(1:3) > W(4:6))))
     errmsg = strcat ("Within must be a box [xmin, ymin, zmin, xmax,", ...
@@ -3328,7 +3328,7 @@ function [errmsg, P, DIR] = placement (P, DIR, AT)
     endif
     if (isempty (AT))
       AT = [0, 0];
-    elseif (! isnumeric (AT) || ! isreal (AT) || ! ismatrix (AT)
+    elseif (! isfloat (AT) || ! isreal (AT) || ! ismatrix (AT)
             || columns (AT) != 2 || rows (AT) < 1 || ! all (isfinite (AT(:))))
       errmsg = "At must be an N-by-2 real matrix of finite values.";
       return;
@@ -3336,7 +3336,7 @@ function [errmsg, P, DIR] = placement (P, DIR, AT)
     DIR = -P.Normal;
     P = toworld (P, double (AT));
   else
-    if (! isnumeric (P) || ! isreal (P) || ! ismatrix (P)
+    if (! isfloat (P) || ! isreal (P) || ! ismatrix (P)
         || columns (P) != 3 || rows (P) < 1 || ! all (isfinite (P(:))))
       errmsg = strcat ("P must be an M-by-3 real matrix of finite values", ...
                        " or a geom.UCS.");
@@ -3897,6 +3897,11 @@ endfunction
 %! assert_equal (volume (S), 6000 - 4 * (4 - pi) * 30, 1e-9);
 %! assert_equal (numfaces (S), 10);
 %! assert_equal (isvalid (S), true);
+
+%!test  # edge indices may be integers, as indices are in Octave
+%! B = solid.box (10, 20, 30);
+%! S = fillet (B, int32 (edges (B, 'Direction', [0, 0, 1])), 2);
+%! assert_equal (volume (S), 6000 - 4 * (4 - pi) * 30, 1e-9);
 
 %!test  # a rounded end of a cylinder
 %! C = solid.cylinder (4, 12);
@@ -4910,6 +4915,8 @@ endfunction
 %!error<solid.Shape.translate: invalid number of input arguments.> ...
 %! translate (solid.Shape ())
 %!error<solid.Shape.translate: V must be a real 3-element vector of finite values.> ...
+%! translate (solid.box (1, 1, 1), int8 ([1, 0, 0]))
+%!error<solid.Shape.translate: V must be a real 3-element vector of finite values.> ...
 %! translate (solid.Shape (), [1, 2])
 %!error<solid.Shape.translate: V must be a real 3-element vector of finite values.> ...
 %! translate (solid.Shape (), [1, NaN, 2])
@@ -4958,6 +4965,8 @@ endfunction
 %! edges (solid.Shape (), 'Type', 'arc')
 %!error<solid.Shape.edges: Type must name a kind of curve: line, circle, ellipse, bspline, other.> ...
 %! edges (solid.Shape (), 'Type', {'line', 1})
+%!error<solid.Shape.edges: Direction must be a real 3-element vector of finite values.> ...
+%! edges (solid.box (2, 2, 2), 'Direction', int8 ([0, 0, 1]))
 %!error<solid.Shape.edges: Direction must not be the zero vector.> ...
 %! edges (solid.Shape (), 'Direction', [0, 0, 0])
 %!error<solid.Shape.edges: Within must be a box \[xmin, ymin, zmin, xmax, ymax, zmax\] with each minimum no greater than its maximum.> ...
@@ -5077,6 +5086,9 @@ endfunction
 %! hole (solid.Shape (), [0, 0, 0], 5, 1, 'Depth', 2)
 %!error<solid.Shape.hole: option names must be character vectors.> ...
 %! hole (solid.Shape (), [0, 0, 0], 5, 1, 1, 2)
+%!error<solid.Shape.hole: Direction must be a real 3-element vector of finite values.> ...
+%! hole (solid.box (20, 20, 10), [10, 10, 10], 5, Inf, ...
+%!       'Direction', int8 ([0, 0, -1]))
 %!error<solid.Shape.hole: Direction must not be the zero vector.> ...
 %! hole (solid.Shape (), [0, 0, 0], 5, 1, 'Direction', [0, 0, 0])
 %!error<solid.Shape.hole: Counterbore must be \[CD, CDEPTH\], wider than D and shallower than DEPTH.> ...

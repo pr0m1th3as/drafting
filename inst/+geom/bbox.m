@@ -102,7 +102,7 @@ endfunction
 %! assert_equal (geom.bbox (P), [0, 0, 4, 4]);
 
 %!error<geom.bbox: invalid number of input arguments.> geom.bbox ()
-%!error<geom.bbox: P must be a real numeric matrix.> geom.bbox ({1, 2})
+%!error<geom.bbox: P must be a real floating-point matrix.> geom.bbox ({1, 2})
 %!error<geom.bbox: P must be an N-by-2 matrix of point coordinates.> ...
 %! geom.bbox ([1, 2, 3])
 %!error<geom.bbox: P must contain at least one point.> geom.bbox (zeros (0, 2))

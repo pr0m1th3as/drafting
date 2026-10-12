@@ -378,7 +378,7 @@ classdef Region
             error ("geom.Region.fit: unknown option '%s'.", name);
         endswitch
       endfor
-      pos = @(x) isnumeric (x) && isreal (x) && isscalar (x) ...
+      pos = @(x) isfloat (x) && isreal (x) && isscalar (x) ...
                  && isfinite (x) && x > 0;
       for name = {'RelTol', 'AbsTol', 'Window'}
         x = opt.(name{1});
@@ -388,7 +388,7 @@ classdef Region
         endif
       endfor
       A = opt.Corner;
-      if (! isnumeric (A) || ! isreal (A) || ! isscalar (A) || ! (A > 0)
+      if (! isfloat (A) || ! isreal (A) || ! isscalar (A) || ! (A > 0)
           || ! (A < 180))
         error (strcat ("geom.Region.fit: Corner must be an angle in the", ...
                        " range (0, 180) degrees."));
@@ -541,7 +541,7 @@ classdef Region
       if (nargin < 2)
         error ("geom.Region.offset: invalid number of input arguments.");
       endif
-      if (! isnumeric (D) || ! isreal (D) || ! isscalar (D) || ! isfinite (D))
+      if (! isfloat (D) || ! isreal (D) || ! isscalar (D) || ! isfinite (D))
         error ("geom.Region.offset: D must be a finite real scalar.");
       endif
       if (mod (numel (varargin), 2) != 0)
@@ -633,7 +633,7 @@ classdef Region
                 all (cellfun (@(r) isa (r, 'geom.Region') && isscalar (r),
                               a(:)')))
           L = [L, a(:)'];
-        elseif (k > 1 && isnumeric (a) && isreal (a) && ismatrix (a)
+        elseif (k > 1 && isfloat (a) && isreal (a) && ismatrix (a)
                 && columns (a) == 2 && all (isfinite (a(:))))
           P = [P; double(a)];
         else
@@ -700,7 +700,7 @@ classdef Region
       if (nargin != 2 && nargin != 4)
         error ("geom.Region.resize: invalid number of input arguments.");
       endif
-      if (! isnumeric (SZ) || ! isreal (SZ) || numel (SZ) != 2
+      if (! isfloat (SZ) || ! isreal (SZ) || numel (SZ) != 2
           || ! all (isfinite (SZ)) || any (SZ < 0) || ! any (SZ > 0))
         error (strcat ("geom.Region.resize: SZ must be a 2-element vector", ...
                        " of nonnegative finite sizes, not all zero."));
@@ -780,7 +780,7 @@ classdef Region
       if (nargin != 2)
         error ("geom.Region.copy: invalid number of input arguments.");
       endif
-      if (! isnumeric (D) || ! isreal (D) || ! ismatrix (D)
+      if (! isfloat (D) || ! isreal (D) || ! ismatrix (D)
           || columns (D) != 2 || rows (D) < 1 || ! all (isfinite (D(:))))
         error (strcat ("geom.Region.copy: D must be an N-by-2 real matrix", ...
                        " of finite offsets."));
@@ -1322,7 +1322,7 @@ endfunction
 function errmsg = checkpoint (P, NAME)
 
   errmsg = '';
-  if (! isnumeric (P) || ! isreal (P) || numel (P) != 2
+  if (! isfloat (P) || ! isreal (P) || numel (P) != 2
       || ! all (isfinite (P)))
     errmsg = sprintf (strcat ("%s must be a real 2-element vector of", ...
                               " finite values."), NAME);

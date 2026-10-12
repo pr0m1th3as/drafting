@@ -99,7 +99,7 @@ function [Q, MARGIN] = curveoffset (P, D, CLOSED = false)
   if (nargin < 2 || nargin > 3)
     error ("geom.curveoffset: invalid number of input arguments.");
   endif
-  if (! isnumeric (D) || ! isreal (D) || ! isscalar (D) || ! isfinite (D))
+  if (! isfloat (D) || ! isreal (D) || ! isscalar (D) || ! isfinite (D))
     error ("geom.curveoffset: D must be a real finite scalar.");
   endif
   if (! (islogical (CLOSED) || isnumeric (CLOSED)) || ! isscalar (CLOSED))
@@ -282,7 +282,7 @@ endfunction
 %!error<geom.curveoffset: D exceeds the radius of curvature by 5; the offset would fold through its own centre of curvature.> ...
 %! t = linspace (0, 2*pi, 361)(1:360)';
 %! geom.curveoffset (25 * [cos(t), sin(t)], 30, true)
-%!error<geom.curveoffset: P must be a real numeric matrix.> ...
+%!error<geom.curveoffset: P must be a real floating-point matrix.> ...
 %! geom.curveoffset ({1, 2}, 1)
 %!error<geom.curveoffset: P must be an N-by-2 matrix of point coordinates.> ...
 %! geom.curveoffset (ones (3, 3), 1)

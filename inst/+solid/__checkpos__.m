@@ -26,7 +26,7 @@ function errmsg = __checkpos__ (X, NAME)
 
   errmsg = '';
 
-  if (! isnumeric (X) || ! isreal (X) || ! isscalar (X) || ! isfinite (X)
+  if (! isfloat (X) || ! isreal (X) || ! isscalar (X) || ! isfinite (X)
       || X <= 0)
     errmsg = sprintf ("%s must be a positive and finite real scalar.", NAME);
   endif
@@ -37,7 +37,8 @@ endfunction
 %! assert_equal (solid.__checkpos__ (2.5, 'R'), '');
 
 %!test
-%! assert_equal (solid.__checkpos__ (int8 (3), 'R'), '');
+%! assert_equal (solid.__checkpos__ (int8 (3), 'R'), ...
+%!               'R must be a positive and finite real scalar.');
 
 %!test
 %! assert_equal (solid.__checkpos__ (0, 'DX'), ...

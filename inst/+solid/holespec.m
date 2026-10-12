@@ -155,7 +155,7 @@ function H = holespec (NAME, varargin)
           endif
         elseif (ischar (value) && strcmpi (value, 'washer'))
           counterbore = 'washer';
-        elseif (isnumeric (value) && isreal (value) && numel (value) == 2
+        elseif (isfloat (value) && isreal (value) && numel (value) == 2
                 && all (isfinite (value)) && all (value > 0))
           counterbore = double (value(:)');
         else
@@ -170,7 +170,7 @@ function H = holespec (NAME, varargin)
           endif
         elseif (ischar (value) && strcmpi (value, 'socket'))
           countersink = 'socket';
-        elseif (isnumeric (value) && isreal (value) && isvector (value)
+        elseif (isfloat (value) && isreal (value) && isvector (value)
                 && numel (value) <= 3 && all (isfinite (value)))
           countersink = [double(value(:)'), 90, 0](1:3);
           if (numel (value) == 2)
@@ -193,7 +193,7 @@ function H = holespec (NAME, varargin)
         endif
         material = value;
       case 'engagement'
-        if (! isnumeric (value) || ! isreal (value) || ! isscalar (value)
+        if (! isfloat (value) || ! isreal (value) || ! isscalar (value)
             || ! isfinite (value))
           error (strcat ("solid.holespec: 'Engagement' must be a real", ...
                          " and finite scalar."));

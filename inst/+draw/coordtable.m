@@ -72,7 +72,7 @@ function D = coordtable (P, ORIGIN, varargin)
   if (! isempty (errmsg))
     error ("draw.coordtable: %s", errmsg);
   endif
-  if (! isnumeric (ORIGIN) || ! isreal (ORIGIN)
+  if (! isfloat (ORIGIN) || ! isreal (ORIGIN)
       || ! isequal (size (ORIGIN), [1, 2]) || ! all (isfinite (ORIGIN)))
     error ("draw.coordtable: ORIGIN must be a 1-by-2 real finite point.");
   endif
@@ -101,7 +101,7 @@ function D = coordtable (P, ORIGIN, varargin)
         error ("draw.coordtable: unknown option '%s'.", name);
     endswitch
   endfor
-  if (! isnumeric (opt.Height) || ! isscalar (opt.Height) || opt.Height <= 0)
+  if (! isfloat (opt.Height) || ! isscalar (opt.Height) || opt.Height <= 0)
     error ("draw.coordtable: Height must be a positive scalar.");
   endif
   if (! isnumeric (opt.Decimals) || ! isscalar (opt.Decimals)
@@ -260,7 +260,7 @@ endfunction
 %! D1 = draw.coordtable ([1, 2], [0, 0], 'decimals', 1);
 %! D2 = draw.coordtable ([1, 2], [0, 0], 'Decimals', 1);
 %! assert_equal (isequal (D1, D2), true);
-%!error<draw.coordtable: P must be a real numeric matrix.> ...
+%!error<draw.coordtable: P must be a real floating-point matrix.> ...
 %! draw.coordtable ({1, 2}, [0, 0])
 %!error<draw.coordtable: P must be an N-by-2 matrix of point coordinates.> ...
 %! draw.coordtable (ones (3, 3), [0, 0])

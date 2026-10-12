@@ -100,7 +100,7 @@ function S = extrude (R, H, varargin)
   if (! isempty (errmsg))
     error ("solid.extrude: %s", errmsg);
   endif
-  if (! isnumeric (H) || ! isreal (H) || ! isvector (H) || numel (H) > 2
+  if (! isfloat (H) || ! isreal (H) || ! isvector (H) || numel (H) > 2
       || ! all (isfinite (H)) || any (H == 0)
       || (numel (H) == 2 && any (H < 0)))
     error (strcat ("solid.extrude: H must be a nonzero finite real", ...
@@ -128,7 +128,7 @@ function S = extrude (R, H, varargin)
     endswitch
   endfor
   A = opt.Taper;
-  if (! isnumeric (A) || ! isreal (A) || ! isvector (A) || numel (A) > 2
+  if (! isfloat (A) || ! isreal (A) || ! isvector (A) || numel (A) > 2
       || ! all (abs (A) < 90))
     error (strcat ("solid.extrude: Taper must be one angle, or two for", ...
                    " both sides, each in the range (-90, 90) degrees."));
@@ -140,7 +140,7 @@ function S = extrude (R, H, varargin)
   if (splines && any (A != 0))
     error ("solid.extrude: Taper cannot be applied to a region with splines.");
   endif
-  if (! isnumeric (opt.Twist) || ! isreal (opt.Twist)
+  if (! isfloat (opt.Twist) || ! isreal (opt.Twist)
       || ! isscalar (opt.Twist) || ! isfinite (opt.Twist))
     error ("solid.extrude: Twist must be a finite real scalar.");
   endif

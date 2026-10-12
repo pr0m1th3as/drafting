@@ -123,7 +123,7 @@ function M = read (FILE, varargin)
     switch (lower (name))
       case 'tolerance'
         T = val;
-        if (! isnumeric (T) || ! isreal (T) || ! isscalar (T)
+        if (! isfloat (T) || ! isreal (T) || ! isscalar (T)
             || ! isfinite (T) || T < 0)
           error (strcat ("polymesh.read: Tolerance must be a non-negative", ...
                          " finite real scalar."));

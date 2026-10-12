@@ -55,7 +55,7 @@ function TF = isrectilinear (P, TOL = 1e-6)
   if (! isempty (errmsg))
     error ("geom.isrectilinear: %s", errmsg);
   endif
-  if (! isnumeric (TOL) || ! isreal (TOL) || ! isscalar (TOL)
+  if (! isfloat (TOL) || ! isreal (TOL) || ! isscalar (TOL)
       || ! isfinite (TOL) || TOL < 0)
     error (strcat ("geom.isrectilinear: TOL must be a non-negative", ...
                    " real finite scalar."));
@@ -127,7 +127,7 @@ endfunction
 %! geom.isrectilinear ([0, 0; 1, 0; 1, 1], [1, 2])
 %!error<geom.isrectilinear: TOL must be a non-negative real finite scalar.> ...
 %! geom.isrectilinear ([0, 0; 1, 0; 1, 1], Inf)
-%!error<geom.isrectilinear: P must be a real numeric matrix.> ...
+%!error<geom.isrectilinear: P must be a real floating-point matrix.> ...
 %! geom.isrectilinear ({1, 2})
 %!error<geom.isrectilinear: P must be an N-by-2 matrix of point coordinates.> ...
 %! geom.isrectilinear (ones (3, 3))

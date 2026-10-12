@@ -71,7 +71,7 @@ endfunction
 function errmsg = checkradius (R, name)
 
   errmsg = '';
-  if (! isnumeric (R) || ! isreal (R) || ! isscalar (R) || ! isfinite (R)
+  if (! isfloat (R) || ! isreal (R) || ! isscalar (R) || ! isfinite (R)
       || R < 0)
     errmsg = sprintf ("%s must be a non-negative and finite real scalar.", ...
                       name);

@@ -72,7 +72,7 @@ function S = revolve (R, ANGLE = 360)
                        " it may have a negative x.");
     endif
   endif
-  if (isempty (errmsg) && (! isnumeric (ANGLE) || ! isreal (ANGLE)
+  if (isempty (errmsg) && (! isfloat (ANGLE) || ! isreal (ANGLE)
                            || ! isscalar (ANGLE) || ! (ANGLE > 0)
                            || ! (ANGLE <= 360)))
     errmsg = "ANGLE must be a real scalar in the range (0, 360].";

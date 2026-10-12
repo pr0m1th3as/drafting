@@ -68,7 +68,7 @@ function [Q, KEPT] = simplify (P, TOL)
   if (! isempty (errmsg))
     error ("geom.simplify: %s", errmsg);
   endif
-  if (! isnumeric (TOL) || ! isreal (TOL) || ! isscalar (TOL)
+  if (! isfloat (TOL) || ! isreal (TOL) || ! isscalar (TOL)
       || ! isfinite (TOL) || TOL < 0)
     error ("geom.simplify: TOL must be a non-negative real finite scalar.");
   endif
@@ -221,7 +221,7 @@ endfunction
 %! geom.simplify ([0, 0; 1, 1], -1)
 %!error<geom.simplify: P must be an N-by-2 matrix of point coordinates.> ...
 %! geom.simplify ([1, 2, 3], 1)
-%!error<geom.simplify: P must be a real numeric matrix.> ...
+%!error<geom.simplify: P must be a real floating-point matrix.> ...
 %! geom.simplify ({1, 2}, 0.1)
 %!error<geom.simplify: P must contain at least one point.> ...
 %! geom.simplify (zeros (0, 2), 0.1)

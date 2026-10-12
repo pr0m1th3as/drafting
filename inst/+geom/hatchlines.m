@@ -120,11 +120,11 @@ function S = hatchlines (varargin)
   if (numel (varargin) > 3 && ! isempty (varargin{4}))
     SPACING = varargin{4};
   endif
-  if (! isnumeric (ANGLE) || ! isreal (ANGLE) || ! isscalar (ANGLE)
+  if (! isfloat (ANGLE) || ! isreal (ANGLE) || ! isscalar (ANGLE)
       || ! isfinite (ANGLE))
     error ("geom.hatchlines: ANGLE must be a real finite scalar.");
   endif
-  if (! isnumeric (SPACING) || ! isreal (SPACING) || ! isscalar (SPACING)
+  if (! isfloat (SPACING) || ! isreal (SPACING) || ! isscalar (SPACING)
       || ! isfinite (SPACING) || SPACING <= 0)
     error ("geom.hatchlines: SPACING must be a positive real finite scalar.");
   endif
@@ -288,7 +288,7 @@ endfunction
 %! geom.hatchlines ([0,0;1,0;1,1], 'ANSI31', 0, 0)
 %!error<geom.hatchlines: ANGLE must be a real finite scalar.> ...
 %! geom.hatchlines ([0,0;1,0;1,1], 'ANSI31', Inf)
-%!error<geom.hatchlines: P must be a real numeric matrix.> ...
+%!error<geom.hatchlines: P must be a real floating-point matrix.> ...
 %! geom.hatchlines ({1, 2}, 'ANSI31', 45, 2)
 %!error<geom.hatchlines: P must be an N-by-2 matrix of point coordinates.> ...
 %! geom.hatchlines (ones (3, 3), 'ANSI31', 45, 2)

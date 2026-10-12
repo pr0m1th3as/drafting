@@ -419,7 +419,7 @@ classdef Path
         this.UCS = V.UCS;
         return;
       endif
-      if (! isnumeric (V) || ! isreal (V) || ! ismatrix (V)
+      if (! isfloat (V) || ! isreal (V) || ! ismatrix (V)
           || ! any (columns (V) == [2, 3]) || rows (V) < 2
           || ! all (isfinite (V(:))))
         error (strcat ("geom.Path: V must be an M-by-2 or M-by-3 real", ...
@@ -508,7 +508,7 @@ classdef Path
       if (nargin < 2)
         error ("geom.Path.fillet: invalid number of input arguments.");
       endif
-      if (! isnumeric (RADIUS) || ! isreal (RADIUS) || ! isscalar (RADIUS)
+      if (! isfloat (RADIUS) || ! isreal (RADIUS) || ! isscalar (RADIUS)
           || ! isfinite (RADIUS) || ! (RADIUS > 0))
         error (strcat ("geom.Path.fillet: RADIUS must be a positive and", ...
                        " finite real scalar."));
@@ -576,7 +576,7 @@ classdef Path
       if (nargin < 2)
         error ("geom.Path.chamfer: invalid number of input arguments.");
       endif
-      if (! isnumeric (D) || ! isreal (D) || ! isvector (D)
+      if (! isfloat (D) || ! isreal (D) || ! isvector (D)
           || numel (D) > 2 || ! all (isfinite (D)) || ! all (D > 0))
         error (strcat ("geom.Path.chamfer: D must be one positive finite", ...
                        " distance, or two."));
@@ -596,7 +596,7 @@ classdef Path
         switch (lower (name))
           case 'angle'
             A = val;
-            if (! isnumeric (A) || ! isreal (A) || ! isscalar (A)
+            if (! isfloat (A) || ! isreal (A) || ! isscalar (A)
                 || ! (A > 0) || ! (A < 180))
               error (strcat ("geom.Path.chamfer: Angle must be in the", ...
                              " range (0, 180) degrees."));
@@ -1369,7 +1369,7 @@ endfunction
 
 function TF = isvec3 (V)
 
-  TF = isnumeric (V) && isreal (V) && isvector (V) && numel (V) == 3 ...
+  TF = isfloat (V) && isreal (V) && isvector (V) && numel (V) == 3 ...
        && all (isfinite (V));
 
 endfunction

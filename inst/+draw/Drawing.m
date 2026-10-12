@@ -266,7 +266,7 @@ classdef Drawing
       if (ischar (LW) && isrow (LW)
           && any (strcmpi (LW, {'byLayer', 'byBlock'})))
         this.LineWeight = byname (LW);
-      elseif (isnumeric (LW) && isreal (LW) && isscalar (LW)
+      elseif (isfloat (LW) && isreal (LW) && isscalar (LW)
               && isfinite (LW) && LW >= 0)
         this.LineWeight = double (LW);
       else
@@ -405,7 +405,7 @@ classdef Drawing
         switch (lower (name))
           case 'dimscale'
             dimScale = val;
-            if (! isnumeric (dimScale) || ! isreal (dimScale)
+            if (! isfloat (dimScale) || ! isreal (dimScale)
                 || ! isscalar (dimScale) || ! isfinite (dimScale)
                 || dimScale <= 0)
               error (strcat ("draw.Drawing.entities: DimScale must be a", ...
@@ -415,7 +415,7 @@ classdef Drawing
             dimScale = double (dimScale);
           case 'chordtol'
             chordTol = val;
-            if (! isnumeric (chordTol) || ! isreal (chordTol)
+            if (! isfloat (chordTol) || ! isreal (chordTol)
                   || ! isscalar (chordTol) || ! isfinite (chordTol)
                   || chordTol <= 0)
               error (strcat ("draw.Drawing.entities: ChordTol must be a", ...
@@ -685,7 +685,7 @@ classdef Drawing
         error (strcat ("draw.Drawing.__ornament__: IDX must be the index", ...
                        " of an entity of D."));
       endif
-      if (! isnumeric (DIMSCALE) || ! isreal (DIMSCALE)
+      if (! isfloat (DIMSCALE) || ! isreal (DIMSCALE)
                                  || ! isscalar (DIMSCALE)
                                  || ! isfinite (DIMSCALE) || DIMSCALE <= 0)
         error (strcat ("draw.Drawing.__ornament__: DIMSCALE must be a real", ...
@@ -929,7 +929,7 @@ classdef Drawing
             L.linetype = val;
           case 'lineweight'
             if (! (isempty (val) && isnumeric (val))
-                && ! (isnumeric (val) && isreal (val) && isscalar (val)
+                && ! (isfloat (val) && isreal (val) && isscalar (val)
                       && isfinite (val) && val >= 0))
               error (strcat ("draw.Drawing.layer: LineWeight must be a", ...
                              " width in millimetres, or empty."));
@@ -1533,11 +1533,11 @@ classdef Drawing
         error (strcat ("draw.Drawing.hatch: PATTERN must be a non-empty", ...
                        " character vector."));
       endif
-      if (! isnumeric (ANGLE) || ! isreal (ANGLE) || ! isscalar (ANGLE)
+      if (! isfloat (ANGLE) || ! isreal (ANGLE) || ! isscalar (ANGLE)
           || ! isfinite (ANGLE))
         error ("draw.Drawing.hatch: ANGLE must be a real finite scalar.");
       endif
-      if (! isnumeric (SPACING) || ! isreal (SPACING)
+      if (! isfloat (SPACING) || ! isreal (SPACING)
           || ! isscalar (SPACING) || ! isfinite (SPACING) || SPACING <= 0)
         error (strcat ("draw.Drawing.hatch: SPACING must be a real", ...
                        " positive finite scalar."));
@@ -1619,7 +1619,7 @@ classdef Drawing
       if (isequal (P1, P2))
         error ("draw.Drawing.dim: P1 and P2 must not be the same point.");
       endif
-      if (! isnumeric (OFFSET) || ! isreal (OFFSET) || ! isscalar (OFFSET)
+      if (! isfloat (OFFSET) || ! isreal (OFFSET) || ! isscalar (OFFSET)
           || ! isfinite (OFFSET))
         error ("draw.Drawing.dim: OFFSET must be a real finite scalar.");
       endif
@@ -2245,11 +2245,11 @@ classdef Drawing
       if (! isempty (errmsg))
         error ("draw.Drawing.insert: POS %s", errmsg);
       endif
-      if (! isnumeric (ROT) || ! isreal (ROT) || ! isscalar (ROT)
+      if (! isfloat (ROT) || ! isreal (ROT) || ! isscalar (ROT)
           || ! isfinite (ROT))
         error ("draw.Drawing.insert: ROT must be a real finite scalar.");
       endif
-      if (! isnumeric (SCALE) || ! isreal (SCALE) || ! isscalar (SCALE)
+      if (! isfloat (SCALE) || ! isreal (SCALE) || ! isscalar (SCALE)
           || ! isfinite (SCALE) || SCALE <= 0)
         error (strcat ("draw.Drawing.insert: SCALE must be a positive real", ...
                        " finite scalar."));
@@ -2570,14 +2570,14 @@ classdef Drawing
       endif
       for f = {'LineWidth', 'FontSize', 'Arc', 'LTScale', 'DimScale'}
         v = opt.(f{1});
-        if (! isnumeric (v) || ! isreal (v) || ! isscalar (v)
+        if (! isfloat (v) || ! isreal (v) || ! isscalar (v)
             || ! isfinite (v) || v <= 0)
           error (strcat ("draw.Drawing.plot: %s must be a positive real", ...
                          " finite scalar."), f{1});
         endif
       endfor
       ## Margin admits 0, which fits the axes tight to the geometry.
-      if (! isnumeric (opt.Margin) || ! isreal (opt.Margin)
+      if (! isfloat (opt.Margin) || ! isreal (opt.Margin)
           || ! isscalar (opt.Margin) || ! isfinite (opt.Margin)
           || opt.Margin < 0)
         error (strcat ("draw.Drawing.plot: Margin must be a non-negative", ...
@@ -2585,7 +2585,7 @@ classdef Drawing
       endif
       ## FontScale is empty for the fixed point size, or points per model unit.
       if (! isempty (opt.FontScale)
-          && (! isnumeric (opt.FontScale) || ! isreal (opt.FontScale)
+          && (! isfloat (opt.FontScale) || ! isreal (opt.FontScale)
               || ! isscalar (opt.FontScale) || ! isfinite (opt.FontScale)
               || opt.FontScale <= 0))
         error (strcat ("draw.Drawing.plot: FontScale must be empty or a", ...
@@ -2931,7 +2931,7 @@ classdef Drawing
         error (strcat ("draw.Drawing.print: Orientation must be", ...
                        " 'landscape' or 'portrait'."));
       endif
-      if (! isnumeric (opt.Margin) || ! isreal (opt.Margin)
+      if (! isfloat (opt.Margin) || ! isreal (opt.Margin)
           || ! isscalar (opt.Margin) || ! isfinite (opt.Margin)
           || opt.Margin < 0)
         error (strcat ("draw.Drawing.print: Margin must be a non-negative", ...
@@ -2939,13 +2939,13 @@ classdef Drawing
       endif
       for f = {'Resolution', 'LineWidth'}
         v = opt.(f{1});
-        if (! isnumeric (v) || ! isreal (v) || ! isscalar (v)
+        if (! isfloat (v) || ! isreal (v) || ! isscalar (v)
             || ! isfinite (v) || v <= 0)
           error (strcat ("draw.Drawing.print: %s must be a positive real", ...
                          " finite scalar."), f{1});
         endif
       endfor
-      if (! isempty (opt.Scale) && (! isnumeric (opt.Scale)
+      if (! isempty (opt.Scale) && (! isfloat (opt.Scale)
           || ! isreal (opt.Scale) || ! isscalar (opt.Scale)
           || ! isfinite (opt.Scale) || opt.Scale <= 0))
         error (strcat ("draw.Drawing.print: Scale must be empty or a", ...
@@ -3167,7 +3167,7 @@ classdef Drawing
         endif
         switch (lower (name))
           case 'scale'
-            if (! isnumeric (val) || ! isreal (val) || ! isscalar (val)
+            if (! isfloat (val) || ! isreal (val) || ! isscalar (val)
                 || ! isfinite (val) || val <= 0)
               error (strcat ("draw.Drawing.tikz: Scale must be a real", ...
                              " positive finite", ...
@@ -3187,7 +3187,7 @@ classdef Drawing
             endif
             styles = logical (val);
           case 'ltscale'
-            if (! isnumeric (val) || ! isreal (val) || ! isscalar (val)
+            if (! isfloat (val) || ! isreal (val) || ! isscalar (val)
                 || ! isfinite (val) || val <= 0)
               error (strcat ("draw.Drawing.tikz: LTScale must be a real", ...
                              " positive", ...
@@ -3570,7 +3570,7 @@ function e = dimcircle (this, kind, C, R, ANG, LABEL)
   if (! isempty (errmsg))
     error ("draw.Drawing.%s: R %s", kind, errmsg);
   endif
-  if (! isnumeric (ANG) || ! isreal (ANG) || ! isscalar (ANG)
+  if (! isfloat (ANG) || ! isreal (ANG) || ! isscalar (ANG)
       || ! isfinite (ANG))
     error ("draw.Drawing.%s: ANG must be a real finite scalar.", kind);
   endif
@@ -3614,7 +3614,7 @@ endfunction
 function errmsg = checkpt (P)
 
   errmsg = '';
-  if (! isnumeric (P) || ! isreal (P) || ! isequal (size (P), [1, 2])
+  if (! isfloat (P) || ! isreal (P) || ! isequal (size (P), [1, 2])
       || ! all (isfinite (P)))
     errmsg = "must be a real finite 1-by-2 vector.";
   endif
@@ -3625,7 +3625,7 @@ endfunction
 function errmsg = checkpts (P)
 
   errmsg = '';
-  if (! isnumeric (P) || ! isreal (P) || ndims (P) != 2 || columns (P) != 2)
+  if (! isfloat (P) || ! isreal (P) || ndims (P) != 2 || columns (P) != 2)
     errmsg = "must be an N-by-2 matrix of point coordinates.";
     return;
   endif
@@ -3639,7 +3639,7 @@ endfunction
 function errmsg = checkradius (R)
 
   errmsg = '';
-  if (! isnumeric (R) || ! isreal (R) || ! isscalar (R) || ! isfinite (R)
+  if (! isfloat (R) || ! isreal (R) || ! isscalar (R) || ! isfinite (R)
       || R <= 0)
     errmsg = "must be a real positive finite scalar.";
   endif
@@ -3651,7 +3651,7 @@ endfunction
 function [errmsg, V] = checkperrow (V, N, positive)
 
   errmsg = '';
-  if (! isnumeric (V) || ! isreal (V) || ! any (numel (V) == [1, N])
+  if (! isfloat (V) || ! isreal (V) || ! any (numel (V) == [1, N])
       || (! isvector (V) && ! isempty (V)) || ! all (isfinite (V))
       || (positive && any (V <= 0)))
     if (positive)
@@ -4053,7 +4053,7 @@ endfunction
 function P = papersize (spec, orient)
 
   if (isnumeric (spec))
-    if (! isreal (spec) || ! isequal (size (spec), [1, 2])
+    if (! isfloat (spec) || ! isreal (spec) || ! isequal (size (spec), [1, 2])
         || ! all (isfinite (spec)) || any (spec <= 0))
       error (strcat ("draw.Drawing.print: Paper must be a name or a", ...
                      " 1-by-2 vector of positive millimetres."));

@@ -73,7 +73,7 @@ function [R, B] = largestrect (P, MARGINS = 0)
   if (! isempty (errmsg))
     error ("geom.largestrect: %s", errmsg);
   endif
-  if (! isnumeric (MARGINS) || ! isreal (MARGINS)
+  if (! isfloat (MARGINS) || ! isreal (MARGINS)
       || ! all (isfinite (MARGINS(:))) || any (MARGINS(:) < 0)
       || ! (isscalar (MARGINS) || isequal (size (MARGINS), [1, 4])))
     error (strcat ("geom.largestrect: MARGINS must be a non-negative real", ...
@@ -263,7 +263,7 @@ endfunction
 %! geom.largestrect ([0, 0; 10, 0; 0, 10])
 %!error<geom.largestrect: MARGINS leave no room inside the bounding box of P.> ...
 %! geom.largestrect ([0, 0; 10, 0; 10, 6; 0, 6], 5)
-%!error<geom.largestrect: P must be a real numeric matrix.> ...
+%!error<geom.largestrect: P must be a real floating-point matrix.> ...
 %! geom.largestrect ({1, 2})
 %!error<geom.largestrect: P must be an N-by-2 matrix of point coordinates.> ...
 %! geom.largestrect (ones (3, 3))
