@@ -3153,6 +3153,18 @@ readassembly (const string& file, const string& name, const string& caller)
   std::map<string, int> seen;
   // A part with no solid is left out, and an assembly left with no part
   strays x;
+  // A name another part has, or another placement in one assembly, is made
+  // distinct with _2, _3 and so on, as names in a 3MF file are
+  std::set<string> taken;
+  auto distinct = [] (std::set<string>& used, const string& n)
+  {
+    string c = n;
+    for (int k = 2; ! used.insert (c).second; k++)
+    {
+      c = n + "_" + std::to_string (k);
+    }
+    return c;
+  };
   std::function<int (const TDF_Label&)> visit;
   visit = [&] (const TDF_Label& l) -> int
   {
@@ -3188,10 +3200,12 @@ readassembly (const string& file, const string& name, const string& caller)
       }
       Matrix C (kept.size (), 13);
       Cell inst (1, kept.size ());
+      std::set<string> placed;
       for (size_t q = 0; q < kept.size (); q++)
       {
         const int k = kept[q];
-        C(q,0) = visit (refs[q]) + 1;
+        const int v = visit (refs[q]);
+        C(q,0) = v + 1;
         double f[12];
         frameof (XCAFDoc_ShapeTool::GetLocation (comps (k)), f, caller);
         for (int j = 0; j < 12; j++)
@@ -3199,9 +3213,10 @@ readassembly (const string& file, const string& name, const string& caller)
           C(q,j+1) = f[j];
         }
         const string in = labelname (comps (k));
-        inst(q) = in.empty () ? labelname (refs[q]) : in;
+        inst(q) = distinct (placed,
+                            in.empty () ? names[v].string_value () : in);
       }
-      names.push_back (nm.empty () ? "assembly" : nm);
+      names.push_back (distinct (taken, nm.empty () ? "assembly" : nm));
       data.push_back (uint8NDArray (dim_vector (0, 0)));
       colours.push_back (Matrix ());
       solids.push_back (Cell ());
@@ -3242,7 +3257,7 @@ readassembly (const string& file, const string& name, const string& caller)
           anyname = true;
         }
       }
-      names.push_back (nm.empty () ? "part" : nm);
+      names.push_back (distinct (taken, nm.empty () ? "part" : nm));
       data.push_back (todata (s));
       colours.push_back (any ? C : Matrix ());
       solids.push_back (anyname ? N : Cell ());

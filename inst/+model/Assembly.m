@@ -142,7 +142,8 @@ classdef Assembly
     ##
     ## The first use of a name defines the part.  A later use places the same
     ## part again, and gives the same @var{X}, or @code{[]} for it; another
-    ## @var{X} under a name already used is an error.  The same means stored
+    ## @var{X} under a name already used is an error, and so is an empty one,
+    ## a shape, a mesh or an assembly with nothing in it.  The same means stored
     ## the same, not only shaped the same: a shape read back from a file is
     ## another shape, so a part is best placed again with @code{[]}.
     ##
@@ -212,7 +213,9 @@ classdef Assembly
         error (strcat ("model.Assembly.add: X must be a solid.Shape, a", ...
                        " polymesh.Mesh or a model.Assembly object, or empty."));
       elseif (isempty (k))
-        if (! isa (X, 'model.Assembly') && isempty (X))
+        if (isa (X, 'model.Assembly') && isempty (X))
+          error ("model.Assembly.add: the assembly '%s' is empty.", NAME);
+        elseif (isempty (X))
           error ("model.Assembly.add: the part '%s' is empty.", NAME);
         endif
         this.Parts(end+1) = struct ('name', NAME, 'item', X);
@@ -1002,6 +1005,8 @@ endfunction
 %! add (model.Assembly (), 'pin', 1, geom.UCS ())
 %!error<model.Assembly.add: the part 'pin' is empty.> ...
 %! add (model.Assembly (), 'pin', solid.Shape (), geom.UCS ())
+%!error<model.Assembly.add: the assembly 'sub' is empty.> ...
+%! add (model.Assembly (), 'sub', model.Assembly ('empty'), geom.UCS ())
 %!error<model.Assembly.add: no part named 'pin' is defined yet.> ...
 %! add (model.Assembly (), 'pin', [], geom.UCS ())
 %!error<model.Assembly.add: a part named 'pin' is already defined, as another shape.>

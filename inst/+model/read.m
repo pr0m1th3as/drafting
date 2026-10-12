@@ -29,7 +29,10 @@
 ## several times is one part placed several times.  Several products at the
 ## top of the file are placed where they are in one assembly, and a file of
 ## a single part gives an assembly placing it once; either is named after
-## the base name of @var{FILE}.
+## the base name of @var{FILE}.  A part without a name is named
+## @qcode{'part'}, an assembly @qcode{'assembly'}, and a name two parts
+## share, or two placements in one assembly, is made distinct with
+## @qcode{'_2'}, @qcode{'_3'} and so on.
 ##
 ## A part of a STEP file is its solids, a closed shell read as the solid it
 ## bounds.  Surfaces, curves and points are left out with a warning that
@@ -92,6 +95,39 @@ endfunction
 %!    [~] = unlink (f);
 %!  end_unwind_protect
 %!endfunction
+
+## A pin and a bolt written to STEP, their names in the file changed from
+## PAT to REP, read back
+%!function R = renamed (PAT, REP)
+%!  A = model.Assembly ('two');
+%!  A = add (A, 'pin', solid.cylinder (2, 10), geom.UCS ());
+%!  A = add (A, 'bolt', solid.box (3, 3, 3), geom.UCS ([0, 0, 1], [10, 0, 0]));
+%!  f = [tempname(), '.step'];
+%!  unwind_protect
+%!    write (A, f);
+%!    t = regexprep (fileread (f), PAT, REP);
+%!    fid = fopen (f, 'w');
+%!    fputs (fid, t);
+%!    fclose (fid);
+%!    R = model.read (f);
+%!  unwind_protect_cleanup
+%!    [~] = unlink (f);
+%!  end_unwind_protect
+%!endfunction
+
+%!test  # two products of one name are two parts, made distinct
+%! R = renamed ("PRODUCT\\('bolt','bolt'", "PRODUCT('pin','pin'");
+%! assert_equal ({R.Parts.name}, {'pin', 'pin_2'});
+%! assert_equal (numsolids (shape (R)), 2);
+
+%!test  # products with no name are parts named part, made distinct
+%! R = renamed ("PRODUCT\\('(pin|bolt)','(pin|bolt)'", "PRODUCT('',''");
+%! assert_equal ({R.Parts.name}, {'part', 'part_2'});
+
+%!test  # two placements of one name in one assembly, made distinct
+%! R = renamed ("USAGE_OCCURRENCE\\('(\\d+)','bolt'", ...
+%!              "USAGE_OCCURRENCE('$1','pin'");
+%! assert_equal ({R.Instances.name}, {'pin', 'pin_2'});
 
 %!test  # names, placements and colours come back
 %! pin = solid.cylinder (2, 12);
