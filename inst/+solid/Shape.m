@@ -594,6 +594,9 @@ classdef Shape
         endif
         switch (lower (name))
           case 'tolerance'
+            if (isempty (val))
+              error ("solid.Shape.write: Tolerance must not be empty.");
+            endif
             opt.Tolerance = val;
           otherwise
             error ("solid.Shape.write: unknown option '%s'.", name);
@@ -3224,7 +3227,12 @@ function [errmsg, opt] = options (args, opt)
     endif
     switch (lower (name))
       case lower (known)
-        opt.(known{strcmpi (name, known)}) = val;
+        key = known{strcmpi (name, known)};
+        if (isempty (val))
+          errmsg = sprintf ("%s must not be empty.", key);
+          return;
+        endif
+        opt.(key) = val;
       otherwise
         errmsg = sprintf ("unknown option '%s'.", name);
         return;
@@ -4644,6 +4652,8 @@ endfunction
 %! write (solid.Shape (), 'a.stl', 'Tolerance')
 %!error<solid.Shape.write: unknown option 'Angle'.> ...
 %! write (solid.Shape (), 'a.stl', 'Angle', 5)
+%!error<solid.Shape.write: Tolerance must not be empty.> ...
+%! write (solid.Shape (), 'a.step', 'Tolerance', [])
 %!error<solid.Shape.write: option names must be character vectors.> ...
 %! write (solid.Shape (), 'a.stl', 1, 5)
 %!test  # option names ignore case
@@ -4956,6 +4966,8 @@ endfunction
 %! edges (solid.Shape (), 'Type')
 %!error<solid.Shape.edges: unknown option 'Normal'.> ...
 %! edges (solid.Shape (), 'Normal', [0, 0, 1])
+%!error<solid.Shape.edges: Face must not be empty.> ...
+%! edges (solid.Shape (), 'Face', [])
 %!error<solid.Shape.edges: option names must be character vectors.> ...
 %! edges (solid.Shape (), 1, [0, 0, 1])
 %!test  # option names ignore case
@@ -5084,6 +5096,8 @@ endfunction
 %! hole (solid.Shape (), [0, 0, 0], 5, NaN)
 %!error<solid.Shape.hole: unknown option 'Depth'.> ...
 %! hole (solid.Shape (), [0, 0, 0], 5, 1, 'Depth', 2)
+%!error<solid.Shape.hole: Countersink must not be empty.> ...
+%! hole (solid.Shape (), [0, 0, 0], 5, 1, 'Countersink', [])
 %!error<solid.Shape.hole: option names must be character vectors.> ...
 %! hole (solid.Shape (), [0, 0, 0], 5, 1, 1, 2)
 %!error<solid.Shape.hole: Direction must be a real 3-element vector of finite values.> ...

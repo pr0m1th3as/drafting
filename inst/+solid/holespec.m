@@ -170,7 +170,8 @@ function H = holespec (NAME, varargin)
           endif
         elseif (ischar (value) && strcmpi (value, 'socket'))
           countersink = 'socket';
-        elseif (isfloat (value) && isreal (value) && isvector (value)
+        elseif (isfloat (value) && isreal (value) && ! isempty (value)
+                && isvector (value)
                 && numel (value) <= 3 && all (isfinite (value)))
           countersink = [double(value(:)'), 90, 0](1:3);
           if (numel (value) == 2)
@@ -510,6 +511,8 @@ endfunction
 %! solid.holespec ('M6', 'Clearance', 'fine', 'Countersink', 'cone')
 %!error<solid.holespec: 'Countersink' must be true, false, 'socket', CD, \[CD, ANGLE\] or \[CD, ANGLE, CDEPTH\].> ...
 %! solid.holespec ('M6', 'Clearance', 'fine', 'Countersink', [12, 180])
+%!error<solid.holespec: 'Countersink' must be true, false, 'socket', CD, \[CD, ANGLE\] or \[CD, ANGLE, CDEPTH\].> ...
+%! solid.holespec ('M6', 'Clearance', 'fine', 'Countersink', zeros (1, 0))
 %!error<solid.holespec: 'Material' must be a character vector.> ...
 %! solid.holespec ('M6', 'Material', 1)
 %!error<solid.holespec: 'Engagement' must be a real and finite scalar.> ...
