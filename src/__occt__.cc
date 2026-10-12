@@ -338,6 +338,25 @@ bspline (const octave_scalar_map& s)
   return new Geom_BSplineCurve (poles, weights, knots, mults, degree);
 }
 
+// Whether the arc from A through M to B bows less than a millionth of its
+// chord, and so is built as the straight segment it is in effect: Open
+// CASCADE puts such an arc on a circle so large that its ends stray
+static bool
+nearlystraight (const gp_Pnt& a, const gp_Pnt& m, const gp_Pnt& b)
+{
+  const gp_Vec ab (a, b);
+  const double L = ab.Magnitude ();
+  return L > 0 && gp_Vec (a, m).Crossed (ab).Magnitude () <= 1e-6 * L * L;
+}
+
+static bool
+nearlystraight (const gp_Pnt2d& a, const gp_Pnt2d& m, const gp_Pnt2d& b)
+{
+  const gp_Vec2d ab (a, b);
+  const double L = ab.Magnitude ();
+  return L > 0 && std::abs (gp_Vec2d (a, m).Crossed (ab)) <= 1e-6 * L * L;
+}
+
 // The wire of a geom.Path as solid.__path__ hands it over, in world
 // coordinates: its vertices; the midpoints of its arcs, NaN for a segment
 // that is not an arc; for each spline segment the control points of its cubic
@@ -365,6 +384,10 @@ chain (const octave_value& p)
              .Edge ());
     }
     else if (octave::math::isnan (m(i,0)))
+    {
+      w.Add (BRepBuilderAPI_MakeEdge (a, b).Edge ());
+    }
+    else if (nearlystraight (a, gp_Pnt (m(i,0), m(i,1), m(i,2)), b))
     {
       w.Add (BRepBuilderAPI_MakeEdge (a, b).Edge ());
     }
@@ -498,7 +521,8 @@ pieces (const octave_value& p, const Matrix& f, int loop, vector<piece>& out)
         c.push_back (span);
       }
     }
-    else if (octave::math::isnan (m(i,0)))
+    else if (octave::math::isnan (m(i,0))
+             || nearlystraight (a, inplane (m, i, f), b))
     {
       c.push_back (MakeSegment2d (a, b).Value ());
     }

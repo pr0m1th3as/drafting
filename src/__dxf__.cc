@@ -2885,6 +2885,10 @@ Reader::load (const string& f)
   if (! in)
     error ("%s: cannot find file '%s'.", g_caller.c_str (), f.c_str ());
   string txt ((istreambuf_iterator<char> (in)), istreambuf_iterator<char> ());
+  // A byte-order mark, which some editors write before UTF-8, is no part of
+  // the first group code
+  if (txt.compare (0, 3, "\xEF\xBB\xBF") == 0)
+    txt.erase (0, 3);
   if (txt.compare (0, 18, "AutoCAD Binary DXF") == 0)
     error ("%s: '%s' is a binary DXF; only ASCII DXF is read.",
            g_caller.c_str (), f.c_str ());
@@ -2904,6 +2908,14 @@ Reader::load (const string& f)
   }
   if (lines.empty ())
     error ("%s: '%s' is empty.", g_caller.c_str (), f.c_str ());
+  // The file ends at EOF; what follows, as the ^Z of old DOS programs, is
+  // no part of it
+  for (size_t k = 0; k + 1 < lines.size (); k += 2)
+    if (trim (lines[k]) == "0" && upper (trim (lines[k+1])) == "EOF")
+    {
+      lines.resize (k + 2);
+      break;
+    }
   if (lines.size () % 2 != 0)
   {
     // A file may end on a blank line after EOF

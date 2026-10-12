@@ -2030,9 +2030,9 @@ classdef Drawing
     ## @strong{A non-uniform scaling that would turn a circle into an ellipse}
     ## raises.  @code{transform} makes no ellipse out of a circle or an arc,
     ## and quietly scaling the radius by one of the two factors would move the
-    ## geometry off the part.  A spline, path, region or hatch refuses it
-    ## too.  A drawing of lines and polylines without arcs scales
-    ## anisotropically without complaint.
+    ## geometry off the part.  An ellipse, a spline, a path, a region or a
+    ## hatch refuses it too.  A drawing of lines and polylines without arcs
+    ## scales anisotropically without complaint.
     ##
     ## @strong{A rotation that would leave an axis-locked dimension off its
     ## axis} raises, naming the entity.  A @qcode{'horizontal'} dimension
@@ -2088,6 +2088,14 @@ classdef Drawing
               endif
               e.angles = a;
             endif
+
+          case 'ellipse'
+            if (! uniform)
+              error (strcat ("draw.Drawing.transform: entity %d is an", ...
+                             " ellipse and the scaling is not uniform."), ii);
+            endif
+            e.radius *= sx;
+            e.angle = dirangle (M, e.angle);
 
           case 'text'
             if (! uniform)
@@ -2442,7 +2450,8 @@ classdef Drawing
     ## @item @qcode{'Axes'} @tab @code{gca} @tab axes to draw into
     ## @item @qcode{'LineWidth'} @tab 0.5 @tab width in points of every line
     ## with no line weight of its own or of its layer, which is drawn at that
-    ## weight
+    ## weight; a weight of 0, DXF's thinnest line, is drawn 0.13 mm wide, the
+    ## thinnest pen of ISO 128
     ## @item @qcode{'FontSize'} @tab 8 @tab size of text, in points
     ## @item @qcode{'Layers'} @tab all @tab cell array of layer names to draw
     ## @item @qcode{'Arc'} @tab 64 @tab segments per full turn when sampling
@@ -2484,7 +2493,9 @@ classdef Drawing
     ## dimension as its extension lines, ticks and label, a spline, path or
     ## region along its curves, a hatch as its loops and its fill lines, clear
     ## of its holes, or as its loops alone with @qcode{'Hatch'} set to
-    ## @qcode{'boundary'}.  @code{draw.Drawing.tikz} draws the same.
+    ## @qcode{'boundary'}.  @code{draw.Drawing.tikz} draws the same.  Text
+    ## is drawn as written, not read as TeX, so braces and underscores stay as
+    ## they are.
     ##
     ## @subheading Line types are drawn properly, not approximated
     ##
@@ -2682,10 +2693,11 @@ classdef Drawing
         for ii = 1:numel (E)
           e = E(ii);
           col = draw.colour (e.colour);
-          ## A weight of its own or its layer's, in millimetres of paper
+          ## A weight of its own or its layer's, in millimetres of paper; a
+          ## weight of 0, DXF's thinnest line, is ISO 128's thinnest pen
           lw = opt.LineWidth;
           if (! isempty (e.lineweight))
-            lw = e.lineweight * 72 / 25.4;
+            lw = (e.lineweight + 0.13 * (e.lineweight == 0)) * 72 / 25.4;
           endif
 
           switch (e.type)
@@ -2798,6 +2810,7 @@ classdef Drawing
                                       'rotation', e.rotation, ...
                                       'horizontalalignment', 'left', ...
                                       'verticalalignment', 'baseline', ...
+                                      'interpreter', 'none', ...
                                       'tag', e.layer);
         endfor
 

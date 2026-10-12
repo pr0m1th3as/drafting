@@ -446,6 +446,30 @@ endfunction
 %! E = entities (D);
 %! assert_equal ({E.linetype, E.colour}, {'CONTINUOUS', 7});
 
+%!test  # a byte-order mark before the first group code is passed over
+%! write (draw.Drawing ().line ([0, 0], [1, 0]), tmpf);
+%! t = fileread (tmpf);
+%! fid = fopen (tmpf, 'w');
+%! fwrite (fid, [uint8([239, 187, 191]), uint8(t)]);
+%! fclose (fid);
+%! unwind_protect
+%!   assert_equal (numentities (draw.read (tmpf)), 1);
+%! unwind_protect_cleanup
+%!   [~] = unlink (tmpf);
+%! end_unwind_protect
+
+%!test  # what follows EOF, as a DOS ^Z, is no part of the file
+%! write (draw.Drawing ().line ([0, 0], [1, 0]), tmpf);
+%! t = fileread (tmpf);
+%! fid = fopen (tmpf, 'w');
+%! fwrite (fid, [uint8(t), uint8(26)]);
+%! fclose (fid);
+%! unwind_protect
+%!   assert_equal (numentities (draw.read (tmpf)), 1);
+%! unwind_protect_cleanup
+%!   [~] = unlink (tmpf);
+%! end_unwind_protect
+
 %!test  # a block's base point lands where its insert places it
 %! fid = fopen (tmpf, 'w');
 %! fputs (fid, ["0\nSECTION\n2\nBLOCKS\n0\nBLOCK\n8\n0\n2\nPEG\n70\n0\n" ...
