@@ -722,6 +722,23 @@ classdef Drawing
 
     endfunction
 
+    ## D with its entity records replaced by E, records as D holds them.  The
+    ## DXF reader draws each entity on D with the records set aside and puts
+    ## them back once, since a drawing appended to one entity at a time copies
+    ## every record it holds on each append.
+    function D = __entities__ (D, E)
+
+      if (nargin != 2)
+        error ("draw.Drawing.__entities__: invalid number of input arguments.");
+      endif
+      if (! isstruct (E) || ! isequal (sort (fieldnames (E)),
+                                       sort (fieldnames (D.Entities))))
+        error ("draw.Drawing.__entities__: E must be entity records.");
+      endif
+      D.Entities = E;
+
+    endfunction
+
   endmethods
 
 ################################################################################

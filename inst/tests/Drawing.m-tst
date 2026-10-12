@@ -2417,6 +2417,18 @@
 %!error<draw.Drawing.__ornament__: entity 1 is a line, not a dimension, centre mark or leader.> ...
 %! __ornament__ (draw.Drawing ().line ([0, 0], [1, 0]), 1, 1)
 
+%!test  # the records of one drawing put into another
+%! D = draw.Drawing ().line ([0, 0; 1, 1], [1, 0; 2, 1]);
+%! B = __entities__ (draw.Drawing (), D.Entities);
+%! assert_equal (B.Entities, D.Entities);
+%!test  # no records leave the drawing empty
+%! D = draw.Drawing ().line ([0, 0], [1, 0]);
+%! assert_equal (numentities (__entities__ (D, D.Entities([]))), 0);
+%!error<draw.Drawing.__entities__: invalid number of input arguments.> ...
+%! __entities__ (draw.Drawing ())
+%!error<draw.Drawing.__entities__: E must be entity records.> ...
+%! __entities__ (draw.Drawing (), struct ('type', 'line'))
+
 %!test  # every entity type reaches the TikZ backend
 %! D = __allentities__ ();
 %! S = tikz (D);

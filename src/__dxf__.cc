@@ -4252,6 +4252,13 @@ public:
     m_ltype = "byLayer";
     m_colour = 256;
     m_lw = -1;
+    // Each entity is drawn on D with the records set aside, and they are
+    // joined once at the end: a drawing appended to one entity at a time
+    // copies every record it holds on each append
+    vector<octave_value> parts (1, prop (D, "Entities"));
+    octave_map none = parts[0].map_value ();
+    none.resize (dim_vector (0, 0));
+    D = call ("__entities__", ovl (D, none));
     for (size_t k = 0; k < recs.size (); k++)
     {
       const Rec& r = recs[k];
@@ -4271,6 +4278,7 @@ public:
             D = call (isclass (lead->second, "geom.Path") ? "path"
                                                          : "region",
                       ovl (D, lead->second));
+            D = aside (D, parts, none);
           }
           catch (const octave::execution_exception&)
           {
@@ -4286,6 +4294,7 @@ public:
       {
         D = attrs (D, r);
         D = one (D, r, defined);
+        D = aside (D, parts, none);
       }
       catch (const Bad& b)
       {
@@ -4312,7 +4321,10 @@ public:
     D = setprop (D, "Linetype", octave_value ("byLayer"));
     D = setprop (D, "Colour", octave_value (256.0));
     D = setprop (D, "LineWeight", octave_value ("byLayer"));
-    return D;
+    octave_value_list all (parts.size ());
+    for (size_t k = 0; k < parts.size (); k++)
+      all(k) = parts[k];
+    return call ("__entities__", ovl (D, call ("horzcat", all)));
   }
 
 private:
@@ -4320,6 +4332,17 @@ private:
   Skips& m_sk;
   string m_layer, m_ltype;
   int m_colour, m_lw;
+
+  // The records D holds moved to PARTS, and D left with NONE
+  octave_value aside (const octave_value& D, vector<octave_value>& parts,
+                      const octave_map& none)
+  {
+    octave_value E = prop (D, "Entities");
+    if (E.numel () == 0)
+      return D;
+    parts.push_back (E);
+    return call ("__entities__", ovl (D, none));
+  }
 
   // Layer, line type and colour are properties of the drawing at the moment
   // an entity is appended: set them, then draw, as a draughtsman does
