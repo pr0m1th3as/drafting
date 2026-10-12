@@ -107,7 +107,9 @@ slurp (const string& file, const string& caller, const char *what)
 
 // The corners of every triangle of an STL file, three rows of x, y and z
 // for each triangle in turn.  A binary file is recognised by its size, which
-// its triangle count sets exactly; anything else must be ASCII, read as the
+// its triangle count sets; a file longer than that is binary too, the bytes
+// after the triangles passed over, unless it is ASCII: starting with "solid"
+// and holding "endsolid", as every ASCII file does.  ASCII is read as the
 // three numbers after every "vertex", in any case and with any spacing.
 vector<double>
 readstl (const string& file, const string& caller)
@@ -121,7 +123,25 @@ readstl (const string& file, const string& caller)
   {
     std::memcpy (&n, buf.data () + 80, 4);
   }
-  if (got >= 84 && got == 84 + 50 * static_cast<size_t> (n))
+  const size_t need = 84 + 50 * static_cast<size_t> (n);
+  bool ascii = false;
+  if (got >= 84 && got != need)
+  {
+    size_t k = 0;
+    while (k < got && std::isspace (static_cast<unsigned char> (buf[k])))
+    {
+      k++;
+    }
+    if (got - k >= 5 && strncasecmp (buf.data () + k, "solid", 5) == 0)
+    {
+      const string head (buf.data (), got);
+      string low (head.size (), ' ');
+      std::transform (head.begin (), head.end (), low.begin (),
+                      [] (unsigned char c) { return std::tolower (c); });
+      ascii = low.find ("endsolid") != string::npos;
+    }
+  }
+  if (got >= 84 && got >= need && ! ascii)
   {
     xyz.reserve (9 * static_cast<size_t> (n));
     for (uint32_t t = 0; t < n; t++)

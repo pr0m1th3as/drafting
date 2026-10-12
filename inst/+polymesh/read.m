@@ -29,10 +29,13 @@
 ##
 ## @itemize
 ## @item
-## An STL file is binary or ASCII.  It is binary when it is exactly as long
-## as the number of triangles it declares makes it, and anything else is
-## read as ASCII, the three numbers after each @qcode{vertex}, whatever the
-## case and spacing.  It has no colours.
+## An STL file is binary or ASCII.  It is ASCII when it starts with
+## @qcode{solid} and holds @qcode{endsolid}, as every ASCII file does, and
+## is read as the three numbers after each @qcode{vertex}, whatever the case
+## and spacing.  Otherwise it is binary when it is at least as long as the
+## number of triangles it declares makes it, any bytes after them passed
+## over, as some programs pad it; a binary file's header may start with
+## @qcode{solid} too.  It has no colours.
 ##
 ## @item
 ## An OBJ file is text.  Its @qcode{v} lines give the vertices, by their
@@ -169,6 +172,20 @@ endfunction
 %!                zeros(2, n, 'uint8')]);
 %!  fclose (fid);
 %!endfunction
+
+%!test  # binary, padded after its triangles, its header starting "solid"
+%! f = [tempname(), '.stl'];
+%! unwind_protect
+%!   writebinary (f, [0, 0, 0; 1, 0, 0; 0, 1, 0]);
+%!   d = fileread (f);
+%!   fid = fopen (f, 'w');
+%!   fwrite (fid, [uint8('solid binary'), uint8(d(13:end)), zeros(1, 16)]);
+%!   fclose (fid);
+%!   M = polymesh.read (f);
+%! unwind_protect_cleanup
+%!   [~] = unlink (f);
+%! end_unwind_protect
+%! assert_equal (size (M.Faces), [1, 3]);
 
 %!test  # binary: the corners welded into eight vertices
 %! f = [tempname(), '.stl'];
