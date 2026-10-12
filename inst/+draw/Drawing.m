@@ -340,7 +340,7 @@ classdef Drawing
     ## @deftypefnx {draw.Drawing} {[@var{E}, @var{LOST}] =} entities (@dots{})
     ## @deftypefnx {draw.Drawing} {[@var{E}, @var{LOST}, @var{BLOCKS}] =} entities (@dots{})
     ##
-    ## Lower a drawing to the flat list of primitives @code{plot} and
+    ## Break a drawing down into the flat list of primitives @code{plot} and
     ## @code{tikz} draw.
     ##
     ## @code{@var{E} = entities (@var{D})} converts the @code{draw.Drawing}
@@ -360,7 +360,7 @@ classdef Drawing
     ## @code{'DimScale', 50}.  Ticks are 45-degree obliques and the text is
     ## horizontal whatever the dimension measures.
     ##
-    ## Nothing on a layer that is not visible is lowered.  Every record takes
+    ## Nothing on a layer that is not visible is returned.  Every record takes
     ## its colour, line type and line weight from its layer where it is drawn
     ## @qcode{'byLayer'}, and the defaults where it is drawn
     ## @qcode{'byBlock'} outside a block, unless @qcode{'Layers'} is
@@ -370,8 +370,8 @@ classdef Drawing
     ## @code{[@var{E}, @var{LOST}] = entities (@dots{})} returns what was drawn
     ## otherwise than it is held, with fields @code{index}, @code{type} and
     ## @code{reason}; omit @var{LOST} and each distinct reason is warned about
-    ## once.  @var{BLOCKS} holds the lowered block definitions when
-    ## @qcode{'Blocks'} is @qcode{'reference'}.
+    ## once.  @var{BLOCKS} holds the block definitions, broken down the same
+    ## way, when @qcode{'Blocks'} is @qcode{'reference'}.
     ##
     ## @end deftypefn
     function [E, LOST, BLOCKS] = entities (D, varargin)
@@ -1788,9 +1788,9 @@ classdef Drawing
     ## reads each position straight off the datum, and no error adds up along a
     ## chain of dimensions.
     ##
-    ## The label is the distance, without sign, to a micron, measured when the
-    ## drawing is lowered, so it follows the geometry; @var{LABEL} gives
-    ## literal text instead.
+    ## The label is the distance, without sign, to a micron, measured each time
+    ## the drawing is plotted or written, so it follows the geometry;
+    ## @var{LABEL} gives literal text instead.
     ##
     ## @example
     ## @group

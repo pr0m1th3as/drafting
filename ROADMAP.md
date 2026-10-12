@@ -49,10 +49,13 @@ These apply to all the work below and are not restated in it.
 - Every feature is shown working, rendered and looked at, in a `%!demo` block
   or on a tutorial page of the guide. A demo that runs is not a demo that
   reads, and no test can tell the two apart.
-- Anything new a drawing holds is added to its lowering and to *every*
-  backend, the DXF writer included. A backend that silently ignores an entity
-  type produces a plausible and incomplete figure, which is worse than an
-  error.
+- Anything new a drawing holds must be broken down into primitives (lines,
+  polylines, arcs, circles, ellipses, text, points) by `entities (D)`, and
+  drawn by *every* backend: `plot`, `print` and `tikz`, which draw what
+  `entities` returns, and the DXF writer, which reads the drawing's own
+  records and so must be taught each new kind itself. A backend that silently
+  ignores an entity type produces a plausible and incomplete figure, which is
+  worse than an error.
 
 ## The language of a technical drawing (0.3.0)
 
@@ -172,9 +175,9 @@ not a gate: findings are verified once and written into BISTs as literal
 expectations, and the test suite remains `pkg test`.
 
 **SVG backend.** No dependency, exact affine control, and it draws from the
-same lowered list that `plot` and `tikz` take, so it is a third consumer rather
-than a new architecture. It serves documentation, the web, and everyone without
-a CAD program.
+same list of primitives `entities` gives `plot` and `tikz`, so it is a third
+consumer rather than a new architecture. It serves documentation, the web, and
+everyone without a CAD program.
 
 ## Other platforms
 
