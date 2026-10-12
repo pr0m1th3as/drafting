@@ -2144,7 +2144,9 @@ classdef Drawing
           error (strcat ("draw.Drawing.merge: argument %d is not a", ...
                          " draw.Drawing object."), k);
         endif
-        this.Entities = [this.Entities, other.Entities];
+        if (! isempty (other.Entities))
+          this.Entities = [this.Entities, other.Entities];
+        endif
         this.Layers = foldlayers (this.Layers, other.Layers);
         for bb = 1:numel (other.Blocks)
           name = other.Blocks(bb).name;
@@ -2340,7 +2342,13 @@ classdef Drawing
         endfor
         parts{ii} = blk;
       endfor
-      this.Entities = [this.Entities([]), parts{:}];
+      ## Empty pieces are left out of the join, since joining empty structs
+      ## alone gives a struct without fields
+      parts = parts(! cellfun (@isempty, parts));
+      this.Entities = this.Entities([]);
+      if (! isempty (parts))
+        this.Entities = [parts{:}];
+      endif
       this.Blocks = this.Blocks([]);
 
     endfunction

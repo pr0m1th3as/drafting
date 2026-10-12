@@ -826,6 +826,10 @@
 %! M = A.merge (A, A, A);
 %! assert_equal (numentities (M), 4);
 
+%!test  # empty drawings merge to an empty drawing that still takes entities
+%! M = merge (draw.Drawing (), draw.Drawing ());
+%! assert_equal (numentities (M.line ([0, 0], [1, 0])), 1);
+
 %!test  # build once, place many: the whole point of the pair
 %! part = draw.Drawing ().circle ([0, 0], 3).line ([-5, 0], [5, 0]);
 %! sheet = draw.Drawing ('assembly');
@@ -942,6 +946,10 @@
 %! D = draw.Drawing ().block ('p', draw.Drawing ().circle ([0, 0], 1));
 %! X = D.insert ('p', [0, 0]).expand ();
 %! assert_equal (any (strcmp ({X.Entities.type}, 'insert')), false);
+
+%!test  # an insert of an empty block expands to a drawing that takes entities
+%! D = draw.Drawing ().block ('e', draw.Drawing ()).insert ('e', [0, 0]);
+%! assert_equal (numentities (expand (D).line ([0, 0], [1, 0])), 1);
 
 %!error<draw.Drawing.block: B must be a draw.Drawing object.> ...
 %! draw.Drawing ().block ('p', 42)
