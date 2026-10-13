@@ -2,7 +2,7 @@
 # name: cache
 # type: cell
 # rows: 3
-# columns: 241
+# columns: 242
 # name: <cell-element>
 # type: sq_string
 # elements: 1
@@ -336,7 +336,7 @@ draw.Drawing.angdim
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 625
+# length: 664
 draw.Drawing: D = angdim (D, V, P1, P2, RAD)
 draw.Drawing: D = angdim (..., LABEL)
 Append an angular dimension at a vertex.
@@ -351,9 +351,9 @@ explement instead. That is the choice being offered, not an ambiguity:
 a corner and its outside both get dimensioned on real drawings.
 
 See also:
-diam,
-radius,
-ordinate,
+draw.Drawing.diam,
+draw.Drawing.radius,
+draw.Drawing.ordinate,
 draw.symbol
 
 
@@ -454,7 +454,7 @@ draw.Drawing.block
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 717
+# length: 756
 draw.Drawing: D = block (D, NAME, B)
 Define a named block from another drawing.
 
@@ -472,9 +472,9 @@ it has already keeps its own properties. Draw a symbol on layer
 '0' to have it take the layer of each insert placing it.
 
 See also:
-insert,
-merge,
-transform
+draw.Drawing.insert,
+draw.Drawing.merge,
+draw.Drawing.transform
 
 
 # name: <cell-element>
@@ -495,7 +495,7 @@ draw.Drawing.centremark
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 774
+# length: 800
 draw.Drawing: D = centremark (D, C, R)
 draw.Drawing: D = centremark (D)
 Append the small cross that marks the centre of a round feature.
@@ -515,8 +515,8 @@ order is to set 'CENTER' and the centre-line layer first and then
 call this once.
 
 See also:
-diam,
-radius,
+draw.Drawing.diam,
+draw.Drawing.radius,
 draw.linetype
 
 
@@ -567,7 +567,7 @@ draw.Drawing.diam
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 662
+# length: 701
 draw.Drawing: D = diam (D, C, R)
 draw.Drawing: D = diam (..., ANG, LABEL)
 Append a diameter dimension across a circle.
@@ -583,9 +583,9 @@ radius is used only where the full circle is not there to measure ---
 which is what radius is for.
 
 See also:
-radius,
-angdim,
-centremark,
+draw.Drawing.radius,
+draw.Drawing.angdim,
+draw.Drawing.centremark,
 draw.symbol
 
 
@@ -654,7 +654,7 @@ draw.Drawing.ellipse
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 619
+# length: 658
 draw.Drawing: D = ellipse (D, C, A, B)
 draw.Drawing: D = ellipse (D, C, A, B, ROT)
 Append ellipses centred at C with semi-axes A and B.
@@ -671,9 +671,9 @@ obliquely, which is most of the time on an isometric or an auxiliary
 view, and what a chamfer on a cylinder projects to.
 
 See also:
-circle,
-arc,
-polyline
+draw.Drawing.circle,
+draw.Drawing.arc,
+draw.Drawing.polyline
 
 
 # name: <cell-element>
@@ -694,7 +694,7 @@ draw.Drawing.expand
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1385
+# length: 1411
 draw.Drawing: D = expand (D)
 Replace every insert with the geometry it refers to.
 
@@ -724,8 +724,8 @@ backstop against a construction this class does not permit, not a rule a
 caller can meet by accident.
 
 See also:
-block,
-insert,
+draw.Drawing.block,
+draw.Drawing.insert,
 draw.Drawing.plot
 
 
@@ -747,7 +747,7 @@ draw.Drawing.hatch
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 926
+# length: 939
 draw.Drawing: D = hatch (D, R)
 draw.Drawing: D = hatch (D, R, PATTERN)
 draw.Drawing: D = hatch (D, R, PATTERN, ANGLE, SPACING)
@@ -774,7 +774,7 @@ face down: the drawing keeps the same region, re-expressed in its own
 coordinates.
 
 See also:
-region,
+draw.Drawing.region,
 geom.Region,
 geom.hatchlines
 
@@ -797,7 +797,7 @@ draw.Drawing.insert
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 704
+# length: 743
 draw.Drawing: D = insert (D, NAME, POS)
 draw.Drawing: D = insert (..., ROT, SCALE)
 Place a defined block at a point.
@@ -817,9 +817,9 @@ rather than leaving a reference that resolves to nothing when the file is
 opened.
 
 See also:
-block,
-merge,
-transform
+draw.Drawing.block,
+draw.Drawing.merge,
+draw.Drawing.transform
 
 
 # name: <cell-element>
@@ -955,7 +955,7 @@ draw.Drawing.leader
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 515
+# length: 541
 draw.Drawing: D = leader (D, P, TEXT)
 Append a leader: an arrow to a feature with a note at its tail.
 
@@ -968,8 +968,8 @@ The note is placed at the last point. It may carry the codes of
 draw.symbol, so a thread callout or a tolerance reads properly.
 
 See also:
-diam,
-radius,
+draw.Drawing.diam,
+draw.Drawing.radius,
 draw.symbol
 
 
@@ -1020,7 +1020,7 @@ draw.Drawing.merge
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1377
+# length: 1416
 draw.Drawing: D = merge (D, D2, ...)
 Append the entities of one or more drawings to this one.
 
@@ -1050,9 +1050,9 @@ separately-built views into a sheet. With transform it is the
 whole of composition: build once, place as often as needed.
 
 See also:
-transform,
-numentities,
-layers
+draw.Drawing.transform,
+draw.Drawing.numentities,
+draw.Drawing.layers
 
 
 # name: <cell-element>
@@ -1096,7 +1096,7 @@ draw.Drawing.ordinate
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1479
+# length: 1505
 draw.Drawing: D = ordinate (D, O, P, AXIS, L)
 draw.Drawing: D = ordinate (..., LABEL)
 Append an ordinate dimension, the distance of a point from a datum.
@@ -1130,8 +1130,8 @@ D = D.ordinate ([0, 0], [20, 15], 'y', [-10, 15]);
 D = D.ordinate ([0, 0], [60, 35], 'y', [-10, 35]);
 
 See also:
-dim,
-leader
+draw.Drawing.dim,
+draw.Drawing.leader
 
 
 # name: <cell-element>
@@ -1152,7 +1152,7 @@ draw.Drawing.path
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 567
+# length: 593
 draw.Drawing: D = path (D, P)
 Append a path.
 
@@ -1171,8 +1171,8 @@ its own coordinates.
 
 See also:
 geom.Path,
-polyline,
-spline
+draw.Drawing.polyline,
+draw.Drawing.spline
 
 
 # name: <cell-element>
@@ -1193,7 +1193,7 @@ draw.Drawing.plot
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 4299
+# length: 4560
 draw.Drawing: plot (D)
 draw.Drawing: plot (HAX, D)
 draw.Drawing: plot (..., Name, Value)
@@ -1226,7 +1226,8 @@ Name Default Meaning
 'Axes' gca axes to draw into
 'LineWidth' 0.5 width in points of every line
 with no line weight of its own or of its layer, which is drawn at that
-weight
+weight; a weight of 0, DXF's thinnest line, is drawn 0.13 mm wide, the
+thinnest pen of ISO 128
 'FontSize' 8 size of text, in points
 'Layers' all cell array of layer names to draw
 'Arc' 64 segments per full turn when sampling
@@ -1267,7 +1268,9 @@ Every entity is drawn as the lines, arcs and text it consists of: a
 dimension as its extension lines, ticks and label, a spline, path or
 region along its curves, a hatch as its loops and its fill lines, clear
 of its holes, or as its loops alone with 'Hatch' set to
-'boundary'. draw.Drawing.tikz draws the same.
+'boundary'. draw.Drawing.tikz draws the same. Text
+is drawn as written, not read as TeX, so braces and underscores stay as
+they are.
 
 Line types are drawn properly, not approximated
 
@@ -1287,10 +1290,10 @@ convention CAD uses. A drawing spanning tens of millimetres therefore
 needs
 no adjustment; one spanning metres wants an 'LTScale' to match.
 
-The cost is one graphics object per dash. Set 'Linetypes' to
-'approximate' on a large drawing to fall back on the figure's
-four
-styles and one object per entity.
+The dashes are pieces of their layer's line object, split by
+NaN, so a long dotted line costs points rather than objects.
+Set 'Linetypes' to 'approximate' on a large drawing to
+draw with the figure's four styles instead, and leave the lines whole.
 
 Text is not to scale by default. A figure sets font size in
 points,
@@ -1411,7 +1414,7 @@ draw.Drawing.print
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 3460
+# length: 3693
 draw.Drawing: print (D, FILE)
 draw.Drawing: print (D, FILE, NAME, VALUE, ...)
 draw.Drawing: [PAPER, SCALE] = print (...)
@@ -1490,6 +1493,10 @@ particular plot.
 
 'LineWidth' is the opposite: a width on the paper, held there at
 every scale, because a 0.35 mm pen is 0.35 mm whatever the sheet shows.
+So are the dashes of a line type and the ticks and labels of a
+dimension: they arrive at their nominal size on the sheet whatever the
+scale, as draw.Drawing.plot draws them with 'LTScale' and
+'DimScale' set to the scale denominator.
 
 See also:
 draw.Drawing.plot,
@@ -1516,7 +1523,7 @@ draw.Drawing.radius
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 410
+# length: 449
 draw.Drawing: D = radius (D, C, R)
 draw.Drawing: D = radius (..., ANG, LABEL)
 Append a radius dimension from a centre out to an arc.
@@ -1528,9 +1535,9 @@ Use it for a fillet or any arc that is less than a full circle, where
 there is no diameter to measure across.
 
 See also:
-diam,
-angdim,
-centremark
+draw.Drawing.diam,
+draw.Drawing.angdim,
+draw.Drawing.centremark
 
 
 # name: <cell-element>
@@ -1551,7 +1558,7 @@ draw.Drawing.region
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 631
+# length: 657
 draw.Drawing: D = region (D, R)
 Append a region, drawn as its outline and holes.
 
@@ -1573,8 +1580,8 @@ coordinates.
 
 See also:
 geom.Region,
-hatch,
-polyline
+draw.Drawing.hatch,
+draw.Drawing.polyline
 
 
 # name: <cell-element>
@@ -1595,7 +1602,7 @@ draw.Drawing.spline
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 495
+# length: 521
 draw.Drawing: D = spline (D, SP)
 Append a spline.
 
@@ -1613,8 +1620,8 @@ coordinates.
 
 See also:
 geom.Spline,
-polyline,
-path
+draw.Drawing.polyline,
+draw.Drawing.path
 
 
 # name: <cell-element>
@@ -1675,7 +1682,7 @@ draw.Drawing.tikz
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 2885
+# length: 2679
 draw.Drawing: S = tikz (D)
 draw.Drawing: S = tikz (D, NAME, VALUE, ...)
 Render a drawing as a TikZ picture for inclusion in the LaTeX report.
@@ -1717,29 +1724,24 @@ reach the page at their nominal size, and a centre line reads as a
 centre line whether the view is at 1:1 or 1:50, while leaving the factor
 visible and adjustable.
 
-Dimensions
+Dimensions and hatches
 
-Dimensions are rendered here from what they measure, which is the point
-of storing them semantically. A TikZ node anchors itself, so the label
-is positioned by naming the side it should sit on and letting TikZ
-measure the text, where a figure or a CAD file has to estimate the width
-of a string from its character count. The same drawing therefore gets
-properly centred labels on the report figure, from one model and without
-a flag anywhere.
-
-Labels are unidirectional, as draw.Drawing.plot draws them, and
-ticks are the 45-degree architectural obliques.
+A dimension, a centre mark and a leader are drawn as the lines and text
+draw.Drawing.entities breaks them into, as
+draw.Drawing.plot draws them: labels unidirectional, ticks the
+45-degree architectural obliques, their size on paper nominal whatever
+the scale. A label is a node anchored at the
+start of its baseline, where draw.Drawing.entities places it
+from an estimate of its width. A hatch is drawn as its outline and its
+fill lines.
 
 What the document needs
 
-A hatch is emitted as \path[pattern=...], which requires
-\usetikzlibrary{patterns}. Nothing else in the output needs a
-library beyond TikZ itself.
-
-Text is written through as UTF-8 and LaTeX's special characters are
-escaped. Greek text needs a Unicode-aware engine, xelatex or
-lualatex, or babel configured for Greek; that is a
-property of the document, not of this output.
+The output needs no library beyond TikZ itself. Text is written
+through as UTF-8 and LaTeX's special characters are escaped. Greek
+text needs a Unicode-aware engine, xelatex or lualatex,
+or babel configured for Greek; that is a property of the
+document, not of this output.
 
 See also:
 draw.Drawing,
@@ -1765,7 +1767,7 @@ draw.Drawing.transform
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 2126
+# length: 2175
 draw.Drawing: D = transform (D, T)
 draw.Drawing: D = transform (D, OP, VAL)
 draw.Drawing: D = transform (D, OP, VAL, CENTRE)
@@ -1795,11 +1797,11 @@ piece that was not there before. The endpoints are exchanged instead.
 What is refused, and why
 
 A non-uniform scaling that would turn a circle into an ellipse
-raises. There is no ellipse entity to put the result in, and quietly
-scaling the radius by one of the two factors would move the geometry off
-the part. A spline, path, region or hatch refuses it too. A drawing
-of lines and polylines without arcs scales anisotropically without
-complaint.
+raises. transform makes no ellipse out of a circle or an arc,
+and quietly scaling the radius by one of the two factors would move the
+geometry off the part. An ellipse, a spline, a path, a region or a
+hatch refuses it too. A drawing of lines and polylines without arcs
+scales anisotropically without complaint.
 
 A rotation that would leave an axis-locked dimension off its
 axis raises, naming the entity. A 'horizontal' dimension
@@ -1812,8 +1814,8 @@ either axis. A dimension made 'aligned' rotates freely.
 
 See also:
 geom.transform,
-merge,
-bbox
+draw.Drawing.merge,
+draw.Drawing.bbox
 
 
 # name: <cell-element>
@@ -1834,7 +1836,7 @@ draw.Drawing.write
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 2581
+# length: 2664
 draw.Drawing: write (D, FILE)
 draw.Drawing: write (D, FILE, Name, Value, ...)
 Write a drawing to a DXF file.
@@ -1868,9 +1870,10 @@ Name/Value pairs:
 
 'Version'
 'R2000', the default, or 'R12' (AC1009) for a
-program that reads nothing later. R12 holds only lines and arcs, so a
-drawing holding an ellipse, a spline, a path, a region or a hatch is an
-error there, naming what R12 cannot hold.
+program that reads nothing later. R12 has no ELLIPSE, no
+SPLINE, no groups and no HATCH, so a drawing holding an
+ellipse, a spline, a path, a region or a hatch is an error there,
+naming what R12 cannot hold.
 'Dimensions'
 'associative', the default, or 'explode' to write each
 dimension as the lines and text it is drawn with, for a program that
@@ -1887,8 +1890,8 @@ The drawing's line-type scale, 1 by default, written in the header so
 the dashes look the same wherever the file is opened.
 
 Text is written with every character outside ASCII escaped as
-\U+XXXX, so the file reads the same whatever the reader's code
-page.
+\U+XXXX, so it reads the same whatever the reader's code page.
+Layer, line-type and block names are written as given, in UTF-8.
 
 See also:
 draw.read,
@@ -2048,7 +2051,7 @@ draw.linetype
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 2449
+# length: 2558
 drafting: NAMES = draw.linetype ()
 drafting: PATTERN = draw.linetype (NAME)
 drafting: [PATTERN, DESCR] = draw.linetype (NAME)
@@ -2060,7 +2063,8 @@ the package defines, as a cell array of character vectors.
 PATTERN = draw.linetype (NAME) returns the dash pattern of
 one of them, as a row vector in millimetres. A positive element is a drawn
 dash, a negative element a gap, and a zero a dot. 'CONTINUOUS' has an
-empty pattern.
+empty pattern. The patterns are the metric ones CAD programs define, so a
+hidden line is dashes of 6.35 with gaps of 3.175.
 
 [PATTERN, DESCR] = draw.linetype (NAME) also returns
 a human-readable description, which is what a DXF line-type table carries.
@@ -2134,7 +2138,7 @@ draw.read
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 2509
+# length: 2591
 drafting: D = draw.read (FILE)
 Read a drawing from an ASCII DXF file.
 
@@ -2149,14 +2153,14 @@ visible, and whether it is printed. An entity that takes its colour, line
 type or line weight from its layer keeps doing so, so the drawing looks as
 it did and a layer changed later changes everything on it.
 
-Geometry returns as itself: lines, points, arcs, circles, ellipses,
-polylines with their bulges, splines, text, and inserts of the blocks the
-file defines, nested blocks included. A HATCH returns as a hatch
-over the regions it fills, its pattern, angle and spacing kept; a pattern
-the package does not define is drawn as 'ANSI31'. A path or a
-region the package wrote, through draw.Drawing.write, returns as
-that path or region. An MTEXT returns as one line of text, its
-formatting removed.
+Geometry returns as itself: lines, points, arcs, circles, ellipses, polylines
+with their bulges, splines, text, and inserts of the blocks the file defines,
+nested blocks included, each block moved so that its base point is its
+origin, where an insert places it. A HATCH returns as a hatch over
+the regions it fills, its pattern, angle and spacing kept; a pattern the
+package does not define is drawn as 'ANSI31'. A path or a region the
+package wrote, through draw.Drawing.write, returns as that path or
+region. An MTEXT returns as one line of text, its formatting removed.
 
 A DIMENSION returns as a dimension: its definition points name what
 it measures, so a linear, aligned, angular, diameter, radius or ordinate
@@ -2266,7 +2270,7 @@ draw.titleblock
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1877
+# length: 1890
 drafting: D = draw.titleblock (SIZE, FIELDS)
 drafting: D = draw.titleblock (SIZE)
 drafting: SIZES = draw.titleblock ()
@@ -2319,7 +2323,7 @@ before sending the geometry to a machine that has no use for them.
 See also:
 draw.Drawing,
 draw.coordtable,
-merge
+draw.Drawing.merge
 
 
 # name: <cell-element>
@@ -2611,7 +2615,7 @@ geom.Path.chain
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1619
+# length: 1615
 geom.Path: C = geom.Path.chain (PIECES)
 Join pieces that meet end to end into paths.
 
@@ -2641,10 +2645,10 @@ The paths are in the world coordinate system, unless every piece has
 the same UCS, in which case they are in that one.
 
 ## A slot drawn as two lines and two half circles, in no order
-C = geom.Path.chain ({geom.Polyline ([0, 0; 20, 0]), ...
-geom.Polyline ([0, 10, 1; 0, 0, 0]), ...
-geom.Polyline ([0, 10; 20, 10]), ...
-geom.Polyline ([20, 0, 1; 20, 10, 0])});
+C = geom.Path.chain ({geom.Polyline([0, 0; 20, 0]), ...
+geom.Polyline([0, 10, 1; 0, 0, 0]), ...
+geom.Polyline([0, 10; 20, 10]), ...
+geom.Polyline([20, 0, 1; 20, 10, 0])});
 
 See also:
 geom.Path.join,
@@ -2834,7 +2838,7 @@ geom.Path.write
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1382
+# length: 1352
 geom.Path: write (P, FILE)
 geom.Path: write (P, FILE, Name, Value, ...)
 Write a path to a DXF file.
@@ -2862,7 +2866,7 @@ which is the default. True colour came only with R2004.
 'Version'
 'R2000' (AC1015), the default, or 'R12'
 (AC1009) for a program that reads nothing later. R12 has no
-groups and holds only lines and arcs, so a path is an error there.
+groups, so a path is an error there.
 'LTScale'
 The drawing's line-type scale, 1 by default, written in the header so
 the dashes look the same wherever the file is opened.
@@ -3732,7 +3736,7 @@ geom.Region.nest
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1470
+# length: 1467
 geom.Region: R = geom.Region.nest (LOOPS)
 Make regions from closed loops, each hole in the loop around it.
 
@@ -3758,11 +3762,11 @@ it must lie in a plane. Loops that cross or touch, themselves or each
 other, make no regions and are refused.
 
 ## A plate with a bore, and a disc lying in the bore
-R = geom.Region.nest ({geom.Polyline ([20, 20, 1; 40, 20, 1], ...
+R = geom.Region.nest ({geom.Polyline([20, 20, 1; 40, 20, 1], ...
 'Closed', true), ...
-geom.Polyline ([0, 0; 60, 0; 60, 40; 0, 40], ...
+geom.Polyline([0, 0; 60, 0; 60, 40; 0, 40], ...
 'Closed', true), ...
-geom.Polyline ([25, 20, 1; 35, 20, 1], ...
+geom.Polyline([25, 20, 1; 35, 20, 1], ...
 'Closed', true)});
 
 See also:
@@ -4636,7 +4640,7 @@ geom.Spline.write
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1268
+# length: 1256
 geom.Spline: write (SP, FILE)
 geom.Spline: write (SP, FILE, Name, Value, ...)
 Write a spline to a DXF file.
@@ -4661,8 +4665,8 @@ An AutoCAD colour index from 1 to 256, 256 meaning the layer's colour,
 which is the default. True colour came only with R2004.
 'Version'
 'R2000' (AC1015), the default, or 'R12'
-(AC1009) for a program that reads nothing later. R12 holds
-only lines and arcs, so a spline is an error there.
+(AC1009) for a program that reads nothing later. R12 has no
+SPLINE, so a spline is an error there.
 'LTScale'
 The drawing's line-type scale, 1 by default, written in the header so
 the dashes look the same wherever the file is opened.
@@ -5218,7 +5222,7 @@ geom.curveoffset
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 3901
+# length: 3984
 drafting: Q = geom.curveoffset (P, D)
 drafting: Q = geom.curveoffset (P, D, CLOSED)
 drafting: [Q, MARGIN] = geom.curveoffset (...)
@@ -5226,9 +5230,10 @@ Equidistant offset of a smooth sampled curve.
 
 Q = geom.curveoffset (P, D) moves every point of the
 curve P a distance D along the curve's own normal and returns the
-result Q, with one point per point of P. P is an
-N-by-2 matrix of points and D is a real scalar in the units of
-P, so millimetres by package convention.
+result Q, with one point per point of P, but for the last
+point of a closed curve that repeats the first, which is dropped. P
+is an N-by-2 matrix of points and D is a real scalar in the
+units of P, so millimetres by package convention.
 
 Q = geom.curveoffset (P, D, CLOSED) treats the
 curve as closed when CLOSED is true. CLOSED defaults to false.
@@ -6050,7 +6055,7 @@ geom.selfintersects
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1778
+# length: 1694
 drafting: TF = geom.selfintersects (P)
 drafting: TF = geom.selfintersects (P, CLOSED)
 drafting: [TF, IDX] = geom.selfintersects (...)
@@ -6082,10 +6087,9 @@ geom.curveoffset. An offset curve can satisfy the curvature condition
 at every point and still pinch closed somewhere along its length; only a
 test like this one sees that.
 
-The test is exhaustive over segment pairs, so its cost grows as the square of
-the number of points. On a profile of a few thousand points that is a
-fraction of a second, but it is not something to call inside a loop over
-candidate designs.
+Only segments whose bounding boxes overlap are tested, found by sweeping
+along x, so a profile of half a million points takes a few
+hundredths of a second.
 
 See also:
 geom.curveoffset,
@@ -6405,7 +6409,7 @@ geom.triangulate
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1959
+# length: 2107
 drafting: T = geom.triangulate (P)
 drafting: T = geom.triangulate (P, HOLES)
 drafting: [T, V] = geom.triangulate (...)
@@ -6425,8 +6429,8 @@ overlap one another; neither is checked.
 list the indices refer to: P followed by each hole in turn.
 
 [T, V, COVERAGE] = geom.triangulate (...)
-returns the fraction of the true area the triangles actually cover. Read it;
-see below.
+returns the area of the triangles over the area of the polygon, less its
+holes. Read it; see below.
 
 The intended use is generating end caps for an extruded solid, where the
 profile carries a central bore and a ring of holes.
@@ -6440,10 +6444,12 @@ of the boundary a sliver of the true area may go uncovered: a triangle
 bridging the concavity has its centroid outside and is discarded, and nothing
 replaces it.
 
-The consequence is that a triangulated region can be slightly smaller than
-the polygon, never larger. Denser sampling of the boundary shrinks the
-shortfall, and COVERAGE measures it, so a caller that needs a guarantee
-can assert on a number rather than trust a description. For a printed
+The consequence is that a triangulated region can differ from the polygon
+along a strongly concave boundary: a sliver of the polygon may go
+uncovered, and a triangle bridging the concavity whose centroid lies inside
+covers a sliver outside it. Denser sampling of the boundary shrinks both.
+COVERAGE below 1 shows a shortfall, but a sliver outside can offset
+one missed inside, so it bounds neither on its own. For a printed
 prototype the shortfall is invisible well before it is zero; for anything
 dimensionally critical, a constrained triangulation is the right tool and
 this is not it.
@@ -6472,7 +6478,7 @@ geom.write
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 2103
+# length: 2042
 drafting: geom.write (C, FILE)
 drafting: geom.write (C, FILE, Name, Value, ...)
 Write several geom objects to one DXF file.
@@ -6510,16 +6516,15 @@ its group so it reads back as part of the region; false by
 default.
 'Version'
 'R2000' (AC1015), the default, or 'R12'
-(AC1009) for a program that reads nothing later. R12 holds only
-lines and arcs, so only polylines may be written as R12; a spline, a path
-or a region is an error naming it.
+(AC1009) for a program that reads nothing later. R12 has no
+SPLINE, no groups and no HATCH, so only polylines may be
+written as R12; a spline, a path or a region is an error naming it.
 'LTScale'
 The drawing's line-type scale, 1 by default, written in the header so
 the dashes look the same wherever the file is opened.
 
-The drawing units are millimetres. Text is written with every character
-outside ASCII escaped as \U+XXXX, so the file reads the same
-whatever the reader's code page.
+The drawing units are millimetres. Layer and line-type names are written
+as given, in UTF-8.
 
 See also:
 geom.read,
@@ -6703,7 +6708,7 @@ model.Assembly.add
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 953
+# length: 1028
 model.Assembly: A = add (A, NAME, X, U)
 model.Assembly: A = add (A, NAME, [], U)
 model.Assembly: A = add (..., 'Name', INSTANCE)
@@ -6718,7 +6723,8 @@ with solid.Shape.mirror or polymesh.Mesh.mirror.
 
 The first use of a name defines the part. A later use places the same
 part again, and gives the same X, or [] for it; another
-X under a name already used is an error. The same means stored
+X under a name already used is an error, and so is an empty one,
+a shape, a mesh or an assembly with nothing in it. The same means stored
 the same, not only shaped the same: a shape read back from a file is
 another shape, so a part is best placed again with [].
 
@@ -7038,7 +7044,7 @@ model.Viewer
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 2556
+# length: 2568
 drafting: model.Viewer
 A window showing a solid, a triangle mesh or an assembly, in which
 edges, faces, solids and coordinate systems can be picked, and solids
@@ -7091,7 +7097,7 @@ after, where the mesh has that colouring.
 Closing the window ends the viewer; assigning a shape again opens a new
 one. The window closes with Octave.
 
-The viewer needs a display to run. It runs on Linux.
+The viewer needs a display to run. It runs on Linux and FreeBSD.
 
 See also:
 solid.Shape.show,
@@ -7615,7 +7621,7 @@ model.read
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1358
+# length: 1944
 drafting: A = model.read (FILE)
 Read an assembly from a STEP or 3MF file.
 
@@ -7628,7 +7634,18 @@ same way. A part the file places
 several times is one part placed several times. Several products at the
 top of the file are placed where they are in one assembly, and a file of
 a single part gives an assembly placing it once; either is named after
-the base name of FILE.
+the base name of FILE. A part without a name is named
+'part', an assembly 'assembly', and a name two parts
+share, or two placements in one assembly, is made distinct with
+'_2', '_3' and so on. A placement that mirrors its
+part is an error, since a geom.UCS places rigidly and a mirrored
+part is another part.
+
+A part of a STEP file is its solids, a closed shell read as the solid it
+bounds. Surfaces, curves and points are left out with a warning that
+counts them, a part that holds nothing else is left out of the assembly,
+and so is a sub-assembly left with no part; a file that holds no solid
+is an error.
 
 A = model.read (FILE) reads a 3MF file, .3mf,
 the same way: each object a polymesh.Mesh part, in the colours
@@ -8206,7 +8223,7 @@ polymesh.Mesh.show
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 865
+# length: 877
 polymesh.Mesh: show (M)
 polymesh.Mesh: V = show (M)
 Show a mesh in a viewer of its own, redrawing in place.
@@ -8225,7 +8242,7 @@ model.Viewer, whose pick returns points clicked on the
 mesh and pickucs a coordinate system.
 
 The viewer is built with the package when Open CASCADE and X11 are
-found, and needs a display to run. It runs on Linux.
+found, and needs a display to run. It runs on Linux and FreeBSD.
 
 See also:
 model.Viewer,
@@ -8375,7 +8392,7 @@ polymesh.read
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 3603
+# length: 3949
 drafting: M = polymesh.read (FILE)
 drafting: M = polymesh.read (FILE, 'Tolerance', T)
 Read a triangle mesh from an STL, OBJ, PLY or 3MF file.
@@ -8386,10 +8403,13 @@ vertices or faces where the file has them. The extension of FILE
 names the format, .stl, .obj, .ply or .3mf,
 in any case.
 
-An STL file is binary or ASCII. It is binary when it is exactly as long
-as the number of triangles it declares makes it, and anything else is
-read as ASCII, the three numbers after each vertex, whatever the
-case and spacing. It has no colours.
+An STL file is binary or ASCII. It is ASCII when it starts with
+solid and holds endsolid, as every ASCII file does, and
+is read as the three numbers after each vertex, whatever the case
+and spacing. Otherwise it is binary when it is at least as long as the
+number of triangles it declares makes it, any bytes after them passed
+over, as some programs pad it; a binary file's header may start with
+solid too. It has no colours.
 
 An OBJ file is text. Its v lines give the vertices, by their
 first three numbers, and their colours by the next three where they have
@@ -8432,7 +8452,9 @@ The vertices come in the order the triangles first use them, and a
 vertex that no face uses is left out. The coordinates are taken as they
 are written; none of the three formats has units, and most files are in
 millimetres. A file with vertices but no faces, such as a point cloud,
-is an error.
+is an error. The lines and points of an OBJ file, and the edges of a PLY
+file, are left out with a warning that counts them, and a file that
+holds them but no face is an error.
 
 A file that colours only some of its vertices, or only some of its faces,
 gives the rest the grey [0.72, 0.74, 0.78] that an uncoloured mesh
@@ -8470,7 +8492,7 @@ solid.Shape
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 2169
+# length: 2376
 drafting: solid.Shape
 A solid in millimetres, modelled through Open CASCADE.
 
@@ -8527,8 +8549,13 @@ The class is a value class. Every operation returns a new shape
 and leaves its operands unchanged, and a copy is independent of the
 original. The empty shape adds nothing to a union and empties an
 intersection, and a boolean whose result holds no material, such as the
-intersection of two solids that do not meet, returns it. A shape is
-saved and loaded with save and load like any other value.
+intersection of two solids that do not meet, returns it.
+
+Octave's save does not keep a classdef object, so a shape is not
+saved as a value. Save its Data, and make it again with
+solid.Shape (DATA), its Colour and Name set
+again; or write it to a STEP file with solid.Shape.write, which
+keeps both, and read it back with solid.read.
 
 See also:
 solid.box,
@@ -8623,7 +8650,7 @@ solid.Shape.Shape
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 746
+# length: 971
 solid.Shape: S = solid.Shape ()
 solid.Shape: S = solid.Shape (DATA)
 Make a shape.
@@ -8632,10 +8659,15 @@ S = solid.Shape () returns the empty shape, which holds
 nothing.
 
 S = solid.Shape (DATA) wraps DATA, the bytes of
-a shape in Open CASCADE's binary format. This is how the functions of
-the solid namespace return what Open CASCADE computed, and it is
-not for direct use: bytes that do not begin with that format's signature
-are refused.
+a shape in Open CASCADE's binary format followed by a check of 16 bytes.
+This is how the functions of the solid namespace return what Open
+CASCADE computed, and it is not for direct use: bytes that do not begin
+with that format's signature, or whose check does not match them, are
+refused here.
+
+A shape holds solids and nothing else: bytes that hold a surface, a
+curve or a point outside a solid are refused. An open surface is a
+polymesh.Mesh.
 
 The empty shape is where a shape built up in a loop starts: it adds
 nothing to a union, so the first pass needs no case of its own.
@@ -9075,7 +9107,7 @@ solid.Shape.hole
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 6411
+# length: 7890
 solid.Shape: S = hole (S, P, D, DEPTH)
 solid.Shape: S = hole (..., Name, Value, ...)
 Drill holes into a shape.
@@ -9091,7 +9123,10 @@ drill comes from outside: everything on the axis before the point is
 cleared too, at the widest diameter of the hole, so a hole entering a
 sloping or curved face is clean all round. A hole started under
 material that its axis passes through first cuts that material as
-well. All the holes are cut in one operation.
+well. All the holes are cut in one operation. A hole that would
+remove nothing, its axis missing the part or its point too far from
+it for DEPTH to reach, is an error naming the point, as a thread
+whose axis meets no bore or cylinder is for solid.Shape.thread.
 
 P may instead be a geom.UCS, such as geom.UCS
 (V) picks off a face in the viewer: the hole starts at its origin
@@ -9132,6 +9167,21 @@ sizes of the twist drills in RUKO's catalogue, chapter 1.01
 Twist drills (2014): DIN 338 type N, HSS ground, article 214,
 0.3 to 20 millimetres, pages 54 to 56; DIN 345 type N, HSS, article
 204, 10 to 60 millimetres, pages 78 and 79.
+
+A tapping hole is countersunk at its entry, as IS 1369 (Part 3):1995,
+prepared from DIN 76-1:1983, draws the entry of an internal thread:
+120 degrees, and 1.05 times the nominal diameter across at the
+surface, the largest its band from the nominal diameter allows, 6.3
+for M6, so that the tap starts square and the thread starts clean. A
+hole drilled through, with an Inf DEPTH or one that
+reaches past the part, is countersunk alike where its axis last leaves
+the part. 'Countersink' false leaves both out, and numbers
+size both. A tapping hole takes no counterbore.
+
+A tapping hole is expected to be drilled, not milled, so a blind one
+ends in the cone the point of a 118 degree twist drill leaves, beyond
+DEPTH, as the drawing of a blind tapped hole in IS 1369 (Part 3)
+shows it. 'Tip' gives another angle, and false a flat bottom.
 
 Name/Value pairs shape the hole:
 
@@ -9174,7 +9224,7 @@ CD, wider than the hole, CDEPTH deep, shallower than the
 hole, for the head of a cap screw. With a named thread and
 'Clearance', true takes the counterbore of IS 3406 (Part 2)
 for a socket head cap screw of ISO 4762, and 'washer' the one
-for the same screw on a plain washer.
+for the same screw on a plain washer. A tapping hole takes none.
 'Countersink'
 CD, [CD, ANGLE] or [CD,
 ANGLE, CDEPTH]: a conical seat of diameter CD at the
@@ -9184,18 +9234,24 @@ of the same diameter CDEPTH deep, none by default. It must be
 shallower than the hole. With a named thread and 'Clearance',
 true takes the countersink of IS 3406 (Part 1) for the countersunk
 heads of ISO 7721, and 'socket' the one for a hexagon socket
-countersunk screw of ISO 10642.
+countersunk screw of ISO 10642. A tapping hole takes the countersink
+of an internal thread by default, as the tapping holes above describe;
+false leaves it out, and numbers replace it.
 'Tip'
 The included angle in degrees of the cone a twist drill leaves at the
-bottom of a blind hole, 118 for a standard drill. It is beyond
-DEPTH, which is measured to the full diameter as a drawing
-dimensions it. By default a blind hole is flat-bottomed.
+bottom of a blind hole, 118 for a standard drill, or false for none.
+It is beyond DEPTH, which is measured to the full diameter as a
+drawing dimensions it. A blind tapping hole is drilled, so it takes
+the point of a 118 degree drill by default; false leaves it
+flat-bottomed, as an end mill or a flat-bottom drill leaves it. Every
+other blind hole is flat-bottomed by default, as an end mill leaves it.
 
 A counterbore and a countersink cannot both be given, and a tip applies
-only to a blind hole. The standard ones need a named thread and
-'Clearance', fine or medium; solid.holespec gives their
-sizes, and the sizes of every hole for a named thread, before it is
-drilled. Drilling the empty shape leaves it empty.
+only to a blind hole. The standard ones need a named thread, and
+those for a screw head 'Clearance', fine or medium;
+solid.holespec gives their sizes, and the sizes of every hole
+for a named thread, before it is drilled. Drilling the empty shape
+leaves it empty.
 
 ## A plate with four counterbored holes for M6 cap screws
 S = solid.box (80, 40, 12);
@@ -9234,7 +9290,7 @@ solid.Shape.hull
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1172
+# length: 1270
 solid.Shape: H = hull (A, B, ...)
 solid.Shape: H = hull (..., 'Tolerance', TOL)
 The convex hull of shapes and points.
@@ -9253,6 +9309,9 @@ it, 0.01 by default, so the hull lies inside the exact one by at most
 TOL; where the exact hull is flat, as between boxes, it is exact
 and its triangles meet as whole faces. Open CASCADE has no exact hull
 of curved faces.
+
+The hull is a new solid, no one operand's material, so it takes no
+Colour and no Name from them.
 
 ## A slot 30 long and 10 wide, 4 deep, cut through a plate
 C = solid.cylinder (5, 4);
@@ -9284,7 +9343,7 @@ solid.Shape.intersect
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 924
+# length: 1277
 solid.Shape: C = intersect (A, B, ...)
 The intersection of shapes, the material common to all of them.
 
@@ -9298,6 +9357,13 @@ parts tells whether they collide: the volume of their intersection is
 the volume of the interference, and parts that stay apart give the
 empty shape. Each solid of the result takes the colour of the first
 coloured solid it came from.
+
+A shape may hold solids that overlap, as the shape of an assembly
+does where its parts meet. After the first it counts as the region
+its solids cover together, and each solid of A is intersected on
+its own and kept apart from the others, so intersecting a part with
+the shape of the assembly round it gives the interference with all its
+parts at once.
 
 ## A shaft through a gear, and the same shaft moved clear of it
 gear = solid.cylinder (20, 5);
@@ -9391,6 +9457,131 @@ isvalid (S)
 # elements: 1
 # length: 53
 True if a shape passes Open CASCADE's validity check.
+
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 17
+solid.Shape.knurl
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 4442
+solid.Shape: S = knurl (S, F, PITCH)
+solid.Shape: S = knurl (S, F, PITCH, DEPTH)
+solid.Shape: S = knurl (..., Name, Value, ...)
+Knurl a cylindrical face of a shape.
+
+S = knurl (S, F, PITCH) knurls the face
+of S indexed by F, as solid.Shape.faces returns it,
+with the crossed knurl of DIN 82 type RGE: two sets of grooves at 30
+degrees either side of the axis, teeth of 90 degrees, cut to full depth,
+leaving raised points. F must be the outside of the part, a
+cylinder all the way round its axis, and must end at each end in a
+circle on one flat face square to the axis: the free end of the part,
+or a shoulder.
+
+PITCH is in millimetres, measured square to the grooves as DIN 82
+gives it, whose series is 0.5, 0.6, 0.8, 1.0, 1.2 and 1.6. A whole
+number of grooves must go round the face, so the pitch is fitted to the
+nearest that gives one: the count is pi d cos (A) / PITCH
+rounded, d the diameter of F and A the
+angle of the grooves from the axis. Rings, at 90 degrees, are counted
+along the length of F the same way.
+
+S = knurl (S, F, PITCH, DEPTH)
+cuts the grooves DEPTH millimetres deep, which leaves flat lands
+at the diameter of F between them. By default they are cut to
+full depth, where the flanks of neighbouring grooves meet in a point:
+P / (2 tan (PROFILE / 2)), half the pitch at 90
+degrees, P the pitch as fitted. A deeper DEPTH is an
+error.
+
+The knurl is built on the surfaces of its teeth directly rather than
+cut, which makes it many times faster than cutting its grooves: a
+knob 28 across knurled at 0.8 takes about two seconds.
+
+That knob has nearly 5000 faces, and every later operation on the
+shape takes them all in: a boolean or a hole takes seconds, and a
+projection for a drawing over half a minute. Knurl a part after its
+other features, and draw it from the shape before knurling, as a
+drawing shows a knurl: the blank, with the knurl's type and pitch
+stated, never its teeth.
+
+Name/Value pairs choose the knurl and finish its ends:
+
+'Pattern'
+'crossed', the default, for two sets of grooves, or
+'single' for one.
+'Angle'
+The angle of the grooves from the axis, in degrees, 30 by default. A
+single knurl takes one angle in the range (-90, 90), a positive
+one running right-handed, as a thread does, and 0 giving straight
+grooves along the axis. A crossed knurl takes one angle A in
+the range (0, 90), for grooves at A and -A, or two
+different angles from -90 to 90, 90 being rings round the axis.
+'Points'
+For a crossed knurl only: 'raised', the default, for points
+standing between the grooves, or 'indented' for pits sunk
+between ridges.
+'Profile'
+The angle between the flanks of a tooth, in degrees, in the range
+(0, 180), 90 by default.
+'Fillet'
+A radius R rounds every free end of F, an end at a shoulder
+being left as it is. A cell array {E, R} rounds
+the end at the edge E to R, and with a row for each end,
+{E1, R1; E2, R2}, gives each its own
+radius. The edges are the circles at the ends of F, as
+solid.Shape.edges returns them, and the knurl runs out over the
+fillet as it does on a blank whose edge was rounded before knurling.
+'Chamfer'
+As 'Fillet', for a chamfer of 45 degrees set back D
+millimetres both ways: a distance D for every free end, or
+{E, D} with a row for each end.
+
+An end of F takes one fillet or chamfer at most, and an end at a
+shoulder takes neither, so naming its edge is an error. The ends given
+by their edges are treated first, and a single size given to the other
+option treats the free ends left: 'Fillet', 0.5, 'Chamfer',
+{E, 1} chamfers the end at E and rounds the other. A
+single size with no free end left to take it is an error, as are single
+sizes for both. The fillets and chamfers must be smaller than the
+radius of F and must not overlap.
+
+The types of DIN 82 are made so:
+
+Type Knurl Options
+RAA straight 'Pattern', 'single', 'Angle', 0
+RBL single, left-hand 'Pattern', 'single', 'Angle', -30
+RBR single, right-hand 'Pattern', 'single'
+RGE crossed, raised points none
+RGV crossed, indented points 'Points', 'indented'
+RKE square, raised points 'Angle', [0, 90]
+RKV square, indented points 'Angle', [0, 90], 'Points', 'indented'
+
+## A knob 28 across, knurled RGE 0.8 with its top edge chamfered 0.5
+S = solid.cylinder (14, 10);
+F = faces (S, 'Type', 'cylinder');
+E = edges (S, 'Type', 'circle', 'Within', [-15, -15, 10, 15, 15, 10]);
+S = knurl (S, F, 0.8, 'Chamfer', {E, 0.5});
+
+See also:
+solid.Shape.faces,
+solid.Shape.edges,
+solid.Shape.fillet,
+solid.Shape.chamfer
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 36
+Knurl a cylindrical face of a shape.
 
 
 
@@ -10018,7 +10209,7 @@ solid.Shape.show
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1786
+# length: 1798
 solid.Shape: show (S)
 solid.Shape: V = show (S)
 Show a shape in a viewer of its own, redrawing in place.
@@ -10057,7 +10248,7 @@ Model of the variable's viewer. Nothing else redraws it:
 changing the variable that was shown does not, until it is shown again.
 
 The viewer is built with the package when Open CASCADE and X11 are
-found, and needs a display to run. It runs on Linux.
+found, and needs a display to run. It runs on Linux and FreeBSD.
 
 See also:
 model.Viewer,
@@ -10134,7 +10325,7 @@ solid.Shape.subtract
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1189
+# length: 1420
 solid.Shape: C = subtract (A, B, ...)
 The difference of shapes, the material of the first in none of the
 others.
@@ -10147,6 +10338,11 @@ an order of magnitude faster than a hundred calls of one hole each.
 
 Removing empty shapes, or nothing, leaves A, and removing
 anything from the empty shape leaves the empty shape.
+
+A shape may hold solids that overlap, as the shape of an assembly
+does where its parts meet. As a tool it removes the region its solids
+cover together, and as A each of its solids is cut on its own
+and kept apart from the others.
 
 Open CASCADE 7.8 can return A uncut and report success, as it
 does for a dome cut by a circle that starts in the plane of the dome's
@@ -10232,7 +10428,7 @@ solid.Shape.thread
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 3304
+# length: 3990
 solid.Shape: S = thread (S, P, NAME, DEPTH)
 solid.Shape: S = thread (..., Name, Value, ...)
 Cut screw threads into a shape.
@@ -10269,14 +10465,26 @@ nominal diameter plus the fundamental deviation of position g,
 its table 1 is, to the R 40 series of ISO 3 and then to a whole
 number. M6 is turned to 5.974. A blank of another diameter is turned
 in the design. An axis that meets neither is an error naming the
-thread and the point, and so is an internal thread deeper than its
-bore.
+thread and the point, and so is a thread that would cut beyond its
+bore or cylinder: the bore must run on 0.03 pitches past the thread,
+and a cylinder must reach as far before any shoulder.
+
+A tube is threaded inside or outside, by whichever of its bore and its
+cylinder fits: a tube of 6 with a bore of 2 takes an external M6. A
+wall whose bore and cylinder both fit is thinner than either thread is
+deep, and is an error, as is an internal thread that would cut through
+the cylinder round its bore.
 
 The profile is the basic profile of ISO 68-1, its 60 degree flanks
 swept round the axis by solid.helix: an internal thread's root
 is flat at the nominal diameter, an external thread's flat at
 D_1. The thread is right-handed, and starts a pitch before the
 point so that it runs out of the surface clean.
+
+Open CASCADE fails to cut some threads, at depths no rule predicts.
+Such a thread is cut again by a tool built another way, and kept only
+when it removes the volume its groove holds inside the part; otherwise
+it is an error naming the thread and the point.
 
 Name/Value pairs place the threads as for solid.Shape.hole:
 
@@ -10365,7 +10573,7 @@ solid.Shape.union
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 806
+# length: 919
 solid.Shape: C = union (A, B, ...)
 The union of shapes, the material of any of them.
 
@@ -10374,8 +10582,9 @@ solid.Shape objects and combines them in one operation, which is
 several times faster than combining them a pair at a time. Faces that
 end up in one plane and edges that end up on one line are merged, so
 the union of two blocks that share a face reads as one block of six
-faces. Empty shapes add nothing, and the union of a single shape is
-that shape.
+faces. A solid that meets no other is kept as it is, without an
+operation, so shapes side by side are combined at once. Empty shapes
+add nothing, and the union of a single shape is that shape.
 
 Each solid of the result takes the colour of the first coloured solid
 it came from, as solid.Shape.Colour describes.
@@ -10859,7 +11068,7 @@ solid.holespec
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 3421
+# length: 3975
 drafting: H = solid.holespec (NAME)
 drafting: H = solid.holespec (NAME, Name, Value, ...)
 The dimensions of the hole for a metric screw, read from its thread.
@@ -10890,7 +11099,8 @@ the drill of ISO 2306, or the one 'Material' or
 'Engagement' chooses inside the 6H band of its minor diameter,
 as solid.Shape.hole describes. With 'Clearance' it is
 the clearance hole for a screw of that thread, and only then can it take
-a counterbore or a countersink.
+a counterbore or the countersink of a screw head. A tapped hole is
+countersunk at its entry unless 'Countersink' is false.
 
 Name/Value pairs:
 
@@ -10905,7 +11115,7 @@ socket head cap screw of ISO 4762 from M1.6 to M36: 11 wide and 6.8 deep
 for M6. 'washer' for its type K2, for the same screw on a plain
 washer, from M3 to M36: 13 wide and 8.5 deep for M6. Or
 [CD, CDEPTH], taken as given. Both standard ones are
-for a fine or a medium clearance hole.
+for a fine or a medium clearance hole, and a tapped hole takes none.
 'Countersink'
 True for the countersink of IS 3406 (Part 1):1986, type A, for the
 countersunk heads of ISO 7721, as on ISO 2009, ISO 7046, ISO 14581 and
@@ -10918,6 +11128,14 @@ wide and 0.45 deep for M6. Type B is in the fine series only. Or
 CD, [CD, ANGLE] or [CD,
 ANGLE, CDEPTH], taken as given, with an angle of 90 and no
 cylinder by default.
+A tapped hole takes by default, or with true, the countersink at the
+entry of an internal thread of IS 1369 (Part 3):1995, prepared from DIN
+76-1:1983: 120 degrees, and 1.05 times the nominal diameter across at the
+surface, the largest its band from the nominal diameter allows, 6.3 for
+M6. False leaves it out, the numbers are taken as given there too, and
+'socket' is refused. solid.Shape.hole sinks a tapped hole
+drilled through alike at its exit.
+
 'Material'
 'Engagement'
 The material tapped, or the thread engagement, which choose the drill of
@@ -10927,7 +11145,7 @@ True to take a thread of any diameter and pitch, as in
 solid.threadspec.
 
 A counterbore and a countersink cannot both be given. False for either
-is the same as leaving it out.
+gives none.
 
 IS 3406 was prepared from DIN 74, parts 1 and 2, of 1980, the forerunners
 of ISO 15065 and DIN 974-1, whose current editions were not read. Where
@@ -11077,7 +11295,7 @@ solid.read
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1122
+# length: 1448
 drafting: S = solid.read (FILE)
 Read a solid from a STEP file.
 
@@ -11095,6 +11313,12 @@ solids in, and it keeps their exact geometry: a hole read from it is a true
 cylinder, as it was modelled. A STEP file must end in .step, in
 either case, and open with the keyword ISO-10303-21;, which may
 follow white space and comments.
+
+Only solids are read, since a solid.Shape holds solids only. A
+closed shell, which some programs write in place of a solid, is read as
+the solid it bounds. Surfaces, curves and points, such as sketches,
+axes and construction surfaces, are left out with a warning that counts
+them, and a file that holds no solid is an error.
 
 model.read reads the same file as a model.Assembly, its
 parts named and placed as the file has them. A triangle mesh, from an
