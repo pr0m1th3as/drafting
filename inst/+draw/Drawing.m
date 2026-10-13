@@ -3410,9 +3410,12 @@ classdef Drawing
     ## the dashes look the same wherever the file is opened.
     ## @end table
     ##
-    ## Text is written with every character outside ASCII escaped as
-    ## @code{\U+XXXX}, so it reads the same whatever the reader's code page.
-    ## Layer, line-type and block names are written as given, in UTF-8.
+    ## Text and the names of layers, line types and blocks are written with
+    ## every character outside ASCII escaped as @code{\U+XXXX}, so they read
+    ## the same whatever the reader's code page.  A text or a name holding a
+    ## line break or another control character cannot be stored and is an
+    ## error, as are two different blocks of one name, such as one a block
+    ## defines for itself and another the drawing defines.
     ##
     ## @seealso{draw.read, draw.Drawing.print, draw.Drawing.tikz, geom.write}
     ## @end deftypefn

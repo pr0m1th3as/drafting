@@ -52,14 +52,19 @@
 ## programs treat it; heights are dropped.  An entity on any other plane, a
 ## mesh, a solid, an entity in paper space, an insert of a block the file
 ## does not define and an entity type the package does not draw are skipped,
-## as is the width of a polyline, which the package does not draw; whatever
-## is skipped is reported in one warning, counted by entity type.
+## as is the width of a polyline, which the package does not draw.  So is a
+## mirrored insert, or one scaled unequally in @math{x} and @math{y}, since
+## a drawing places a block turned and scaled alike in both; rows and
+## columns of an insert are placed one insert each.  Whatever is skipped is
+## reported in one warning, counted by entity type.
 ##
 ## Coordinates are converted to millimetres from the units the file declares
-## in @code{$INSUNITS}; a file declaring none is read as millimetres.  The
-## reader takes ASCII DXF from R12 (@code{AC1009}) to R2018
-## (@code{AC1032}); text before R2007 is decoded from the code page the
-## header names, and from R2007 on as UTF-8.  A binary DXF is an error.
+## in @code{$INSUNITS}, any of those DXF defines; a file declaring none is
+## read as millimetres, and so is one declaring a code DXF does not define,
+## with a warning.  The reader takes ASCII DXF from R12 (@code{AC1009}) to
+## R2018 (@code{AC1032}); text and names before R2007 are decoded from the
+## code page the header names, and from R2007 on as UTF-8.  A binary DXF is
+## an error.
 ##
 ## @seealso{draw.Drawing, draw.Drawing.write, geom.read}
 ## @end deftypefn
@@ -390,6 +395,90 @@ endfunction
 %! unwind_protect
 %!   R = draw.read (tmpf);
 %!   assert_equal (numentities (R), 1);
+%! unwind_protect_cleanup
+%!   [~] = unlink (tmpf);
+%! end_unwind_protect
+
+## The drawing in a file whose block B is a line from (0, 0) to (10, 0),
+## placed by an INSERT at (5, 5) with the groups INS, in the units UNITS
+%!function D = readinsert (f, ins, units = 4)
+%!  fid = fopen (f, 'w');
+%!  fputs (fid, [sprintf("0\nSECTION\n2\nHEADER\n9\n$INSUNITS\n70\n%d\n", ...
+%!                       units), "0\nENDSEC\n0\nSECTION\n2\nBLOCKS\n" ...
+%!               "0\nBLOCK\n8\n0\n2\nB\n70\n0\n10\n0\n20\n0\n30\n0\n" ...
+%!               "3\nB\n0\nLINE\n8\n0\n10\n0\n20\n0\n30\n0\n11\n10\n" ...
+%!               "21\n0\n31\n0\n0\nENDBLK\n8\n0\n0\nENDSEC\n" ...
+%!               "0\nSECTION\n2\nENTITIES\n0\nINSERT\n8\n0\n2\nB\n" ...
+%!               "10\n5\n20\n5\n30\n0\n", ins, "0\nENDSEC\n0\nEOF\n"]);
+%!  fclose (fid);
+%!  unwind_protect
+%!    D = draw.read (f);
+%!  unwind_protect_cleanup
+%!    [~] = unlink (f);
+%!  end_unwind_protect
+%!endfunction
+
+%!test  # an insert with both scales negative is turned a half turn
+%! D = expand (readinsert (tmpf, "41\n-1\n42\n-1\n"));
+%! assert_equal (D.Entities.pts, [5, 5; -5, 5], 1e-12);
+
+%!test  # facing down and scaled -1 in x, an insert is not mirrored
+%! D = expand (readinsert (tmpf, "41\n-1\n210\n0\n220\n0\n230\n-1\n"));
+%! assert_equal (D.Entities.pts, [-5, 5; 5, 5], 1e-12);
+
+%!test  # rows and columns of an insert are placed copy by copy
+%! D = expand (readinsert (tmpf, "70\n3\n71\n2\n44\n20\n45\n10\n"));
+%! assert_equal (numentities (D), 6);
+%! assert_equal (D.Entities(6).pts, [45, 15; 55, 15], 1e-12);
+
+%!test  # US survey feet are read in millimetres
+%! D = expand (readinsert (tmpf, "", 21));
+%! assert_equal (D.Entities.pts, [5, 5; 15, 5] * 1.2e6 / 3937, -1e-12);
+
+%!warning<draw.read: skipped 1 mirrored INSERT.> ...
+%! D = readinsert (tmpf, "41\n-1\n");
+%! assert_equal (numentities (D), 0);
+
+%!warning<draw.read: skipped 1 mirrored INSERT.> ...
+%! D = readinsert (tmpf, "210\n0\n220\n0\n230\n-1\n");
+%! assert_equal (numentities (D), 0);
+
+%!warning<draw.read: skipped 1 INSERT scaled unequally in x and y.> ...
+%! D = readinsert (tmpf, "41\n2\n");
+%! assert_equal (numentities (D), 0);
+
+%!warning<draw.read: '.*' declares \$INSUNITS 99, which DXF does not define; it is read in millimetres.> ...
+%! D = expand (readinsert (tmpf, "", 99));
+%! assert_equal (D.Entities.pts, [5, 5; 15, 5], 1e-12);
+
+%!test  # Greek names of layers and blocks survive the code page
+%! B = draw.Drawing ().line ([0, 0], [10, 0]);
+%! D = draw.Drawing ().layer ('Στρώμα').block ('Βίδα', B);
+%! D.Layer = 'Στρώμα';
+%! D = D.insert ('Βίδα', [5, 5]);
+%! unwind_protect
+%!   write (D, tmpf);
+%!   R = draw.read (tmpf);
+%!   assert_equal ({R.Layers(2).name, R.Blocks.name, R.Entities.block, ...
+%!                  R.Entities.layer}, {'Στρώμα', 'Βίδα', 'Βίδα', 'Στρώμα'});
+%! unwind_protect_cleanup
+%!   [~] = unlink (tmpf);
+%! end_unwind_protect
+
+%!test  # a block *D1 kept from a file is not taken for a dimension's
+%! fid = fopen (tmpf, 'w');
+%! fputs (fid, ["0\nSECTION\n2\nBLOCKS\n0\nBLOCK\n8\n0\n2\n*D1\n70\n1\n" ...
+%!              "10\n0\n20\n0\n30\n0\n3\n*D1\n0\nCIRCLE\n8\n0\n10\n0\n20\n0\n" ...
+%!              "30\n0\n40\n3\n0\nENDBLK\n8\n0\n0\nENDSEC\n" ...
+%!              "0\nSECTION\n2\nENTITIES\n0\nINSERT\n8\n0\n2\n*D1\n" ...
+%!              "10\n50\n20\n0\n30\n0\n0\nENDSEC\n0\nEOF\n"]);
+%! fclose (fid);
+%! unwind_protect
+%!   D = dim (draw.read (tmpf), [0, 0], [20, 0], 5);
+%!   write (D, tmpf);
+%!   R = expand (draw.read (tmpf));
+%!   assert_equal ({R.Entities.type}, {'circle', 'dim'});
+%!   assert_equal (R.Entities(1).pts, [50, 0], 1e-12);
 %! unwind_protect_cleanup
 %!   [~] = unlink (tmpf);
 %! end_unwind_protect

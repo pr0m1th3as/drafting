@@ -1057,7 +1057,16 @@ put (ostringstream& s, int code, const string& v)
 {
   char b[16];
   snprintf (b, sizeof (b), "%3d\n", code);
-  s << b << v << "\n";
+  // A text or a name ends at the end of its line, so it holds no control
+  // character; a name is escaped past ASCII as a text is
+  const bool named = code == 2 || code == 3 || code == 6 || code == 7
+                     || code == 8;
+  if (code == 1 || named)
+    for (unsigned char c : v)
+      if (c < 0x20 || c == 0x7F)
+        error ("%s: a text or name holds a line break or another control "
+               "character, which DXF cannot store.", g_caller.c_str ());
+  s << b << (named ? encodetext (v) : v) << "\n";
 }
 
 static void
@@ -2273,18 +2282,29 @@ drawingitems (Writer& w, vector<Item>& dest, const octave_value& D,
   }
 }
 
-// Every block a drawing defines, and those its blocks define, once each
+// Every block a drawing defines, and those its blocks define, once each.
+// A file holds one block of a name, so two different blocks sharing one,
+// such as one a block defines for itself and another the drawing defines,
+// are an error rather than one standing in for the other.
 static void
-drawingblocks (Writer& w, const octave_value& D, set<string>& seen)
+drawingblocks (Writer& w, const octave_value& D,
+               map<string, octave_value>& seen)
 {
   octave_map B = prop (D, "Blocks").map_value ();
+  vector<octave_value> subs;
   for (octave_idx_type i = 0; i < B.numel (); i++)
   {
     string name = B.contents ("name")(i).string_value ();
-    if (seen.count (upper (name)))
-      continue;
-    seen.insert (upper (name));
     octave_value sub = B.contents ("drawing")(i);
+    auto it = seen.find (upper (name));
+    if (it != seen.end ())
+    {
+      if (! call ("isequal", ovl (it->second, sub)).bool_value ())
+        error ("%s: two different blocks are named '%s', and a file holds "
+               "one block of a name.", g_caller.c_str (), name.c_str ());
+      continue;
+    }
+    seen[upper (name)] = sub;
     vector<Item> items;
     drawingitems (w, items, sub, true);
     Writer::Block blk;
@@ -2292,8 +2312,29 @@ drawingblocks (Writer& w, const octave_value& D, set<string>& seen)
     blk.anon = false;
     blk.items = items;
     w.blocks.push_back (blk);
-    drawingblocks (w, sub, seen);
+    subs.push_back (sub);
   }
+  for (const auto& sub : subs)
+    drawingblocks (w, sub, seen);
+}
+
+// The highest number N of a block named *DN in the drawing D or in the
+// blocks it defines, such as one kept from another program's file, so that
+// the pictures of dimensions are numbered past it
+static int
+lastdim (const octave_value& D)
+{
+  int m = 0;
+  octave_map B = prop (D, "Blocks").map_value ();
+  for (octave_idx_type i = 0; i < B.numel (); i++)
+  {
+    string name = upper (B.contents ("name")(i).string_value ());
+    if (name.size () > 2 && name.size () < 10 && name.compare (0, 2, "*D") == 0
+        && name.find_first_not_of ("0123456789", 2) == string::npos)
+      m = max (m, atoi (name.c_str () + 2));
+    m = max (m, lastdim (B.contents ("drawing")(i)));
+  }
+  return m;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -2492,12 +2533,13 @@ cmdwrite (const octave_value_list& args)
       r.plot = L.contents ("plot")(k).bool_value ();
       wr.deflayer (L.contents ("name")(k).string_value (), r);
     }
+    wr.ndim = lastdim (D);
     drawingitems (wr, wr.model, D, false);
     // Expanded, the blocks are in place of their inserts and nothing
     // refers to them
     if (! w.expand)
     {
-      set<string> seen;
+      map<string, octave_value> seen;
       drawingblocks (wr, D, seen);
     }
   }
@@ -3026,26 +3068,47 @@ Reader::load (const string& f)
     }
     i = j;
   }
-  switch (units)
+  // Millimetres to each unit $INSUNITS names, 0 being none: the US survey
+  // foot is 1200/3937 m, the astronomical unit 149 597 870 700 m, the light
+  // year 9 460 730 472 580 800 m and the parsec 648000/pi astronomical units
+  static const double mm[25] = {
+    1, 25.4, 304.8, 1609344, 1, 10, 1000, 1e6, 25.4e-6, 0.0254, 914.4,
+    1e-7, 1e-6, 1e-3, 100, 1e4, 1e5, 1e12, 1.495978707e14,
+    9.4607304725808e18, 1.495978707e14 * 648000 / M_PI, 1.2e6 / 3937,
+    1e5 / 3937, 3.6e6 / 3937, 6.336e9 / 3937};
+  if (units >= 0 && units <= 24)
+    scale = mm[units];
+  else
   {
-    case 1: scale = 25.4; break;
-    case 2: scale = 304.8; break;
-    case 4: scale = 1; break;
-    case 5: scale = 10; break;
-    case 6: scale = 1000; break;
-    case 7: scale = 1e6; break;
-    case 8: scale = 25.4e-6; break;
-    case 9: scale = 0.0254; break;
-    case 10: scale = 914.4; break;
-    case 13: scale = 1e-3; break;
-    case 14: scale = 100; break;
-    default: scale = 1; break;
+    warning ("%s: '%s' declares $INSUNITS %d, which DXF does not define; "
+             "it is read in millimetres.", g_caller.c_str (), file.c_str (),
+             units);
+    scale = 1;
   }
-  for (auto& r : ents)
+  // Names are decoded as texts are: from the code page before R2007, and
+  // from their \U+ escapes
+  auto names = [this] (Rec& r)
+  {
     r.layer = decode (r.layer);
+    r.ltype = decode (r.ltype);
+    if (r.type == "INSERT" || r.type == "DIMENSION")
+      for (auto& t : r.tags)
+        if (t.first == 2)
+          t.second = decode (t.second);
+  };
+  for (auto& r : ents)
+    names (r);
   for (auto& b : blocks)
+  {
+    b.name = decode (b.name);
     for (auto& r : b.ents)
-      r.layer = decode (r.layer);
+      names (r);
+  }
+  for (auto& l : layers)
+  {
+    l.name = decode (l.name);
+    l.ltype = decode (l.ltype);
+  }
 }
 
 // A reason to skip an entity, carried out of the builders below
@@ -4356,6 +4419,10 @@ public:
           m_sk.add (r.type + " off the xy plane");
         else if (b.why == "undefined")
           m_sk.add ("INSERT of an undefined block");
+        else if (b.why == "mirrored")
+          m_sk.add ("mirrored INSERT");
+        else if (b.why == "unequal")
+          m_sk.add ("INSERT scaled unequally in x and y");
         else
           m_sk.add (skiplabel (r, b.why));
       }
@@ -4519,13 +4586,46 @@ private:
         rot = deg (atan2 (r.num (21), r.num (11)));
       return call ("text", ovl (D, xy (r.pt (10) * sc), s, h, rot));
     }
+    // An insert lies in its own frame, whose x axis runs along -x when it
+    // faces down.  Scales of opposite sign mirror it, and so does facing
+    // down; the two together cancel.  A drawing places a block turned and
+    // scaled alike in x and y, so a mirrored insert, or one scaled unequally,
+    // is skipped.  Rows and columns of copies (MINSERT) are placed one by one.
     if (T == "INSERT")
     {
       string nm = trim (r.str (2));
       if (! defined.count (upper (nm)))
         throw Bad {"undefined"};
-      return call ("insert", ovl (D, nm, xy (r.pt (10) * sc), r.num (50),
-                                  r.num (41, 1)));
+      V3 n = normalof (r);
+      if (! isz (n))
+        throw Bad {"tilted"};
+      const double sx = r.num (41, 1);
+      const double sy = r.num (42, 1);
+      const double cols = r.num (70, 1);
+      const double rows = r.num (71, 1);
+      if (! isfinite (sx) || ! isfinite (sy) || sx == 0 || sy == 0
+          || ! (cols >= 1) || ! (rows >= 1) || cols * rows > 1e5)
+        throw Bad {"invalid"};
+      if (((sx < 0) != (sy < 0)) != (n.z < 0))
+        throw Bad {"mirrored"};
+      if (fabs (fabs (sx) - fabs (sy)) > 1e-9 * fabs (sx))
+        throw Bad {"unequal"};
+      const Frame F = ocsframe (n);
+      const double t = r.num (50) * M_PI / 180;
+      const V3 u = toworld (F, v3 (cos (t) * sx, sin (t) * sx, 0));
+      const double rot = deg (atan2 (u.y, u.x));
+      const double cs = r.num (44, 0) * sc;
+      const double rs = r.num (45, 0) * sc;
+      const V3 P = r.pt (10) * sc;
+      for (int i = 0; i < static_cast<int> (rows); i++)
+        for (int j = 0; j < static_cast<int> (cols); j++)
+        {
+          const V3 q = v3 (P.x + cos (t) * j * cs - sin (t) * i * rs,
+                           P.y + sin (t) * j * cs + cos (t) * i * rs, P.z);
+          D = call ("insert", ovl (D, nm, xy (toworld (F, q)), rot,
+                                   fabs (sx)));
+        }
+      return D;
     }
     if (T == "DIMENSION")
       return raisedim (D, r, sc, m_rd.decode (r.str (1, "<>")));

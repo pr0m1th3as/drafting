@@ -64,7 +64,9 @@
 ## @end table
 ##
 ## The drawing units are millimetres.  Layer and line-type names are written
-## as given, in UTF-8.
+## with every character outside ASCII escaped as @code{\U+XXXX}, so they
+## read the same whatever the reader's code page; a name holding a line
+## break or another control character is an error.
 ##
 ## @seealso{geom.read, geom.Polyline.write, geom.Spline.write,
 ## geom.Path.write, geom.Region.write, draw.Drawing.write}

@@ -81,10 +81,12 @@
 ## is left over, are reported in one warning, counted by entity type.
 ##
 ## Coordinates are converted to millimetres from the units the file declares
-## in @code{$INSUNITS}; a file declaring none is read as millimetres.  The
-## reader takes ASCII DXF from R12 (@code{AC1009}) to R2018
-## (@code{AC1032}).  Text before R2007 is decoded from the code page the
-## header names, and from R2007 on as UTF-8.  A binary DXF is an error.
+## in @code{$INSUNITS}, any of those DXF defines; a file declaring none is
+## read as millimetres, and so is one declaring a code DXF does not define,
+## with a warning.  The reader takes ASCII DXF from R12 (@code{AC1009}) to
+## R2018 (@code{AC1032}).  Text and names before R2007 are decoded from the
+## code page the header names, and from R2007 on as UTF-8.  A binary DXF is
+## an error.
 ##
 ## @example
 ## @group

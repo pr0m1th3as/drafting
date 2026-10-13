@@ -380,7 +380,10 @@ write (D, 'exploded.dxf', 'Dimensions', 'explode');</code></pre>
 <p>A drawing lies in the plane <i>z</i> = 0, so <code>draw.read</code>
 mirrors an entity facing down into the plane facing up and drops heights.
 An entity on any other plane, a mesh, a solid, an entity in paper space and
-an insert of a block the file does not define are skipped and reported. A
+an insert of a block the file does not define are skipped and reported, and
+so is a mirrored insert, or one scaled unequally in <i>x</i> and <i>y</i>,
+since a drawing places a block turned and scaled alike in both. Rows and
+columns of an insert are placed one insert each. A
 geom object can go into a drawing only if it lies in the <i>xy</i> plane;
 one in another plane is written with <code>geom.write</code> instead.</p>
 
@@ -396,10 +399,13 @@ one in another plane is written with <code>geom.write</code> instead.</p>
   (<code>AC1032</code>). A binary DXF is an error.</li>
   <li><b>Units:</b> the writer declares millimetres. The reader converts
   coordinates to millimetres from the units the file declares in
-  <code>$INSUNITS</code>, and reads a file declaring none as
-  millimetres.</li>
-  <li><b>Text:</b> written with every character outside ASCII escaped as
-  <code>\U+XXXX</code>, so it reads the same whatever the reader's code page.
+  <code>$INSUNITS</code>, any DXF defines, US survey feet among them. It
+  reads a file declaring none as millimetres, and one declaring a code DXF
+  does not define too, with a warning.</li>
+  <li><b>Text and names:</b> text and the names of layers, line types and
+  blocks are written with every character outside ASCII escaped as
+  <code>\U+XXXX</code>, so they read the same whatever the reader's code
+  page; one holding a line break or another control character is an error.
   Read from the code page the header names before R2007, and as UTF-8 from
   R2007 on.</li>
 </ul>
