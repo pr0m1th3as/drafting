@@ -3732,12 +3732,16 @@ using RealArray = TColStd_HArray1OfReal;
 #endif
 
 // The sheet P over theta from T0 to T1 and z from Z0 to Z1: cubic in theta
-// through a point a degree, linear in z, its parameters theta and z
+// through a point every quarter of a degree, linear in z, its parameters
+// theta and z.  An interpolated curve's parameter strays a little from
+// theta between its points, which moves the edges of a face along it: at a
+// point a degree, over the small range of one face, enough to change a
+// knurl's volume by a part in ten million.
 static Handle (Geom_Surface)
 flank (const sheet& p, double t0, double t1, double z0, double z1)
 {
-  const int n = std::max (4, static_cast<int> (ceil ((t1 - t0)
-                                                     / (M_PI / 180))) + 1);
+  const int n = std::max (8, static_cast<int> (ceil ((t1 - t0)
+                                                     / (M_PI / 720))) + 1);
   Handle (RealArray) par = new RealArray (1, n);
   Handle (PointArray) p0 = new PointArray (1, n);
   Handle (PointArray) p1 = new PointArray (1, n);
@@ -3787,6 +3791,79 @@ interp2d (const vector<gp_Pnt2d>& P)
   Geom2dAPI_Interpolate I (pts, par, false, 1e-12);
   I.Perform ();
   return I.Curve ();
+}
+
+// The sheet P of a set of grooves at the angle whose cosine and sine are CA
+// and SA, laid along the groove: its parameters are w = R CA theta - SA z
+// across the groove, from W0 to W1, and l = R SA theta + CA z along it, from
+// L0 to L1.  A single knurl's flank is a strip round the face, and a surface
+// laid in theta and z would span the face's whole height to hold it.  It
+// interpolates a grid, cubic both ways: curves along l, a point every
+// quarter of a degree of theta, through the same parameters, then their
+// poles across w.
+static Handle (Geom_Surface)
+groove (const sheet& p, double ca, double sa, double R, double w0, double w1,
+        double l0, double l1)
+{
+  auto deg = [] (double turn)
+  {
+    return std::max (8, static_cast<int> (ceil (turn / (M_PI / 720))) + 1);
+  };
+  const int nw = deg (std::abs (ca) * (w1 - w0) / R);
+  const int nl = deg (std::abs (sa) * (l1 - l0) / R);
+  Handle (RealArray) lpar = new RealArray (1, nl);
+  for (int i = 1; i <= nl; i++)
+  {
+    lpar->SetValue (i, l0 + (l1 - l0) * (i - 1) / (nl - 1));
+  }
+  vector<Handle (Geom_BSplineCurve)> rows;
+  for (int k = 0; k < nw; k++)
+  {
+    const double w = w0 + (w1 - w0) * k / (nw - 1);
+    Handle (PointArray) pts = new PointArray (1, nl);
+    for (int i = 1; i <= nl; i++)
+    {
+      const double l = lpar->Value (i);
+      const double t = (ca * w + sa * l) / R;
+      const double z = - sa * w + ca * l;
+      const double r = p.a + p.b * t + p.c * z;
+      pts->SetValue (i, gp_Pnt (r * cos (t), r * sin (t), z));
+    }
+    GeomAPI_Interpolate I (pts, lpar, false, 1e-12);
+    I.Perform ();
+    rows.push_back (I.Curve ());
+  }
+  const int np = rows[0]->NbPoles ();
+  Handle (RealArray) wpar = new RealArray (1, nw);
+  for (int k = 1; k <= nw; k++)
+  {
+    wpar->SetValue (k, w0 + (w1 - w0) * (k - 1) / (nw - 1));
+  }
+  vector<Handle (Geom_BSplineCurve)> cols;
+  for (int j = 1; j <= np; j++)
+  {
+    Handle (PointArray) pts = new PointArray (1, nw);
+    for (int k = 1; k <= nw; k++)
+    {
+      pts->SetValue (k, rows[k-1]->Pole (j));
+    }
+    GeomAPI_Interpolate I (pts, wpar, false, 1e-12);
+    I.Perform ();
+    cols.push_back (I.Curve ());
+  }
+  const int mp = cols[0]->NbPoles ();
+  NCollection_Array2<gp_Pnt> P (1, mp, 1, np);
+  for (int m = 1; m <= mp; m++)
+  {
+    for (int j = 1; j <= np; j++)
+    {
+      P(m,j) = cols[j-1]->Pole (m);
+    }
+  }
+  return new Geom_BSplineSurface (P, cols[0]->Knots (), rows[0]->Knots (),
+                                  cols[0]->Multiplicities (),
+                                  rows[0]->Multiplicities (),
+                                  cols[0]->Degree (), rows[0]->Degree ());
 }
 
 // The knurled skin of the cylinder of radius R from Z0 to Z1 about the z
@@ -4034,48 +4111,10 @@ skin (double R, double z0, double z1, const knurlspec& spec,
     Z.push_back ({zb1, z1, 2, 1});
   }
 
-  // The polygons, and the range of theta each surface must span
+  // The polygons
   vector<patch> faces;
-  map<int, pair<double, double>> trange;
   auto keepface = [&] (const patch& F)
   {
-    if (F.sid >= 0)
-    {
-      auto& r = trange[F.sid];
-      if (r.first == 0 && r.second == 0)
-      {
-        r = {1e300, -1e300};
-      }
-      for (double tt : F.t)
-      {
-        r.first = std::min (r.first, tt);
-        r.second = std::max (r.second, tt);
-      }
-      // A crease can bulge past the polygon's corners
-      for (size_t i = 0; i < F.t.size (); i++)
-      {
-        const int ke = F.ee[i];
-        const sheet& pe = F.ep[i];
-        if (! F.arc[i] || ke < 0 || K.E[ke].type != 1
-            || std::abs (pe.b) <= 1e-12)
-        {
-          continue;
-        }
-        const treatment& E = K.E[ke];
-        const size_t j = (i + 1) % F.t.size ();
-        const double v1 = K.vof (ke, F.z[i]);
-        const double v2 = K.vof (ke, F.z[j]);
-        for (int m = 1; m < 32; m++)
-        {
-          const double v = v1 + (v2 - v1) * m / 32;
-          const double z = E.zc + E.t * sin (v);
-          const double th = (E.rmaj + E.t * cos (v) - pe.a - pe.c * z)
-                            / pe.b;
-          r.first = std::min (r.first, th);
-          r.second = std::max (r.second, th);
-        }
-      }
-    }
     faces.push_back (F);
   };
   bool overflow = false;
@@ -4432,20 +4471,81 @@ skin (double R, double z0, double z1, const knurlspec& spec,
       send[E.sid] = k;
     }
   }
-  map<int, sheet> fp;
-  for (const patch& F : faces)
+  // A flank surface for each face, over the face's own range, so that its
+  // poles stay close to the face: Open CASCADE boxes a face by its whole
+  // surface, and a box much larger than the face slows every later boolean.
+  // A single knurl's flank is laid along its groove.
+  const bool helical = spec.angles.size () == 1
+                       && std::abs (spec.angles[0]) > 1e-12;
+  const double gca = sets[0].ca;
+  const double gsa = sets[0].sa;
+  auto alongw = [&] (double th, double z)
   {
-    if (keys[F.sid].compare (0, 5, "flank") == 0 && F.sid == F.p.sid
-        && fp.find (F.sid) == fp.end ())
+    return R * gca * th - gsa * z;
+  };
+  auto alongl = [&] (double th, double z)
+  {
+    return R * gsa * th + gca * z;
+  };
+  vector<Handle (Geom_Surface)> fs (faces.size ());
+  for (size_t f = 0; f < faces.size (); f++)
+  {
+    const patch& F = faces[f];
+    if (keys[F.sid].compare (0, 5, "flank") != 0)
     {
-      fp[F.sid] = F.p;
+      continue;
     }
-  }
-  for (const auto& kv : fp)
-  {
-    const auto& r = trange[kv.first];
-    S[kv.first] = flank (kv.second, r.first - M_PI / 360,
-                         r.second + M_PI / 360, z0, z1);
+    // The face's corners and the points of its creases, (theta, z)
+    vector<pair<double, double>> pts;
+    for (size_t i = 0; i < F.t.size (); i++)
+    {
+      pts.push_back ({F.t[i], F.z[i]});
+    }
+    // A crease on a fillet can bulge past the face's corners
+    for (size_t i = 0; i < F.t.size (); i++)
+    {
+      const int ke = F.ee[i];
+      const sheet& pe = F.ep[i];
+      if (! F.arc[i] || ke < 0 || K.E[ke].type != 1
+          || std::abs (pe.b) <= 1e-12)
+      {
+        continue;
+      }
+      const treatment& E = K.E[ke];
+      const size_t j = (i + 1) % F.t.size ();
+      const double v1 = K.vof (ke, F.z[i]);
+      const double v2 = K.vof (ke, F.z[j]);
+      for (int m = 1; m < 32; m++)
+      {
+        const double v = v1 + (v2 - v1) * m / 32;
+        const double z = E.zc + E.t * sin (v);
+        const double th = (E.rmaj + E.t * cos (v) - pe.a - pe.c * z) / pe.b;
+        pts.push_back ({th, z});
+      }
+    }
+    double a0 = 1e300;
+    double a1 = -1e300;
+    double b0 = 1e300;
+    double b1 = -1e300;
+    for (const auto& q : pts)
+    {
+      const double a = helical ? alongw (q.first, q.second) : q.first;
+      const double b = helical ? alongl (q.first, q.second) : q.second;
+      a0 = std::min (a0, a);
+      a1 = std::max (a1, a);
+      b0 = std::min (b0, b);
+      b1 = std::max (b1, b);
+    }
+    if (helical)
+    {
+      fs[f] = groove (F.p, gca, gsa, R, a0 - 1e-3, a1 + 1e-3, b0 - 1e-3,
+                      b1 + 1e-3);
+    }
+    else
+    {
+      fs[f] = flank (F.p, a0 - M_PI / 360, a1 + M_PI / 360, b0 - 1e-3,
+                     b1 + 1e-3);
+    }
   }
 
   // The faces, sewn into the skin.  A crease on a fillet is sampled evenly in
@@ -4465,15 +4565,22 @@ skin (double R, double z0, double z1, const knurlspec& spec,
     return gp_Pnt2d (th, z);
   };
   BRepBuilderAPI_Sewing sew (1e-6);
-  for (const patch& F : faces)
+  for (size_t f = 0; f < faces.size (); f++)
   {
+    const patch& F = faces[f];
     const int s = F.sid;
-    const Handle (Geom_Surface)& surf = S[s];
+    const Handle (Geom_Surface)& surf = fs[f].IsNull () ? S[s] : fs[f];
+    const bool along = helical && ! fs[f].IsNull ();
+    auto at = [&] (double th, double z)
+    {
+      return along ? gp_Pnt2d (alongw (th, z), alongl (th, z))
+                   : uv (s, th, z);
+    };
     const size_t n = F.t.size ();
     vector<TopoDS_Vertex> V (n);
     for (size_t i = 0; i < n; i++)
     {
-      const gp_Pnt2d q = uv (s, F.t[i], F.z[i]);
+      const gp_Pnt2d q = at (F.t[i], F.z[i]);
       V[i] = BRepBuilderAPI_MakeVertex (surf->Value (q.X (), q.Y ()))
                .Vertex ();
     }
@@ -4481,8 +4588,8 @@ skin (double R, double z0, double z1, const knurlspec& spec,
     for (size_t i = 0; i < n; i++)
     {
       const size_t j = (i + 1) % n;
-      const gp_Pnt2d a = uv (s, F.t[i], F.z[i]);
-      const gp_Pnt2d b = uv (s, F.t[j], F.z[j]);
+      const gp_Pnt2d a = at (F.t[i], F.z[i]);
+      const gp_Pnt2d b = at (F.t[j], F.z[j]);
       const sheet& pe = F.ep[i];
       const int ke = F.ee[i];
       const bool curved = F.arc[i] && ke >= 0 && K.E[ke].type == 1
@@ -4513,7 +4620,7 @@ skin (double R, double z0, double z1, const knurlspec& spec,
           {
             th = F.t[i] + (F.t[j] - F.t[i]) * (z - F.z[i]) / (F.z[j] - F.z[i]);
           }
-          pts.push_back (uv (s, th, z));
+          pts.push_back (at (th, z));
         }
         pts.push_back (b);
         cv = interp2d (pts);
@@ -5351,24 +5458,97 @@ function directly. \n\
     // pairwise.  Open CASCADE takes no shape whose solids overlap, as an
     // assembly's do: given one it returns a wrong result and reports
     // nothing.  So every operation takes the solids of each shape on its own.
+    // Solids whose boxes meet are fused in groups, and a solid that meets
+    // none is kept as it is.  Open CASCADE intersects every pair of faces
+    // whose boxes overlap, and it boxes a spline face by its poles, which can
+    // stand well outside the face, so solids that do not touch can still
+    // cost it minutes: two knurled knobs 16 apart took 8 s, and 21 apart half
+    // a second.
     else if (cmd == "fuse")
     {
-      ShapeList objects, tools;
-      vector<TopoDS_Shape> sources;
+      vector<TopoDS_Shape> solids;
       for (int i = 2; i < args.length (); i++)
       {
-        sources.push_back (toshape (args(i), caller));
-        ShapeList& list = (i == 2 ? objects : tools);
-        for (const TopoDS_Shape& p : eachsolid (sources.back ()))
+        for (const TopoDS_Shape& p : eachsolid (toshape (args(i), caller)))
         {
-          list.Append (p);
+          solids.push_back (p);
         }
       }
-      BRepAlgoAPI_Fuse op;
-      op.SetArguments (objects);
-      op.SetTools (tools);
-      const TopoDS_Shape r = boolean (op, caller, "union");
-      out = traced (r, lineage (op, sources, r));
+      const int n = solids.size ();
+      Matrix B (n, 6);
+      for (int i = 0; i < n; i++)
+      {
+        boxrow (solids[i], B, i);
+      }
+      double tol = 1;
+      for (octave_idx_type k = 0; k < B.numel (); k++)
+      {
+        tol = std::max (tol, std::abs (B(k)));
+      }
+      tol *= 1e-9;
+      vector<int> up (n);
+      for (int i = 0; i < n; i++)
+      {
+        up[i] = i;
+      }
+      function<int (int)> root = [&] (int i)
+      {
+        return up[i] == i ? i : up[i] = root (up[i]);
+      };
+      for (int i = 0; i < n; i++)
+      {
+        for (int j = i + 1; j < n; j++)
+        {
+          bool meet = true;
+          for (int c = 0; c < 3 && meet; c++)
+          {
+            meet = B(i,c+3) >= B(j,c) - tol && B(i,c) <= B(j,c+3) + tol;
+          }
+          if (meet)
+          {
+            up[root (i)] = root (j);
+          }
+        }
+      }
+      map<int, vector<int>> groups;
+      for (int i = 0; i < n; i++)
+      {
+        groups[root (i)].push_back (i);
+      }
+      vector<TopoDS_Shape> results;
+      origins L;
+      for (const auto& g : groups)
+      {
+        const vector<int>& G = g.second;
+        if (G.size () == 1)
+        {
+          results.push_back (solids[G[0]]);
+          L.push_back ({G[0] + 1});
+          continue;
+        }
+        ShapeList objects, tools;
+        vector<TopoDS_Shape> src;
+        for (int i : G)
+        {
+          (src.empty () ? objects : tools).Append (solids[i]);
+          src.push_back (solids[i]);
+        }
+        BRepAlgoAPI_Fuse op;
+        op.SetArguments (objects);
+        op.SetTools (tools);
+        const TopoDS_Shape r = boolean (op, caller, "union");
+        for (const std::set<int>& o : lineage (op, src, r))
+        {
+          std::set<int> h;
+          for (int k : o)
+          {
+            h.insert (G[k-1] + 1);
+          }
+          L.push_back (h);
+        }
+        results.push_back (r);
+      }
+      out = traced (gather (results), L);
     }
     else if (cmd == "cut")
     {

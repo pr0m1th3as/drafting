@@ -260,8 +260,9 @@ classdef Shape
     ## several times faster than combining them a pair at a time.  Faces that
     ## end up in one plane and edges that end up on one line are merged, so
     ## the union of two blocks that share a face reads as one block of six
-    ## faces.  Empty shapes add nothing, and the union of a single shape is
-    ## that shape.
+    ## faces.  A solid that meets no other is kept as it is, without an
+    ## operation, so shapes side by side are combined at once.  Empty shapes
+    ## add nothing, and the union of a single shape is that shape.
     ##
     ## Each solid of the result takes the colour of the first coloured solid
     ## it came from, as @code{solid.Shape.Colour} describes.
@@ -3880,6 +3881,25 @@ endfunction
 %! assert_equal (volume (C), 2750, 1e-9);
 %! assert_equal (numsolids (C), 2);
 
+%!test  # solids that meet no other are kept as they are
+%! K = knurl (solid.cylinder (6, 8), 1, 1);
+%! C = union (K, translate (K, [16, 0, 0]));
+%! assert_equal (numsolids (C), 2);
+%! assert_equal (numfaces (C), 2 * numfaces (K));
+%! assert_equal (volume (C), 2 * volume (K), -1e-9);
+
+%!test  # touching solids are fused, the others kept, colours carried
+%! A = solid.box (10, 10, 10);
+%! A.Colour = [1, 0, 0];
+%! B = translate (solid.box (10, 10, 10), [10, 0, 0]);
+%! B.Colour = [0, 1, 0];
+%! D = translate (solid.box (5, 5, 5), [40, 0, 0]);
+%! D.Colour = [0, 0, 1];
+%! C = union (D, A, B);
+%! assert_equal (numsolids (C), 2);
+%! assert_equal (numfaces (C), 12);
+%! assert_equal (sortrows (C.Colour), [0, 0, 1; 1, 0, 0]);
+
 %!test  # empty shapes add nothing
 %! A = solid.box (10, 10, 10);
 %! assert_equal (volume (union (A, solid.Shape ())), 1000, 1e-9);
@@ -5205,13 +5225,13 @@ endfunction
 
 %!test  # RKE, square with raised points
 %! S = knurl (solid.cylinder (5, 6), 1, 1, 'Angle', [0, 90]);
-%! assert_equal (volume (S), 410.9608363, 1e-5);
+%! assert_equal (volume (S), 410.9608046, 1e-5);
 %! assert_equal (isvalid (S), true);
 
 %!test  # RKV, square with indented points
 %! S = knurl (solid.cylinder (5, 6), 1, 1, 'Angle', [0, 90], ...
 %!            'Points', 'indented');
-%! assert_equal (volume (S), 440.4107670, 1e-5);
+%! assert_equal (volume (S), 440.4108046, 1e-5);
 %! assert_equal (isvalid (S), true);
 
 %!test  # crossed at 45 degrees
@@ -5226,7 +5246,7 @@ endfunction
 
 %!test  # teeth of 60 degrees
 %! S = knurl (solid.cylinder (5, 6), 1, 1, 'Profile', 60);
-%! assert_equal (volume (S), 368.5876316, 1e-5);
+%! assert_equal (volume (S), 368.5876419, 1e-5);
 %! assert_equal (isvalid (S), true);
 
 %!test  # a fillet smaller than the depth
@@ -5236,7 +5256,7 @@ endfunction
 
 %!test  # a fillet larger than the depth at every free end
 %! S = knurl (solid.cylinder (5, 6), 1, 1, 'Fillet', 1);
-%! assert_equal (volume (S), 406.6176553, 1e-5);
+%! assert_equal (volume (S), 406.6176662, 1e-5);
 %! assert_equal (isvalid (S), true);
 
 %!test  # a chamfer smaller than the depth
@@ -5262,7 +5282,7 @@ endfunction
 %! R.UCS = geom.UCS ([0, 0, -1], [0, 0, -42.2]);
 %! K = pocket (K, R, 5.5);
 %! S = knurl (K, 1, 2.0733, 0.8, 'Angle', 45, 'Fillet', {3, 2});
-%! assert_equal (volume (S), 4638.466068, 1e-5);
+%! assert_equal (volume (S), 4638.466155, 1e-5);
 %! assert_equal (isvalid (S), true);
 
 %!test  # a knurl up to a shoulder, chamfered at its free end
