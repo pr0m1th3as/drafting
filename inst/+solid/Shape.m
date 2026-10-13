@@ -1458,7 +1458,7 @@ classdef Shape
 ##                             Available Methods                              ##
 ##                                                                            ##
 ## 'fillet'          'chamfer'         'shell'           'hole'               ##
-## 'pocket'                                                                   ##
+## 'pocket'          'knurl'                                                  ##
 ################################################################################
 
   methods (Access = public)
@@ -2444,6 +2444,219 @@ classdef Shape
 
     endfunction
 
+    ## -*- texinfo -*-
+    ## @deftypefn  {solid.Shape} {@var{S} =} knurl (@var{S}, @var{F}, @var{PITCH})
+    ## @deftypefnx {solid.Shape} {@var{S} =} knurl (@var{S}, @var{F}, @var{PITCH}, @var{DEPTH})
+    ## @deftypefnx {solid.Shape} {@var{S} =} knurl (@dots{}, @var{Name}, @var{Value}, @dots{})
+    ##
+    ## Knurl a cylindrical face of a shape.
+    ##
+    ## @code{@var{S} = knurl (@var{S}, @var{F}, @var{PITCH})} knurls the face
+    ## of @var{S} indexed by @var{F}, as @code{solid.Shape.faces} returns it,
+    ## with the crossed knurl of DIN 82 type RGE: two sets of grooves at 30
+    ## degrees either side of the axis, teeth of 90 degrees, cut to full depth,
+    ## leaving raised points.  @var{F} must be the outside of the part, a
+    ## cylinder all the way round its axis, and must end at each end in a
+    ## circle on one flat face square to the axis: the free end of the part,
+    ## or a shoulder.
+    ##
+    ## @var{PITCH} is in millimetres, measured square to the grooves as DIN 82
+    ## gives it, whose series is 0.5, 0.6, 0.8, 1.0, 1.2 and 1.6.  A whole
+    ## number of grooves must go round the face, so the pitch is fitted to the
+    ## nearest that gives one: the count is @math{pi d cos (A) / @var{PITCH}}
+    ## rounded, @math{d} the diameter of @var{F} and @math{A} the
+    ## angle of the grooves from the axis.  Rings, at 90 degrees, are counted
+    ## along the length of @var{F} the same way.
+    ##
+    ## @code{@var{S} = knurl (@var{S}, @var{F}, @var{PITCH}, @var{DEPTH})}
+    ## cuts the grooves @var{DEPTH} millimetres deep, which leaves flat lands
+    ## at the diameter of @var{F} between them.  By default they are cut to
+    ## full depth, where the flanks of neighbouring grooves meet in a point:
+    ## @math{@var{P} / (2 tan (@var{PROFILE} / 2))}, half the pitch at 90
+    ## degrees, @var{P} the pitch as fitted.  A deeper @var{DEPTH} is an
+    ## error.
+    ##
+    ## The knurl is built on the surfaces of its teeth directly rather than
+    ## cut, which makes it many times faster than cutting its grooves: a
+    ## knob 28 across knurled at 0.8 takes about two seconds.
+    ##
+    ## Name/Value pairs choose the knurl and finish its ends:
+    ##
+    ## @table @asis
+    ## @item @qcode{'Pattern'}
+    ## @qcode{'crossed'}, the default, for two sets of grooves, or
+    ## @qcode{'single'} for one.
+    ##
+    ## @item @qcode{'Angle'}
+    ## The angle of the grooves from the axis, in degrees, 30 by default.  A
+    ## single knurl takes one angle in the range @math{(-90, 90)}, a positive
+    ## one running right-handed, as a thread does, and 0 giving straight
+    ## grooves along the axis.  A crossed knurl takes one angle @math{A} in
+    ## the range @math{(0, 90)}, for grooves at @math{A} and @math{-A}, or two
+    ## different angles from -90 to 90, 90 being rings round the axis.
+    ##
+    ## @item @qcode{'Points'}
+    ## For a crossed knurl only: @qcode{'raised'}, the default, for points
+    ## standing between the grooves, or @qcode{'indented'} for pits sunk
+    ## between ridges.
+    ##
+    ## @item @qcode{'Profile'}
+    ## The angle between the flanks of a tooth, in degrees, in the range
+    ## @math{(0, 180)}, 90 by default.
+    ##
+    ## @item @qcode{'Fillet'}
+    ## @code{@{@var{E}, @var{R}@}} rounds the ends of @var{F} at the edges
+    ## @var{E}, one or both, to the radius @var{R}; a matrix with a row
+    ## @code{[@var{E}, @var{R}]} for each end gives each its own radius.  The
+    ## edges are the circles at the ends of @var{F}, as
+    ## @code{solid.Shape.edges} returns them, and the knurl runs out over the
+    ## fillet as it does on a blank whose edge was rounded before knurling.
+    ##
+    ## @item @qcode{'Chamfer'}
+    ## As @qcode{'Fillet'}, for a chamfer of 45 degrees set back @var{C}
+    ## millimetres both ways: @code{@{@var{E}, @var{C}@}} or a row
+    ## @code{[@var{E}, @var{C}]} for each end.
+    ## @end table
+    ##
+    ## An end of @var{F} takes one fillet or chamfer at most, and an end at a
+    ## shoulder takes neither.  The fillets and chamfers must be smaller than
+    ## the radius of @var{F} and must not overlap.
+    ##
+    ## The types of DIN 82 are made so:
+    ##
+    ## @multitable @columnfractions 0.12 0.38 0.50
+    ## @headitem Type @tab Knurl @tab Options
+    ## @item RAA @tab straight @tab
+    ## @qcode{'Pattern', 'single', 'Angle', 0}
+    ## @item RBL @tab single, left-hand @tab
+    ## @qcode{'Pattern', 'single', 'Angle', -30}
+    ## @item RBR @tab single, right-hand @tab
+    ## @qcode{'Pattern', 'single'}
+    ## @item RGE @tab crossed, raised points @tab none
+    ## @item RGV @tab crossed, indented points @tab
+    ## @qcode{'Points', 'indented'}
+    ## @item RKE @tab square, raised points @tab
+    ## @qcode{'Angle', [0, 90]}
+    ## @item RKV @tab square, indented points @tab
+    ## @qcode{'Angle', [0, 90], 'Points', 'indented'}
+    ## @end multitable
+    ##
+    ## @example
+    ## @group
+    ## ## A knob 28 across, knurled RGE 0.8 with its top edge chamfered 0.5
+    ## S = solid.cylinder (14, 10);
+    ## F = faces (S, 'Type', 'cylinder');
+    ## E = edges (S, 'Type', 'circle', 'Within', [-15, -15, 10, 15, 15, 10]);
+    ## S = knurl (S, F, 0.8, 'Chamfer', @{E, 0.5@});
+    ## @end group
+    ## @end example
+    ##
+    ## @seealso{solid.Shape.faces, solid.Shape.edges, solid.Shape.fillet,
+    ## solid.Shape.chamfer}
+    ## @end deftypefn
+    function this = knurl (this, F, PITCH, varargin)
+
+      ## Input validation
+      if (nargin < 3)
+        error ("solid.Shape.knurl: invalid number of input arguments.");
+      endif
+      ## The depth, if given, then Name/Value pairs
+      DEPTH = 0;
+      if (mod (numel (varargin), 2) == 1)
+        DEPTH = varargin{1};
+        varargin(1) = [];
+        errmsg = solid.__checkpos__ (DEPTH, 'DEPTH');
+        if (! isempty (errmsg))
+          error ("solid.Shape.knurl: %s", errmsg);
+        endif
+      endif
+      [errmsg, opt] = options (varargin, struct ('Pattern', 'crossed', ...
+                                                 'Angle', 30, ...
+                                                 'Points', [], ...
+                                                 'Profile', 90, ...
+                                                 'Fillet', [], ...
+                                                 'Chamfer', []));
+      if (isempty (errmsg))
+        errmsg = solid.__checkpos__ (PITCH, 'PITCH');
+      endif
+      if (isempty (errmsg) && ! any (strcmp (opt.Pattern, {'single', ...
+                                                            'crossed'})))
+        errmsg = "Pattern must be 'single' or 'crossed'.";
+      endif
+      if (! isempty (errmsg))
+        error ("solid.Shape.knurl: %s", errmsg);
+      endif
+      crossed = strcmp (opt.Pattern, 'crossed');
+      A = opt.Angle;
+      if (crossed)
+        a = A;
+        a(a == -90) = 90;
+        if (! isfloat (A) || ! isreal (A) || ! any (numel (A) == [1, 2])
+            || (isscalar (A) && ! (A > 0 && A < 90))
+            || (numel (A) == 2 && ! (all (abs (A) <= 90) && a(1) != a(2))))
+          error (strcat ("solid.Shape.knurl: Angle of a crossed knurl must", ...
+                         " be one angle in the range (0, 90) degrees, or", ...
+                         " two different angles from -90 to 90."));
+        endif
+        if (isscalar (A))
+          A = [A, -A];
+        endif
+      elseif (! isfloat (A) || ! isreal (A) || ! isscalar (A)
+              || ! (abs (A) < 90))
+        error (strcat ("solid.Shape.knurl: Angle of a single knurl must be", ...
+                       " in the range (-90, 90) degrees."));
+      endif
+      indented = false;
+      if (! isempty (opt.Points))
+        if (! crossed)
+          error ("solid.Shape.knurl: Points applies only to a crossed knurl.");
+        endif
+        if (! any (strcmp (opt.Points, {'raised', 'indented'})))
+          error ("solid.Shape.knurl: Points must be 'raised' or 'indented'.");
+        endif
+        indented = strcmp (opt.Points, 'indented');
+      endif
+      P = opt.Profile;
+      if (! isfloat (P) || ! isreal (P) || ! isscalar (P)
+          || ! (P > 0 && P < 180))
+        error (strcat ("solid.Shape.knurl: Profile must be an angle in the", ...
+                       " range (0, 180) degrees."));
+      endif
+      if (! isscalar (F)
+          || ! isempty (checkindex (F, numfaces (this), 'F', 'face', false)))
+        error ("solid.Shape.knurl: F must be a single face index of S.");
+      endif
+      if (! ismember (F, faces (this, 'Type', 'cylinder')))
+        error ("solid.Shape.knurl: F must be a cylindrical face.");
+      endif
+      ## The treated ends, a row [EDGE, TYPE, SIZE] each, TYPE 1 for a fillet
+      ## and 2 for a chamfer
+      T = zeros (0, 3);
+      kinds = {'Fillet', 'R'; 'Chamfer', 'C'};
+      for k = 1:2
+        if (isempty (opt.(kinds{k,1})))
+          continue;
+        endif
+        [errmsg, E] = endedges (opt.(kinds{k,1}), kinds{k,:}, numedges (this));
+        if (! isempty (errmsg))
+          error ("solid.Shape.knurl: %s", errmsg);
+        endif
+        T = [T; E(:,1), k * ones(rows (E), 1), E(:,2)];
+      endfor
+      if (numel (unique (T(:,1))) != rows (T))
+        error (strcat ("solid.Shape.knurl: an edge can take one fillet or", ...
+                       " chamfer only."));
+      endif
+
+      r = occt ('solid.Shape.knurl', 'knurl', this.Data, double (F), ...
+                double (PITCH), double (DEPTH), double (A), indented, ...
+                double (P), T);
+      S = this;
+      this.Data = r{1};
+      [this.Colour, this.Name] = inherit (r{2}, S);
+
+    endfunction
+
   endmethods
 
 ################################################################################
@@ -3318,6 +3531,37 @@ function errmsg = checkindex (I, N, name, what, emptyok)
       || (isempty (I) && ! emptyok) || any (I != fix (I)) || any (I < 1)
       || any (I > N))
     errmsg = sprintf ("%s must be a vector of %s indices of S.", name, what);
+  endif
+
+endfunction
+
+## The edges and sizes the option NAME of knurl gives, {E, X} or a row [E, X]
+## for each end of the face, as rows [EDGE, SIZE]; N is the number of edges of
+## S.  Returns an error message body, empty when VAL is valid.
+function [errmsg, E] = endedges (VAL, NAME, X, N)
+
+  errmsg = '';
+  E = zeros (0, 2);
+  if (iscell (VAL) && numel (VAL) == 2)
+    e = VAL{1};
+    ok = isempty (solid.__checkpos__ (VAL{2}, X)) && numel (e) <= 2 ...
+         && isempty (checkindex (e, N, 'E', 'edge', false));
+    if (ok)
+      E = [double(e(:)), repmat(double (VAL{2}), numel (e), 1)];
+    endif
+  else
+    ok = isfloat (VAL) && isreal (VAL) && columns (VAL) == 2 ...
+         && any (rows (VAL) == [1, 2]) && all (isfinite (VAL(:,2))) ...
+         && all (VAL(:,2) > 0) ...
+         && isempty (checkindex (VAL(:,1), N, 'E', 'edge', false));
+    if (ok)
+      E = double (VAL);
+    endif
+  endif
+  if (! ok)
+    errmsg = sprintf (strcat ("%s must be {E, %s}, or a row [E, %s] for", ...
+                              " each end, with E edges of S and %s", ...
+                              " positive."), NAME, X, X, X);
   endif
 
 endfunction
@@ -4912,6 +5156,125 @@ endfunction
 %! R = geom.Region ([0, 0; 1, 0; 1, 1]);
 %! assert_equal (isempty (pocket (solid.Shape (), R, 1)), true);
 
+%!test  # RGE by default, crossed at 30 degrees with raised points
+%! S = knurl (solid.cylinder (5, 6), 1, 1);
+%! assert_equal (volume (S), 410.2178807, 1e-5);
+%! assert_equal (isvalid (S), true);
+
+%!test  # RAA, straight
+%! S = knurl (solid.cylinder (5, 6), 1, 1, 'Pattern', 'single', 'Angle', 0);
+%! assert_equal (volume (S), 425.0959715, 1e-5);
+%! assert_equal (isvalid (S), true);
+
+%!test  # RBL, single left-hand
+%! S = knurl (solid.cylinder (5, 6), 1, 1, 'Pattern', 'single', 'Angle', -30);
+%! assert_equal (volume (S), 425.3487143, 1e-5);
+%! assert_equal (isvalid (S), true);
+
+%!test  # RBR, single right-hand
+%! S = knurl (solid.cylinder (5, 6), 1, 1, 'Pattern', 'single');
+%! assert_equal (volume (S), 425.3487144, 1e-5);
+%! assert_equal (isvalid (S), true);
+
+%!test  # a positive angle runs right-handed, as a thread does
+%! S = solid.cylinder (5, 6);
+%! B = translate (solid.box (0.05, 0.05, 0.05), ...
+%!                [4.75 * cos(0.0577), 4.75 * sin(0.0577), 0.5] - 0.025);
+%! R = knurl (S, 1, 1, 'Pattern', 'single', 'Angle', 30);
+%! L = knurl (S, 1, 1, 'Pattern', 'single', 'Angle', -30);
+%! assert_equal (volume (intersect (R, B)), 0, 1e-12);
+%! assert_equal (volume (intersect (L, B)), 1.25e-4, 1e-12);
+
+%!test  # RGV, crossed with indented points
+%! S = knurl (solid.cylinder (5, 6), 1, 1, 'Points', 'indented');
+%! assert_equal (volume (S), 440.4795441, 1e-5);
+%! assert_equal (isvalid (S), true);
+
+%!test  # RKE, square with raised points
+%! S = knurl (solid.cylinder (5, 6), 1, 1, 'Angle', [0, 90]);
+%! assert_equal (volume (S), 410.9608363, 1e-5);
+%! assert_equal (isvalid (S), true);
+
+%!test  # RKV, square with indented points
+%! S = knurl (solid.cylinder (5, 6), 1, 1, 'Angle', [0, 90], ...
+%!            'Points', 'indented');
+%! assert_equal (volume (S), 440.4107670, 1e-5);
+%! assert_equal (isvalid (S), true);
+
+%!test  # crossed at 45 degrees
+%! S = knurl (solid.cylinder (5, 6), 1, 1, 'Angle', 45);
+%! assert_equal (volume (S), 410.2803679, 1e-5);
+%! assert_equal (isvalid (S), true);
+
+%!test  # DEPTH short of full depth leaves lands
+%! S = knurl (solid.cylinder (5, 6), 1, 1, 0.2);
+%! assert_equal (volume (S), 458.3985091, 1e-5);
+%! assert_equal (isvalid (S), true);
+
+%!test  # teeth of 60 degrees
+%! S = knurl (solid.cylinder (5, 6), 1, 1, 'Profile', 60);
+%! assert_equal (volume (S), 368.5876316, 1e-5);
+%! assert_equal (isvalid (S), true);
+
+%!test  # a fillet smaller than the depth
+%! S = knurl (solid.cylinder (5, 6), 1, 1, 'Fillet', {1, 0.2});
+%! assert_equal (volume (S), 410.2073196, 1e-5);
+%! assert_equal (isvalid (S), true);
+
+%!test  # fillets larger than the depth at both ends
+%! S = knurl (solid.cylinder (5, 6), 1, 1, 'Fillet', {[1, 3], 1});
+%! assert_equal (volume (S), 406.6176553, 1e-5);
+%! assert_equal (isvalid (S), true);
+
+%!test  # a chamfer smaller than the depth
+%! S = knurl (solid.cylinder (5, 6), 1, 1, 'Chamfer', {1, 0.2});
+%! assert_equal (volume (S), 410.1804325, 1e-5);
+%! assert_equal (isvalid (S), true);
+
+%!test  # a chamfer larger than the depth and a fillet, one row each
+%! S = knurl (solid.cylinder (5, 6), 1, 1, 'Chamfer', [3, 1], ...
+%!            'Fillet', [1, 0.3]);
+%! assert_equal (volume (S), 403.9932985, 1e-5);
+%! assert_equal (isvalid (S), true);
+
+%!test  # a knob knurled last, after its bore and hex pocket
+%! K = solid.cylinder (14, 10, geom.UCS ([0, 0, 1], [0, 0, -42.2]));
+%! K = hole (K, geom.UCS ([0, 0, 1], [0, 0, -32.2]), 'M8', Inf, ...
+%!           'Clearance', 'medium');
+%! R = geom.Region (13 / sqrt (3) * [cosd(0:60:300)', sind(0:60:300)']);
+%! R.UCS = geom.UCS ([0, 0, -1], [0, 0, -42.2]);
+%! K = pocket (K, R, 5.5);
+%! S = knurl (K, 1, 2.0733, 0.8, 'Angle', 45, 'Fillet', {3, 2});
+%! assert_equal (volume (S), 4638.466068, 1e-5);
+%! assert_equal (isvalid (S), true);
+
+%!test  # a knurl up to a shoulder, chamfered at its free end
+%! S = union (solid.cylinder (7, 2, geom.UCS ([0, 0, 1], [0, 0, -2])), ...
+%!            solid.cylinder (5, 6));
+%! S = knurl (S, 4, 1, 'Chamfer', {5, 0.5});
+%! assert_equal (volume (S), 717.3871989, 1e-5);
+%! assert_equal (isvalid (S), true);
+
+%!test  # a bored roller along the x axis, rounded at both ends
+%! S = solid.cylinder (5, 6, geom.UCS ([1, 0, 0], [-3, 0, 0]));
+%! S = hole (S, geom.UCS ([1, 0, 0], [3, 0, 0]), 3, Inf);
+%! S = knurl (S, 1, 1, 'Pattern', 'single', 'Fillet', {[1, 3], 0.8});
+%! assert_equal (volume (S), 380.1073839, 1e-5);
+%! assert_equal (isvalid (S), true);
+
+%!test  # the other solids, the colours and the names are kept
+%! S = rectarray (solid.cylinder (5, 6), [2, 1, 1], [20, 0, 0]);
+%! S.Colour = [1, 0, 0; 0, 0, 1];
+%! S.Name = {'a'; 'b'};
+%! S = knurl (S, 1, 1);
+%! assert_equal (volume (S), 410.2178807 + 150 * pi, 1e-5);
+%! assert_equal (S.Colour, [1, 0, 0; 0, 0, 1]);
+%! assert_equal (S.Name, {'a'; 'b'});
+
+%!test  # option names in any case
+%! S = knurl (solid.cylinder (5, 6), 1, 1, 'pattern', 'single');
+%! assert_equal (volume (S), 425.3487144, 1e-5);
+
 %!error<solid.Shape: DATA must be a uint8 row vector.> solid.Shape ('abc')
 %!error<solid.Shape: DATA must be a uint8 row vector.> ...
 %! solid.Shape (uint8 ([1; 2]))
@@ -5201,6 +5564,75 @@ endfunction
 %! pocket (solid.Shape (), geom.Region ([0, 0; 1, 0; 1, 1]), 1, 1, 2)
 %!error<solid.Shape.pocket: Taper must be an angle in the range \(-90, 90\) degrees.> ...
 %! pocket (solid.Shape (), geom.Region ([0, 0; 1, 0; 1, 1]), 1, 'Taper', 90)
+%!error<solid.Shape.knurl: invalid number of input arguments.> ...
+%! knurl (solid.cylinder (5, 6), 1)
+%!error<solid.Shape.knurl: DEPTH must be a positive and finite real scalar.> ...
+%! knurl (solid.cylinder (5, 6), 1, 1, -1)
+%!error<solid.Shape.knurl: PITCH must be a positive and finite real scalar.> ...
+%! knurl (solid.cylinder (5, 6), 1, 0)
+%!error<solid.Shape.knurl: option names must be character vectors.> ...
+%! knurl (solid.cylinder (5, 6), 1, 1, 1, 2)
+%!error<solid.Shape.knurl: unknown option 'Tip'.> ...
+%! knurl (solid.cylinder (5, 6), 1, 1, 'Tip', 1)
+%!error<solid.Shape.knurl: Fillet must not be empty.> ...
+%! knurl (solid.cylinder (5, 6), 1, 1, 'Fillet', [])
+%!error<solid.Shape.knurl: Pattern must be 'single' or 'crossed'.> ...
+%! knurl (solid.cylinder (5, 6), 1, 1, 'Pattern', 'cross')
+%!error<solid.Shape.knurl: Angle of a single knurl must be in the range \(-90, 90\) degrees.> ...
+%! knurl (solid.cylinder (5, 6), 1, 1, 'Pattern', 'single', 'Angle', 90)
+%!error<solid.Shape.knurl: Angle of a crossed knurl must be one angle in the range \(0, 90\) degrees, or two different angles from -90 to 90.> ...
+%! knurl (solid.cylinder (5, 6), 1, 1, 'Angle', 0)
+%!error<solid.Shape.knurl: Angle of a crossed knurl must be one angle in the range \(0, 90\) degrees, or two different angles from -90 to 90.> ...
+%! knurl (solid.cylinder (5, 6), 1, 1, 'Angle', [30, 30])
+%!error<solid.Shape.knurl: Angle of a crossed knurl must be one angle in the range \(0, 90\) degrees, or two different angles from -90 to 90.> ...
+%! knurl (solid.cylinder (5, 6), 1, 1, 'Angle', [-90, 90])
+%!error<solid.Shape.knurl: Points applies only to a crossed knurl.> ...
+%! knurl (solid.cylinder (5, 6), 1, 1, 'Pattern', 'single', 'Points', 'raised')
+%!error<solid.Shape.knurl: Points must be 'raised' or 'indented'.> ...
+%! knurl (solid.cylinder (5, 6), 1, 1, 'Points', 'sunk')
+%!error<solid.Shape.knurl: Profile must be an angle in the range \(0, 180\) degrees.> ...
+%! knurl (solid.cylinder (5, 6), 1, 1, 'Profile', 180)
+%!error<solid.Shape.knurl: F must be a single face index of S.> ...
+%! knurl (solid.cylinder (5, 6), [1, 2], 1)
+%!error<solid.Shape.knurl: F must be a single face index of S.> ...
+%! knurl (solid.cylinder (5, 6), 4, 1)
+%!error<solid.Shape.knurl: F must be a cylindrical face.> ...
+%! knurl (solid.cylinder (5, 6), 2, 1)
+%!error<solid.Shape.knurl: Fillet must be \{E, R\}, or a row \[E, R\] for each end, with E edges of S and R positive.> ...
+%! knurl (solid.cylinder (5, 6), 1, 1, 'Fillet', {1})
+%!error<solid.Shape.knurl: Fillet must be \{E, R\}, or a row \[E, R\] for each end, with E edges of S and R positive.> ...
+%! knurl (solid.cylinder (5, 6), 1, 1, 'Fillet', {1, -1})
+%!error<solid.Shape.knurl: Fillet must be \{E, R\}, or a row \[E, R\] for each end, with E edges of S and R positive.> ...
+%! knurl (solid.cylinder (5, 6), 1, 1, 'Fillet', {9, 1})
+%!error<solid.Shape.knurl: Chamfer must be \{E, C\}, or a row \[E, C\] for each end, with E edges of S and C positive.> ...
+%! knurl (solid.cylinder (5, 6), 1, 1, 'Chamfer', [1, 1, 2])
+%!error<solid.Shape.knurl: an edge can take one fillet or chamfer only.> ...
+%! knurl (solid.cylinder (5, 6), 1, 1, 'Fillet', {1, 1}, 'Chamfer', {1, 1})
+%!error<solid.Shape.knurl: F must go all the way round its axis.> ...
+%! S = subtract (solid.cylinder (5, 6), ...
+%!               translate (solid.box (10, 10, 6), [-5, -10, 0]));
+%! knurl (S, faces (S, 'Type', 'cylinder'), 1);
+%!error<solid.Shape.knurl: F must be an outside face, not a bore.> ...
+%! knurl (hole (solid.cylinder (10, 30), [0, 0, 30], 6, Inf), 4, 1)
+%!error<solid.Shape.knurl: F must end in a circle at each end.> ...
+%! T = rotate (translate (solid.box (30, 30, 10), [-15, -15, 8]), 20, ...
+%!             [1, 0, 0], [0, 0, 8]);
+%! knurl (subtract (solid.cylinder (5, 10), T), 1, 1)
+%!error<solid.Shape.knurl: each end of F must meet one flat face square to its axis.> ...
+%! S = fillet (solid.cylinder (5, 6), 1, 1);
+%! knurl (S, faces (S, 'Type', 'cylinder'), 1)
+%!error<solid.Shape.knurl: edge 2 is not at an end of F.> ...
+%! knurl (solid.cylinder (5, 6), 1, 1, 'Chamfer', {2, 1})
+%!error<solid.Shape.knurl: edge 4 is where F meets a shoulder, so it cannot be filleted or chamfered.> ...
+%! S = union (solid.cylinder (7, 2, geom.UCS ([0, 0, 1], [0, 0, -2])), ...
+%!            solid.cylinder (5, 6));
+%! knurl (S, 4, 1, 'Chamfer', {4, 0.5})
+%!error<solid.Shape.knurl: DEPTH must be no more than 0.5038, the full depth of the teeth at the pitch fitted round F.> ...
+%! knurl (solid.cylinder (5, 6), 1, 1, 0.6)
+%!error<solid.Shape.knurl: a fillet or chamfer must be smaller than the radius of F.> ...
+%! knurl (solid.cylinder (5, 6), 1, 1, 'Fillet', {1, 5})
+%!error<solid.Shape.knurl: the fillets or chamfers at the two ends of F overlap.> ...
+%! knurl (solid.cylinder (5, 6), 1, 1, 'Fillet', {[1, 3], 3.5})
 
 %!test  # a box cut through the middle
 %! U = geom.UCS ([0, 0, 1], [0, 0, 15]);

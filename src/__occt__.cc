@@ -64,6 +64,8 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepBuilderAPI_MakeWire.hxx>
+#include <BRepBuilderAPI_MakeVertex.hxx>
+#include <BRepBuilderAPI_Sewing.hxx>
 #include <BRepBuilderAPI_GTransform.hxx>
 #include <BRepBuilderAPI_Transform.hxx>
 #include <BRepCheck_Analyzer.hxx>
@@ -121,6 +123,13 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <GCE2d_MakeArcOfCircle.hxx>
 #include <GCE2d_MakeSegment.hxx>
 #endif
+#if OCC_VERSION_MAJOR >= 8
+#include <NCollection_HArray1.hxx>
+#else
+#include <TColStd_HArray1OfReal.hxx>
+#include <TColgp_HArray1OfPnt.hxx>
+#include <TColgp_HArray1OfPnt2d.hxx>
+#endif
 #include <GeomAPI.hxx>
 #include <BndLib_Add2dCurve.hxx>
 #include <Bnd_Box2d.hxx>
@@ -128,6 +137,15 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <gp_Pnt2d.hxx>
 #include <gp_Pln.hxx>
 #include <Geom_CylindricalSurface.hxx>
+#include <Geom_ConicalSurface.hxx>
+#include <Geom_ToroidalSurface.hxx>
+#include <GeomAPI_Interpolate.hxx>
+#include <Geom2dAPI_Interpolate.hxx>
+#include <ShapeAnalysis_FreeBounds.hxx>
+#include <gp_Cylinder.hxx>
+#include <TopoDS_Shell.hxx>
+#include <TopoDS_Solid.hxx>
+#include <TopoDS_Vertex.hxx>
 #include <Geom_Plane.hxx>
 #include <GProp_GProps.hxx>
 #include <Interface_Static.hxx>
@@ -3349,6 +3367,1508 @@ readassembly (const string& file, const string& name, const string& caller)
   return out;
 }
 
+// Knurling.  A knurl is laid out on its face unrolled, in the angle theta
+// round the axis and z along it, where each flank of a groove is a sheet
+// r = a + b theta + c z.  The unrolled face is cut into polygons, each lying
+// on one sheet or on the fillet or chamfer of an end, those on the same
+// surface are joined where they share a side, and each is built as a face on
+// its true surface.  No boolean is involved, which makes a knurl twenty times
+// faster than cutting its grooves.
+namespace knurling
+{
+
+// A polygon in the unrolled face, its corners (theta, z)
+typedef vector<pair<double, double>> poly;
+
+// The sheet r = a + b theta + c z, numbered sid among the skin's surfaces
+struct sheet
+{
+  double a, b, c;
+  int sid;
+};
+
+// The treatment of one end of the face: none (0), a fillet (1) or a chamfer
+// (2) of size t
+struct treatment
+{
+  int type = 0;
+  double t = 0;
+  double zc = 0;     // the centre of a fillet along the axis
+  double rmaj = 0;   // the radius a fillet's centre runs round at
+  double zref = 0;   // where a chamfer's cone is measured from
+  double ang = 0;    // a chamfer's half angle
+  int sid = -1;
+  int sign = 0;      // +1 at Z0, -1 at Z1: the direction into the face
+  double zend = 0;
+};
+
+// One polygon of the skin, lying on the surface sid.  Side i runs from
+// corner i to the next, straight in the unrolled face unless arc(i) is set,
+// when it is the crease where the sheet ep(i) meets the treatment of the end
+// ee(i).
+struct patch
+{
+  vector<double> t, z;
+  vector<char> arc;
+  vector<sheet> ep;
+  vector<int> ee;
+  sheet p;           // the sheet the polygon lies on, when a flank
+  int sid;
+  int end;           // the end whose treatment it meets, or -1
+};
+
+// The cylinder of radius R from Z0 to Z1 and the treatments of its ends
+struct blank
+{
+  double R, z0, z1;
+  treatment E[2];
+
+  // The radius of the end K's treatment at Z, R beyond its reach
+  double env (int k, double z) const
+  {
+    const treatment& e = E[k];
+    const double d = e.sign * (z - e.zend);
+    if (e.type == 0 || d >= e.t)
+    {
+      return R;
+    }
+    if (e.type == 2)
+    {
+      return R - e.t + d;
+    }
+    const double q = e.t - d;
+    return R - e.t + sqrt (std::max (e.t * e.t - q * q, 0.0));
+  }
+
+  // The angle round the tube of the fillet at the end K, at Z
+  double vof (int k, double z) const
+  {
+    const treatment& e = E[k];
+    return asin (std::min (std::max ((z - e.zc) / e.t, -1.0), 1.0));
+  }
+};
+
+// One set of grooves (raised) or ridges (indented), running where w = s cos A
+// - z sin A is constant, s the length round the face: its pitch P, its count
+// round the face, and its pieces along w, r = al + be w on [w0, w1]
+struct grooveset
+{
+  double ca, sa, P;
+  int count;
+  vector<double> w0, w1, al, be;
+};
+
+// The knurl asked for: its pitch, its depth (0 for the full depth), the
+// angle of its teeth in degrees, the angle of each set of grooves from the
+// axis in degrees, whether its points are indented, and the type and size of
+// the treatment at each end
+struct knurlspec
+{
+  double pitch, depth, profile;
+  vector<double> angles;
+  bool indented;
+  double ends[2][2];
+};
+
+static double
+polyarea (const poly& Q)
+{
+  double a = 0;
+  for (size_t i = 0; i < Q.size (); i++)
+  {
+    const size_t j = (i + 1) % Q.size ();
+    a += Q[i].first * Q[j].second - Q[j].first * Q[i].second;
+  }
+  return a / 2;
+}
+
+// The part of Q where a theta + b z + d >= 0
+static poly
+clip (const poly& Q, double a, double b, double d)
+{
+  poly out;
+  const size_t n = Q.size ();
+  if (n == 0)
+  {
+    return out;
+  }
+  vector<double> f (n);
+  const double s = std::max (1.0, hypot (a, b));
+  for (size_t i = 0; i < n; i++)
+  {
+    f[i] = a * Q[i].first + b * Q[i].second + d;
+    if (std::abs (f[i]) < 1e-12 * s)
+    {
+      f[i] = 0;
+    }
+  }
+  for (size_t i = 0; i < n; i++)
+  {
+    const size_t j = (i + 1) % n;
+    if (f[i] >= 0)
+    {
+      out.push_back (Q[i]);
+    }
+    if (f[i] * f[j] < 0)
+    {
+      const double w = f[i] / (f[i] - f[j]);
+      out.push_back ({Q[i].first + w * (Q[j].first - Q[i].first),
+                      Q[i].second + w * (Q[j].second - Q[i].second)});
+    }
+  }
+  poly q;
+  for (size_t i = 0; i < out.size (); i++)
+  {
+    const auto& p1 = out[i];
+    const auto& p2 = out[(i + 1) % out.size ()];
+    if (hypot (p1.first - p2.first, p1.second - p2.second) > 1e-10)
+    {
+      q.push_back (p1);
+    }
+  }
+  return q;
+}
+
+// How far the sheet P stands above the treatment of the end K at (T, Z)
+static double
+hval (const blank& K, int k, const sheet& p, double t, double z)
+{
+  return p.a + p.b * t + p.c * z - K.env (k, z);
+}
+
+// Where hval changes sign strictly inside the segment from (T0, Z0) to
+// (T1, Z1), as fractions of it; hval is convex along a segment, so it has
+// two roots at most
+static vector<double>
+roots (const blank& K, int k, const sheet& p, double t0, double z0,
+       double t1, double z1)
+{
+  auto f = [&] (double s)
+  {
+    return hval (K, k, p, t0 + s * (t1 - t0), z0 + s * (z1 - z0));
+  };
+  auto bisect = [&] (double a, double b)
+  {
+    double fa = f (a);
+    for (int i = 0; i < 200 && b - a > 1e-15; i++)
+    {
+      const double m = (a + b) / 2;
+      const double fm = f (m);
+      if ((fa < 0) == (fm < 0))
+      {
+        a = m;
+        fa = fm;
+      }
+      else
+      {
+        b = m;
+      }
+    }
+    return (a + b) / 2;
+  };
+  vector<double> r;
+  const double fa = f (0);
+  const double fb = f (1);
+  if (fa * fb < 0 && std::abs (fa) > 1e-12 && std::abs (fb) > 1e-12)
+  {
+    r.push_back (bisect (0, 1));
+    return r;
+  }
+  // Both ends on one side: the minimum, by golden section, decides
+  double a = 0;
+  double b = 1;
+  const double g = (sqrt (5.0) - 1) / 2;
+  double x1 = b - g * (b - a);
+  double x2 = a + g * (b - a);
+  double f1 = f (x1);
+  double f2 = f (x2);
+  for (int i = 0; i < 100; i++)
+  {
+    if (f1 < f2)
+    {
+      b = x2;
+      x2 = x1;
+      f2 = f1;
+      x1 = b - g * (b - a);
+      f1 = f (x1);
+    }
+    else
+    {
+      a = x1;
+      x1 = x2;
+      f1 = f2;
+      x2 = a + g * (b - a);
+      f2 = f (x2);
+    }
+  }
+  const double tm = (a + b) / 2;
+  if (f (tm) < -1e-12)
+  {
+    if (fa > 1e-12)
+    {
+      r.push_back (bisect (0, tm));
+    }
+    if (fb > 1e-12)
+    {
+      r.push_back (bisect (tm, 1));
+    }
+  }
+  return r;
+}
+
+// The polygon Q on the sheet P, every side straight
+static patch
+plain (const poly& Q, const sheet& p, int sid, int end)
+{
+  patch F;
+  for (const auto& q : Q)
+  {
+    F.t.push_back (q.first);
+    F.z.push_back (q.second);
+    F.arc.push_back (0);
+    F.ep.push_back (p);
+    F.ee.push_back (end);
+  }
+  F.p = p;
+  F.sid = sid;
+  F.end = end;
+  return F;
+}
+
+// The polygon Q on the sheet P split where it meets the treatment of the end
+// K: below the crease the sheet, beyond it the treatment.  False when Q meets
+// the crease more than twice, and must be cut smaller first.
+static bool
+split (const blank& K, int k, const poly& Q, const sheet& p,
+       vector<patch>& out)
+{
+  struct corner
+  {
+    double t, z;
+    int side;
+  };
+  vector<corner> L;
+  const size_t n = Q.size ();
+  auto side = [] (double h)
+  {
+    return h < -1e-12 ? -1 : (h > 1e-12 ? 1 : 0);
+  };
+  for (size_t i = 0; i < n; i++)
+  {
+    const size_t j = (i + 1) % n;
+    L.push_back ({Q[i].first, Q[i].second,
+                  side (hval (K, k, p, Q[i].first, Q[i].second))});
+    for (double s : roots (K, k, p, Q[i].first, Q[i].second,
+                           Q[j].first, Q[j].second))
+    {
+      L.push_back ({Q[i].first + s * (Q[j].first - Q[i].first),
+                    Q[i].second + s * (Q[j].second - Q[i].second), 0});
+    }
+  }
+  int zeros = 0;
+  for (const corner& c : L)
+  {
+    zeros += (c.side == 0);
+  }
+  if (zeros > 2)
+  {
+    return false;
+  }
+  for (int s : {-1, 1})
+  {
+    vector<size_t> keep;
+    bool any = false;
+    for (size_t i = 0; i < L.size (); i++)
+    {
+      if (L[i].side == 0 || L[i].side == s)
+      {
+        keep.push_back (i);
+        any = any || L[i].side == s;
+      }
+    }
+    if (! any)
+    {
+      continue;
+    }
+    patch F;
+    F.p = p;
+    F.sid = s < 0 ? p.sid : K.E[k].sid;
+    F.end = k;
+    for (size_t m = 0; m < keep.size (); m++)
+    {
+      const size_t i = keep[m];
+      const size_t j = keep[(m + 1) % keep.size ()];
+      bool line = false;
+      if ((i + 1) % L.size () == j)
+      {
+        const double h = hval (K, k, p, (L[i].t + L[j].t) / 2,
+                               (L[i].z + L[j].z) / 2);
+        line = s < 0 ? h <= 1e-12 : h >= -1e-12;
+      }
+      F.t.push_back (L[i].t);
+      F.z.push_back (L[i].z);
+      F.arc.push_back (! line);
+      F.ep.push_back (p);
+      F.ee.push_back (k);
+    }
+    if (F.t.size () >= 3 || (F.t.size () == 2 && (F.arc[0] || F.arc[1])))
+    {
+      out.push_back (F);
+    }
+  }
+  return true;
+}
+
+// The handles of arrays the curve interpolators take, which Open CASCADE 8.0
+// names by their element type
+#if OCC_VERSION_MAJOR >= 8
+using PointArray = NCollection_HArray1<gp_Pnt>;
+using Point2dArray = NCollection_HArray1<gp_Pnt2d>;
+using RealArray = NCollection_HArray1<double>;
+#else
+using PointArray = TColgp_HArray1OfPnt;
+using Point2dArray = TColgp_HArray1OfPnt2d;
+using RealArray = TColStd_HArray1OfReal;
+#endif
+
+// The sheet P over theta from T0 to T1 and z from Z0 to Z1: cubic in theta
+// through a point a degree, linear in z, its parameters theta and z
+static Handle (Geom_Surface)
+flank (const sheet& p, double t0, double t1, double z0, double z1)
+{
+  const int n = std::max (4, static_cast<int> (ceil ((t1 - t0)
+                                                     / (M_PI / 180))) + 1);
+  Handle (RealArray) par = new RealArray (1, n);
+  Handle (PointArray) p0 = new PointArray (1, n);
+  Handle (PointArray) p1 = new PointArray (1, n);
+  for (int i = 1; i <= n; i++)
+  {
+    const double t = t0 + (t1 - t0) * (i - 1) / (n - 1);
+    par->SetValue (i, t);
+    const double r0 = p.a + p.b * t + p.c * z0;
+    const double r1 = p.a + p.b * t + p.c * z1;
+    p0->SetValue (i, gp_Pnt (r0 * cos (t), r0 * sin (t), z0));
+    p1->SetValue (i, gp_Pnt (r1 * cos (t), r1 * sin (t), z1));
+  }
+  GeomAPI_Interpolate i0 (p0, par, false, 1e-12);
+  GeomAPI_Interpolate i1 (p1, par, false, 1e-12);
+  i0.Perform ();
+  i1.Perform ();
+  const Handle (Geom_BSplineCurve) c0 = i0.Curve ();
+  const Handle (Geom_BSplineCurve) c1 = i1.Curve ();
+  NCollection_Array2<gp_Pnt> P (1, c0->NbPoles (), 1, 2);
+  for (int i = 1; i <= c0->NbPoles (); i++)
+  {
+    P(i,1) = c0->Pole (i);
+    P(i,2) = c1->Pole (i);
+  }
+  NCollection_Array1<double> vk (1, 2);
+  vk(1) = z0;
+  vk(2) = z1;
+  NCollection_Array1<int> vm (1, 2);
+  vm(1) = 2;
+  vm(2) = 2;
+  return new Geom_BSplineSurface (P, c0->Knots (), vk, c0->Multiplicities (),
+                                  vm, c0->Degree (), 1);
+}
+
+// The 2-D curve through the points P, evenly parametrised
+static Handle (Geom2d_Curve)
+interp2d (const vector<gp_Pnt2d>& P)
+{
+  const int n = P.size ();
+  Handle (Point2dArray) pts = new Point2dArray (1, n);
+  Handle (RealArray) par = new RealArray (1, n);
+  for (int i = 0; i < n; i++)
+  {
+    pts->SetValue (i + 1, P[i]);
+    par->SetValue (i + 1, static_cast<double> (i) / (n - 1));
+  }
+  Geom2dAPI_Interpolate I (pts, par, false, 1e-12);
+  I.Perform ();
+  return I.Curve ();
+}
+
+// The knurled skin of the cylinder of radius R from Z0 to Z1 about the z
+// axis, the low point of its first set of grooves at theta 0 and Z0, as a
+// shell open at both ends
+static TopoDS_Shape
+skin (double R, double z0, double z1, const knurlspec& spec,
+      const string& caller)
+{
+  blank K;
+  K.R = R;
+  K.z0 = z0;
+  K.z1 = z1;
+  const double L = 2 * M_PI * R;
+  const double H = z1 - z0;
+  const double prof = spec.profile * M_PI / 180;
+  const double ct = 1 / tan (prof / 2);       // the slope of a flank, dr/dw
+  const bool indented = spec.indented;
+
+  // The sets of grooves, each pitch fitted to a whole count round the face,
+  // or along it for rings
+  vector<grooveset> sets;
+  double full = 1e300;
+  for (double a : spec.angles)
+  {
+    grooveset s;
+    const bool ring = std::abs (std::abs (a) - 90) < 1e-12;
+    s.ca = ring ? 0 : cos (a * M_PI / 180);
+    s.sa = ring ? (a > 0 ? 1 : -1) : sin (a * M_PI / 180);
+    if (ring)
+    {
+      s.count = std::max (1, static_cast<int> (lround (H / spec.pitch)));
+      s.P = H / s.count;
+    }
+    else
+    {
+      s.count = std::max (1, static_cast<int> (lround (L * s.ca
+                                                       / spec.pitch)));
+      s.P = L * s.ca / s.count;
+    }
+    full = std::min (full, s.P / (2 * tan (prof / 2)));
+    sets.push_back (s);
+  }
+  const double D = spec.depth > 0 ? spec.depth : full;
+  if (D > full * (1 + 1e-12))
+  {
+    error ("%s: DEPTH must be no more than %.4g, the full depth of the"
+           " teeth at the pitch fitted round F.", caller.c_str (), full);
+  }
+  const double e = D / ct;                  // half the width of a groove at R
+
+  // The surfaces of the skin, numbered by name
+  map<string, int> sidof;
+  vector<string> keys;
+  auto sid = [&] (const string& k)
+  {
+    auto it = sidof.find (k);
+    if (it != sidof.end ())
+    {
+      return it->second;
+    }
+    const int n = keys.size ();
+    sidof[k] = n;
+    keys.push_back (k);
+    return n;
+  };
+  const int cylR = sid ("cylinder R");
+  const int cylD = sid ("cylinder R-D");
+
+  // The ends
+  for (int k = 0; k < 2; k++)
+  {
+    treatment& E = K.E[k];
+    E.type = static_cast<int> (spec.ends[k][0]);
+    E.t = spec.ends[k][1];
+    E.sign = k == 0 ? 1 : -1;
+    E.zend = k == 0 ? z0 : z1;
+    if (E.type == 1)
+    {
+      E.zc = E.zend + E.sign * E.t;
+      E.rmaj = R - E.t;
+      E.sid = sid (k == 0 ? "torus 0" : "torus 1");
+    }
+    else if (E.type == 2)
+    {
+      E.zref = k == 0 ? z0 : z1 - E.t;
+      E.ang = k == 0 ? M_PI / 4 : -M_PI / 4;
+      E.sid = sid (k == 0 ? "cone 0" : "cone 1");
+    }
+  }
+  if (K.E[0].t >= R || K.E[1].t >= R)
+  {
+    error ("%s: a fillet or chamfer must be smaller than the radius of F.",
+           caller.c_str ());
+  }
+  if (K.E[0].t + K.E[1].t > H)
+  {
+    error ("%s: the fillets or chamfers at the two ends of F overlap.",
+           caller.c_str ());
+  }
+
+  // The pieces of each set along w, the low point of a groove (raised) or
+  // of a pit (indented) at theta 0 and Z0
+  for (grooveset& s : sets)
+  {
+    double wa = 1e300;
+    double wb = -1e300;
+    for (double ss : {0.0, L})
+    {
+      for (double zz : {z0, z1})
+      {
+        const double w = ss * s.ca - zz * s.sa;
+        wa = std::min (wa, w);
+        wb = std::max (wb, w);
+      }
+    }
+    const double wl = - z0 * s.sa;
+    const long k0 = static_cast<long> (floor ((wa - wl) / s.P)) - 1;
+    const long k1 = static_cast<long> (ceil ((wb - wl) / s.P)) + 1;
+    for (long k = k0; k <= k1; k++)
+    {
+      if (! indented)
+      {
+        const double g = wl + k * s.P;
+        s.w0.push_back (g - e);
+        s.w1.push_back (g);
+        s.al.push_back (R - D + ct * g);
+        s.be.push_back (-ct);
+        s.w0.push_back (g);
+        s.w1.push_back (g + e);
+        s.al.push_back (R - D - ct * g);
+        s.be.push_back (ct);
+        if (s.P - 2 * e > 1e-12)
+        {
+          s.w0.push_back (g + e);
+          s.w1.push_back (g + s.P - e);
+          s.al.push_back (R);
+          s.be.push_back (0);
+        }
+      }
+      else
+      {
+        const double q = wl + (k + 0.5) * s.P;
+        s.w0.push_back (q - e);
+        s.w1.push_back (q);
+        s.al.push_back (R - ct * q);
+        s.be.push_back (ct);
+        s.w0.push_back (q);
+        s.w1.push_back (q + e);
+        s.al.push_back (R + ct * q);
+        s.be.push_back (-ct);
+        if (s.P - 2 * e > 1e-12)
+        {
+          s.w0.push_back (q + e);
+          s.w1.push_back (q + s.P - e);
+          s.al.push_back (R - D);
+          s.be.push_back (0);
+        }
+      }
+    }
+  }
+  // A single knurl takes a second set of one piece at R, which never wins
+  if (sets.size () == 1)
+  {
+    grooveset s;
+    s.ca = 1;
+    s.sa = 0;
+    s.P = 0;
+    s.count = 0;
+    s.w0.push_back (-1e300);
+    s.w1.push_back (1e300);
+    s.al.push_back (R);
+    s.be.push_back (0);
+    sets.push_back (s);
+  }
+  auto piece = [&] (int j, size_t i)
+  {
+    const grooveset& s = sets[j];
+    sheet p;
+    p.a = s.al[i];
+    p.b = s.be[i] * R * s.ca;
+    p.c = - s.be[i] * s.sa;
+    if (s.be[i] == 0)
+    {
+      p.sid = s.al[i] == R ? cylR : cylD;
+    }
+    else
+    {
+      p.sid = sid ("flank " + to_string (j) + " " + to_string (i));
+    }
+    return p;
+  };
+
+  // Zones along z: a band all treatment, where a treatment reaches below the
+  // grooves; treated; plain; treated; band
+  struct zone
+  {
+    double za, zb;
+    int kind;        // 0 plain, 1 treated, 2 band
+    int end;
+  };
+  vector<zone> Z;
+  const double rlow = R - D;
+  double zb0 = z0;
+  double zb1 = z1;
+  for (int k = 0; k < 2; k++)
+  {
+    const treatment& E = K.E[k];
+    if (E.type == 0)
+    {
+      continue;
+    }
+    const double lo = R - E.t;
+    if (lo < rlow - 1e-9)
+    {
+      double dz;
+      if (E.type == 2)
+      {
+        dz = rlow - lo;
+      }
+      else
+      {
+        dz = E.t - sqrt (E.t * E.t - (rlow - lo) * (rlow - lo));
+      }
+      (k == 0 ? zb0 : zb1) = E.zend + E.sign * dz / 2;
+    }
+  }
+  if (zb0 > z0)
+  {
+    Z.push_back ({z0, zb0, 2, 0});
+  }
+  const double zt0 = z0 + K.E[0].t;
+  const double zt1 = z1 - K.E[1].t;
+  if (K.E[0].type)
+  {
+    Z.push_back ({zb0, zt0, 1, 0});
+  }
+  Z.push_back ({K.E[0].type ? zt0 : z0, K.E[1].type ? zt1 : z1, 0, -1});
+  if (K.E[1].type)
+  {
+    Z.push_back ({zt1, zb1, 1, 1});
+  }
+  if (zb1 < z1)
+  {
+    Z.push_back ({zb1, z1, 2, 1});
+  }
+
+  // The polygons, and the range of theta each surface must span
+  vector<patch> faces;
+  map<int, pair<double, double>> trange;
+  auto keepface = [&] (const patch& F)
+  {
+    if (F.sid >= 0)
+    {
+      auto& r = trange[F.sid];
+      if (r.first == 0 && r.second == 0)
+      {
+        r = {1e300, -1e300};
+      }
+      for (double tt : F.t)
+      {
+        r.first = std::min (r.first, tt);
+        r.second = std::max (r.second, tt);
+      }
+      // A crease can bulge past the polygon's corners
+      for (size_t i = 0; i < F.t.size (); i++)
+      {
+        const int ke = F.ee[i];
+        const sheet& pe = F.ep[i];
+        if (! F.arc[i] || ke < 0 || K.E[ke].type != 1
+            || std::abs (pe.b) <= 1e-12)
+        {
+          continue;
+        }
+        const treatment& E = K.E[ke];
+        const size_t j = (i + 1) % F.t.size ();
+        const double v1 = K.vof (ke, F.z[i]);
+        const double v2 = K.vof (ke, F.z[j]);
+        for (int m = 1; m < 32; m++)
+        {
+          const double v = v1 + (v2 - v1) * m / 32;
+          const double z = E.zc + E.t * sin (v);
+          const double th = (E.rmaj + E.t * cos (v) - pe.a - pe.c * z)
+                            / pe.b;
+          r.first = std::min (r.first, th);
+          r.second = std::max (r.second, th);
+        }
+      }
+    }
+    faces.push_back (F);
+  };
+  bool overflow = false;
+  vector<patch> pend;
+  auto add = [&] (poly Q, const sheet& p, const zone& z)
+  {
+    if (polyarea (Q) < 0)
+    {
+      reverse (Q.begin (), Q.end ());
+    }
+    if (Q.size () < 3 || polyarea (Q) < 1e-14)
+    {
+      return;
+    }
+    if (z.kind == 1)
+    {
+      if (! split (K, z.end, Q, p, pend))
+      {
+        overflow = true;
+      }
+    }
+    else
+    {
+      pend.push_back (plain (Q, p, p.sid, -1));
+    }
+  };
+  // Q between w = A and w = B of the set S, w = R ca theta - sa z
+  auto wclip = [&] (const poly& Q, const grooveset& s, double a, double b)
+  {
+    if (s.P == 0)
+    {
+      return Q;
+    }
+    return clip (clip (Q, R * s.ca, -s.sa, -a), -R * s.ca, s.sa, b);
+  };
+  for (const zone& zn : Z)
+  {
+    if (zn.kind == 2 || zn.zb - zn.za < 1e-12)
+    {
+      continue;
+    }
+    // A treated zone is cut into bands, more of them until no polygon meets
+    // the crease more than twice: a long flank can cross a fillet four times
+    for (int nb = 1; ; nb *= 2)
+    {
+      overflow = false;
+      pend.clear ();
+      const int nslab = zn.kind == 1 ? nb : 1;
+      for (int sl = 0; sl < nslab && ! overflow; sl++)
+      {
+        zone z = zn;
+        z.za = zn.za + (zn.zb - zn.za) * sl / nslab;
+        z.zb = sl + 1 == nslab ? zn.zb
+                               : zn.za + (zn.zb - zn.za) * (sl + 1) / nslab;
+        const poly box {{0, z.za}, {2 * M_PI, z.za}, {2 * M_PI, z.zb},
+                        {0, z.zb}};
+        const grooveset& s1 = sets[0];
+        const grooveset& s2 = sets[1];
+        for (size_t i = 0; i < s1.w0.size (); i++)
+        {
+          const poly Q1 = wclip (box, s1, s1.w0[i], s1.w1[i]);
+          if (Q1.size () < 3)
+          {
+            continue;
+          }
+          double wa = 1e300;
+          double wb = -1e300;
+          for (const auto& q : Q1)
+          {
+            const double w = s2.P == 0 ? 0 : R * s2.ca * q.first
+                                             - s2.sa * q.second;
+            wa = std::min (wa, w);
+            wb = std::max (wb, w);
+          }
+          const size_t j0 = lower_bound (s2.w1.begin (), s2.w1.end (), wa)
+                            - s2.w1.begin ();
+          for (size_t j = j0; j < s2.w0.size () && s2.w0[j] < wb; j++)
+          {
+            const poly Q = wclip (Q1, s2, s2.w0[j], s2.w1[j]);
+            if (Q.size () < 3)
+            {
+              continue;
+            }
+            const sheet p1 = piece (0, i);
+            const sheet p2 = piece (1, j);
+            if (s2.be[j] == 0)
+            {
+              add (Q, p1, z);
+            }
+            else if (s1.be[i] == 0)
+            {
+              add (Q, p2, z);
+            }
+            else
+            {
+              // Where both sets cut, the lower sheet wins when raised and
+              // the higher when indented
+              const double a = p2.b - p1.b;
+              const double b = p2.c - p1.c;
+              const double d = p2.a - p1.a;
+              add (clip (Q, a, b, d), indented ? p2 : p1, z);
+              add (clip (Q, -a, -b, -d), indented ? p1 : p2, z);
+            }
+          }
+        }
+      }
+      if (! overflow)
+      {
+        for (const patch& F : pend)
+        {
+          keepface (F);
+        }
+        break;
+      }
+      if (nb >= 256)
+      {
+        error ("%s: the knurl could not be laid out along the fillet or"
+               " chamfer of F.", caller.c_str ());
+      }
+    }
+  }
+  // The bands, all treatment, their inner sides through the corners the
+  // polygons next to them leave there
+  for (const zone& z : Z)
+  {
+    if (z.kind != 2)
+    {
+      continue;
+    }
+    const double zin = z.end == 0 ? z.zb : z.za;
+    const double zout = z.end == 0 ? z.za : z.zb;
+    vector<double> pts;
+    for (const patch& F : faces)
+    {
+      for (size_t m = 0; m < F.z.size (); m++)
+      {
+        if (std::abs (F.z[m] - zin) < 1e-12)
+        {
+          pts.push_back (F.t[m]);
+        }
+      }
+    }
+    sort (pts.begin (), pts.end ());
+    vector<double> tt;
+    for (double x : pts)
+    {
+      if (tt.empty () || x - tt.back () > 1e-10)
+      {
+        tt.push_back (x);
+      }
+    }
+    const size_t step = 8;
+    for (size_t a = 0; a + 1 < tt.size (); a += step)
+    {
+      const size_t b = std::min (a + step, tt.size () - 1);
+      patch F;
+      F.p = {0, 0, 0, -1};
+      F.sid = K.E[z.end].sid;
+      F.end = z.end;
+      auto put = [&] (double th, double zz)
+      {
+        F.t.push_back (th);
+        F.z.push_back (zz);
+        F.arc.push_back (0);
+        F.ep.push_back (F.p);
+        F.ee.push_back (z.end);
+      };
+      if (z.end == 0)
+      {
+        put (tt[a], zout);
+        put (tt[b], zout);
+        for (size_t m = b; m > a; m--)
+        {
+          put (tt[m], zin);
+        }
+        put (tt[a], zin);
+      }
+      else
+      {
+        for (size_t m = a; m <= b; m++)
+        {
+          put (tt[m], zin);
+        }
+        put (tt[b], zout);
+        put (tt[a], zout);
+      }
+      keepface (F);
+    }
+  }
+
+  // Polygons on one surface that share a straight side are joined into one,
+  // which Open CASCADE's own unifying does not do reliably here
+  typedef pair<long long, long long> vkey;
+  auto key = [] (double a, double b)
+  {
+    return make_pair (llround (a * 1e9), llround (b * 1e9));
+  };
+  map<pair<vkey, vkey>, vector<size_t>> owner;
+  for (size_t f = 0; f < faces.size (); f++)
+  {
+    const patch& F = faces[f];
+    for (size_t i = 0; i < F.t.size (); i++)
+    {
+      if (F.arc[i])
+      {
+        continue;
+      }
+      const size_t j = (i + 1) % F.t.size ();
+      owner[minmax (key (F.t[i], F.z[i]), key (F.t[j], F.z[j]))]
+        .push_back (f);
+    }
+  }
+  vector<size_t> up (faces.size ());
+  for (size_t f = 0; f < up.size (); f++)
+  {
+    up[f] = f;
+  }
+  function<size_t (size_t)> root = [&] (size_t f)
+  {
+    return up[f] == f ? f : up[f] = root (up[f]);
+  };
+  for (const auto& kv : owner)
+  {
+    if (kv.second.size () == 2)
+    {
+      const size_t f = kv.second[0];
+      const size_t g = kv.second[1];
+      if (f != g && faces[f].sid == faces[g].sid)
+      {
+        up[root (f)] = root (g);
+      }
+    }
+  }
+  map<size_t, vector<size_t>> groups;
+  for (size_t f = 0; f < faces.size (); f++)
+  {
+    groups[root (f)].push_back (f);
+  }
+  vector<patch> merged;
+  for (const auto& gv : groups)
+  {
+    const vector<size_t>& G = gv.second;
+    if (G.size () == 1)
+    {
+      merged.push_back (faces[G[0]]);
+      continue;
+    }
+    // The sides of the group, those it holds both ways dropped, followed
+    // round from one to the next
+    struct side
+    {
+      vkey a, b;
+      double ta, za;
+      char arc;
+      sheet p;
+      int end;
+    };
+    map<pair<vkey, vkey>, int> count;
+    vector<side> all;
+    for (size_t f : G)
+    {
+      const patch& F = faces[f];
+      for (size_t i = 0; i < F.t.size (); i++)
+      {
+        const size_t j = (i + 1) % F.t.size ();
+        const side d {key (F.t[i], F.z[i]), key (F.t[j], F.z[j]), F.t[i],
+                      F.z[i], F.arc[i], F.ep[i], F.ee[i]};
+        all.push_back (d);
+        count[{d.a, d.b}]++;
+      }
+    }
+    map<vkey, vector<size_t>> from;
+    for (size_t k = 0; k < all.size (); k++)
+    {
+      if (all[k].arc || ! count.count ({all[k].b, all[k].a}))
+      {
+        from[all[k].a].push_back (k);
+      }
+    }
+    bool ok = ! from.empty ();
+    for (const auto& kv : from)
+    {
+      ok = ok && kv.second.size () == 1;
+    }
+    patch M;
+    if (ok)
+    {
+      size_t k = from.begin ()->second[0];
+      const vkey start = all[k].a;
+      size_t n = 0;
+      do
+      {
+        M.t.push_back (all[k].ta);
+        M.z.push_back (all[k].za);
+        M.arc.push_back (all[k].arc);
+        M.ep.push_back (all[k].p);
+        M.ee.push_back (all[k].end);
+        const auto it = from.find (all[k].b);
+        if (it == from.end ())
+        {
+          ok = false;
+          break;
+        }
+        k = it->second[0];
+        n++;
+      }
+      while (all[k].a != start && n <= from.size ());
+      ok = ok && n == from.size ();
+    }
+    if (ok)
+    {
+      M.p = faces[G[0]].p;
+      M.sid = faces[G[0]].sid;
+      M.end = faces[G[0]].end;
+      merged.push_back (M);
+    }
+    else
+    {
+      for (size_t f : G)
+      {
+        merged.push_back (faces[f]);
+      }
+    }
+  }
+  faces.swap (merged);
+
+  // The surfaces: cylinders at R and R - D, a torus or a cone at each
+  // treated end, and each flank over the theta its polygons span
+  const int ns = keys.size ();
+  vector<Handle (Geom_Surface)> S (ns);
+  vector<int> stype (ns, 0);    // 0 (theta, z) itself, 1 torus, 2 cone
+  vector<int> send (ns, -1);
+  S[cylR] = new Geom_CylindricalSurface (gp_Ax3 (gp::XOY ()), R);
+  S[cylD] = new Geom_CylindricalSurface (gp_Ax3 (gp::XOY ()), R - D);
+  for (int k = 0; k < 2; k++)
+  {
+    const treatment& E = K.E[k];
+    if (E.type == 1)
+    {
+      S[E.sid] = new Geom_ToroidalSurface (gp_Ax3 (gp_Pnt (0, 0, E.zc),
+                                                   gp::DZ (), gp::DX ()),
+                                           E.rmaj, E.t);
+      stype[E.sid] = 1;
+    }
+    else if (E.type == 2)
+    {
+      S[E.sid] = new Geom_ConicalSurface (gp_Ax3 (gp_Pnt (0, 0, E.zref),
+                                                  gp::DZ (), gp::DX ()),
+                                          E.ang, k == 0 ? R - E.t : R);
+      stype[E.sid] = 2;
+    }
+    if (E.type)
+    {
+      send[E.sid] = k;
+    }
+  }
+  map<int, sheet> fp;
+  for (const patch& F : faces)
+  {
+    if (keys[F.sid].compare (0, 5, "flank") == 0 && F.sid == F.p.sid
+        && fp.find (F.sid) == fp.end ())
+    {
+      fp[F.sid] = F.p;
+    }
+  }
+  for (const auto& kv : fp)
+  {
+    const auto& r = trange[kv.first];
+    S[kv.first] = flank (kv.second, r.first - M_PI / 360,
+                         r.second + M_PI / 360, z0, z1);
+  }
+
+  // The faces, sewn into the skin.  A crease on a fillet is sampled evenly in
+  // the torus angle, since in z its slope is infinite at the end face.
+  const int N = 33;
+  auto uv = [&] (int s, double th, double z)
+  {
+    if (stype[s] == 1)
+    {
+      return gp_Pnt2d (th, K.vof (send[s], z));
+    }
+    if (stype[s] == 2)
+    {
+      const treatment& E = K.E[send[s]];
+      return gp_Pnt2d (th, (z - E.zref) / cos (E.ang));
+    }
+    return gp_Pnt2d (th, z);
+  };
+  BRepBuilderAPI_Sewing sew (1e-6);
+  for (const patch& F : faces)
+  {
+    const int s = F.sid;
+    const Handle (Geom_Surface)& surf = S[s];
+    const size_t n = F.t.size ();
+    vector<TopoDS_Vertex> V (n);
+    for (size_t i = 0; i < n; i++)
+    {
+      const gp_Pnt2d q = uv (s, F.t[i], F.z[i]);
+      V[i] = BRepBuilderAPI_MakeVertex (surf->Value (q.X (), q.Y ()))
+               .Vertex ();
+    }
+    BRepBuilderAPI_MakeWire mw;
+    for (size_t i = 0; i < n; i++)
+    {
+      const size_t j = (i + 1) % n;
+      const gp_Pnt2d a = uv (s, F.t[i], F.z[i]);
+      const gp_Pnt2d b = uv (s, F.t[j], F.z[j]);
+      const sheet& pe = F.ep[i];
+      const int ke = F.ee[i];
+      const bool curved = F.arc[i] && ke >= 0 && K.E[ke].type == 1
+                          && std::abs (pe.b) > 1e-12;
+      const bool torusline = ! F.arc[i] && stype[s] == 1
+                             && std::abs (F.z[i] - F.z[j]) > 1e-12
+                             && std::abs (F.t[i] - F.t[j]) > 1e-12;
+      Handle (Geom2d_Curve) cv;
+      double p1 = 0;
+      double p2 = 1;
+      if (curved || torusline)
+      {
+        const int k = curved ? ke : send[s];
+        const treatment& E = K.E[k];
+        const double v1 = K.vof (k, F.z[i]);
+        const double v2 = K.vof (k, F.z[j]);
+        vector<gp_Pnt2d> pts {a};
+        for (int m = 1; m < N - 1; m++)
+        {
+          const double v = v1 + (v2 - v1) * m / (N - 1);
+          const double z = E.zc + E.t * sin (v);
+          double th;
+          if (curved)
+          {
+            th = (E.rmaj + E.t * cos (v) - pe.a - pe.c * z) / pe.b;
+          }
+          else
+          {
+            th = F.t[i] + (F.t[j] - F.t[i]) * (z - F.z[i]) / (F.z[j] - F.z[i]);
+          }
+          pts.push_back (uv (s, th, z));
+        }
+        pts.push_back (b);
+        cv = interp2d (pts);
+      }
+      else
+      {
+        const gp_Vec2d dv (a, b);
+        cv = new Geom2d_Line (a, gp_Dir2d (dv));
+        p2 = dv.Magnitude ();
+      }
+      mw.Add (BRepBuilderAPI_MakeEdge (cv, surf, V[i], V[j], p1, p2).Edge ());
+    }
+    TopoDS_Face face = BRepBuilderAPI_MakeFace (surf, mw.Wire (), true).Face ();
+    BRepLib::BuildCurves3d (face, 1e-7);
+    sew.Add (face);
+  }
+  sew.Perform ();
+  return sew.SewedShape ();
+}
+
+// The signed area the wire W encloses in the plane of the axes AX, its edges
+// in the order and sense they take in it
+static double
+wirearea (const TopoDS_Wire& w, const gp_Ax3& ax)
+{
+  vector<gp_Pnt> p;
+  for (TopExp_Explorer x (w, TopAbs_EDGE); x.More (); x.Next ())
+  {
+    const TopoDS_Edge e = TopoDS::Edge (x.Current ());
+    BRepAdaptor_Curve c (e);
+    const double f = c.FirstParameter ();
+    const double l = c.LastParameter ();
+    const bool rev = e.Orientation () == TopAbs_REVERSED;
+    for (int k = 0; k < 16; k++)
+    {
+      p.push_back (c.Value (rev ? l - (l - f) * k / 16 : f + (l - f) * k / 16));
+    }
+  }
+  double a = 0;
+  const gp_Dir X = ax.XDirection ();
+  const gp_Dir Y = ax.YDirection ();
+  const gp_Pnt O = ax.Location ();
+  for (size_t i = 0; i < p.size (); i++)
+  {
+    const gp_Vec u (O, p[i]);
+    const gp_Vec v (O, p[(i + 1) % p.size ()]);
+    a += u.Dot (X) * v.Dot (Y) - v.Dot (X) * u.Dot (Y);
+  }
+  return a / 2;
+}
+
+// The solid SO with its face F knurled: F replaced by the knurled skin, the
+// flat face at each end of F given the knurl's outline in place of its
+// circle, and every other face kept.  TREAT has a row for each treated end,
+// the index of its edge in S, its type and its size.
+static TopoDS_Shape
+knurlsolid (const TopoDS_Shape& so, const TopoDS_Face& F, const ShapeMap& emap,
+            knurlspec spec, const Matrix& treat, const string& caller)
+{
+  const char *who = caller.c_str ();
+  BRepAdaptor_Surface ad (F);
+  const gp_Cylinder cy = ad.Cylinder ();
+  const double R = cy.Radius ();
+  const gp_Ax3 ax (cy.Location (), cy.Axis ().Direction (),
+                   cy.XAxis ().Direction ());
+  double u0, u1, v0, v1;
+  BRepTools::UVBounds (F, u0, u1, v0, v1);
+  if (u1 - u0 < 2 * M_PI - 1e-9)
+  {
+    error ("%s: F must go all the way round its axis.", who);
+  }
+  {
+    gp_Pnt p;
+    gp_Vec du, dv;
+    ad.D1 ((u0 + u1) / 2, (v0 + v1) / 2, p, du, dv);
+    gp_Vec n = du.Crossed (dv);
+    if (F.Orientation () == TopAbs_REVERSED)
+    {
+      n.Reverse ();
+    }
+    gp_Vec rad (ax.Location (), p);
+    rad -= gp_Vec (ax.Direction ()) * rad.Dot (gp_Vec (ax.Direction ()));
+    if (n.Dot (rad) <= 0)
+    {
+      error ("%s: F must be an outside face, not a bore.", who);
+    }
+  }
+  auto zof = [&] (const gp_Pnt& p)
+  {
+    return gp_Vec (ax.Location (), p).Dot (gp_Vec (ax.Direction ()));
+  };
+  double z0 = 1e300;
+  double z1 = -1e300;
+  for (TopExp_Explorer x (F, TopAbs_VERTEX); x.More (); x.Next ())
+  {
+    const double z = zof (BRep_Tool::Pnt (TopoDS::Vertex (x.Current ())));
+    z0 = std::min (z0, z);
+    z1 = std::max (z1, z);
+  }
+
+  // The ends: their circles, and the flat face each meets
+  ShapeListMap e2f;
+  TopExp::MapShapesAndAncestors (so, TopAbs_EDGE, TopAbs_FACE, e2f);
+  vector<TopoDS_Edge> endE[2];
+  TopoDS_Face P[2];
+  for (TopExp_Explorer x (F, TopAbs_EDGE); x.More (); x.Next ())
+  {
+    const TopoDS_Edge e = TopoDS::Edge (x.Current ());
+    if (BRep_Tool::Degenerated (e) || BRep_Tool::IsClosed (e, F))
+    {
+      continue;
+    }
+    BRepAdaptor_Curve c (e);
+    const double z = zof (c.Value ((c.FirstParameter ()
+                                    + c.LastParameter ()) / 2));
+    const int k = std::abs (z - z0) < 1e-6 ? 0
+                  : (std::abs (z - z1) < 1e-6 ? 1 : -1);
+    if (k < 0 || c.GetType () != GeomAbs_Circle)
+    {
+      error ("%s: F must end in a circle at each end.", who);
+    }
+    bool seen = false;
+    for (const TopoDS_Edge& f : endE[k])
+    {
+      seen = seen || f.IsSame (e);
+    }
+    if (seen)
+    {
+      continue;
+    }
+    endE[k].push_back (e);
+    for (const TopoDS_Shape& q : e2f.FindFromKey (e))
+    {
+      if (! q.IsSame (F))
+      {
+        if (P[k].IsNull ())
+        {
+          P[k] = TopoDS::Face (q);
+        }
+        else if (! P[k].IsSame (q))
+        {
+          error ("%s: each end of F must meet one flat face square to its"
+                 " axis.", who);
+        }
+      }
+    }
+  }
+  bool shoulder[2];
+  for (int k = 0; k < 2; k++)
+  {
+    if (P[k].IsNull ())
+    {
+      error ("%s: each end of F must meet one flat face square to its"
+             " axis.", who);
+    }
+    BRepAdaptor_Surface pa (P[k]);
+    if (pa.GetType () != GeomAbs_Plane
+        || ! pa.Plane ().Axis ().Direction ().IsParallel (ax.Direction (),
+                                                          1e-9))
+    {
+      error ("%s: each end of F must meet one flat face square to its"
+             " axis.", who);
+    }
+    // A shoulder: the end face reaches beyond F
+    shoulder[k] = false;
+    for (TopExp_Explorer x (P[k], TopAbs_EDGE); x.More (); x.Next ())
+    {
+      BRepAdaptor_Curve c (TopoDS::Edge (x.Current ()));
+      for (int m = 0; m <= 4; m++)
+      {
+        const gp_Pnt p = c.Value (c.FirstParameter ()
+                                  + (c.LastParameter ()
+                                     - c.FirstParameter ()) * m / 4);
+        gp_Vec r (ax.Location (), p);
+        r -= gp_Vec (ax.Direction ()) * r.Dot (gp_Vec (ax.Direction ()));
+        shoulder[k] = shoulder[k] || r.Magnitude () > R + 1e-6;
+      }
+    }
+  }
+
+  // The treatments, each named by its edge
+  for (int k = 0; k < 2; k++)
+  {
+    spec.ends[k][0] = spec.ends[k][1] = 0;
+  }
+  for (octave_idx_type i = 0; i < treat.rows (); i++)
+  {
+    const int ei = static_cast<int> (treat(i,0));
+    int k = -1;
+    for (int kk = 0; kk < 2; kk++)
+    {
+      for (const TopoDS_Edge& f : endE[kk])
+      {
+        if (f.IsSame (emap (ei)))
+        {
+          k = kk;
+        }
+      }
+    }
+    if (k < 0)
+    {
+      error ("%s: edge %d is not at an end of F.", who, ei);
+    }
+    if (shoulder[k])
+    {
+      error ("%s: edge %d is where F meets a shoulder, so it cannot be"
+             " filleted or chamfered.", who, ei);
+    }
+    if (spec.ends[k][0] != 0)
+    {
+      error ("%s: an end of F can take one fillet or chamfer only.", who);
+    }
+    spec.ends[k][0] = treat(i,1);
+    spec.ends[k][1] = treat(i,2);
+  }
+
+  // The knurled skin, built about the z axis and put on the axis of F, its
+  // first groove at the cylinder's own x direction
+  TopoDS_Shape side = skin (R, z0, z1, spec, caller);
+  gp_Trsf place;
+  place.SetDisplacement (gp_Ax3 (gp::XOY ()), ax);
+  side = BRepBuilderAPI_Transform (side, place, false).Shape ();
+
+  // Each end face with its circle replaced by the outline of the knurl
+  ShapeAnalysis_FreeBounds fb (side, false, false);
+  TopoDS_Wire W[2];
+  for (TopExp_Explorer x (fb.GetClosedWires (), TopAbs_WIRE); x.More ();
+       x.Next ())
+  {
+    const TopoDS_Wire w = TopoDS::Wire (x.Current ());
+    TopExp_Explorer vx (w, TopAbs_VERTEX);
+    const double z = zof (BRep_Tool::Pnt (TopoDS::Vertex (vx.Current ())));
+    const int k = std::abs (z - z0) < 1e-6 ? 0
+                  : (std::abs (z - z1) < 1e-6 ? 1 : -1);
+    if (k < 0 || ! W[k].IsNull ())
+    {
+      error ("%s: Open CASCADE could not close the knurl at the ends of F.",
+             who);
+    }
+    W[k] = w;
+  }
+  if (W[0].IsNull () || W[1].IsNull ())
+  {
+    error ("%s: Open CASCADE could not close the knurl at the ends of F.",
+           who);
+  }
+  BRep_Builder bb;
+  TopoDS_Face N[2];
+  for (int k = 0; k < 2; k++)
+  {
+    const TopoDS_Face Pf = TopoDS::Face (P[k].Oriented (TopAbs_FORWARD));
+    TopoDS_Wire old;
+    for (TopExp_Explorer x (Pf, TopAbs_WIRE); x.More (); x.Next ())
+    {
+      for (TopExp_Explorer y (x.Current (), TopAbs_EDGE); y.More (); y.Next ())
+      {
+        if (y.Current ().IsSame (endE[k][0]))
+        {
+          old = TopoDS::Wire (x.Current ());
+        }
+      }
+    }
+    bool whole = ! old.IsNull ();
+    for (TopExp_Explorer y (old, TopAbs_EDGE); whole && y.More (); y.Next ())
+    {
+      bool ours = false;
+      for (const TopoDS_Edge& f : endE[k])
+      {
+        ours = ours || f.IsSame (y.Current ());
+      }
+      whole = ours;
+    }
+    if (! whole)
+    {
+      error ("%s: each end of F must be a whole loop of the face it meets.",
+             who);
+    }
+    TopoDS_Wire nw = W[k];
+    if ((wirearea (old, ax) > 0) != (wirearea (nw, ax) > 0))
+    {
+      nw.Reverse ();
+    }
+    TopoDS_Face Nf = TopoDS::Face (Pf.EmptyCopied ());
+    for (TopExp_Explorer x (Pf, TopAbs_WIRE); x.More (); x.Next ())
+    {
+      bb.Add (Nf, x.Current ().IsSame (old) ? TopoDS_Shape (nw)
+                                            : x.Current ());
+    }
+    N[k] = Nf;
+  }
+
+  // The solid again: every face but F and its end faces, the new end faces
+  // and the knurled skin
+  TopoDS_Solid out;
+  bb.MakeSolid (out);
+  for (TopExp_Explorer x (so, TopAbs_SHELL); x.More (); x.Next ())
+  {
+    TopoDS_Shell sh;
+    bb.MakeShell (sh);
+    bool touched = false;
+    for (TopExp_Explorer y (x.Current (), TopAbs_FACE); y.More (); y.Next ())
+    {
+      const TopoDS_Shape& f = y.Current ();
+      if (f.IsSame (F))
+      {
+        touched = true;
+        continue;
+      }
+      const int k = f.IsSame (P[0]) ? 0 : (f.IsSame (P[1]) ? 1 : -1);
+      bb.Add (sh, k < 0 ? f : N[k].Oriented (f.Orientation ()));
+    }
+    if (touched)
+    {
+      for (TopExp_Explorer y (side, TopAbs_FACE); y.More (); y.Next ())
+      {
+        bb.Add (sh, y.Current ());
+      }
+    }
+    sh.Closed (true);
+    bb.Add (out, sh);
+  }
+  if (! BRepCheck_Analyzer (out).IsValid ())
+  {
+    error ("%s: Open CASCADE could not knurl F.", who);
+  }
+  return out;
+}
+
+// The shape S with its face of index FI knurled, its other solids as they
+// were and in the same order
+static TopoDS_Shape
+knurl (const TopoDS_Shape& s, int fi, const knurlspec& spec,
+       const Matrix& treat, const string& caller)
+{
+  ShapeMap fmap;
+  ShapeMap emap;
+  TopExp::MapShapes (s, TopAbs_FACE, fmap);
+  TopExp::MapShapes (s, TopAbs_EDGE, emap);
+  const TopoDS_Face F = TopoDS::Face (fmap (fi));
+  vector<TopoDS_Shape> parts = eachsolid (s);
+  for (TopoDS_Shape& so : parts)
+  {
+    ShapeMap own;
+    TopExp::MapShapes (so, TopAbs_FACE, own);
+    if (own.Contains (F))
+    {
+      so = knurlsolid (so, F, emap, spec, treat, caller);
+      break;
+    }
+  }
+  return gather (parts);
+}
+
+}
+
 // The arguments of a call, read by position.  Each command reads the ones it
 // needs without counting them first; one past the end of the list raises an
 // error instead of reading beyond it.
@@ -3775,6 +5295,25 @@ function directly. \n\
                caller.c_str ());
       }
       out = traced (r, overlap (s, r));
+    }
+
+    // A knurl on the cylindrical face F: its pitch, its depth (0 for the
+    // full depth), the angle of each set of grooves, whether its points are
+    // indented, the angle of its teeth, and a row [EDGE, TYPE, SIZE] for each
+    // end filleted (TYPE 1) or chamfered (TYPE 2)
+    else if (cmd == "knurl")
+    {
+      const TopoDS_Shape s = toshape (args(2), caller);
+      knurling::knurlspec spec;
+      spec.pitch = args(4).double_value ();
+      spec.depth = args(5).double_value ();
+      const NDArray a = args(6).array_value ();
+      spec.angles.assign (a.data (), a.data () + a.numel ());
+      spec.indented = args(7).bool_value ();
+      spec.profile = args(8).double_value ();
+      const TopoDS_Shape r = knurling::knurl (s, args(3).int_value (), spec,
+                                              args(9).matrix_value (), caller);
+      out = traced (r, itself (count (s, TopAbs_SOLID)));
     }
 
     // Booleans.  A union and a difference take every solid after the first
