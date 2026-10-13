@@ -1572,6 +1572,10 @@ classdef Drawing
         error (strcat ("draw.Drawing.hatch: PATTERN must be a non-empty", ...
                        " character vector."));
       endif
+      if (! any (strcmpi (PATTERN, geom.hatchlines ())))
+        error (strcat ("draw.Drawing.hatch: '%s' is not a defined pattern;", ...
+                       " use geom.hatchlines () for the list."), PATTERN);
+      endif
       if (! isfloat (ANGLE) || ! isreal (ANGLE) || ! isscalar (ANGLE)
           || ! isfinite (ANGLE))
         error ("draw.Drawing.hatch: ANGLE must be a real finite scalar.");
@@ -1790,6 +1794,12 @@ classdef Drawing
       if (isequal (P1(:)', V(:)') || isequal (P2(:)', V(:)'))
         error (strcat ("draw.Drawing.angdim: an arm point must differ from", ...
                        " the vertex."));
+      endif
+      a = mod (atan2 (P2(2) - V(2), P2(1) - V(1))
+               - atan2 (P1(2) - V(2), P1(1) - V(1)), 2 * pi);
+      if (a < 1e-12 || a > 2 * pi - 1e-12)
+        error (strcat ("draw.Drawing.angdim: P1 and P2 lie on one ray from", ...
+                       " V, so they make no angle."));
       endif
 
       e = makeentity ('angdim', pen (this));
@@ -2432,7 +2442,8 @@ classdef Drawing
     ## of the current ones, as every plotting function in Octave accepts an axes
     ## handle ahead of its data. The @qcode{'Axes'} pair below does the same
     ## thing
-    ## and is equivalent.
+    ## and is equivalent.  A figure handle draws into that figure's current
+    ## axes, made if it has none.
     ##
     ## @code{@var{H} = draw.Drawing.plot (@dots{})} returns a column of graphics
     ## handles, one per object created.  Every line of one layer, colour, line
@@ -2656,8 +2667,16 @@ classdef Drawing
 
       if (isempty (opt.Axes))
         opt.Axes = gca ();
-      elseif (! isscalar (opt.Axes) || ! ishandle (opt.Axes))
-        error ("draw.Drawing.plot: Axes must be a graphics handle.");
+      elseif (! isscalar (opt.Axes) || ! ishandle (opt.Axes)
+              || ! any (strcmp (get (opt.Axes, 'type'), {'axes', 'figure'})))
+        error (strcat ("draw.Drawing.plot: Axes must be the handle of an", ...
+                       " axes or a figure."));
+      elseif (strcmp (get (opt.Axes, 'type'), 'figure'))
+        fig = opt.Axes;
+        opt.Axes = get (fig, 'currentaxes');
+        if (isempty (opt.Axes))
+          opt.Axes = axes ('parent', fig);
+        endif
       endif
 
       ## The same lowering the file backends use, so the figure shows what the

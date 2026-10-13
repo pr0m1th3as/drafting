@@ -324,6 +324,8 @@
 %! draw.Drawing ().hatch (geom.Polyline ([0, 0; 1, 0; 1, 1], 'Closed', true))
 %!error<draw.Drawing.hatch: PATTERN must be a non-empty character vector.> ...
 %! draw.Drawing ().hatch (geom.Region ([0, 0; 1, 0; 1, 1]), '')
+%!error<draw.Drawing.hatch: 'TARTAN' is not a defined pattern; use geom.hatchlines \(\) for the list.> ...
+%! draw.Drawing ().hatch (geom.Region ([0, 0; 1, 0; 1, 1]), 'TARTAN')
 %!error<draw.Drawing.hatch: ANGLE must be a real finite scalar.> ...
 %! draw.Drawing ().hatch (geom.Region ([0, 0; 1, 0; 1, 1]), 'ANSI31', NaN, 1)
 %!error<draw.Drawing.hatch: SPACING must be a real positive finite scalar.> ...
@@ -1151,6 +1153,8 @@
 %! draw.Drawing ().diam ([0, 0], 0)
 %!error<draw.Drawing.angdim: an arm point must differ from the vertex.> ...
 %! draw.Drawing ().angdim ([0, 0], [0, 0], [1, 1], 5)
+%!error<draw.Drawing.angdim: P1 and P2 lie on one ray from V, so they make no angle.> ...
+%! draw.Drawing ().angdim ([0, 0], [10, 0], [20, 0], 5)
 %!error<draw.Drawing.leader: P must hold at least two points.> ...
 %! draw.Drawing ().leader ([0, 0], 'x')
 %!error<draw.Drawing.centremark: R must be real, positive and finite, one value or one per row.> ...
@@ -1534,6 +1538,23 @@
 %!   ax = axes ('parent', f);
 %!   H = plot (ax, draw.Drawing ().line ([0, 0], [1, 1]));
 %!   assert_equal (get (H(1), 'parent'), ax);
+%! unwind_protect_cleanup
+%!   close (f);
+%! end_unwind_protect
+
+%!test  # a figure handle draws into that figure's axes, made if need be
+%! f = figure ('visible', 'off');
+%! unwind_protect
+%!   H = plot (f, draw.Drawing ().line ([0, 0], [1, 1]));
+%!   assert_equal (get (get (H(1), 'parent'), 'parent'), f);
+%! unwind_protect_cleanup
+%!   close (f);
+%! end_unwind_protect
+
+%!error<draw.Drawing.plot: Axes must be the handle of an axes or a figure.> ...
+%! f = figure ('visible', 'off');
+%! unwind_protect
+%!   plot (line ('parent', axes ('parent', f)), draw.Drawing ());
 %! unwind_protect_cleanup
 %!   close (f);
 %! end_unwind_protect

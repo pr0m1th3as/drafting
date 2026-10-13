@@ -147,6 +147,9 @@ function M = read (FILE, varargin)
 
   [V, F, VC, FC] = __mesh__ ('read', 'polymesh.read', FILE, double (T), ...
                              fmt(2:end));
+  if (! all (isfinite (V(:))))
+    error ("polymesh.read: FILE holds a vertex that is not finite.");
+  endif
   M = polymesh.Mesh (V, F);
   M.VertexColour = VC;
   M.FaceColour = FC;
@@ -172,6 +175,17 @@ endfunction
 %!                zeros(2, n, 'uint8')]);
 %!  fclose (fid);
 %!endfunction
+
+%!error<polymesh.read: FILE holds a vertex that is not finite.> ...
+%! f = [tempname(), '.stl'];
+%! V = cube ();
+%! V(1) = NaN;
+%! writebinary (f, V);
+%! unwind_protect
+%!   polymesh.read (f);
+%! unwind_protect_cleanup
+%!   [~] = unlink (f);
+%! end_unwind_protect
 
 %!test  # binary, padded after its triangles, its header starting "solid"
 %! f = [tempname(), '.stl'];

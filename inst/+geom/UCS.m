@@ -202,6 +202,9 @@ classdef UCS
       if (nargin == 0)
         return;
       endif
+      if (nargin > 3)
+        error ("geom.UCS: invalid number of input arguments.");
+      endif
 
       ## Picked with the mouse in a viewer, which knows how
       if (nargin == 1 || (nargin == 2 && isobject (varargin{1})))
@@ -451,6 +454,8 @@ endfunction
 %!error<geom.UCS.eq: both operands must be geom.UCS objects.> ...
 %! geom.UCS () == 1
 
+%!error<geom.UCS: invalid number of input arguments.> ...
+%! geom.UCS ([0, 0, 1], [0, 0, 0], [1, 0, 0], 4)
 %!error<geom.UCS: V must be a viewer to pick in, such as a model.Viewer.> ...
 %! geom.UCS ([0, 0, 1])
 %!error<geom.UCS: V must be a viewer to pick in, such as a model.Viewer.> ...
