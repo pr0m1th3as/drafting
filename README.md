@@ -70,7 +70,7 @@ Standard that anyone can download free.
 
 ## Tutorials
 
-The [guide](https://pr0m1th3as.github.io/drafting/guide/) has eighteen tutorials
+The [guide](https://pr0m1th3as.github.io/drafting/guide/) has nineteen tutorials
 that build parts and drawings step by step. Every output and every picture on
 them is made by the code above it. New to Octave? Start with
 [A brief Octave primer](https://pr0m1th3as.github.io/drafting/guide/primer.html),
@@ -112,6 +112,8 @@ the Octave the tutorials use.
     the holes a screw passes through, and the seats that sink its head.
 18. [Looking inside a model](https://pr0m1th3as.github.io/drafting/guide/18_looking_inside.html):
     solids hidden or shown through in the viewer, chosen by name.
+19. [Knurling](https://pr0m1th3as.github.io/drafting/guide/19_knurling.html):
+    a knurled knob, the seven types of DIN 82, and its ends finished.
 
 The scripts the pages are built from are in [`docs/guide/src`](docs/guide/src).
 
