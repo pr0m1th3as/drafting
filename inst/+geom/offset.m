@@ -55,8 +55,8 @@
 ##
 ## An offset too large for the outline to absorb raises an error rather than
 ## returning a self-intersecting result.  This is detected by checking that the
-## orientation survives and that no edge has reversed direction, which is exact
-## for rectilinear outlines.
+## orientation survives, that no edge has reversed direction and that no two
+## edges cross.
 ##
 ## @seealso{geom.isrectilinear, geom.largestrect, geom.signedarea}
 ## @end deftypefn
@@ -114,10 +114,12 @@ function Q = offset (P, D)
     Q(ii,:) = meet (Base(jj,:), Dir(jj,:), Base(ii,:), Dir(ii,:));
   endfor
 
-  ## An offset the outline cannot absorb shows up as a lost orientation or a
-  ## reversed edge.  For rectilinear input those two catch every failure.
+  ## An offset the outline cannot absorb shows up as a lost orientation, a
+  ## reversed edge, or two edges crossing: a narrow neck between two notches
+  ## collapses with every edge still running its own way
   DirNew = [Q(2:end,:); Q(1,:)] - Q;
-  if (sign (geom.signedarea (Q)) != 1 || any (sum (DirNew .* Dir, 2) <= 0))
+  if (sign (geom.signedarea (Q)) != 1 || any (sum (DirNew .* Dir, 2) <= 0)
+      || geom.selfintersects (Q, true))
     error (strcat ("geom.offset: D is too large for P; the offset outline", ...
                    " would be degenerate."));
   endif
@@ -228,6 +230,11 @@ endfunction
 %! Q = geom.offset (P, 1);
 %! assert_equal (Q, [1, 1; 5, 1; 9, 1; 9, 9; 1, 9], 1e-12);
 
+%!test  # a neck holds an offset short of its width
+%! P = [0, 0; 30, 0; 30, 20; 16, 20; 16, 2; 14, 2; 14, 20; 0, 20];
+%! Q = geom.offset (P, 0.99);
+%! assert_equal (Q(1:2,:), [0.99, 0.99; 29.01, 0.99], 1e-12);
+
 %!error<geom.offset: invalid number of input arguments.> ...
 %! geom.offset ([0, 0; 1, 0; 1, 1])
 %!error<geom.offset: P must be a polygon with at least 3 vertices.> ...
@@ -256,3 +263,6 @@ endfunction
 %! geom.offset (zeros (0, 2), 1)
 %!error<geom.offset: P must not contain NaN or Inf values.> ...
 %! geom.offset ([0, 0; 1, 1; 2, 2; NaN, 3], 1)
+%!error<geom.offset: D is too large for P; the offset outline would be degenerate.> ...
+%! geom.offset ([0, 0; 30, 0; 30, 20; 16, 20; 16, 2; 14, 2; 14, 20; 0, 20], ...
+%!              1.5)

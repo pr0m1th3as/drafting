@@ -51,9 +51,11 @@ function A = signedarea (P)
     error ("geom.signedarea: %s", errmsg);
   endif
 
-  ## Shoelace formula over the closed vertex ring
-  x = P(:,1);
-  y = P(:,2);
+  ## Shoelace formula over the closed vertex ring, measured from the first
+  ## vertex: from the origin, a polygon far from it would lose its area to
+  ## rounding, a unit square at 1e8 mm to nothing
+  x = P(:,1) - P(1,1);
+  y = P(:,2) - P(1,2);
   xNext = [x(2:end); x(1)];
   yNext = [y(2:end); y(1)];
   A = sum (x .* yNext - xNext .* y) / 2;
@@ -99,6 +101,11 @@ endfunction
 
 %!test  # degenerate collinear polygon has zero area
 %! assert_equal (geom.signedarea ([0, 0; 1, 0; 2, 0]), 0);
+
+%!test  # a polygon far from the origin keeps its area
+%! P = [0, 0; 1, 0; 1, 1; 0, 1];
+%! assert_equal (geom.signedarea (P + 1e8), 1, 1e-9);
+%! assert_equal (geom.signedarea (P + 1e12), 1, 1e-9);
 
 %!error<geom.signedarea: invalid number of input arguments.> geom.signedarea ()
 %!error<geom.signedarea: P must be a real floating-point matrix.> geom.signedarea ('a')

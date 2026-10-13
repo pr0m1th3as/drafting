@@ -24,7 +24,8 @@
 ## @code{@var{P} = geom.intersectlines (@var{A}, @var{B})} returns the point at
 ## which the lines through @var{A} and @var{B} meet.  Each line is given as a
 ## 2-by-2 matrix holding two points on it, one per row.  @var{P} is empty when
-## the lines are parallel.
+## the lines are parallel, or within @math{10^{-12}} radians of it, which
+## rounding cannot tell from parallel.
 ##
 ## @code{[@var{P}, @var{TA}, @var{TB}] = geom.intersectlines (@dots{})} also
 ## returns where the crossing falls along each line, as a fraction of the
@@ -64,7 +65,10 @@ function [P, TA, TB] = intersectlines (A, B)
   s = B(2,:) - B(1,:);
   d = r(1) * s(2) - r(2) * s(1);
 
-  if (d == 0)
+  ## Rounding leaves d about eps times the product of the lengths for lines
+  ## that are parallel; a crossing that close to parallel would lie further
+  ## off than any drawing reaches
+  if (abs (d) <= 1e-12 * norm (r) * norm (s))
     P = zeros (0, 2);
     TA = [];
     TB = [];
@@ -166,6 +170,14 @@ endfunction
 %! B = [1, 7; 6, -2];
 %! assert_equal (geom.intersectlines (A, B), ...
 %!               geom.intersectlines (flipud (A), flipud (B)), 1e-12);
+
+%!test  # lines parallel up to rounding are parallel
+%! P = geom.intersectlines ([0, 0; 1, 0], [0, 1; 1, 1 + 4 * eps]);
+%! assert_equal (size (P), [0, 2]);
+
+%!test  # lines a little short of parallel still meet
+%! P = geom.intersectlines ([0, 0; 1, 0], [0, 1; 1, 1 + 1e-9]);
+%! assert_equal (P, [-1e9, 0], -1e-6);
 
 %!error<geom.intersectlines: invalid number of input arguments.> ...
 %! geom.intersectlines ([0, 0; 1, 1])

@@ -167,8 +167,13 @@ function S = scanfill (P, adeg, spacing)
     t = (y - a(:,2)) ./ (b(:,2) - a(:,2));
     x = sort (a(:,1) + t .* (b(:,1) - a(:,1)));
 
+    ## A scan through a lowest vertex meets both its edges at one point, a
+    ## piece of no length, which is left out
+    tol = 1e-12 * max ([1; abs(x)]);
     for ii = 1:2:numel (x) - 1
-      S(end+1,:) = [x(ii), y, x(ii+1), y];
+      if (x(ii+1) - x(ii) > tol)
+        S(end+1,:) = [x(ii), y, x(ii+1), y];
+      endif
     endfor
   endfor
 
@@ -277,6 +282,10 @@ endfunction
 %! P = [0, 0; 20, 0; 20, 20; 0, 20];
 %! S = geom.hatchlines (P, 'HORIZONTAL', 90);
 %! assert_equal (S(:,1), S(:,3), 1e-9);
+
+%!test  # a scan through a lowest vertex leaves no piece of no length
+%! S = geom.hatchlines ([0, 0; 10, 5; 0, 10; -10, 5], 'HORIZONTAL', 0, 5);
+%! assert_equal (S, [-10, 5, 10, 5], 1e-12);
 
 %!error<geom.hatchlines: invalid number of input arguments.> ...
 %! geom.hatchlines ([0,0;1,0;1,1], 'ANSI31', 0, 1, 2)

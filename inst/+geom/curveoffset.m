@@ -41,17 +41,17 @@
 ## @code{[@var{Q}, @var{MARGIN}] = geom.curveoffset (@dots{})} additionally
 ## returns how much further the curve could have been offset before the result
 ## degenerated.  @var{MARGIN} is the smallest radius of curvature on the side
-## being offset towards, less @var{D}; it is @code{Inf} for a curve that never
-## turns that way.  A design that must not approach the limit can test
-## @var{MARGIN} rather than wait for the error.
+## being offset towards, less the distance @code{abs (@var{D})}; it is
+## @code{Inf} for a curve that never turns that way.  A design that must not
+## approach the limit can test @var{MARGIN} rather than wait for the error.
 ##
 ## @strong{Validity is decided by a criterion, not detected afterwards.}
-## Offsetting inward by more than the radius of curvature at a point folds the
-## curve through its own centre of curvature, and the criterion is simply that
-## @var{D} must not exceed @code{1 / @var{K}} wherever the curvature @var{K} is
-## positive on the offset side.  This is the undercut condition of a cycloidal
-## disc, and of any roller running in a groove.  Violating it raises an error
-## rather than returning a folded curve.
+## Offsetting by more than the radius of curvature at a point, towards its
+## centre, folds the curve through that centre, and the criterion is simply
+## that @code{abs (@var{D})} must not exceed @code{1 / @var{K}} wherever the
+## curvature @var{K} turns towards the offset side.  This is the undercut
+## condition of a cycloidal disc, and of any roller running in a groove.
+## Violating it raises an error rather than returning a folded curve.
 ##
 ## Offsetting @emph{exactly} to the centre of curvature is admitted: it yields a
 ## cusp, which touches rather than folds.  That boundary is tested to a relative
@@ -155,8 +155,9 @@ function [Q, MARGIN] = curveoffset (P, D, CLOSED = false)
   ## closed curve so that a positive D is always inward
   N = s * [-T(:,2), T(:,1)];
 
-  ## Curvature measured on that same side
-  K = s * geom.curvature (P, CLOSED);
+  ## Curvature measured on the side offset towards: the side of N, or the
+  ## other side for a negative D
+  K = s * sign (D + (D == 0)) * geom.curvature (P, CLOSED);
   turning = K(isfinite (K) & K > 0);
   if (isempty (turning))
     RLIM = Inf;
@@ -172,7 +173,7 @@ function [Q, MARGIN] = curveoffset (P, D, CLOSED = false)
     ## any distance that could matter to a manufactured part.
     tol = 1e-9 * RLIM;
   endif
-  MARGIN = RLIM - D;
+  MARGIN = RLIM - abs (D);
 
   if (MARGIN < -tol)
     error (strcat ("geom.curveoffset: D exceeds the radius of curvature by", ...
@@ -270,6 +271,11 @@ endfunction
 %! Q = geom.curveoffset (P, 1, true);
 %! assert_equal (size (Q), [200, 2]);
 
+%!test  # a negative offset measures its margin on the right
+%! c = 2 * [cosd(180:-5:0)', sind(180:-5:0)'];
+%! [~, MARGIN] = geom.curveoffset (c, -1);
+%! assert_equal (MARGIN, 1, 1e-6);
+
 %!error<geom.curveoffset: invalid number of input arguments.> ...
 %! geom.curveoffset ([0, 0; 1, 0; 1, 1])
 %!error<geom.curveoffset: D must be a real finite scalar.> ...
@@ -293,3 +299,5 @@ endfunction
 %! geom.curveoffset (zeros (0, 2), 1)
 %!error<geom.curveoffset: P must not contain NaN or Inf values.> ...
 %! geom.curveoffset ([0, 0; 1, 1; 2, 2; NaN, 3], 1)
+%!error<geom.curveoffset: D exceeds the radius of curvature by 1; the offset would fold through its own centre of curvature.> ...
+%! geom.curveoffset (2 * [cosd(180:-5:0)', sind(180:-5:0)'], -3)

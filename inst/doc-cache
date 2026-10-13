@@ -5231,7 +5231,7 @@ geom.curveoffset
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 3984
+# length: 4006
 drafting: Q = geom.curveoffset (P, D)
 drafting: Q = geom.curveoffset (P, D, CLOSED)
 drafting: [Q, MARGIN] = geom.curveoffset (...)
@@ -5256,17 +5256,17 @@ unchanged.
 [Q, MARGIN] = geom.curveoffset (...) additionally
 returns how much further the curve could have been offset before the result
 degenerated. MARGIN is the smallest radius of curvature on the side
-being offset towards, less D; it is Inf for a curve that never
-turns that way. A design that must not approach the limit can test
-MARGIN rather than wait for the error.
+being offset towards, less the distance abs (D); it is
+Inf for a curve that never turns that way. A design that must not
+approach the limit can test MARGIN rather than wait for the error.
 
 Validity is decided by a criterion, not detected afterwards.
-Offsetting inward by more than the radius of curvature at a point folds the
-curve through its own centre of curvature, and the criterion is simply that
-D must not exceed 1 / K wherever the curvature K is
-positive on the offset side. This is the undercut condition of a cycloidal
-disc, and of any roller running in a groove. Violating it raises an error
-rather than returning a folded curve.
+Offsetting by more than the radius of curvature at a point, towards its
+centre, folds the curve through that centre, and the criterion is simply
+that abs (D) must not exceed 1 / K wherever the
+curvature K turns towards the offset side. This is the undercut
+condition of a cycloidal disc, and of any roller running in a groove.
+Violating it raises an error rather than returning a folded curve.
 
 Offsetting exactly to the centre of curvature is admitted: it yields a
 cusp, which touches rather than folds. That boundary is tested to a relative
@@ -5648,7 +5648,7 @@ geom.intersectlines
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1314
+# length: 1390
 drafting: P = geom.intersectlines (A, B)
 drafting: [P, TA, TB] = geom.intersectlines (A, B)
 Where two lines cross.
@@ -5656,7 +5656,8 @@ Where two lines cross.
 P = geom.intersectlines (A, B) returns the point at
 which the lines through A and B meet. Each line is given as a
 2-by-2 matrix holding two points on it, one per row. P is empty when
-the lines are parallel.
+the lines are parallel, or within 10^{-12} radians of it, which
+rounding cannot tell from parallel.
 
 [P, TA, TB] = geom.intersectlines (...) also
 returns where the crossing falls along each line, as a fraction of the
@@ -5822,7 +5823,7 @@ geom.offset
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 2015
+# length: 1999
 drafting: Q = geom.offset (P, D)
 Offset a rectilinear polygon inward or outward.
 
@@ -5861,8 +5862,8 @@ point by point cannot give.
 
 An offset too large for the outline to absorb raises an error rather than
 returning a self-intersecting result. This is detected by checking that the
-orientation survives and that no edge has reversed direction, which is exact
-for rectilinear outlines.
+orientation survives, that no edge has reversed direction and that no two
+edges cross.
 
 See also:
 geom.isrectilinear,
@@ -6066,7 +6067,7 @@ geom.selfintersects
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1694
+# length: 1837
 drafting: TF = geom.selfintersects (P)
 drafting: TF = geom.selfintersects (P, CLOSED)
 drafting: [TF, IDX] = geom.selfintersects (...)
@@ -6087,11 +6088,14 @@ k runs from point k to point k+1.
 
 Segments that merely share an end point are not crossings, so consecutive
 segments are never reported, nor are the first and last segments of a closed
-curve. A curve that touches itself without crossing, where two segments
-meet at a point that is an end of both, is reported, since for the purposes
-this test serves, touching and crossing are equally fatal. Touching means
-meeting: segments any distance apart, however small, do not touch, where a
-geom.Region counts curves within 1e-7 mm of one another as touching.
+curve. A point repeating the one before it adds a segment of no length,
+which is passed over, so the segments either side of it count as
+consecutive. A curve that touches itself without crossing, where two
+segments meet at a point that is an end of both, is reported, since for the
+purposes this test serves, touching and crossing are equally fatal.
+Touching means meeting: segments any distance apart, however small, do not
+touch, where a geom.Region counts curves within 1e-7 mm of one
+another as touching.
 
 This is the global companion to the local criterion in
 geom.curveoffset. An offset curve can satisfy the curvature condition

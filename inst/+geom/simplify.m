@@ -120,9 +120,11 @@ function [d, k] = furthest (P, i, j)
     ## A degenerate segment: measure to the point itself
     dist = sqrt (sum (V .^ 2, 2));
   else
-    ## Perpendicular distance to the infinite line is enough: the extremes of a
-    ## Douglas-Peucker split are interior to the segment by construction
-    dist = abs (V(:,1) * e(2) - V(:,2) * e(1)) / L;
+    ## Distance to the segment, not to the line through it: a curve that runs
+    ## past the end of the segment and back lies on the line but off the
+    ## segment
+    u = min (max ((V * e') / L ^ 2, 0), 1);
+    dist = sqrt (sum ((V - u * e) .^ 2, 2));
   endif
 
   [d, m] = max (dist);
@@ -214,6 +216,10 @@ endfunction
 %! assert_equal (rows (Q) < rows (P) / 4, true);
 %! ratio = abs (geom.signedarea (Q)) / abs (geom.signedarea (P));
 %! assert_equal (ratio, 1, 1e-3);
+
+%!test  # a curve that runs past its end and back keeps its turn
+%! [~, k] = geom.simplify ([0, 0; 10, 0; 5, 0], 0.1);
+%! assert_equal (k(:)', [1, 2, 3]);
 
 %!error<geom.simplify: invalid number of input arguments.> ...
 %! geom.simplify ([0, 0; 1, 1])

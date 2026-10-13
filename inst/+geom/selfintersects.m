@@ -37,11 +37,14 @@
 ##
 ## Segments that merely share an end point are not crossings, so consecutive
 ## segments are never reported, nor are the first and last segments of a closed
-## curve.  A curve that touches itself without crossing, where two segments
-## meet at a point that is an end of both, is reported, since for the purposes
-## this test serves, touching and crossing are equally fatal.  Touching means
-## meeting: segments any distance apart, however small, do not touch, where a
-## @code{geom.Region} counts curves within 1e-7 mm of one another as touching.
+## curve.  A point repeating the one before it adds a segment of no length,
+## which is passed over, so the segments either side of it count as
+## consecutive.  A curve that touches itself without crossing, where two
+## segments meet at a point that is an end of both, is reported, since for the
+## purposes this test serves, touching and crossing are equally fatal.
+## Touching means meeting: segments any distance apart, however small, do not
+## touch, where a @code{geom.Region} counts curves within 1e-7 mm of one
+## another as touching.
 ##
 ## This is the global companion to the local criterion in
 ## @code{geom.curveoffset}.  An offset curve can satisfy the curvature condition
@@ -70,8 +73,25 @@ function [TF, IDX] = selfintersects (P, CLOSED = false)
     error ("geom.selfintersects: %s", errmsg);
   endif
 
-  ## Only segments whose boxes overlap are tested
-  IDX = __mesh__ ('crossings', 'geom.selfintersects', P, CLOSED);
+  ## A point repeating the one before it makes a segment of no length, whose
+  ## neighbours would then meet as segments that are not adjacent.  It is
+  ## passed over, and the segments found are numbered as in P.
+  keep = [true; any(diff (P) != 0, 2)];
+  if (CLOSED && rows (P) > 1 && isequal (P(end,:), P(1,:)))
+    keep(end) = false;
+  endif
+  first = find (keep);
+  IDX = zeros (0, 2);
+  if (numel (first) >= 3 || (! CLOSED && numel (first) >= 2))
+    ## Only segments whose boxes overlap are tested
+    IDX = __mesh__ ('crossings', 'geom.selfintersects', P(keep,:), CLOSED);
+    if (! isempty (IDX) && ! all (keep))
+      ## Segment k of the points kept ends at the point kept next, and is
+      ## the last segment of P before it; the closing one is P's last
+      seg = [first(2:end) - 1; rows(P)];
+      IDX = reshape (seg(IDX), size (IDX));
+    endif
+  endif
   TF = ! isempty (IDX);
 
 endfunction
@@ -138,6 +158,14 @@ endfunction
 %!test  # segments in line within rounding, 1e-14 apart, overlap
 %! [~, IDX] = geom.selfintersects ([0, 0; 10, 1e-14; 20, 0; 15, 0; 5, 0]);
 %! assert_equal (IDX, [1, 4; 2, 4]);
+
+%!test  # a repeated point is passed over
+%! assert_equal (geom.selfintersects ([0, 0; 1, 0; 1, 0; 1, 1; 0, 1], true), ...
+%!               false);
+
+%!test  # and the segments found are numbered as in P
+%! [~, IDX] = geom.selfintersects ([0, 0; 2, 2; 2, 2; 2, 0; 0, 2]);
+%! assert_equal (IDX, [1, 4]);
 
 %!error<geom.selfintersects: invalid number of input arguments.> ...
 %! geom.selfintersects ()

@@ -49,8 +49,10 @@ function C = centroid (P)
     error ("geom.centroid: %s", errmsg);
   endif
 
-  x = P(:,1);
-  y = P(:,2);
+  ## Measured from the first vertex, so that a polygon far from the origin
+  ## keeps its precision
+  x = P(:,1) - P(1,1);
+  y = P(:,2) - P(1,2);
   xNext = [x(2:end); x(1)];
   yNext = [y(2:end); y(1)];
 
@@ -66,7 +68,8 @@ function C = centroid (P)
     error ("geom.centroid: P has zero area, so its centroid is undefined.");
   endif
 
-  C = [sum(( x + xNext) .* cross), sum((y + yNext) .* cross)] / (6 * A);
+  C = [sum(( x + xNext) .* cross), sum((y + yNext) .* cross)] / (6 * A) ...
+      + P(1,:);
 
 endfunction
 
@@ -119,6 +122,10 @@ endfunction
 %! a = geom.centroid ([0, 0; 4, 0; 4, 4; 0, 4]);
 %! b = geom.centroid ([0, 0; 2, 0; 4, 0; 4, 4; 0, 4]);
 %! assert_equal (a, b, 1e-12);
+
+%!test  # a polygon far from the origin keeps its centroid
+%! P = [0, 0; 1, 0; 1, 1; 0, 1] + 1e12;
+%! assert_equal (geom.centroid (P) - 1e12, [0.5, 0.5], 1e-9);
 
 %!error<geom.centroid: invalid number of input arguments.> geom.centroid ()
 %!error<geom.centroid: P must be an N-by-2 matrix of point coordinates.> ...
