@@ -2505,22 +2505,28 @@ classdef Shape
     ## @math{(0, 180)}, 90 by default.
     ##
     ## @item @qcode{'Fillet'}
-    ## @code{@{@var{E}, @var{R}@}} rounds the ends of @var{F} at the edges
-    ## @var{E}, one or both, to the radius @var{R}; a matrix with a row
-    ## @code{[@var{E}, @var{R}]} for each end gives each its own radius.  The
-    ## edges are the circles at the ends of @var{F}, as
+    ## A radius @var{R} rounds every free end of @var{F}, an end at a shoulder
+    ## being left as it is.  A cell array @code{@{@var{E}, @var{R}@}} rounds
+    ## the end at the edge @var{E} to @var{R}, and with a row for each end,
+    ## @code{@{@var{E1}, @var{R1}; @var{E2}, @var{R2}@}}, gives each its own
+    ## radius.  The edges are the circles at the ends of @var{F}, as
     ## @code{solid.Shape.edges} returns them, and the knurl runs out over the
     ## fillet as it does on a blank whose edge was rounded before knurling.
     ##
     ## @item @qcode{'Chamfer'}
-    ## As @qcode{'Fillet'}, for a chamfer of 45 degrees set back @var{C}
-    ## millimetres both ways: @code{@{@var{E}, @var{C}@}} or a row
-    ## @code{[@var{E}, @var{C}]} for each end.
+    ## As @qcode{'Fillet'}, for a chamfer of 45 degrees set back @var{D}
+    ## millimetres both ways: a distance @var{D} for every free end, or
+    ## @code{@{@var{E}, @var{D}@}} with a row for each end.
     ## @end table
     ##
     ## An end of @var{F} takes one fillet or chamfer at most, and an end at a
-    ## shoulder takes neither.  The fillets and chamfers must be smaller than
-    ## the radius of @var{F} and must not overlap.
+    ## shoulder takes neither, so naming its edge is an error.  The ends given
+    ## by their edges are treated first, and a single size given to the other
+    ## option treats the free ends left: @qcode{'Fillet', 0.5, 'Chamfer',
+    ## @{@var{E}, 1@}} chamfers the end at @var{E} and rounds the other.  A
+    ## single size with no free end left to take it is an error, as are single
+    ## sizes for both.  The fillets and chamfers must be smaller than the
+    ## radius of @var{F} and must not overlap.
     ##
     ## The types of DIN 82 are made so:
     ##
@@ -2630,9 +2636,9 @@ classdef Shape
         error ("solid.Shape.knurl: F must be a cylindrical face.");
       endif
       ## The treated ends, a row [EDGE, TYPE, SIZE] each, TYPE 1 for a fillet
-      ## and 2 for a chamfer
+      ## and 2 for a chamfer, EDGE 0 for every free end left
       T = zeros (0, 3);
-      kinds = {'Fillet', 'R'; 'Chamfer', 'C'};
+      kinds = {'Fillet', 'R', 'radius'; 'Chamfer', 'D', 'distance'};
       for k = 1:2
         if (isempty (opt.(kinds{k,1})))
           continue;
@@ -2643,7 +2649,12 @@ classdef Shape
         endif
         T = [T; E(:,1), k * ones(rows (E), 1), E(:,2)];
       endfor
-      if (numel (unique (T(:,1))) != rows (T))
+      if (sum (T(:,1) == 0) > 1)
+        error (strcat ("solid.Shape.knurl: Fillet and Chamfer cannot both", ...
+                       " be a single size for every free end."));
+      endif
+      E = T(T(:,1) > 0, 1);
+      if (numel (unique (E)) != numel (E))
         error (strcat ("solid.Shape.knurl: an edge can take one fillet or", ...
                        " chamfer only."));
       endif
@@ -3535,33 +3546,35 @@ function errmsg = checkindex (I, N, name, what, emptyok)
 
 endfunction
 
-## The edges and sizes the option NAME of knurl gives, {E, X} or a row [E, X]
-## for each end of the face, as rows [EDGE, SIZE]; N is the number of edges of
-## S.  Returns an error message body, empty when VAL is valid.
-function [errmsg, E] = endedges (VAL, NAME, X, N)
+## The ends the option NAME of knurl treats, as rows [EDGE, SIZE]: a size X
+## for every free end as EDGE 0, or {E, X} with a row for each end; WHAT names
+## X and N is the number of edges of S.  Returns an error message body, empty
+## when VAL is valid.
+function [errmsg, E] = endedges (VAL, NAME, X, WHAT, N)
 
   errmsg = '';
   E = zeros (0, 2);
-  if (iscell (VAL) && numel (VAL) == 2)
-    e = VAL{1};
-    ok = isempty (solid.__checkpos__ (VAL{2}, X)) && numel (e) <= 2 ...
-         && isempty (checkindex (e, N, 'E', 'edge', false));
+  if (iscell (VAL))
+    ok = columns (VAL) == 2 && any (rows (VAL) == [1, 2]);
+    for i = 1:rows (VAL)
+      ok = ok && isscalar (VAL{i,1}) ...
+           && isempty (checkindex (VAL{i,1}, N, 'E', 'edge', false)) ...
+           && isempty (solid.__checkpos__ (VAL{i,2}, X));
+    endfor
     if (ok)
-      E = [double(e(:)), repmat(double (VAL{2}), numel (e), 1)];
+      E = double ([VAL{:,1}; VAL{:,2}]');
     endif
   else
-    ok = isfloat (VAL) && isreal (VAL) && columns (VAL) == 2 ...
-         && any (rows (VAL) == [1, 2]) && all (isfinite (VAL(:,2))) ...
-         && all (VAL(:,2) > 0) ...
-         && isempty (checkindex (VAL(:,1), N, 'E', 'edge', false));
+    ok = isempty (solid.__checkpos__ (VAL, X));
     if (ok)
-      E = double (VAL);
+      E = [0, double(VAL)];
     endif
   endif
   if (! ok)
-    errmsg = sprintf (strcat ("%s must be {E, %s}, or a row [E, %s] for", ...
-                              " each end, with E edges of S and %s", ...
-                              " positive."), NAME, X, X, X);
+    errmsg = sprintf (strcat ("%s must be a positive %s %s for every free", ...
+                              " end, or a cell array {E, %s} with a row", ...
+                              " for each end, E an edge index of S."), ...
+                      NAME, WHAT, X, X);
   endif
 
 endfunction
@@ -5221,8 +5234,8 @@ endfunction
 %! assert_equal (volume (S), 410.2073196, 1e-5);
 %! assert_equal (isvalid (S), true);
 
-%!test  # fillets larger than the depth at both ends
-%! S = knurl (solid.cylinder (5, 6), 1, 1, 'Fillet', {[1, 3], 1});
+%!test  # a fillet larger than the depth at every free end
+%! S = knurl (solid.cylinder (5, 6), 1, 1, 'Fillet', 1);
 %! assert_equal (volume (S), 406.6176553, 1e-5);
 %! assert_equal (isvalid (S), true);
 
@@ -5231,9 +5244,13 @@ endfunction
 %! assert_equal (volume (S), 410.1804325, 1e-5);
 %! assert_equal (isvalid (S), true);
 
-%!test  # a chamfer larger than the depth and a fillet, one row each
-%! S = knurl (solid.cylinder (5, 6), 1, 1, 'Chamfer', [3, 1], ...
-%!            'Fillet', [1, 0.3]);
+%!test  # a row for each end, each its own radius
+%! S = knurl (solid.cylinder (5, 6), 1, 1, 'Fillet', {3, 1; 1, 0.3});
+%! assert_equal (volume (S), 408.3065809, 1e-5);
+%! assert_equal (isvalid (S), true);
+
+%!test  # an end named by its edge first, a single size for the end left
+%! S = knurl (solid.cylinder (5, 6), 1, 1, 'Fillet', 0.3, 'Chamfer', {3, 1});
 %! assert_equal (volume (S), 403.9932985, 1e-5);
 %! assert_equal (isvalid (S), true);
 
@@ -5255,10 +5272,16 @@ endfunction
 %! assert_equal (volume (S), 717.3871989, 1e-5);
 %! assert_equal (isvalid (S), true);
 
+%!test  # a single size leaves the end at a shoulder as it is
+%! S = union (solid.cylinder (7, 2, geom.UCS ([0, 0, 1], [0, 0, -2])), ...
+%!            solid.cylinder (5, 6));
+%! S = knurl (S, 4, 1, 'Chamfer', 0.5);
+%! assert_equal (volume (S), 717.3871989, 1e-5);
+
 %!test  # a bored roller along the x axis, rounded at both ends
 %! S = solid.cylinder (5, 6, geom.UCS ([1, 0, 0], [-3, 0, 0]));
 %! S = hole (S, geom.UCS ([1, 0, 0], [3, 0, 0]), 3, Inf);
-%! S = knurl (S, 1, 1, 'Pattern', 'single', 'Fillet', {[1, 3], 0.8});
+%! S = knurl (S, 1, 1, 'Pattern', 'single', 'Fillet', 0.8);
 %! assert_equal (volume (S), 380.1073839, 1e-5);
 %! assert_equal (isvalid (S), true);
 
@@ -5598,16 +5621,22 @@ endfunction
 %! knurl (solid.cylinder (5, 6), 4, 1)
 %!error<solid.Shape.knurl: F must be a cylindrical face.> ...
 %! knurl (solid.cylinder (5, 6), 2, 1)
-%!error<solid.Shape.knurl: Fillet must be \{E, R\}, or a row \[E, R\] for each end, with E edges of S and R positive.> ...
+%!error<solid.Shape.knurl: Fillet must be a positive radius R for every free end, or a cell array \{E, R\} with a row for each end, E an edge index of S.> ...
 %! knurl (solid.cylinder (5, 6), 1, 1, 'Fillet', {1})
-%!error<solid.Shape.knurl: Fillet must be \{E, R\}, or a row \[E, R\] for each end, with E edges of S and R positive.> ...
+%!error<solid.Shape.knurl: Fillet must be a positive radius R for every free end, or a cell array \{E, R\} with a row for each end, E an edge index of S.> ...
 %! knurl (solid.cylinder (5, 6), 1, 1, 'Fillet', {1, -1})
-%!error<solid.Shape.knurl: Fillet must be \{E, R\}, or a row \[E, R\] for each end, with E edges of S and R positive.> ...
+%!error<solid.Shape.knurl: Fillet must be a positive radius R for every free end, or a cell array \{E, R\} with a row for each end, E an edge index of S.> ...
 %! knurl (solid.cylinder (5, 6), 1, 1, 'Fillet', {9, 1})
-%!error<solid.Shape.knurl: Chamfer must be \{E, C\}, or a row \[E, C\] for each end, with E edges of S and C positive.> ...
+%!error<solid.Shape.knurl: Fillet must be a positive radius R for every free end, or a cell array \{E, R\} with a row for each end, E an edge index of S.> ...
+%! knurl (solid.cylinder (5, 6), 1, 1, 'Fillet', {[1, 3], 0.5})
+%!error<solid.Shape.knurl: Fillet must be a positive radius R for every free end, or a cell array \{E, R\} with a row for each end, E an edge index of S.> ...
+%! knurl (solid.cylinder (5, 6), 1, 1, 'Fillet', -1)
+%!error<solid.Shape.knurl: Chamfer must be a positive distance D for every free end, or a cell array \{E, D\} with a row for each end, E an edge index of S.> ...
 %! knurl (solid.cylinder (5, 6), 1, 1, 'Chamfer', [1, 1, 2])
 %!error<solid.Shape.knurl: an edge can take one fillet or chamfer only.> ...
 %! knurl (solid.cylinder (5, 6), 1, 1, 'Fillet', {1, 1}, 'Chamfer', {1, 1})
+%!error<solid.Shape.knurl: Fillet and Chamfer cannot both be a single size for every free end.> ...
+%! knurl (solid.cylinder (5, 6), 1, 1, 'Fillet', 0.5, 'Chamfer', 0.5)
 %!error<solid.Shape.knurl: F must go all the way round its axis.> ...
 %! S = subtract (solid.cylinder (5, 6), ...
 %!               translate (solid.box (10, 10, 6), [-5, -10, 0]));
@@ -5627,12 +5656,21 @@ endfunction
 %! S = union (solid.cylinder (7, 2, geom.UCS ([0, 0, 1], [0, 0, -2])), ...
 %!            solid.cylinder (5, 6));
 %! knurl (S, 4, 1, 'Chamfer', {4, 0.5})
+%!error<solid.Shape.knurl: F has no free end left to fillet.> ...
+%! S = union (solid.cylinder (7, 2, geom.UCS ([0, 0, 1], [0, 0, -2])), ...
+%!            solid.cylinder (5, 6));
+%! knurl (S, 4, 1, 'Fillet', 0.8, 'Chamfer', {5, 0.5})
+%!error<solid.Shape.knurl: F has no free end left to chamfer.> ...
+%! S = union (solid.cylinder (7, 2, geom.UCS ([0, 0, 1], [0, 0, -2])), ...
+%!            solid.cylinder (5, 6));
+%! S = union (S, solid.cylinder (7, 2, geom.UCS ([0, 0, 1], [0, 0, 6])));
+%! knurl (S, 4, 1, 'Chamfer', 0.5)
 %!error<solid.Shape.knurl: DEPTH must be no more than 0.5038, the full depth of the teeth at the pitch fitted round F.> ...
 %! knurl (solid.cylinder (5, 6), 1, 1, 0.6)
 %!error<solid.Shape.knurl: a fillet or chamfer must be smaller than the radius of F.> ...
 %! knurl (solid.cylinder (5, 6), 1, 1, 'Fillet', {1, 5})
 %!error<solid.Shape.knurl: the fillets or chamfers at the two ends of F overlap.> ...
-%! knurl (solid.cylinder (5, 6), 1, 1, 'Fillet', {[1, 3], 3.5})
+%! knurl (solid.cylinder (5, 6), 1, 1, 'Fillet', 3.5)
 
 %!test  # a box cut through the middle
 %! U = geom.UCS ([0, 0, 1], [0, 0, 15]);

@@ -4567,8 +4567,9 @@ wirearea (const TopoDS_Wire& w, const gp_Ax3& ax)
 
 // The solid SO with its face F knurled: F replaced by the knurled skin, the
 // flat face at each end of F given the knurl's outline in place of its
-// circle, and every other face kept.  TREAT has a row for each treated end,
-// the index of its edge in S, its type and its size.
+// circle, and every other face kept.  TREAT has a row for each treatment,
+// the index in S of the edge it treats, or 0 for every free end left, its
+// type and its size.
 static TopoDS_Shape
 knurlsolid (const TopoDS_Shape& so, const TopoDS_Face& F, const ShapeMap& emap,
             knurlspec spec, const Matrix& treat, const string& caller)
@@ -4694,7 +4695,8 @@ knurlsolid (const TopoDS_Shape& so, const TopoDS_Face& F, const ShapeMap& emap,
     }
   }
 
-  // The treatments, each named by its edge
+  // The treatments: first those named by their edge, then a size for every
+  // free end left, given as edge 0
   for (int k = 0; k < 2; k++)
   {
     spec.ends[k][0] = spec.ends[k][1] = 0;
@@ -4702,6 +4704,10 @@ knurlsolid (const TopoDS_Shape& so, const TopoDS_Face& F, const ShapeMap& emap,
   for (octave_idx_type i = 0; i < treat.rows (); i++)
   {
     const int ei = static_cast<int> (treat(i,0));
+    if (ei == 0)
+    {
+      continue;
+    }
     int k = -1;
     for (int kk = 0; kk < 2; kk++)
     {
@@ -4728,6 +4734,28 @@ knurlsolid (const TopoDS_Shape& so, const TopoDS_Face& F, const ShapeMap& emap,
     }
     spec.ends[k][0] = treat(i,1);
     spec.ends[k][1] = treat(i,2);
+  }
+  for (octave_idx_type i = 0; i < treat.rows (); i++)
+  {
+    if (treat(i,0) != 0)
+    {
+      continue;
+    }
+    bool used = false;
+    for (int k = 0; k < 2; k++)
+    {
+      if (! shoulder[k] && spec.ends[k][0] == 0)
+      {
+        spec.ends[k][0] = treat(i,1);
+        spec.ends[k][1] = treat(i,2);
+        used = true;
+      }
+    }
+    if (! used)
+    {
+      error ("%s: F has no free end left to %s.", who,
+             treat(i,1) == 1 ? "fillet" : "chamfer");
+    }
   }
 
   // The knurled skin, built about the z axis and put on the axis of F, its
@@ -5300,7 +5328,7 @@ function directly. \n\
     // A knurl on the cylindrical face F: its pitch, its depth (0 for the
     // full depth), the angle of each set of grooves, whether its points are
     // indented, the angle of its teeth, and a row [EDGE, TYPE, SIZE] for each
-    // end filleted (TYPE 1) or chamfered (TYPE 2)
+    // fillet (TYPE 1) or chamfer (TYPE 2), EDGE 0 for every free end left
     else if (cmd == "knurl")
     {
       const TopoDS_Shape s = toshape (args(2), caller);
