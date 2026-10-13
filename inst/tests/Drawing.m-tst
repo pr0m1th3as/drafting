@@ -389,6 +389,19 @@
 %! [B, W, H] = D.bbox ();
 %! assert_equal (B, geom.bbox (P));
 %! assert_equal ([W, H], [1600, 1800]);
+%!test  # an ellipse extends to its extremes along each axis
+%! B = bbox (draw.Drawing ().ellipse ([0, 0], 10, 2, 30));
+%! assert_equal (B, [-sqrt(76), -sqrt(28), sqrt(76), sqrt(28)], 1e-12);
+
+%!test  # a bulge extends to the arc it stands for
+%! D = draw.Drawing ().polyline (geom.Polyline ([0, 0, 1; 10, 0, 0]));
+%! assert_equal (bbox (D), [0, -5, 10, 0], 1e-12);
+
+%!test  # an insert extends to the geometry it places
+%! B = draw.Drawing ().circle ([0, 0], 1);
+%! D = draw.Drawing ().block ('B', B).insert ('B', [100, 0], 0, 3);
+%! assert_equal (bbox (D), [97, -3, 103, 3], 1e-12);
+
 %!test  # a circle extends by its radius on all four sides
 %! D = draw.Drawing ().circle ([100, 200], 10);
 %! assert_equal (D.bbox (), [90, 190, 110, 210], 1e-9);
@@ -642,9 +655,12 @@
 %!   close (f);
 %! end_unwind_protect
 
-%!error<draw.Drawing.print: D has nothing on a layer that is printed.> ...
+%!error<draw.Drawing.print: D has nothing on a layer that is visible and printed.> ...
 %! D = draw.Drawing ().layer ('C', 'Plot', false);
 %! D.Layer = 'C';
+%! print (D.line ([0, 0], [1, 0]), 'x.pdf');
+%!error<draw.Drawing.print: D has nothing on a layer that is visible and printed.> ...
+%! D = draw.Drawing ().layer ('0', 'Visible', false);
 %! print (D.line ([0, 0], [1, 0]), 'x.pdf');
 
 %!test  # tikz gives each layer's properties to its style
@@ -1518,6 +1534,18 @@
 %!   close (f);
 %! end_unwind_protect
 
+%!test  # a pattern too fine for its line draws the whole line solid
+%! f = figure ('visible', 'off');
+%! unwind_protect
+%!   ax = axes ('parent', f);
+%!   D = draw.Drawing ();
+%!   D.Linetype = 'HIDDEN';
+%!   H = plot (D.line ([0, 0], [1e6, 0]), 'Axes', ax);
+%!   assert_equal (__runlengths__ (H), 1e6);
+%! unwind_protect_cleanup
+%!   close (f);
+%! end_unwind_protect
+
 %!test  # LTScale stretches the pattern, so fewer dashes cover the same run
 %! f = figure ('visible', 'off');
 %! unwind_protect
@@ -2314,6 +2342,17 @@
 %! D.Colour = 'red';
 %! S = tikz (D.line ([0, 0], [1, 0]));
 %! assert_equal (! isempty (strfind (S, '\draw[red, dash pattern=on')), true);
+
+%!test  # a colour past 8 is given as itself, and text takes its colour
+%! D = draw.Drawing ();
+%! D.Colour = 30;
+%! D = D.line ([0, 0], [1, 0]);
+%! D.Colour = 'red';
+%! S = tikz (D.text ([0, 0], 'NOTE'));
+%! assert_equal (! isempty (strfind (S, ...
+%!               '\draw[color={rgb,255:red,255;green,127;blue,0}]')), true);
+%! assert_equal (! isempty (strfind (S, '\selectfont, red] at (0,0) {NOTE}')), ...
+%!               true);
 
 %!test  # a default entity carries no options at all
 %! S = tikz (draw.Drawing ().line ([0, 0], [1, 0]));

@@ -53,9 +53,12 @@
 ## @item 256 @tab @qcode{'byLayer'} @tab the default
 ## @end multitable
 ##
-## Indices from 9 to 255 are valid and are carried through, but only the ten
-## above have names and known renderings.  An unnamed index renders as a mid
-## grey rather than raising, so that a file from elsewhere still draws.
+## Indices from 9 to 255 have no names, and render as the AutoCAD colour
+## index draws them, so that a file from elsewhere draws in its colours: 9 a
+## light grey; 10 to 249 twenty-four hues 15 degrees apart, from red, each at
+## five values from bright to dark and alternately full and half saturated,
+## so that 30 is orange, @code{[255, 127, 0] / 255}; and 250 to 255 six
+## greys from dark to white.
 ##
 ## @strong{No true colour.}  The DXF revision this package writes, R2000,
 ## carries an index and nothing else, true colour arriving only with R2004, so
@@ -105,7 +108,7 @@ function OUT = colour (varargin)
       && ARG == fix (ARG) && ARG >= 0 && ARG <= 256)
     k = find (ARG == [T{:,2}], 1);
     if (isempty (k))
-      OUT = [0.5, 0.5, 0.5];       # valid but unnamed: render, do not raise
+      OUT = aci (ARG);
     else
       OUT = T{k,3};
     endif
@@ -114,6 +117,28 @@ function OUT = colour (varargin)
 
   error (strcat ("draw.colour: ARG must be a colour name or an integer", ...
                  " index from 0 to 256."));
+
+endfunction
+
+
+## The rendering of the unnamed index N, from 9 to 255, as the AutoCAD colour
+## index draws it
+function RGB = aci (N)
+
+  if (N == 9)
+    RGB = [192, 192, 192] / 255;
+  elseif (N >= 250)
+    g = [51, 91, 132, 173, 214, 255](N - 249);
+    RGB = [g, g, g] / 255;
+  else
+    s = mod (N - 10, 10);
+    v = [255, 255, 204, 204, 153, 153, 127, 127, 76, 76](s + 1);
+    c = hsv2rgb ([floor((N - 10) / 10) / 24, 1, 1]);
+    if (mod (s, 2) == 1)
+      c = 0.5 + c / 2;
+    endif
+    RGB = floor (v * c + 1e-9) / 255;
+  endif
 
 endfunction
 
@@ -156,6 +181,13 @@ endfunction
 %! assert_equal (rgb, [1, 0, 0]);
 %! assert_equal (all (rgb >= 0 & rgb <= 1), true);
 
+%!test  # unnamed indices render as the AutoCAD colour index draws them
+%! assert_equal (round (255 * draw.colour (9)), [192, 192, 192]);
+%! assert_equal (round (255 * draw.colour (11)), [255, 127, 127]);
+%! assert_equal (round (255 * draw.colour (30)), [255, 127, 0]);
+%! assert_equal (round (255 * draw.colour (170)), [0, 0, 255]);
+%! assert_equal (round (255 * draw.colour (250)), [51, 51, 51]);
+
 %!test  # white is drawn black, because paper is white
 %! assert_equal (draw.colour (7), [0, 0, 0]);
 
@@ -180,7 +212,7 @@ endfunction
 %! assert_equal (draw.colour ('RED'), draw.colour ('red'));
 
 %!test  # a valid but unnamed index renders rather than raising
-%! assert_equal (draw.colour (137), [0.5, 0.5, 0.5]);
+%! assert_equal (round (255 * draw.colour (137)), [63, 127, 127]);
 
 %!error<draw.colour: invalid number of input arguments.> draw.colour (1, 2)
 %!error<draw.colour: 'puce' is not a named colour; use draw.colour \(\) for the list.> ...

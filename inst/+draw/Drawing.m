@@ -1007,7 +1007,9 @@ classdef Drawing
     ## of the four cardinal directions, and an arc contributes its two
     ## endpoints together with whichever of those four points its sweep
     ## actually passes through.  Taking the centre alone would understate a
-    ## circle by a radius on every side.
+    ## circle by a radius on every side.  An ellipse contributes its extremes
+    ## along each axis, a polyline's bulge its arc, and an insert the
+    ## geometry it places.
     ##
     ## Two things are deliberately not accounted for, because the model does
     ## not know them: the rendered width and height of a text entity, of which
@@ -1028,6 +1030,9 @@ classdef Drawing
         return;
       endif
 
+      if (any (strcmp ({this.Entities.type}, 'insert')))
+        this = expand (this);
+      endif
       P = [];
       for ii = 1:numel (this.Entities)
         P = [P; extentpoints(this.Entities(ii))];
@@ -3052,9 +3057,10 @@ classdef Drawing
       P = D;
       printed = upper ({D.Layers([D.Layers.plot]).name});
       P.Entities = D.Entities(ismember (upper ({D.Entities.layer}), printed));
-      if (P.numentities () == 0)
+      shown = upper ({D.Layers([D.Layers.plot] & [D.Layers.visible]).name});
+      if (! any (ismember (upper ({P.Entities.layer}), shown)))
         error (strcat ("draw.Drawing.print: D has nothing on a layer that", ...
-                       " is printed."));
+                       " is visible and printed."));
       endif
       usable = PAPER - 2 * opt.Margin;
       if (any (usable <= 0))
@@ -3925,6 +3931,35 @@ function P = extentpoints (e)
     case 'arc'
       P = arcextent (e.pts, e.radius, e.angles(1), e.angles(2));
 
+    case 'ellipse'
+      C = e.pts;
+      a = e.radius(1);
+      b = e.radius(2);
+      hx = sqrt ((a * cosd (e.angle)) ^ 2 + (b * sind (e.angle)) ^ 2);
+      hy = sqrt ((a * sind (e.angle)) ^ 2 + (b * cosd (e.angle)) ^ 2);
+      P = [C(1) - hx, C(2); C(1) + hx, C(2); C(1), C(2) - hy; C(1), C(2) + hy];
+
+    case 'polyline'
+      P = e.pts;
+      n = rows (P);
+      for k = 1:min (numel (e.bulge), n - ! e.closed)
+        if (e.bulge(k) == 0)
+          continue;
+        endif
+        ## The arc of the bulge, built as flattenbulge builds it
+        j = mod (k, n) + 1;
+        inc = 4 * atan (e.bulge(k));
+        chord = P(j,:) - P(k,:);
+        L = norm (chord);
+        R = L / (2 * abs (sin (inc / 2)));
+        h = sqrt (max (0, R ^ 2 - (L / 2) ^ 2)) * sign (cos (inc / 2));
+        ctr = (P(k,:) + P(j,:)) / 2 ...
+              + sign (e.bulge(k)) * h * [-chord(2), chord(1)] / L;
+        a1 = atan2d (P(k,2) - ctr(2), P(k,1) - ctr(1));
+        a2 = a1 + inc * 180 / pi;
+        P = [P; arcextent(ctr, R, min (a1, a2), max (a1, a2))];
+      endfor
+
     case 'ordinate'
       P = e.pts(1:2,:);
 
@@ -4062,7 +4097,13 @@ function C = dashes (P, pat)
   L = abs (pat(:));
   step = L;
   step(pat(:) <= 0) = max (L(pat(:) <= 0), eps);
-  nc = min (ceil (total / sum (step)) + 1, ceil (1e5 / numel (pat)));
+  ## A pattern too fine for the line, more than 1e5 elements along it, is
+  ## drawn solid, as CAD programs draw it, rather than stopping short
+  nc = ceil (total / sum (step)) + 1;
+  if (nc * numel (pat) > 1e5)
+    C = {P};
+    return;
+  endif
   L = repmat (L, nc, 1);
   step = repmat (step, nc, 1);
   kind = repmat (sign (pat(:)), nc, 1);
@@ -4720,6 +4761,22 @@ function o = dopts (e, ltscale, scale)
 
 endfunction
 
+## The colour number C as a TikZ option: a name for 1 to 8, the colour
+## itself for 9 to 255, and nothing for by layer or by block
+function p = colourpart (c)
+
+  names = {'red', 'yellow', 'green', 'cyan', 'blue', 'magenta', 'black', ...
+           'gray'};
+  p = '';
+  if (c >= 1 && c <= 8)
+    p = names{c};
+  elseif (c >= 9 && c <= 255)
+    p = sprintf ('color={rgb,255:red,%d;green,%d;blue,%d}', ...
+                 round (255 * draw.colour (c)));
+  endif
+
+endfunction
+
 ## Colour C, line type LT and line weight LW as TikZ options, none for what
 ## is by layer, by block or the default.
 ##
@@ -4732,10 +4789,9 @@ function parts = optparts (c, lt, lw, ltscale, scale)
 
   parts = {};
 
-  colours = {'', 'red', 'yellow', 'green', 'cyan', 'blue', 'magenta', ...
-             'black', 'gray'};
-  if (c >= 1 && c <= 8)
-    parts{end+1} = colours{c + 1};
+  p = colourpart (c);
+  if (! isempty (p))
+    parts{end+1} = p;
   endif
 
   if (! any (strcmpi (lt, {'CONTINUOUS', 'byLayer', 'byBlock'})))
@@ -4829,6 +4885,10 @@ function lines = render (e, scale, ltscale)
     case 'TEXT'
       opts = sprintf ('anchor=base west, inner sep=0pt, font=%s', ...
                       fontfor (e.height, scale));
+      p = colourpart (optfield (e, 'colour', 256));
+      if (! isempty (p))
+        opts = sprintf ('%s, %s', opts, p);
+      endif
       if (e.rotation != 0)
         opts = sprintf ('%s, rotate=%s', opts, fmt (e.rotation));
       endif
