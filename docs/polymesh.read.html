@@ -235,7 +235,6 @@
 					<li><a href="geom.isrectilinear.html" class="text-decoration-none font-monospace"><small>geom.isrectilinear</small></a></li>
 					<li><a href="geom.offset.html" class="text-decoration-none font-monospace"><small>geom.offset</small></a></li>
 					<li><a href="geom.largestrect.html" class="text-decoration-none font-monospace"><small>geom.largestrect</small></a></li>
-					<li><a href="geom.triangulate.html" class="text-decoration-none font-monospace"><small>geom.triangulate</small></a></li>
 					<li><a href="geom.hatchlines.html" class="text-decoration-none font-monospace"><small>geom.hatchlines</small></a></li>
 				</ul>
 				</div>
@@ -364,6 +363,8 @@
 					<li><a href="solid.sweep.html" class="text-decoration-none font-monospace"><small>solid.sweep</small></a></li>
 					<li><a href="solid.helix.html" class="text-decoration-none font-monospace"><small>solid.helix</small></a></li>
 					<li><a href="solid.read.html" class="text-decoration-none font-monospace"><small>solid.read</small></a></li>
+					<li><a href="solid.threadspec.html" class="text-decoration-none font-monospace"><small>solid.threadspec</small></a></li>
+					<li><a href="solid.holespec.html" class="text-decoration-none font-monospace"><small>solid.holespec</small></a></li>
 				</ul>
 				</div>
 			</div>
@@ -406,10 +407,13 @@
 </p>
 <ul>
 <li>
- An STL file is binary or ASCII.  It is binary when it is exactly as long
- as the number of triangles it declares makes it, and anything else is
- read as ASCII, the three numbers after each <code>vertex</code>, whatever the
- case and spacing.  It has no colours.
+ An STL file is binary or ASCII.  It is ASCII when it starts with
+ <code>solid</code> and holds <code>endsolid</code>, as every ASCII file does, and
+ is read as the three numbers after each <code>vertex</code>, whatever the case
+ and spacing.  Otherwise it is binary when it is at least as long as the
+ number of triangles it declares makes it, any bytes after them passed
+ over, as some programs pad it; a binary file&rsquo;s header may start with
+ <code>solid</code> too.  It has no colours.
 </li><li>
  An OBJ file is text.  Its <code>v</code> lines give the vertices, by their
  first three numbers, and their colours by the next three where they have
@@ -453,7 +457,9 @@
  vertex that no face uses is left out.  The coordinates are taken as they
  are written; none of the three formats has units, and most files are in
  millimetres.  A file with vertices but no faces, such as a point cloud,
- is an error.
+ is an error.  The lines and points of an OBJ file, and the edges of a PLY
+ file, are left out with a warning that counts them, and a file that
+ holds them but no face is an error.
 </p>
 <p> A file that colours only some of its vertices, or only some of its faces,
  gives the rest the grey <code>[0.72, 0.74, 0.78]</code> that an uncoloured mesh
@@ -473,7 +479,7 @@
   <a href="solid.polyhedron.html">solid.polyhedron</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/fff062e/inst/+polymesh/read.m">polymesh.read</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/b937a57/inst/+polymesh/read.m">polymesh.read</a>
 </p>
 </div>
 

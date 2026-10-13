@@ -320,6 +320,14 @@
 <p> Append the single-line text <var>S</var> with its insertion point at <var>P</var>.
 </p>
 <div class="ms-5">
+<p> <var>P</var> is an N-by-2 matrix in millimetres, one text per row; zero rows
+ append nothing.  <var>S</var> is one character vector for every row or a
+ cell array of one per row, and <var>H</var> and <var>ROT</var> are each one value
+ or a vector of one per row:
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example"> D = draw.Drawing ().text ([0, 0; 0, 10], {'A', 'B'});
+</pre></td></tr></table>
+
 <p> <var>H</var> is the cap height in millimetres and defaults to <em class="math">2.5</em>, the
  smallest of the ISO 3098 sizes and the usual height for notes on a
  drawing at <em class="math">1:50</em>.  <var>ROT</var> rotates the text about its insertion
@@ -329,7 +337,7 @@
  where its text starts but not how wide it ends up.
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/fff062e/inst/+draw/Drawing.m#L1243">draw.Drawing</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/b937a57/inst/+draw/Drawing.m#L1349">draw.Drawing</a>
 </p>
 </div>
 

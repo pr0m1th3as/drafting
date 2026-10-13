@@ -235,7 +235,6 @@
 					<li><a href="geom.isrectilinear.html" class="text-decoration-none font-monospace"><small>geom.isrectilinear</small></a></li>
 					<li><a href="geom.offset.html" class="text-decoration-none font-monospace"><small>geom.offset</small></a></li>
 					<li><a href="geom.largestrect.html" class="text-decoration-none font-monospace"><small>geom.largestrect</small></a></li>
-					<li><a href="geom.triangulate.html" class="text-decoration-none font-monospace"><small>geom.triangulate</small></a></li>
 					<li><a href="geom.hatchlines.html" class="text-decoration-none font-monospace"><small>geom.hatchlines</small></a></li>
 				</ul>
 				</div>
@@ -364,6 +363,8 @@
 					<li><a href="solid.sweep.html" class="text-decoration-none font-monospace"><small>solid.sweep</small></a></li>
 					<li><a href="solid.helix.html" class="text-decoration-none font-monospace"><small>solid.helix</small></a></li>
 					<li><a href="solid.read.html" class="text-decoration-none font-monospace"><small>solid.read</small></a></li>
+					<li><a href="solid.threadspec.html" class="text-decoration-none font-monospace"><small>solid.threadspec</small></a></li>
+					<li><a href="solid.holespec.html" class="text-decoration-none font-monospace"><small>solid.holespec</small></a></li>
 				</ul>
 				</div>
 			</div>
@@ -401,9 +402,10 @@
 <div class="ms-5">
 <p> <code><var>Q</var> = geom.curveoffset (<var>P</var>, <var>D</var>)</code> moves every point of the
  curve <var>P</var> a distance <var>D</var> along the curve&rsquo;s own normal and returns the
- result <var>Q</var>, with one point per point of <var>P</var>.  <var>P</var> is an
- <em class="math">N</em>-by-2 matrix of points and <var>D</var> is a real scalar in the units of
- <var>P</var>, so millimetres by package convention.
+ result <var>Q</var>, with one point per point of <var>P</var>, but for the last
+ point of a closed curve that repeats the first, which is dropped.  <var>P</var>
+ is an <em class="math">N</em>-by-2 matrix of points and <var>D</var> is a real scalar in the
+ units of <var>P</var>, so millimetres by package convention.
 </p>
 <p> <code><var>Q</var> = geom.curveoffset (<var>P</var>, <var>D</var>, <var>CLOSED</var>)</code> treats the
  curve as closed when <var>CLOSED</var> is true.  <var>CLOSED</var> defaults to false.
@@ -417,17 +419,17 @@
 <p> <code>[<var>Q</var>, <var>MARGIN</var>] = geom.curveoffset (&hellip;)</code> additionally
  returns how much further the curve could have been offset before the result
  degenerated.  <var>MARGIN</var> is the smallest radius of curvature on the side
- being offset towards, less <var>D</var>; it is <code>Inf</code> for a curve that never
- turns that way.  A design that must not approach the limit can test
- <var>MARGIN</var> rather than wait for the error.
+ being offset towards, less the distance <code>abs (<var>D</var>)</code>; it is
+ <code>Inf</code> for a curve that never turns that way.  A design that must not
+ approach the limit can test <var>MARGIN</var> rather than wait for the error.
 </p>
 <p> <strong>Validity is decided by a criterion, not detected afterwards.</strong>
- Offsetting inward by more than the radius of curvature at a point folds the
- curve through its own centre of curvature, and the criterion is simply that
- <var>D</var> must not exceed <code>1 / <var>K</var></code> wherever the curvature <var>K</var> is
- positive on the offset side.  This is the undercut condition of a cycloidal
- disc, and of any roller running in a groove.  Violating it raises an error
- rather than returning a folded curve.
+ Offsetting by more than the radius of curvature at a point, towards its
+ centre, folds the curve through that centre, and the criterion is simply
+ that <code>abs (<var>D</var>)</code> must not exceed <code>1 / <var>K</var></code> wherever the
+ curvature <var>K</var> turns towards the offset side.  This is the undercut
+ condition of a cycloidal disc, and of any roller running in a groove.
+ Violating it raises an error rather than returning a folded curve.
 </p>
 <p> Offsetting <em>exactly</em> to the centre of curvature is admitted: it yields a
  cusp, which touches rather than folds.  That boundary is tested to a relative
@@ -473,7 +475,7 @@
   <a href="geom.offset.html">geom.offset</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/fff062e/inst/+geom/curveoffset.m">geom.curveoffset</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/b937a57/inst/+geom/curveoffset.m">geom.curveoffset</a>
 </p>
 </div>
         <div class="card rounded my-4">

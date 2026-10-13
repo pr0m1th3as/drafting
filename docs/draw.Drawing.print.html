@@ -400,6 +400,10 @@
 </p>
 <p> <code>'LineWidth'</code> is the opposite: a width on the paper, held there at
  every scale, because a 0.35 mm pen is 0.35 mm whatever the sheet shows.
+ So are the dashes of a line type and the ticks and labels of a
+ dimension: they arrive at their nominal size on the sheet whatever the
+ scale, as <code>draw.Drawing.plot</code> draws them with <code>'LTScale'</code> and
+ <code>'DimScale'</code> set to the scale denominator.
 </p>
 <p> <strong>See also: </strong>
   <a href="draw.Drawing.plot.html">draw.Drawing.plot</a>, 
@@ -408,7 +412,7 @@
   <a href="draw.Drawing.write.html">draw.Drawing.write</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/fff062e/inst/+draw/Drawing.m#L2498">draw.Drawing</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/b937a57/inst/+draw/Drawing.m#L2798">draw.Drawing</a>
 </p>
 </div>
         <div class="card rounded my-4">

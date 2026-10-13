@@ -235,7 +235,6 @@
 					<li><a href="geom.isrectilinear.html" class="text-decoration-none font-monospace"><small>geom.isrectilinear</small></a></li>
 					<li><a href="geom.offset.html" class="text-decoration-none font-monospace"><small>geom.offset</small></a></li>
 					<li><a href="geom.largestrect.html" class="text-decoration-none font-monospace"><small>geom.largestrect</small></a></li>
-					<li><a href="geom.triangulate.html" class="text-decoration-none font-monospace"><small>geom.triangulate</small></a></li>
 					<li><a href="geom.hatchlines.html" class="text-decoration-none font-monospace"><small>geom.hatchlines</small></a></li>
 				</ul>
 				</div>
@@ -364,6 +363,8 @@
 					<li><a href="solid.sweep.html" class="text-decoration-none font-monospace"><small>solid.sweep</small></a></li>
 					<li><a href="solid.helix.html" class="text-decoration-none font-monospace"><small>solid.helix</small></a></li>
 					<li><a href="solid.read.html" class="text-decoration-none font-monospace"><small>solid.read</small></a></li>
+					<li><a href="solid.threadspec.html" class="text-decoration-none font-monospace"><small>solid.threadspec</small></a></li>
+					<li><a href="solid.holespec.html" class="text-decoration-none font-monospace"><small>solid.holespec</small></a></li>
 				</ul>
 				</div>
 			</div>
@@ -449,7 +450,7 @@
   <a href="geom.bbox.html">geom.bbox</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/fff062e/inst/+draw/Drawing.m">draw.Drawing</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/b937a57/inst/+draw/Drawing.m">draw.Drawing</a>
 </p>
 </div>
         <p class="lead my-3">The <code>draw.Drawing</code> class contains the following properties:</p>
@@ -898,11 +899,11 @@ millimetres.
                     <tbody>
                       <tr>
                         <td><b><code><a href="draw.Drawing.line.html">line</a></code></b></td>
-                        <td>Append a straight line segment from P1 to P2.</td>
+                        <td>Append straight line segments from P1 to P2.</td>
                       </tr>
                       <tr>
                         <td><b><code><a href="draw.Drawing.point.html">point</a></code></b></td>
-                        <td>Append a single point.</td>
+                        <td>Append points.</td>
                       </tr>
                       <tr>
                         <td><b><code><a href="draw.Drawing.polyline.html">polyline</a></code></b></td>
@@ -922,15 +923,15 @@ millimetres.
                       </tr>
                       <tr>
                         <td><b><code><a href="draw.Drawing.arc.html">arc</a></code></b></td>
-                        <td>Append a circular arc centred on C with radius R.</td>
+                        <td>Append circular arcs centred on C with radius R.</td>
                       </tr>
                       <tr>
                         <td><b><code><a href="draw.Drawing.circle.html">circle</a></code></b></td>
-                        <td>Append a full circle centred on C with radius R millimetres.</td>
+                        <td>Append full circles centred on C with radius R millimetres.</td>
                       </tr>
                       <tr>
                         <td><b><code><a href="draw.Drawing.ellipse.html">ellipse</a></code></b></td>
-                        <td>Append an ellipse centred at C with semi-axes A and B.</td>
+                        <td>Append ellipses centred at C with semi-axes A and B.</td>
                       </tr>
                       <tr>
                         <td><b><code><a href="draw.Drawing.text.html">text</a></code></b></td>

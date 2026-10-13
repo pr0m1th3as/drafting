@@ -235,7 +235,6 @@
 					<li><a href="geom.isrectilinear.html" class="text-decoration-none font-monospace"><small>geom.isrectilinear</small></a></li>
 					<li><a href="geom.offset.html" class="text-decoration-none font-monospace"><small>geom.offset</small></a></li>
 					<li><a href="geom.largestrect.html" class="text-decoration-none font-monospace"><small>geom.largestrect</small></a></li>
-					<li><a href="geom.triangulate.html" class="text-decoration-none font-monospace"><small>geom.triangulate</small></a></li>
 					<li><a href="geom.hatchlines.html" class="text-decoration-none font-monospace"><small>geom.hatchlines</small></a></li>
 				</ul>
 				</div>
@@ -364,6 +363,8 @@
 					<li><a href="solid.sweep.html" class="text-decoration-none font-monospace"><small>solid.sweep</small></a></li>
 					<li><a href="solid.helix.html" class="text-decoration-none font-monospace"><small>solid.helix</small></a></li>
 					<li><a href="solid.read.html" class="text-decoration-none font-monospace"><small>solid.read</small></a></li>
+					<li><a href="solid.threadspec.html" class="text-decoration-none font-monospace"><small>solid.threadspec</small></a></li>
+					<li><a href="solid.holespec.html" class="text-decoration-none font-monospace"><small>solid.holespec</small></a></li>
 				</ul>
 				</div>
 			</div>
@@ -430,7 +431,7 @@
   <a href="geom.tangentpoints.html">geom.tangentpoints</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/fff062e/inst/+geom/intersectcircles.m">geom.intersectcircles</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/b937a57/inst/+geom/intersectcircles.m">geom.intersectcircles</a>
 </p>
 </div>
         <div class="card rounded my-4">
@@ -456,10 +457,7 @@
    41.429  -27.994</pre>
                 <pre style="overflow-x: auto; white-space: pre; padding: 0.6rem 0.8rem; margin: 0.3rem 0; border: 1px solid #cfe0e6; border-left: 4px solid #4a90a4; border-radius: 4px; background-color: #eef5f8;"> D = draw.Drawing ().circle ([0, 0], 50).circle ([70, 0], 40);
  D.Colour = 'red';
- for k = 1:rows (P)
-   D = D.line (P(k,:) - [4, 0], P(k,:) + [4, 0]);
-   D = D.line (P(k,:) - [0, 4], P(k,:) + [0, 4]);
- endfor
+ D = D.line ([P - [4, 0]; P - [0, 4]], [P + [4, 0]; P + [0, 4]]);
  plot (D);
  title ('a point located from two distances');</pre>
                 <div class="text-center">

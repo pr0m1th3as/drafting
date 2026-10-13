@@ -235,7 +235,6 @@
 					<li><a href="geom.isrectilinear.html" class="text-decoration-none font-monospace"><small>geom.isrectilinear</small></a></li>
 					<li><a href="geom.offset.html" class="text-decoration-none font-monospace"><small>geom.offset</small></a></li>
 					<li><a href="geom.largestrect.html" class="text-decoration-none font-monospace"><small>geom.largestrect</small></a></li>
-					<li><a href="geom.triangulate.html" class="text-decoration-none font-monospace"><small>geom.triangulate</small></a></li>
 					<li><a href="geom.hatchlines.html" class="text-decoration-none font-monospace"><small>geom.hatchlines</small></a></li>
 				</ul>
 				</div>
@@ -364,6 +363,8 @@
 					<li><a href="solid.sweep.html" class="text-decoration-none font-monospace"><small>solid.sweep</small></a></li>
 					<li><a href="solid.helix.html" class="text-decoration-none font-monospace"><small>solid.helix</small></a></li>
 					<li><a href="solid.read.html" class="text-decoration-none font-monospace"><small>solid.read</small></a></li>
+					<li><a href="solid.threadspec.html" class="text-decoration-none font-monospace"><small>solid.threadspec</small></a></li>
+					<li><a href="solid.holespec.html" class="text-decoration-none font-monospace"><small>solid.holespec</small></a></li>
 				</ul>
 				</div>
 			</div>
@@ -429,7 +430,7 @@
   <a href="solid.polyhedron.html">solid.polyhedron</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/fff062e/inst/+polymesh/Mesh.m">polymesh.Mesh</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/b937a57/inst/+polymesh/Mesh.m">polymesh.Mesh</a>
 </p>
 </div>
         <p class="lead my-3">The <code>polymesh.Mesh</code> class contains the following properties:</p>
@@ -775,7 +776,7 @@ Show a mesh in a viewer of its own, redrawing in place.
  mesh and <code>pickucs</code> a coordinate system.
 </p>
 <p> The viewer is built with the package when Open CASCADE and X11 are
- found, and needs a display to run.  It runs on Linux.
+ found, and needs a display to run.  It runs on Linux and FreeBSD.
 </p>
 <p> <strong>See also: </strong>
   <a href="model.Viewer.html">model.Viewer</a>, 
@@ -983,9 +984,12 @@ The volume a closed mesh encloses, in cubic millimetres.
 <p class="h5 fs fs-last"><code>polymesh.Mesh: <var>V</var> = <b>volume</b> (<var>M</var>)</code></p>
 <p> </p>
 <p> The mesh must be closed, as <code>isclosed</code> tells; an open mesh
- encloses nothing and is an error.  The volume is the same whichever
- way the triangles are turned, as long as they all agree.  The empty
- mesh has volume zero.
+ encloses nothing and is an error.  Each shell, a closed sheet of
+ triangles joined to one another, counts by its own volume whichever
+ way its triangles are turned: added when it lies inside an even number
+ of the other shells, and taken away, as a cavity, when inside an odd
+ number.  Shells that cross one another are counted as if they did not.
+ The empty mesh has volume zero.
 </p>
 <p> <strong>See also: </strong>
   <a href="polymesh.Mesh.html#polymesh_Mesh_isclosed">polymesh.Mesh.isclosed</a>, 

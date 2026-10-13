@@ -235,7 +235,6 @@
 					<li><a href="geom.isrectilinear.html" class="text-decoration-none font-monospace"><small>geom.isrectilinear</small></a></li>
 					<li><a href="geom.offset.html" class="text-decoration-none font-monospace"><small>geom.offset</small></a></li>
 					<li><a href="geom.largestrect.html" class="text-decoration-none font-monospace"><small>geom.largestrect</small></a></li>
-					<li><a href="geom.triangulate.html" class="text-decoration-none font-monospace"><small>geom.triangulate</small></a></li>
 					<li><a href="geom.hatchlines.html" class="text-decoration-none font-monospace"><small>geom.hatchlines</small></a></li>
 				</ul>
 				</div>
@@ -364,6 +363,8 @@
 					<li><a href="solid.sweep.html" class="text-decoration-none font-monospace"><small>solid.sweep</small></a></li>
 					<li><a href="solid.helix.html" class="text-decoration-none font-monospace"><small>solid.helix</small></a></li>
 					<li><a href="solid.read.html" class="text-decoration-none font-monospace"><small>solid.read</small></a></li>
+					<li><a href="solid.threadspec.html" class="text-decoration-none font-monospace"><small>solid.threadspec</small></a></li>
+					<li><a href="solid.holespec.html" class="text-decoration-none font-monospace"><small>solid.holespec</small></a></li>
 				</ul>
 				</div>
 			</div>
@@ -458,8 +459,13 @@
  and leaves its operands unchanged, and a copy is independent of the
  original.  The empty shape adds nothing to a union and empties an
  intersection, and a boolean whose result holds no material, such as the
- intersection of two solids that do not meet, returns it.  A shape is
- saved and loaded with <code>save</code> and <code>load</code> like any other value.
+ intersection of two solids that do not meet, returns it.
+</p>
+<p> Octave&rsquo;s <code>save</code> does not keep a classdef object, so a shape is not
+ saved as a value.  Save its <code>Data</code>, and make it again with
+ <code>solid.Shape (<var>DATA</var>)</code>, its <code>Colour</code> and <code>Name</code> set
+ again; or write it to a STEP file with <code>solid.Shape.write</code>, which
+ keeps both, and read it back with <code>solid.read</code>.
 </p>
 <p> <strong>See also: </strong>
   <a href="solid.box.html">solid.box</a>, 
@@ -468,7 +474,7 @@
   <a href="solid.Shape.show.html">solid.Shape.show</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/fff062e/inst/+solid/Shape.m">solid.Shape</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/b937a57/inst/+solid/Shape.m">solid.Shape</a>
 </p>
 </div>
         <p class="lead my-3">The <code>solid.Shape</code> class contains the following properties:</p>
@@ -501,6 +507,43 @@ Colour of each solid
  feature makes takes the colour of the first coloured solid it came
  from, so parts apart keep their own; the tools of <code>subtract</code> give
  none.
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#solid_Shape_Name"
+              aria-expanded="false" aria-controls="solid_Shape_Name">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>Name</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Name of each solid
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="solid_Shape_Name">
+            <div class="border-bottom py-2">
+<p> </p>
+<p> A cell column of character vectors, one for each of the shape&rsquo;s
+ <em class="math">N</em> solids in the order <code>solid.Shape.numsolids</code> counts them,
+ <code>''</code> for a solid without a name, or empty when none has one.
+ Assigning a single character vector, or a cell of one, names every
+ solid; a cell of <em class="math">N</em> names each in turn.  A name is free text,
+ kept as it is given and never read for meaning.  A STEP file carries
+ it out and in, and a 3MF file out, as <code>solid.Shape.write</code>
+ describes.  A transform keeps it, and each solid a boolean or a
+ feature makes takes the name of the first named solid it came from, as
+ it takes its colour by <code>solid.Shape.Colour</code>; the tools of
+ <code>subtract</code> give none.
 </p>
 
 
@@ -693,6 +736,10 @@ Colour of each solid
                         <td><b><code><a href="solid.Shape.numedges.html">numedges</a></code></b></td>
                         <td>The number of edges of a shape, each counted once.</td>
                       </tr>
+                      <tr>
+                        <td><b><code><a href="solid.Shape.solids.html">solids</a></code></b></td>
+                        <td>The solids of a shape, one by one.</td>
+                      </tr>
                     </tbody>
                   </table>
 
@@ -762,8 +809,16 @@ Colour of each solid
                         <td>Drill holes into a shape.</td>
                       </tr>
                       <tr>
+                        <td><b><code><a href="solid.Shape.thread.html">thread</a></code></b></td>
+                        <td>Cut screw threads into a shape.</td>
+                      </tr>
+                      <tr>
                         <td><b><code><a href="solid.Shape.pocket.html">pocket</a></code></b></td>
                         <td>Cut a pocket into a shape.</td>
+                      </tr>
+                      <tr>
+                        <td><b><code><a href="solid.Shape.knurl.html">knurl</a></code></b></td>
+                        <td>Knurl a cylindrical face of a shape.</td>
                       </tr>
                     </tbody>
                   </table>

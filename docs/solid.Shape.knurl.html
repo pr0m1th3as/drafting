@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Geometry, CAD Input/Output and Technical Drawing: solid.Shape.knurl</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" integrity="sha512-1ycn6IcaQQ40/MKBW2W4Rhis/DbILU74C1vSrLJxCq57o941Ym01SwNsOMqvEBFlcgUa6xLiPY/NS5R+E6ztJQ==" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/css/bootstrap.min.css" integrity="sha384-KyZXEAg3QhqLMpG8r+8fhAXLRk2vvoC2f3B09zVXn8CA5QIVfZOJ3BCsw2P0p/We" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-U1DAWAznBHeqEIlVSCgzq+c9gqGAJn5c/t99JyeKa9xxaYpSvHU5awsuZVVFIhvj" crossorigin="anonymous"></script>
+    <script type="text/javascript" async
+      src="https://cdn.jsdelivr.net/npm/mathjax@2/MathJax.js?config=TeX-AMS_CHTML">
+    </script>
+    <script type="text/javascript">
+      window.addEventListener("load", () => {
+        for (let i of document.querySelectorAll(".collapse ul")) {
+          let tog = document.createElement("div");
+          tog.innerHTML = i.previousSibling.textContent;
+          tog.className = "toggle";
+          tog.onclick = () => tog.classList.toggle("show");
+          i.parentElement.removeChild(i.previousSibling);
+          i.parentElement.insertBefore(tog, i);
+        }
+      });
+      // Open the collapsible demo an "#example" link points to, then scroll to
+      // it.  getElementById (not querySelector) matches ids that contain a dot,
+      // e.g. "Class.method-example1".
+      function openHashTarget () {
+        if (! window.location.hash) { return; }
+        let el = document.getElementById (
+          decodeURIComponent (window.location.hash.slice (1)));
+        if (! el) { return; }
+        if (el.classList.contains ("collapse") &&
+            ! el.classList.contains ("show")) {
+          bootstrap.Collapse.getOrCreateInstance (el).show ();
+        }
+        el.scrollIntoView ();
+      }
+      window.addEventListener ("DOMContentLoaded", openHashTarget);
+      window.addEventListener ("hashchange", openHashTarget);
+      // When the collapsible named by the current URL fragment is collapsed,
+      // drop the fragment (replaceState: no scroll, no history entry).  Otherwise
+      // the fragment would still equal this id, so clicking the same #example
+      // link again fires no "hashchange" and the example would not re-expand.
+      document.addEventListener ("hide.bs.collapse", (e) => {
+        if (e.target.id && window.location.hash === "#" + e.target.id) {
+          history.replaceState (null, "",
+            window.location.pathname + window.location.search);
+        }
+      });
+      // Let the browser's find-in-page reach the text inside a collapsed
+      // panel.  The attribute "hidden=until-found" is what makes content
+      // searchable and revealable; the style block below clears the
+      // "display: none" that would otherwise stop the attribute meaning
+      // anything, a box that is not generated having nothing to reveal.  Set
+      // it only where it is understood, which "content-visibility" is no test
+      // for, Firefox having shipped the two apart.  Where it is not, the panel
+      // keeps the user agent's plain [hidden] and the page behaves as before.
+      window.addEventListener ("DOMContentLoaded", () => {
+        if (! ("onbeforematch" in document.body)) { return; }
+        document.documentElement.classList.add ("until-found");
+        let panels = document.querySelectorAll (
+          ".collapse:not(.show):not(.navbar-collapse)");
+        for (let el of panels) {
+          el.setAttribute ("hidden", "until-found");
+          // Fired on a find-in-page hit, before the browser drops the
+          // attribute and scrolls to it.  Bootstrap keeps a panel's state in
+          // its class list, so adding the class here opens the panel in the
+          // same frame and leaves the button shutting it correctly afterwards.
+          // Bootstrap's own show () would animate against that scroll, and the
+          // attribute once dropped, "display: none" would take the panel back
+          // part way through.
+          el.addEventListener ("beforematch", () => {
+            el.classList.add ("show");
+            for (let b of document.querySelectorAll ("[data-bs-target]")) {
+              if (b.getAttribute ("data-bs-target") === "#" + el.id) {
+                b.setAttribute ("aria-expanded", "true");
+              }
+            }
+          });
+        }
+        // Drop the attribute before Bootstrap measures the panel it is opening,
+        // which it does after firing this; a revealable one measures nothing.
+        document.addEventListener ("show.bs.collapse", (e) => {
+          e.target.removeAttribute ("hidden");
+        });
+        // Restore it once the panel is shut, rather than while it is shutting.
+        document.addEventListener ("hidden.bs.collapse", (e) => {
+          if (! e.target.classList.contains ("navbar-collapse")) {
+            e.target.setAttribute ("hidden", "until-found");
+          }
+        });
+      });
+    </script>
+    <style>
+    .fs {
+    margin-top: -0.15em;
+    margin-bottom: -0.15em;
+    }
+    .fs-last {
+    margin-bottom: calc(1rem - 0.15em);
+    }
+    p.description {
+    font-family: Consolas, "Courier New", monospace;
+    }
+    p.description code {
+    font-size: inherit;
+    }
+    h6:hover {
+      color: gray;
+    }
+    code {
+    font-family: Consolas, "Courier New", monospace;
+    border-radius: 0.3em;
+    white-space: nowrap;
+    color: gray;
+    }
+    code.description {
+    font-family: Consolas, "Courier New", monospace;
+    border-radius: 0.3em;
+    white-space: normal;
+    font-size:1.2em;
+    color: gray;
+    }
+    var {
+    font-family: Consolas, "Courier New", monospace;
+    border-radius: 0.3em;
+    font-style: normal;
+    font-weight: bold;
+    color: gray;
+    }
+    td {
+      vertical-align: top;
+    }
+    [id^="togList"],                        /* HIDE CHECKBOX */
+    [id^="togList"] ~ .list,                /* HIDE LIST */
+    [id^="togList"] + label  span + span,   /* HIDE "Collapse" */
+    [id^="togList"]:checked + label span{   /* HIDE "Expand" (IF CHECKED) */
+      display:none;
+    }
+    [id^="togList"]:checked + label span + span{
+      display:inline-block;                 /* SHOW "Collapse" (IF CHECKED) */
+    }
+    [id^="togList"]:checked ~ .list{
+      display:block;                        /* SHOW LIST (IF CHECKED) */
+    }
+    /* Bootstrap hides a collapsed panel with "display: none", which generates
+       no box, so the "content-visibility: hidden" the user agent gives
+       "hidden=until-found" could never apply and the text would stay beyond
+       find-in-page.  Clear that one declaration, and only where the script
+       above has found the attribute to be understood: an attribute selector
+       matches a value the browser does not understand, so an ungated rule
+       would leave every panel of an older browser standing open.  The
+       "!important" is required rather than decoration: the reboot carries
+       "[hidden] {display: none !important}", which the attribute itself brings
+       into play, and only another "!important" can outrank it. */
+    html.until-found .collapse[hidden="until-found"]:not(.show) {
+      display: block !important;
+    }
+    </style>
+  </head>
+  <body>
+    <div class="bg-dark">
+      <div class="container-xl">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+          <div class="container-fluid">
+            <a class="navbar-brand" href=index.html>
+              <img src="assets/drafting.png" alt="drafting" class="d-inline-block align-top" width="25" height="25">
+              Geometry, CAD Input/Output and Technical Drawing
+            </a>
+            <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+              <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+              <ul class="navbar-nav">
+                <li class="nav-item">
+                  <a class="nav-link" href="index.html#Solid modelling">
+                    <i class="fas fa-list-alt"></i>
+                    Solid modelling
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="https://gnu-octave.github.io/packages/">
+                  <img src="assets/octave-logo.svg" alt="GNU Octave logo" class="d-inline-block align-top" width="25" height="25">
+                    Octave Packages
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="https://www.octave.org">
+                    <i class="fas fa-home"></i>
+                    GNU Octave website
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </nav>
+      </div>
+    </div>
+    <div class="container-xl my-4">
+      <div class="row flex-nowrap" style="min-height:0">
+        <div class="col-md-2 bg-light" style="overflow-y: scroll; width: 250px;">
+          <div class="p-2" style="text-align: center;">
+            <h3><a href="solid.Shape.html" class="text-decoration-none">solid.Shape</a></h3>
+            <h4 style="color: blue">Methods</h4>
+          </div>
+			<div class="row">
+				<a href="solid.Shape.html" class="text-decoration-none"><h6>&#8962;&nbsp;solid.Shape</h6></a>
+			</div>
+			<div class="row">
+				<input id="togList1" type="checkbox">
+				<label for="togList1">
+					<span><h6>Creating and combining</h6></span>
+					<span><h6>Creating and combining</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="solid.Shape.Shape.html" class="text-decoration-none font-monospace"><small>Shape</small></a></li>
+					<li><a href="solid.Shape.union.html" class="text-decoration-none font-monospace"><small>union</small></a></li>
+					<li><a href="solid.Shape.subtract.html" class="text-decoration-none font-monospace"><small>subtract</small></a></li>
+					<li><a href="solid.Shape.intersect.html" class="text-decoration-none font-monospace"><small>intersect</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList2" type="checkbox">
+				<label for="togList2">
+					<span><h6>Meshing, viewing and files</h6></span>
+					<span><h6>Meshing, viewing and files</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="solid.Shape.tessellate.html" class="text-decoration-none font-monospace"><small>tessellate</small></a></li>
+					<li><a href="solid.Shape.show.html" class="text-decoration-none font-monospace"><small>show</small></a></li>
+					<li><a href="solid.Shape.write.html" class="text-decoration-none font-monospace"><small>write</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList3" type="checkbox">
+				<label for="togList3">
+					<span><h6>Transforms</h6></span>
+					<span><h6>Transforms</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="solid.Shape.translate.html" class="text-decoration-none font-monospace"><small>translate</small></a></li>
+					<li><a href="solid.Shape.rotate.html" class="text-decoration-none font-monospace"><small>rotate</small></a></li>
+					<li><a href="solid.Shape.mirror.html" class="text-decoration-none font-monospace"><small>mirror</small></a></li>
+					<li><a href="solid.Shape.scale.html" class="text-decoration-none font-monospace"><small>scale</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList4" type="checkbox">
+				<label for="togList4">
+					<span><h6>Measures</h6></span>
+					<span><h6>Measures</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="solid.Shape.volume.html" class="text-decoration-none font-monospace"><small>volume</small></a></li>
+					<li><a href="solid.Shape.area.html" class="text-decoration-none font-monospace"><small>area</small></a></li>
+					<li><a href="solid.Shape.centroid.html" class="text-decoration-none font-monospace"><small>centroid</small></a></li>
+					<li><a href="solid.Shape.bbox.html" class="text-decoration-none font-monospace"><small>bbox</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList5" type="checkbox">
+				<label for="togList5">
+					<span><h6>Queries</h6></span>
+					<span><h6>Queries</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="solid.Shape.isvalid.html" class="text-decoration-none font-monospace"><small>isvalid</small></a></li>
+					<li><a href="solid.Shape.isempty.html" class="text-decoration-none font-monospace"><small>isempty</small></a></li>
+					<li><a href="solid.Shape.numsolids.html" class="text-decoration-none font-monospace"><small>numsolids</small></a></li>
+					<li><a href="solid.Shape.numfaces.html" class="text-decoration-none font-monospace"><small>numfaces</small></a></li>
+					<li><a href="solid.Shape.numedges.html" class="text-decoration-none font-monospace"><small>numedges</small></a></li>
+					<li><a href="solid.Shape.solids.html" class="text-decoration-none font-monospace"><small>solids</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList6" type="checkbox">
+				<label for="togList6">
+					<span><h6>Edges and faces</h6></span>
+					<span><h6>Edges and faces</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="solid.Shape.edges.html" class="text-decoration-none font-monospace"><small>edges</small></a></li>
+					<li><a href="solid.Shape.faces.html" class="text-decoration-none font-monospace"><small>faces</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList7" type="checkbox" checked>
+				<label for="togList7">
+					<span><h6>Features</h6></span>
+					<span><h6>Features</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="solid.Shape.fillet.html" class="text-decoration-none font-monospace"><small>fillet</small></a></li>
+					<li><a href="solid.Shape.chamfer.html" class="text-decoration-none font-monospace"><small>chamfer</small></a></li>
+					<li><a href="solid.Shape.shell.html" class="text-decoration-none font-monospace"><small>shell</small></a></li>
+					<li><a href="solid.Shape.hole.html" class="text-decoration-none font-monospace"><small>hole</small></a></li>
+					<li><a href="solid.Shape.thread.html" class="text-decoration-none font-monospace"><small>thread</small></a></li>
+					<li><a href="solid.Shape.pocket.html" class="text-decoration-none font-monospace"><small>pocket</small></a></li>
+					<li><a href="solid.Shape.knurl.html" class="text-decoration-none font-monospace fw-bolder"><small>knurl</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList8" type="checkbox">
+				<label for="togList8">
+					<span><h6>Sections and projections</h6></span>
+					<span><h6>Sections and projections</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="solid.Shape.section.html" class="text-decoration-none font-monospace"><small>section</small></a></li>
+					<li><a href="solid.Shape.projection.html" class="text-decoration-none font-monospace"><small>projection</small></a></li>
+				</ul>
+				</div>
+			</div>
+			<div class="row">
+				<input id="togList9" type="checkbox">
+				<label for="togList9">
+					<span><h6>Hulls, sizes and copies</h6></span>
+					<span><h6>Hulls, sizes and copies</h6></span>
+				</label>
+				<div class="list">
+				<ul style="list-style-type: none; padding-left: 20px;">
+					<li><a href="solid.Shape.hull.html" class="text-decoration-none font-monospace"><small>hull</small></a></li>
+					<li><a href="solid.Shape.resize.html" class="text-decoration-none font-monospace"><small>resize</small></a></li>
+					<li><a href="solid.Shape.copy.html" class="text-decoration-none font-monospace"><small>copy</small></a></li>
+					<li><a href="solid.Shape.rectarray.html" class="text-decoration-none font-monospace"><small>rectarray</small></a></li>
+					<li><a href="solid.Shape.polararray.html" class="text-decoration-none font-monospace"><small>polararray</small></a></li>
+				</ul>
+				</div>
+			</div>
+
+			  </div>
+			  <div class="col-md-10">
+          <div class="card rounded">
+            <div class="card-header card-header-mod">
+              <div class="row d-flex flex-wrap align-items-center">
+                <h3 class="d-inline-block mr-2">
+                Method&nbsp;Reference: <b><code>solid.Shape.knurl</code></b>
+                </h3>
+              </div>
+            </div>
+            <div class="card-body">
+              <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                  <li class="breadcrumb-item"><a href="index.html">drafting</a></li>
+                  <li class="breadcrumb-item"><a href="solid.Shape.html">solid.Shape</a></li>
+                  <li class="breadcrumb-item active" aria-current="page">knurl</li>
+                </ol>
+              </nav>
+
+<p class="h5 fs"><code>solid.Shape: <var>S</var> = <b>knurl</b> (<var>S</var>, <var>F</var>, <var>PITCH</var>)</code></p>
+<p class="h5 fs"><code>solid.Shape: <var>S</var> = <b>knurl</b> (<var>S</var>, <var>F</var>, <var>PITCH</var>, <var>DEPTH</var>)</code></p>
+<p class="h5 fs fs-last"><code>solid.Shape: <var>S</var> = <b>knurl</b> (&hellip;, <var>Name</var>, <var>Value</var>, &hellip;)</code></p>
+<p> Knurl a cylindrical face of a shape.
+</p>
+<div class="ms-5">
+<p> <code><var>S</var> = knurl (<var>S</var>, <var>F</var>, <var>PITCH</var>)</code> knurls the face
+ of <var>S</var> indexed by <var>F</var>, as <code>solid.Shape.faces</code> returns it,
+ with the crossed knurl of DIN 82 type RGE: two sets of grooves at 30
+ degrees either side of the axis, teeth of 90 degrees, cut to full depth,
+ leaving raised points.  <var>F</var> must be the outside of the part, a
+ cylinder all the way round its axis, and must end at each end in a
+ circle on one flat face square to the axis: the free end of the part,
+ or a shoulder.
+</p>
+<p> <var>PITCH</var> is in millimetres, measured square to the grooves as DIN 82
+ gives it, whose series is 0.5, 0.6, 0.8, 1.0, 1.2 and 1.6.  A whole
+ number of grooves must go round the face, so the pitch is fitted to the
+ nearest that gives one: the count is <em class="math">pi d cos (A) / <var>PITCH</var></em>
+ rounded, <em class="math">d</em> the diameter of <var>F</var> and <em class="math">A</em> the
+ angle of the grooves from the axis.  Rings, at 90 degrees, are counted
+ along the length of <var>F</var> the same way.
+</p>
+<p> <code><var>S</var> = knurl (<var>S</var>, <var>F</var>, <var>PITCH</var>, <var>DEPTH</var>)</code>
+ cuts the grooves <var>DEPTH</var> millimetres deep, which leaves flat lands
+ at the diameter of <var>F</var> between them.  By default they are cut to
+ full depth, where the flanks of neighbouring grooves meet in a point:
+ <em class="math"><var>P</var> / (2 tan (<var>PROFILE</var> / 2))</em>, half the pitch at 90
+ degrees, <var>P</var> the pitch as fitted.  A deeper <var>DEPTH</var> is an
+ error.
+</p>
+<p> The knurl is built on the surfaces of its teeth directly rather than
+ cut, which makes it many times faster than cutting its grooves: a
+ knob 28 across knurled at 0.8 takes about two seconds.
+</p>
+<p> That knob has nearly 5000 faces, and every later operation on the
+ shape takes them all in: a boolean or a hole takes seconds, and a
+ projection for a drawing over half a minute.  Knurl a part after its
+ other features, and draw it from the shape before knurling, as a
+ drawing shows a knurl: the blank, with the knurl&rsquo;s type and pitch
+ stated, never its teeth.
+</p>
+<p> Name/Value pairs choose the knurl and finish its ends:
+</p>
+<dl compact="compact">
+<dt> <code>'Pattern'</code></dt>
+<dd> <code>'crossed'</code>, the default, for two sets of grooves, or
+ <code>'single'</code> for one.</dd>
+<dt> <code>'Angle'</code></dt>
+<dd> The angle of the grooves from the axis, in degrees, 30 by default.  A
+ single knurl takes one angle in the range <em class="math">(-90, 90)</em>, a positive
+ one running right-handed, as a thread does, and 0 giving straight
+ grooves along the axis.  A crossed knurl takes one angle <em class="math">A</em> in
+ the range <em class="math">(0, 90)</em>, for grooves at <em class="math">A</em> and <em class="math">-A</em>, or two
+ different angles from -90 to 90, 90 being rings round the axis.</dd>
+<dt> <code>'Points'</code></dt>
+<dd> For a crossed knurl only: <code>'raised'</code>, the default, for points
+ standing between the grooves, or <code>'indented'</code> for pits sunk
+ between ridges.</dd>
+<dt> <code>'Profile'</code></dt>
+<dd> The angle between the flanks of a tooth, in degrees, in the range
+ <em class="math">(0, 180)</em>, 90 by default.</dd>
+<dt> <code>'Fillet'</code></dt>
+<dd> A radius <var>R</var> rounds every free end of <var>F</var>, an end at a shoulder
+ being left as it is.  A cell array <code>{<var>E</var>, <var>R</var>}</code> rounds
+ the end at the edge <var>E</var> to <var>R</var>, and with a row for each end,
+ <code>{<var>E1</var>, <var>R1</var>; <var>E2</var>, <var>R2</var>}</code>, gives each its own
+ radius.  The edges are the circles at the ends of <var>F</var>, as
+ <code>solid.Shape.edges</code> returns them, and the knurl runs out over the
+ fillet as it does on a blank whose edge was rounded before knurling.</dd>
+<dt> <code>'Chamfer'</code></dt>
+<dd> As <code>'Fillet'</code>, for a chamfer of 45 degrees set back <var>D</var>
+ millimetres both ways: a distance <var>D</var> for every free end, or
+ <code>{<var>E</var>, <var>D</var>}</code> with a row for each end.</dd>
+</dl>
+
+<p> An end of <var>F</var> takes one fillet or chamfer at most, and an end at a
+ shoulder takes neither, so naming its edge is an error.  The ends given
+ by their edges are treated first, and a single size given to the other
+ option treats the free ends left: <code>'Fillet', 0.5, 'Chamfer',
+ {<var>E</var>, 1}</code> chamfers the end at <var>E</var> and rounds the other.  A
+ single size with no free end left to take it is an error, as are single
+ sizes for both.  The fillets and chamfers must be smaller than the
+ radius of <var>F</var> and must not overlap.
+</p>
+<p> The types of DIN 82 are made so:
+</p>
+<div class="table-responsive">
+<table class="table table-striped table-bordered table-sm">
+<thead class="table-primary"><tr><th width="12%">Type</th><th width="38%">Knurl</th><th width="50%">Options</th></tr></thead>
+<tr><td width="12%">RAA</td><td width="38%">straight</td><td width="50%"> <code>'Pattern', 'single', 'Angle', 0</code></td></tr>
+<tr><td width="12%">RBL</td><td width="38%">single, left-hand</td><td width="50%"> <code>'Pattern', 'single', 'Angle', -30</code></td></tr>
+<tr><td width="12%">RBR</td><td width="38%">single, right-hand</td><td width="50%"> <code>'Pattern', 'single'</code></td></tr>
+<tr><td width="12%">RGE</td><td width="38%">crossed, raised points</td><td width="50%">none</td></tr>
+<tr><td width="12%">RGV</td><td width="38%">crossed, indented points</td><td width="50%"> <code>'Points', 'indented'</code></td></tr>
+<tr><td width="12%">RKE</td><td width="38%">square, raised points</td><td width="50%"> <code>'Angle', [0, 90]</code></td></tr>
+<tr><td width="12%">RKV</td><td width="38%">square, indented points</td><td width="50%"> <code>'Angle', [0, 90], 'Points', 'indented'</code></td></tr>
+</table>
+</div>
+
+<table><tr><td>&nbsp;</td><td><pre class="example"> ## A knob 28 across, knurled RGE 0.8 with its top edge chamfered 0.5
+ S = solid.cylinder (14, 10);
+ F = faces (S, 'Type', 'cylinder');
+ E = edges (S, 'Type', 'circle', 'Within', [-15, -15, 10, 15, 15, 10]);
+ S = knurl (S, F, 0.8, 'Chamfer', {E, 0.5});
+</pre></td></tr></table>
+
+<p> <strong>See also: </strong>
+  <a href="solid.Shape.faces.html">solid.Shape.faces</a>, 
+  <a href="solid.Shape.edges.html">solid.Shape.edges</a>, 
+  <a href="solid.Shape.fillet.html">solid.Shape.fillet</a>, 
+  <a href="solid.Shape.chamfer.html">solid.Shape.chamfer</a>
+</p>
+<p><strong>Source Code: </strong>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/b937a57/inst/+solid/Shape.m#L2421">solid.Shape</a>
+</p>
+</div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </body>
+</html>

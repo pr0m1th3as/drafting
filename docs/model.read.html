@@ -235,7 +235,6 @@
 					<li><a href="geom.isrectilinear.html" class="text-decoration-none font-monospace"><small>geom.isrectilinear</small></a></li>
 					<li><a href="geom.offset.html" class="text-decoration-none font-monospace"><small>geom.offset</small></a></li>
 					<li><a href="geom.largestrect.html" class="text-decoration-none font-monospace"><small>geom.largestrect</small></a></li>
-					<li><a href="geom.triangulate.html" class="text-decoration-none font-monospace"><small>geom.triangulate</small></a></li>
 					<li><a href="geom.hatchlines.html" class="text-decoration-none font-monospace"><small>geom.hatchlines</small></a></li>
 				</ul>
 				</div>
@@ -364,6 +363,8 @@
 					<li><a href="solid.sweep.html" class="text-decoration-none font-monospace"><small>solid.sweep</small></a></li>
 					<li><a href="solid.helix.html" class="text-decoration-none font-monospace"><small>solid.helix</small></a></li>
 					<li><a href="solid.read.html" class="text-decoration-none font-monospace"><small>solid.read</small></a></li>
+					<li><a href="solid.threadspec.html" class="text-decoration-none font-monospace"><small>solid.threadspec</small></a></li>
+					<li><a href="solid.holespec.html" class="text-decoration-none font-monospace"><small>solid.holespec</small></a></li>
 				</ul>
 				</div>
 			</div>
@@ -399,13 +400,25 @@
 <div class="ms-5">
 <p> <code><var>A</var> = model.read (<var>FILE</var>)</code> returns the product the STEP file
  <var>FILE</var> holds as a <code>model.Assembly</code>, in millimetres whatever unit
- the file was written in: its parts with their names and the colours of
- their solids, placed where the file places them and named as it names the
- placements, and its sub-assemblies the same way.  A part the file places
+ the file was written in: its parts with their names and the colours and
+ <code>solid.Shape.Name</code> of their solids, placed where the file places
+ them and named as it names the placements, and its sub-assemblies the
+ same way.  A part the file places
  several times is one part placed several times.  Several products at the
  top of the file are placed where they are in one assembly, and a file of
  a single part gives an assembly placing it once; either is named after
- the base name of <var>FILE</var>.
+ the base name of <var>FILE</var>.  A part without a name is named
+ <code>'part'</code>, an assembly <code>'assembly'</code>, and a name two parts
+ share, or two placements in one assembly, is made distinct with
+ <code>'_2'</code>, <code>'_3'</code> and so on.  A placement that mirrors its
+ part is an error, since a <code>geom.UCS</code> places rigidly and a mirrored
+ part is another part.
+</p>
+<p> A part of a STEP file is its solids, a closed shell read as the solid it
+ bounds.  Surfaces, curves and points are left out with a warning that
+ counts them, a part that holds nothing else is left out of the assembly,
+ and so is a sub-assembly left with no part; a file that holds no solid
+ is an error.
 </p>
 <p> <code><var>A</var> = model.read (<var>FILE</var>)</code> reads a 3MF file, <code>.3mf</code>,
  the same way: each object a <code>polymesh.Mesh</code> part, in the colours
@@ -426,7 +439,7 @@
   <a href="polymesh.read.html">polymesh.read</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/fff062e/inst/+model/read.m">model.read</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/b937a57/inst/+model/read.m">model.read</a>
 </p>
 </div>
 

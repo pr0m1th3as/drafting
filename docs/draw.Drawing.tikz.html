@@ -361,31 +361,26 @@
 </table>
 </div>
 
-<a name="Dimensions"></a>
-<h3 class="subheading">Dimensions</h3>
+<a name="Dimensions-and-hatches"></a>
+<h3 class="subheading">Dimensions and hatches</h3>
 
-<p> Dimensions are rendered here from what they measure, which is the point
- of storing them semantically.  A TikZ node anchors itself, so the label
- is positioned by naming the side it should sit on and letting TikZ
- measure the text, where a figure or a CAD file has to estimate the width
- of a string from its character count.  The same drawing therefore gets
- properly centred labels on the report figure, from one model and without
- a flag anywhere.
-</p>
-<p> Labels are unidirectional, as <code>draw.Drawing.plot</code> draws them, and
- ticks are the 45-degree architectural obliques.
+<p> A dimension, a centre mark and a leader are drawn as the lines and text
+ <code>draw.Drawing.entities</code> breaks them into, as
+ <code>draw.Drawing.plot</code> draws them: labels unidirectional, ticks the
+ 45-degree architectural obliques, their size on paper nominal whatever
+ the scale.  A label is a node anchored at the
+ start of its baseline, where <code>draw.Drawing.entities</code> places it
+ from an estimate of its width.  A hatch is drawn as its outline and its
+ fill lines.
 </p>
 <a name="What-the-document-needs"></a>
 <h3 class="subheading">What the document needs</h3>
 
-<p> A hatch is emitted as <code>\path[pattern=&hellip;]</code>, which requires
- <code>\usetikzlibrary{patterns}</code>.  Nothing else in the output needs a
- library beyond TikZ itself.
-</p>
-<p> Text is written through as UTF-8 and LaTeX&rsquo;s special characters are
- escaped.  Greek text needs a Unicode-aware engine, <code>xelatex</code> or
- <code>lualatex</code>, or <code>babel</code> configured for Greek; that is a
- property of the document, not of this output.
+<p> The output needs no library beyond TikZ itself.  Text is written
+ through as UTF-8 and LaTeX&rsquo;s special characters are escaped.  Greek
+ text needs a Unicode-aware engine, <code>xelatex</code> or <code>lualatex</code>,
+ or <code>babel</code> configured for Greek; that is a property of the
+ document, not of this output.
 </p>
 <p> <strong>See also: </strong>
   <a href="draw.Drawing.html">draw.Drawing</a>, 
@@ -393,7 +388,7 @@
   <a href="draw.Drawing.write.html">draw.Drawing.write</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/fff062e/inst/+draw/Drawing.m#L2743">draw.Drawing</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/b937a57/inst/+draw/Drawing.m#L3044">draw.Drawing</a>
 </p>
 </div>
         <div class="card rounded my-4">
@@ -432,8 +427,8 @@
 \begin{tikzpicture}[x=0.5mm, y=0.5mm, line width=0.18mm]
   % layer: AXES
   \begin{scope}[drAXES]
-    \draw[red, dash pattern=on 1.25mm off 0.25mm on 0.25mm off 0.25mm] (18.5,12.5) -- (21.5,12.5);
-    \draw[red, dash pattern=on 1.25mm off 0.25mm on 0.25mm off 0.25mm] (20,11) -- (20,14);
+    \draw[red, dash pattern=on 31.75mm off 6.35mm on 6.35mm off 6.35mm] (18.5,12.5) -- (21.5,12.5);
+    \draw[red, dash pattern=on 31.75mm off 6.35mm on 6.35mm off 6.35mm] (20,11) -- (20,14);
   \end{scope}
   % layer: BODY
   \begin{scope}[drBODY]
@@ -470,8 +465,8 @@
    m = regexp (S, 'dash pattern=[^]]*', 'match');
    printf ('scale 1:%-3d %s\n', sc, m{1});
  endfor</pre>
-                <pre style="overflow-x: auto; white-space: pre; padding: 0.6rem 0.8rem; margin: 0.3rem 0 0.8rem 0; border: 1px solid #e2e2e2; border-left: 4px solid #b7b7b7; border-radius: 4px; background-color: #fafafa;">scale 1:1   dash pattern=on 0.5mm off 0.25mm
-scale 1:20  dash pattern=on 0.5mm off 0.25mm</pre>
+                <pre style="overflow-x: auto; white-space: pre; padding: 0.6rem 0.8rem; margin: 0.3rem 0 0.8rem 0; border: 1px solid #e2e2e2; border-left: 4px solid #b7b7b7; border-radius: 4px; background-color: #fafafa;">scale 1:1   dash pattern=on 12.7mm off 6.35mm
+scale 1:20  dash pattern=on 12.7mm off 6.35mm</pre>
 
             </div>
           </div>

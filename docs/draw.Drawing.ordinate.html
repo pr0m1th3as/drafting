@@ -333,9 +333,9 @@
  reads each position straight off the datum, and no error adds up along a
  chain of dimensions.
 </p>
-<p> The label is the distance, without sign, to a micron, measured when the
- drawing is lowered, so it follows the geometry; <var>LABEL</var> gives
- literal text instead.
+<p> The label is the distance, without sign, to a micron, measured each time
+ the drawing is plotted or written, so it follows the geometry;
+ <var>LABEL</var> gives literal text instead.
 </p>
 <table><tr><td>&nbsp;</td><td><pre class="example"> ## A plate with two holes, dimensioned from its lower left corner
  D = draw.Drawing ();
@@ -349,11 +349,11 @@
 </pre></td></tr></table>
 
 <p> <strong>See also: </strong>
-  <a href="draw.Drawing.dim.html">dim</a>, 
-  <a href="draw.Drawing.leader.html">leader</a>
+  <a href="draw.Drawing.dim.html">draw.Drawing.dim</a>, 
+  <a href="draw.Drawing.leader.html">draw.Drawing.leader</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/fff062e/inst/+draw/Drawing.m#L1577">draw.Drawing</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/b937a57/inst/+draw/Drawing.m#L1683">draw.Drawing</a>
 </p>
 </div>
 

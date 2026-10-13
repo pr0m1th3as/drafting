@@ -328,7 +328,9 @@
  of the four cardinal directions, and an arc contributes its two
  endpoints together with whichever of those four points its sweep
  actually passes through.  Taking the centre alone would understate a
- circle by a radius on every side.
+ circle by a radius on every side.  An ellipse contributes its extremes
+ along each axis, a polyline&rsquo;s bulge its arc, and an insert the
+ geometry it places.
 </p>
 <p> Two things are deliberately not accounted for, because the model does
  not know them: the rendered width and height of a text entity, of which
@@ -340,7 +342,7 @@
 <p> An empty drawing has no extent, and returns an empty <var>B</var>.
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/fff062e/inst/+draw/Drawing.m#L873">draw.Drawing</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/b937a57/inst/+draw/Drawing.m#L928">draw.Drawing</a>
 </p>
 </div>
 

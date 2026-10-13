@@ -235,7 +235,6 @@
 					<li><a href="geom.isrectilinear.html" class="text-decoration-none font-monospace"><small>geom.isrectilinear</small></a></li>
 					<li><a href="geom.offset.html" class="text-decoration-none font-monospace"><small>geom.offset</small></a></li>
 					<li><a href="geom.largestrect.html" class="text-decoration-none font-monospace"><small>geom.largestrect</small></a></li>
-					<li><a href="geom.triangulate.html" class="text-decoration-none font-monospace"><small>geom.triangulate</small></a></li>
 					<li><a href="geom.hatchlines.html" class="text-decoration-none font-monospace"><small>geom.hatchlines</small></a></li>
 				</ul>
 				</div>
@@ -364,6 +363,8 @@
 					<li><a href="solid.sweep.html" class="text-decoration-none font-monospace"><small>solid.sweep</small></a></li>
 					<li><a href="solid.helix.html" class="text-decoration-none font-monospace"><small>solid.helix</small></a></li>
 					<li><a href="solid.read.html" class="text-decoration-none font-monospace fw-bolder"><small>solid.read</small></a></li>
+					<li><a href="solid.threadspec.html" class="text-decoration-none font-monospace"><small>solid.threadspec</small></a></li>
+					<li><a href="solid.holespec.html" class="text-decoration-none font-monospace"><small>solid.holespec</small></a></li>
 				</ul>
 				</div>
 			</div>
@@ -402,13 +403,21 @@
  unit the file was written in.  A file holding several parts returns them
  together, and <code>solid.Shape.numsolids</code> counts them.  The colour the
  file gives a solid, or failing that the first of its faces with one, is
- its row of <code>solid.Shape.Colour</code>.
+ its row of <code>solid.Shape.Colour</code>.  The name the file gives a solid
+ itself, not the name of the part it belongs to, is its element of
+ <code>solid.Shape.Name</code>.
 </p>
 <p> STEP (ISO 10303-21) is the format every mechanical CAD program exchanges
  solids in, and it keeps their exact geometry: a hole read from it is a true
  cylinder, as it was modelled.  A STEP file must end in <code>.step</code>, in
  either case, and open with the keyword <code>ISO-10303-21;</code>, which may
  follow white space and comments.
+</p>
+<p> Only solids are read, since a <code>solid.Shape</code> holds solids only.  A
+ closed shell, which some programs write in place of a solid, is read as
+ the solid it bounds.  Surfaces, curves and points, such as sketches,
+ axes and construction surfaces, are left out with a warning that counts
+ them, and a file that holds no solid is an error.
 </p>
 <p> <code>model.read</code> reads the same file as a <code>model.Assembly</code>, its
  parts named and placed as the file has them.  A triangle mesh, from an
@@ -422,7 +431,7 @@
   <a href="polymesh.read.html">polymesh.read</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/fff062e/inst/+solid/read.m">solid.read</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/b937a57/inst/+solid/read.m">solid.read</a>
 </p>
 </div>
 

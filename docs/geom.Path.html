@@ -235,7 +235,6 @@
 					<li><a href="geom.isrectilinear.html" class="text-decoration-none font-monospace"><small>geom.isrectilinear</small></a></li>
 					<li><a href="geom.offset.html" class="text-decoration-none font-monospace"><small>geom.offset</small></a></li>
 					<li><a href="geom.largestrect.html" class="text-decoration-none font-monospace"><small>geom.largestrect</small></a></li>
-					<li><a href="geom.triangulate.html" class="text-decoration-none font-monospace"><small>geom.triangulate</small></a></li>
 					<li><a href="geom.hatchlines.html" class="text-decoration-none font-monospace"><small>geom.hatchlines</small></a></li>
 				</ul>
 				</div>
@@ -364,6 +363,8 @@
 					<li><a href="solid.sweep.html" class="text-decoration-none font-monospace"><small>solid.sweep</small></a></li>
 					<li><a href="solid.helix.html" class="text-decoration-none font-monospace"><small>solid.helix</small></a></li>
 					<li><a href="solid.read.html" class="text-decoration-none font-monospace"><small>solid.read</small></a></li>
+					<li><a href="solid.threadspec.html" class="text-decoration-none font-monospace"><small>solid.threadspec</small></a></li>
+					<li><a href="solid.holespec.html" class="text-decoration-none font-monospace"><small>solid.holespec</small></a></li>
 				</ul>
 				</div>
 			</div>
@@ -425,7 +426,7 @@
   <a href="geom.UCS.html">geom.UCS</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/fff062e/inst/+geom/Path.m">geom.Path</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/b937a57/inst/+geom/Path.m">geom.Path</a>
 </p>
 </div>
         <p class="lead my-3">The <code>geom.Path</code> class contains the following properties:</p>
@@ -859,7 +860,7 @@ Write a path to a DXF file.
 <dt> <code>'Version'</code></dt>
 <dd> <code>'R2000'</code> (<code>AC1015</code>), the default, or <code>'R12'</code>
  (<code>AC1009</code>) for a program that reads nothing later.  R12 has no
- groups and holds only lines and arcs, so a path is an error there.</dd>
+ groups, so a path is an error there.</dd>
 <dt> <code>'LTScale'</code></dt>
 <dd> The drawing&rsquo;s line-type scale, 1 by default, written in the header so
  the dashes look the same wherever the file is opened.</dd>
@@ -961,10 +962,10 @@ Join pieces that meet end to end into paths.
  the same UCS, in which case they are in that one.
 </p>
 <table><tr><td>&nbsp;</td><td><pre class="example"> ## A slot drawn as two lines and two half circles, in no order
- C = geom.Path.chain ({geom.Polyline ([0, 0; 20, 0]), ...
-                      geom.Polyline ([0, 10, 1; 0, 0, 0]), ...
-                      geom.Polyline ([0, 10; 20, 10]), ...
-                      geom.Polyline ([20, 0, 1; 20, 10, 0])});
+ C = geom.Path.chain ({geom.Polyline([0, 0; 20, 0]), ...
+                      geom.Polyline([0, 10, 1; 0, 0, 0]), ...
+                      geom.Polyline([0, 10; 20, 10]), ...
+                      geom.Polyline([20, 0, 1; 20, 10, 0])});
 </pre></td></tr></table>
 
 <p> <strong>See also: </strong>

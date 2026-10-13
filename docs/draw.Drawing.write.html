@@ -349,9 +349,10 @@
 <dl compact="compact">
 <dt> <code>'Version'</code></dt>
 <dd> <code>'R2000'</code>, the default, or <code>'R12'</code> (<code>AC1009</code>) for a
- program that reads nothing later.  R12 holds only lines and arcs, so a
- drawing holding an ellipse, a spline, a path, a region or a hatch is an
- error there, naming what R12 cannot hold.</dd>
+ program that reads nothing later.  R12 has no <code>ELLIPSE</code>, no
+ <code>SPLINE</code>, no groups and no <code>HATCH</code>, so a drawing holding an
+ ellipse, a spline, a path, a region or a hatch is an error there,
+ naming what R12 cannot hold.</dd>
 <dt> <code>'Dimensions'</code></dt>
 <dd> <code>'associative'</code>, the default, or <code>'explode'</code> to write each
  dimension as the lines and text it is drawn with, for a program that
@@ -368,9 +369,12 @@
  the dashes look the same wherever the file is opened.</dd>
 </dl>
 
-<p> Text is written with every character outside ASCII escaped as
- <code>\U+XXXX</code>, so the file reads the same whatever the reader&rsquo;s code
- page.
+<p> Text and the names of layers, line types and blocks are written with
+ every character outside ASCII escaped as <code>\U+XXXX</code>, so they read
+ the same whatever the reader&rsquo;s code page.  A text or a name holding a
+ line break or another control character cannot be stored and is an
+ error, as are two different blocks of one name, such as one a block
+ defines for itself and another the drawing defines.
 </p>
 <p> <strong>See also: </strong>
   <a href="draw.read.html">draw.read</a>, 
@@ -379,7 +383,7 @@
   <a href="geom.write.html">geom.write</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/fff062e/inst/+draw/Drawing.m#L2933">draw.Drawing</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/b937a57/inst/+draw/Drawing.m#L3238">draw.Drawing</a>
 </p>
 </div>
 

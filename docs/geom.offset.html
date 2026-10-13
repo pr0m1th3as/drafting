@@ -235,7 +235,6 @@
 					<li><a href="geom.isrectilinear.html" class="text-decoration-none font-monospace"><small>geom.isrectilinear</small></a></li>
 					<li><a href="geom.offset.html" class="text-decoration-none font-monospace fw-bolder"><small>geom.offset</small></a></li>
 					<li><a href="geom.largestrect.html" class="text-decoration-none font-monospace"><small>geom.largestrect</small></a></li>
-					<li><a href="geom.triangulate.html" class="text-decoration-none font-monospace"><small>geom.triangulate</small></a></li>
 					<li><a href="geom.hatchlines.html" class="text-decoration-none font-monospace"><small>geom.hatchlines</small></a></li>
 				</ul>
 				</div>
@@ -364,6 +363,8 @@
 					<li><a href="solid.sweep.html" class="text-decoration-none font-monospace"><small>solid.sweep</small></a></li>
 					<li><a href="solid.helix.html" class="text-decoration-none font-monospace"><small>solid.helix</small></a></li>
 					<li><a href="solid.read.html" class="text-decoration-none font-monospace"><small>solid.read</small></a></li>
+					<li><a href="solid.threadspec.html" class="text-decoration-none font-monospace"><small>solid.threadspec</small></a></li>
+					<li><a href="solid.holespec.html" class="text-decoration-none font-monospace"><small>solid.holespec</small></a></li>
 				</ul>
 				</div>
 			</div>
@@ -432,8 +433,8 @@
 </p>
 <p> An offset too large for the outline to absorb raises an error rather than
  returning a self-intersecting result.  This is detected by checking that the
- orientation survives and that no edge has reversed direction, which is exact
- for rectilinear outlines.
+ orientation survives, that no edge has reversed direction and that no two
+ edges cross.
 </p>
 <p> <strong>See also: </strong>
   <a href="geom.isrectilinear.html">geom.isrectilinear</a>, 
@@ -441,7 +442,7 @@
   <a href="geom.signedarea.html">geom.signedarea</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/fff062e/inst/+geom/offset.m">geom.offset</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/b937a57/inst/+geom/offset.m">geom.offset</a>
 </p>
 </div>
         <div class="card rounded my-4">

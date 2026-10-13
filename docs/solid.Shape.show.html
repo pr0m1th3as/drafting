@@ -278,6 +278,7 @@
 					<li><a href="solid.Shape.numsolids.html" class="text-decoration-none font-monospace"><small>numsolids</small></a></li>
 					<li><a href="solid.Shape.numfaces.html" class="text-decoration-none font-monospace"><small>numfaces</small></a></li>
 					<li><a href="solid.Shape.numedges.html" class="text-decoration-none font-monospace"><small>numedges</small></a></li>
+					<li><a href="solid.Shape.solids.html" class="text-decoration-none font-monospace"><small>solids</small></a></li>
 				</ul>
 				</div>
 			</div>
@@ -306,7 +307,9 @@
 					<li><a href="solid.Shape.chamfer.html" class="text-decoration-none font-monospace"><small>chamfer</small></a></li>
 					<li><a href="solid.Shape.shell.html" class="text-decoration-none font-monospace"><small>shell</small></a></li>
 					<li><a href="solid.Shape.hole.html" class="text-decoration-none font-monospace"><small>hole</small></a></li>
+					<li><a href="solid.Shape.thread.html" class="text-decoration-none font-monospace"><small>thread</small></a></li>
 					<li><a href="solid.Shape.pocket.html" class="text-decoration-none font-monospace"><small>pocket</small></a></li>
+					<li><a href="solid.Shape.knurl.html" class="text-decoration-none font-monospace"><small>knurl</small></a></li>
 				</ul>
 				</div>
 			</div>
@@ -375,29 +378,31 @@
  expression rather than a variable, such as <code>show (fillet (part,
  E, 3))</code>, has no name, and all such shapes share one window.
 </p>
-<p> Drag with the left mouse button to rotate, the middle one to pan, and
- turn the wheel to zoom; <code>F</code> fits the part to the window and
- <code>0</code>, <code>1</code>, <code>2</code> and <code>3</code> turn it to the isometric, front,
- top and right views.  Closing a window ends its viewer, and the next
+<p> Drag with the left mouse button to rotate, keeping <em class="math">z</em> up, the
+ middle one to pan, and turn the wheel to zoom; <code>F</code> fits the part to
+ the window, <code>0</code>, <code>1</code>, <code>2</code> and <code>3</code> turn it to the
+ isometric, front, top and right views, and <code>T</code> lets it turn any way
+ or keeps <em class="math">z</em> up again.  Closing a window ends its viewer, and the
+ next
  <code>show</code> of that variable opens a new one.  Showing the empty shape
  opens a variable&rsquo;s window before there is anything to draw in it.
 </p>
 <p> <code><var>V</var> = show (<var>S</var>)</code> also returns the viewer.  Assigning to
- <code><var>V</var>.Shape</code> redraws it at once, and
+ <code><var>V</var>.Model</code> redraws it at once, and
  <code>model.Viewer.pick</code> picks edges and faces with the mouse:
 </p>
 <table><tr><td>&nbsp;</td><td><pre class="example"> part = solid.box (80, 40, 12);
  V = show (part);
  E = pick (V, 'edge');     # click the edges, then press Enter
- V.Shape = fillet (V.Shape, E, 3);
+ V.Model = fillet (V.Model, E, 3);
 </pre></td></tr></table>
 
 <p> Calling <code>show (<var>S</var>)</code> is the same as assigning <var>S</var> to the
- <code>Shape</code> of the variable&rsquo;s viewer.  Nothing else redraws it:
+ <code>Model</code> of the variable&rsquo;s viewer.  Nothing else redraws it:
  changing the variable that was shown does not, until it is shown again.
 </p>
 <p> The viewer is built with the package when Open CASCADE and X11 are
- found, and needs a display to run.  It runs on Linux.
+ found, and needs a display to run.  It runs on Linux and FreeBSD.
 </p>
 <p> <strong>See also: </strong>
   <a href="model.Viewer.html">model.Viewer</a>, 
@@ -405,7 +410,7 @@
   <a href="polymesh.Mesh.html#polymesh_Mesh_show">polymesh.Mesh.show</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/fff062e/inst/+solid/Shape.m#L445">solid.Shape</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/b937a57/inst/+solid/Shape.m#L490">solid.Shape</a>
 </p>
 </div>
 

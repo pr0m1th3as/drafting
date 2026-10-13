@@ -334,23 +334,35 @@
 <p> A circle keeps its centre and scales its radius; an arc rotates its
  angles; text moves, rotates and scales its height; a spline, path or
  region moves as the exact curve it is; a hatch moves its region,
- rotates its pattern and scales its spacing.  A dimension carries its
- measured points and scales its offset.
+ rotates its pattern and scales its spacing.  An insert turns and scales
+ the block it places.  A dimension carries its measured points and its
+ offset, a diameter or radius dimension its radius and direction, an
+ angular dimension its radius; one with no label of its own is labelled
+ with what it measures whenever it is drawn or written, so its label
+ follows it.
 </p>
 <p> <strong>A reflection reverses the sweep of an arc.</strong>  Arcs run
  counter-clockwise from the first angle to the second, so mirroring one
  and keeping the order would silently give the complementary arc &mdash; the
- piece that was not there before.  The endpoints are exchanged instead.
+ piece that was not there before.  The endpoints are exchanged instead,
+ and for the same reason the bulges of a polyline change sign and the
+ arms of an angular dimension are exchanged.
 </p>
 <a name="What-is-refused,-and-why"></a>
 <h3 class="subheading">What is refused, and why</h3>
 
 <p> <strong>A non-uniform scaling that would turn a circle into an ellipse</strong>
- raises.  There is no ellipse entity to put the result in, and quietly
- scaling the radius by one of the two factors would move the geometry off
- the part.  A spline, path, region or hatch refuses it too.  A drawing
- of lines and polylines without arcs scales anisotropically without
- complaint.
+ raises.  <code>transform</code> makes no ellipse out of a circle or an arc,
+ and quietly scaling the radius by one of the two factors would move the
+ geometry off the part.  An ellipse, a spline, a path, a region or a
+ hatch refuses it too, as do a polyline with arcs, an insert and a
+ diameter, radius or angular dimension.  A drawing of lines and
+ polylines without arcs scales anisotropically without complaint.
+</p>
+<p> <strong>An insert cannot be mirrored</strong>, since it places its block turned
+ and scaled but never reflected; mirroring one raises, naming it.  Expand
+ the drawing first with <code>draw.Drawing.expand</code> to mirror what the
+ insert places.
 </p>
 <p> <strong>A rotation that would leave an axis-locked dimension off its
  axis</strong> raises, naming the entity.  A <code>'horizontal'</code> dimension
@@ -363,11 +375,11 @@
 </p>
 <p> <strong>See also: </strong>
   <a href="geom.transform.html">geom.transform</a>, 
-  <a href="draw.Drawing.merge.html">merge</a>, 
-  <a href="draw.Drawing.bbox.html">bbox</a>
+  <a href="draw.Drawing.merge.html">draw.Drawing.merge</a>, 
+  <a href="draw.Drawing.bbox.html">draw.Drawing.bbox</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/fff062e/inst/+draw/Drawing.m#L1757">draw.Drawing</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/b937a57/inst/+draw/Drawing.m#L1875">draw.Drawing</a>
 </p>
 </div>
 

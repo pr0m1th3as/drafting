@@ -235,7 +235,6 @@
 					<li><a href="geom.isrectilinear.html" class="text-decoration-none font-monospace"><small>geom.isrectilinear</small></a></li>
 					<li><a href="geom.offset.html" class="text-decoration-none font-monospace"><small>geom.offset</small></a></li>
 					<li><a href="geom.largestrect.html" class="text-decoration-none font-monospace"><small>geom.largestrect</small></a></li>
-					<li><a href="geom.triangulate.html" class="text-decoration-none font-monospace"><small>geom.triangulate</small></a></li>
 					<li><a href="geom.hatchlines.html" class="text-decoration-none font-monospace"><small>geom.hatchlines</small></a></li>
 				</ul>
 				</div>
@@ -364,6 +363,8 @@
 					<li><a href="solid.sweep.html" class="text-decoration-none font-monospace"><small>solid.sweep</small></a></li>
 					<li><a href="solid.helix.html" class="text-decoration-none font-monospace"><small>solid.helix</small></a></li>
 					<li><a href="solid.read.html" class="text-decoration-none font-monospace"><small>solid.read</small></a></li>
+					<li><a href="solid.threadspec.html" class="text-decoration-none font-monospace"><small>solid.threadspec</small></a></li>
+					<li><a href="solid.holespec.html" class="text-decoration-none font-monospace"><small>solid.holespec</small></a></li>
 				</ul>
 				</div>
 			</div>
@@ -458,10 +459,12 @@
  is left over, are reported in one warning, counted by entity type.
 </p>
 <p> Coordinates are converted to millimetres from the units the file declares
- in <code>$INSUNITS</code>; a file declaring none is read as millimetres.  The
- reader takes ASCII DXF from R12 (<code>AC1009</code>) to R2018
- (<code>AC1032</code>).  Text before R2007 is decoded from the code page the
- header names, and from R2007 on as UTF-8.  A binary DXF is an error.
+ in <code>$INSUNITS</code>, any of those DXF defines; a file declaring none is
+ read as millimetres, and so is one declaring a code DXF does not define,
+ with a warning.  The reader takes ASCII DXF from R12 (<code>AC1009</code>) to
+ R2018 (<code>AC1032</code>).  Text and names before R2007 are decoded from the
+ code page the header names, and from R2007 on as UTF-8.  A binary DXF is
+ an error.
 </p>
 <table><tr><td>&nbsp;</td><td><pre class="example"> R = geom.Region (geom.Polyline ([0, 0; 60, 0; 60, 40; 0, 40], ...
                                  'Closed', true));
@@ -480,7 +483,7 @@
   <a href="draw.read.html">draw.read</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/fff062e/inst/+geom/read.m">geom.read</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/b937a57/inst/+geom/read.m">geom.read</a>
 </p>
 </div>
 

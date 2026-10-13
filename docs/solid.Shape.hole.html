@@ -278,6 +278,7 @@
 					<li><a href="solid.Shape.numsolids.html" class="text-decoration-none font-monospace"><small>numsolids</small></a></li>
 					<li><a href="solid.Shape.numfaces.html" class="text-decoration-none font-monospace"><small>numfaces</small></a></li>
 					<li><a href="solid.Shape.numedges.html" class="text-decoration-none font-monospace"><small>numedges</small></a></li>
+					<li><a href="solid.Shape.solids.html" class="text-decoration-none font-monospace"><small>solids</small></a></li>
 				</ul>
 				</div>
 			</div>
@@ -306,7 +307,9 @@
 					<li><a href="solid.Shape.chamfer.html" class="text-decoration-none font-monospace"><small>chamfer</small></a></li>
 					<li><a href="solid.Shape.shell.html" class="text-decoration-none font-monospace"><small>shell</small></a></li>
 					<li><a href="solid.Shape.hole.html" class="text-decoration-none font-monospace fw-bolder"><small>hole</small></a></li>
+					<li><a href="solid.Shape.thread.html" class="text-decoration-none font-monospace"><small>thread</small></a></li>
 					<li><a href="solid.Shape.pocket.html" class="text-decoration-none font-monospace"><small>pocket</small></a></li>
+					<li><a href="solid.Shape.knurl.html" class="text-decoration-none font-monospace"><small>knurl</small></a></li>
 				</ul>
 				</div>
 			</div>
@@ -375,38 +378,138 @@
  cleared too, at the widest diameter of the hole, so a hole entering a
  sloping or curved face is clean all round.  A hole started under
  material that its axis passes through first cuts that material as
- well.  All the holes are cut in one operation.
+ well.  All the holes are cut in one operation.  A hole that would
+ remove nothing, its axis missing the part or its point too far from
+ it for <var>DEPTH</var> to reach, is an error naming the point, as a thread
+ whose axis meets no bore or cylinder is for <code>solid.Shape.thread</code>.
 </p>
-<p> <var>D</var> may instead name an ISO metric coarse thread, such as
- <code>'M6'</code> or <code>'M2.5'</code>, from M1 to M64: the hole is then drilled
- at the tapping size for that thread, its nominal diameter less its
- pitch, so <code>'M6'</code> drills 5 millimetres.  The thread itself is not
- modelled.
+<p> <var>P</var> may instead be a <code>geom.UCS</code>, such as <code>geom.UCS
+ (<var>V</var>)</code> picks off a face in the viewer: the hole starts at its origin
+ and runs against its normal, which points out of the part, so its
+ normal sets the direction.  With <code>'At'</code>, a hole is drilled at
+ every point given in the plane of the UCS instead, which places a bolt
+ circle or a row of holes on a face in one call.
+</p>
+<a name="Tapping-holes"></a>
+<h3 class="subheading">Tapping holes</h3>
+
+<p> <var>D</var> may instead name an ISO metric thread from M1 to M64 with a
+ diameter and pitch of ISO 261: a coarse thread by its diameter, as
+ <code>'M6'</code>, a fine one with its pitch, as <code>'M10x1.25'</code>.  The
+ hole is then drilled for tapping that thread by hand, and the thread
+ itself is cut by <code>solid.Shape.thread</code>.  The drill is the one ISO
+ 2306:1972 lists for the thread in its tables 1 and 2, so <code>'M6'</code>
+ drills 5 millimetres and <code>'M8'</code> 6.8; for a thread it does not
+ list, M60 and M64 among them, it is the rule ISO 2306 states, the
+ nominal diameter less the pitch.
+</p>
+<p> With <code>'Custom'</code>, <var>D</var> may name a thread of any diameter and
+ pitch, as <code>'M16x0.8'</code>, or <code>'M6.35x1.27'</code> for the 1/4-20
+ UNC of an imperial screw, whose basic profile is the same.  Its drill
+ is the nominal diameter less the pitch rounded to a step of 0.05
+ millimetres, the step nearest that inside the band below.
+</p>
+<p> Every drill lies in the 6H tolerance band of the thread&rsquo;s minor
+ diameter, from <em class="math">D_1</em>, the nominal diameter less <em class="math">1.0825 P</em>,
+ up by the tolerance of ISO 965-1:1998, 13.3.2, table 3, so a drawing
+ that states 6H is met.  At a pitch of 0.25 and 0.2, where ISO 965-1
+ has no grade 6, the band is the coarsest grade it has, 5 and 4.  Tough
+ materials take a larger drill than soft ones, and <code>'Material'</code>
+ and <code>'Engagement'</code> choose another drill inside the band.  For a
+ custom thread the drills are the steps of 0.05 millimetres, and a band
+ too narrow to hold one, at the finest pitches, is an error naming the
+ thread.  A drill chosen otherwise is the ISO 2306 drill or one of the
+ sizes of the twist drills in RUKO&rsquo;s catalogue, chapter 1.01
+ <cite>Twist drills</cite> (2014): DIN 338 type N, HSS ground, article 214,
+ 0.3 to 20 millimetres, pages 54 to 56; DIN 345 type N, HSS, article
+ 204, 10 to 60 millimetres, pages 78 and 79.
+</p>
+<p> A tapping hole is countersunk at its entry, as IS 1369 (Part 3):1995,
+ prepared from DIN 76-1:1983, draws the entry of an internal thread:
+ 120 degrees, and 1.05 times the nominal diameter across at the
+ surface, the largest its band from the nominal diameter allows, 6.3
+ for M6, so that the tap starts square and the thread starts clean.  A
+ hole drilled through, with an <code>Inf</code> <var>DEPTH</var> or one that
+ reaches past the part, is countersunk alike where its axis last leaves
+ the part.  <code>'Countersink'</code> false leaves both out, and numbers
+ size both.  A tapping hole takes no counterbore.
+</p>
+<p> A tapping hole is expected to be drilled, not milled, so a blind one
+ ends in the cone the point of a 118 degree twist drill leaves, beyond
+ <var>DEPTH</var>, as the drawing of a blind tapped hole in IS 1369 (Part 3)
+ shows it.  <code>'Tip'</code> gives another angle, and false a flat bottom.
 </p>
 <p> Name/Value pairs shape the hole:
 </p>
 <dl compact="compact">
 <dt> <code>'Direction'</code></dt>
 <dd> The nonzero 3-element direction the holes run in from their points,
- <code>[0, 0, -1]</code> by default.</dd>
+ <code>[0, 0, -1]</code> by default.  It cannot be given when <var>P</var> is a
+ <code>geom.UCS</code>.</dd>
+<dt> <code>'At'</code></dt>
+<dd> An <em class="math">N</em>-by-2 matrix of points in the plane of the <code>geom.UCS</code>
+ <var>P</var>, one hole at each, all against its normal; the UCS origin alone
+ by default.  It applies only when <var>P</var> is a <code>geom.UCS</code>.</dd>
+<dt> <code>'Material'</code></dt>
+<dd> The material tapped, for a named thread.  A tough one,
+ <code>'stainless'</code> or <code>'nickel'</code>, takes the largest drill inside
+ the band, and <code>'steel'</code>, <code>'aluminium'</code>, <code>'brass'</code>,
+ <code>'castiron'</code> and <code>'plastic'</code> keep the ISO 2306 drill.  The
+ tough ones are those OSG&rsquo;s chart <cite>Tap Drill Size and Pitch
+ Diameter Limit</cite>, volume 3 (2024), names hard or tough: stainless
+ steel, nickel steel, Monel, cast steel and drop forgings.</dd>
+<dt> <code>'Engagement'</code></dt>
+<dd> The thread engagement for a named thread, as a percentage of the full
+ thread in ISO&rsquo;s terms, 100 drilling at <em class="math">D_1</em>: the diameter asked
+ is the nominal diameter less <em class="math">1.0825 P</em> times the percentage over
+ 100, and the drill is the one nearest it inside the band.  A
+ percentage that falls outside the band is an error naming the thread
+ and the band, from 78.2 to 100 for M6.  It cannot be given with
+ <code>'Material'</code>.</dd>
+<dt> <code>'Custom'</code></dt>
+<dd> True to take a named thread of any diameter and pitch, false by
+ default, so that a name outside ISO 261, as a mistyped pitch, is an
+ error.  A thread of ISO 261 is drilled as without it.</dd>
+<dt> <code>'Clearance'</code></dt>
+<dd> For a named thread, <code>'fine'</code>, <code>'medium'</code> or
+ <code>'coarse'</code>: the hole is the clearance hole of ISO 273 in that
+ series for a screw of the thread, not a hole for tapping it, 6.6 for
+ M6 in the medium series.</dd>
 <dt> <code>'Counterbore'</code></dt>
 <dd> <code>[<var>CD</var>, <var>CDEPTH</var>]</code>: a flat-bottomed bore of diameter
  <var>CD</var>, wider than the hole, <var>CDEPTH</var> deep, shallower than the
- hole, for the head of a cap screw.</dd>
+ hole, for the head of a cap screw.  With a named thread and
+ <code>'Clearance'</code>, true takes the counterbore of IS 3406 (Part 2)
+ for a socket head cap screw of ISO 4762, and <code>'washer'</code> the one
+ for the same screw on a plain washer.  A tapping hole takes none.</dd>
 <dt> <code>'Countersink'</code></dt>
-<dd> <var>CD</var> or <code>[<var>CD</var>, <var>ANGLE</var>]</code>: a conical seat of diameter
- <var>CD</var> at the surface, wider than the hole, with an included angle of
- <var>ANGLE</var> degrees, 90 by default as for ISO countersunk screws.  It
- must be shallower than the hole.</dd>
+<dd> <var>CD</var>, <code>[<var>CD</var>, <var>ANGLE</var>]</code> or <code>[<var>CD</var>,
+ <var>ANGLE</var>, <var>CDEPTH</var>]</code>: a conical seat of diameter <var>CD</var> at the
+ surface, wider than the hole, with an included angle of <var>ANGLE</var>
+ degrees, 90 by default as for ISO countersunk screws, below a cylinder
+ of the same diameter <var>CDEPTH</var> deep, none by default.  It must be
+ shallower than the hole.  With a named thread and <code>'Clearance'</code>,
+ true takes the countersink of IS 3406 (Part 1) for the countersunk
+ heads of ISO 7721, and <code>'socket'</code> the one for a hexagon socket
+ countersunk screw of ISO 10642.  A tapping hole takes the countersink
+ of an internal thread by default, as the tapping holes above describe;
+ false leaves it out, and numbers replace it.</dd>
 <dt> <code>'Tip'</code></dt>
 <dd> The included angle in degrees of the cone a twist drill leaves at the
- bottom of a blind hole, 118 for a standard drill.  It is beyond
- <var>DEPTH</var>, which is measured to the full diameter as a drawing
- dimensions it.  By default a blind hole is flat-bottomed.</dd>
+ bottom of a blind hole, 118 for a standard drill, or false for none.
+ It is beyond <var>DEPTH</var>, which is measured to the full diameter as a
+ drawing dimensions it.  A blind tapping hole is drilled, so it takes
+ the point of a 118 degree drill by default; false leaves it
+ flat-bottomed, as an end mill or a flat-bottom drill leaves it.  Every
+ other blind hole is flat-bottomed by default, as an end mill leaves it.</dd>
 </dl>
 
 <p> A counterbore and a countersink cannot both be given, and a tip applies
- only to a blind hole.  Drilling the empty shape leaves it empty.
+ only to a blind hole.  The standard ones need a named thread, and
+ those for a screw head <code>'Clearance'</code>, fine or medium;
+ <code>solid.holespec</code> gives their sizes, and the sizes of every hole
+ for a named thread, before it is drilled.  Drilling the empty shape
+ leaves it empty.
 </p>
 <table><tr><td>&nbsp;</td><td><pre class="example"> ## A plate with four counterbored holes for M6 cap screws
  S = solid.box (80, 40, 12);
@@ -414,12 +517,22 @@
  S = hole (S, P, 6.6, Inf, 'Counterbore', [11, 6.5]);
 </pre></td></tr></table>
 
+<table><tr><td>&nbsp;</td><td><pre class="example"> ## Four holes tapped M5 in stainless steel on a bolt circle of 30
+ S = solid.cylinder (25, 10);
+ U = geom.UCS ([0, 0, 1], [0, 0, 10]);
+ XY = 15 * [1, 0; 0, 1; -1, 0; 0, -1];
+ S = hole (S, U, 'M5', 8, 'At', XY, 'Material', 'stainless');
+</pre></td></tr></table>
+
 <p> <strong>See also: </strong>
+  <a href="solid.Shape.thread.html">solid.Shape.thread</a>, 
+  <a href="solid.holespec.html">solid.holespec</a>, 
+  <a href="solid.threadspec.html">solid.threadspec</a>, 
   <a href="solid.Shape.subtract.html">solid.Shape.subtract</a>, 
   <a href="solid.cylinder.html">solid.cylinder</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/fff062e/inst/+solid/Shape.m#L1585">solid.Shape</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/b937a57/inst/+solid/Shape.m#L1804">solid.Shape</a>
 </p>
 </div>
 

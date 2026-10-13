@@ -235,7 +235,6 @@
 					<li><a href="geom.isrectilinear.html" class="text-decoration-none font-monospace"><small>geom.isrectilinear</small></a></li>
 					<li><a href="geom.offset.html" class="text-decoration-none font-monospace"><small>geom.offset</small></a></li>
 					<li><a href="geom.largestrect.html" class="text-decoration-none font-monospace"><small>geom.largestrect</small></a></li>
-					<li><a href="geom.triangulate.html" class="text-decoration-none font-monospace"><small>geom.triangulate</small></a></li>
 					<li><a href="geom.hatchlines.html" class="text-decoration-none font-monospace"><small>geom.hatchlines</small></a></li>
 				</ul>
 				</div>
@@ -364,6 +363,8 @@
 					<li><a href="solid.sweep.html" class="text-decoration-none font-monospace"><small>solid.sweep</small></a></li>
 					<li><a href="solid.helix.html" class="text-decoration-none font-monospace"><small>solid.helix</small></a></li>
 					<li><a href="solid.read.html" class="text-decoration-none font-monospace"><small>solid.read</small></a></li>
+					<li><a href="solid.threadspec.html" class="text-decoration-none font-monospace"><small>solid.threadspec</small></a></li>
+					<li><a href="solid.holespec.html" class="text-decoration-none font-monospace"><small>solid.holespec</small></a></li>
 				</ul>
 				</div>
 			</div>
@@ -405,7 +406,8 @@
 <p> <code><var>PATTERN</var> = draw.linetype (<var>NAME</var>)</code> returns the dash pattern of
  one of them, as a row vector in millimetres.  A positive element is a drawn
  dash, a negative element a gap, and a zero a dot.  <code>'CONTINUOUS'</code> has an
- empty pattern.
+ empty pattern.  The patterns are the metric ones CAD programs define, so a
+ hidden line is dashes of 6.35 with gaps of 3.175.
 </p>
 <p> <code>[<var>PATTERN</var>, <var>DESCR</var>] = draw.linetype (<var>NAME</var>)</code> also returns
  a human-readable description, which is what a DXF line-type table carries.
@@ -472,7 +474,7 @@
   <a href="draw.Drawing.write.html">draw.Drawing.write</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/fff062e/inst/+draw/linetype.m">draw.linetype</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/b937a57/inst/+draw/linetype.m">draw.linetype</a>
 </p>
 </div>
         <div class="card rounded my-4">
@@ -505,11 +507,11 @@
                 <pre style="overflow-x: auto; white-space: pre; padding: 0.6rem 0.8rem; margin: 0.3rem 0; border: 1px solid #cfe0e6; border-left: 4px solid #4a90a4; border-radius: 4px; background-color: #eef5f8;"> draw.linetype ('CENTER')</pre>
                 <pre style="overflow-x: auto; white-space: pre; padding: 0.6rem 0.8rem; margin: 0.3rem 0 0.8rem 0; border: 1px solid #e2e2e2; border-left: 4px solid #b7b7b7; border-radius: 4px; background-color: #fafafa;">ans =
 
-   1.2500  -0.2500   0.2500  -0.2500</pre>
+   31.7500   -6.3500    6.3500   -6.3500</pre>
                 <pre style="overflow-x: auto; white-space: pre; padding: 0.6rem 0.8rem; margin: 0.3rem 0; border: 1px solid #cfe0e6; border-left: 4px solid #4a90a4; border-radius: 4px; background-color: #eef5f8;"> [pat, descr] = draw.linetype ('PHANTOM')</pre>
                 <pre style="overflow-x: auto; white-space: pre; padding: 0.6rem 0.8rem; margin: 0.3rem 0 0.8rem 0; border: 1px solid #e2e2e2; border-left: 4px solid #b7b7b7; border-radius: 4px; background-color: #fafafa;">pat =
 
-   1.2500  -0.2500   0.2500  -0.2500   0.2500  -0.2500
+   31.7500   -6.3500    6.3500   -6.3500    6.3500   -6.3500
 
 descr = Phantom ____ _ _ ____</pre>
 

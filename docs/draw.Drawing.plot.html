@@ -330,11 +330,17 @@
  of the current ones, as every plotting function in Octave accepts an axes
  handle ahead of its data. The <code>'Axes'</code> pair below does the same
  thing
- and is equivalent.
+ and is equivalent.  A figure handle draws into that figure&rsquo;s current
+ axes, made if it has none.
 </p>
 <p> <code><var>H</var> = draw.Drawing.plot (&hellip;)</code> returns a column of graphics
- handles,
- one per object created, so that a caller can restyle or delete them.
+ handles, one per object created.  Every line of one layer, colour, line
+ style and width is one line object, its pieces split by <code>NaN</code>;
+ points are markers of one line object per layer and colour; each text
+ is an object of its own, drawn on top.  The <code>'Tag'</code> of every
+ object is its layer&rsquo;s name, so
+ <code>findobj (<var>HAX</var>, 'Tag', <var>NAME</var>)</code> finds what the layer
+ <var>NAME</var> drew, to restyle, hide or delete it.
 </p>
 <a name="Name/Value-pairs"></a>
 <h3 class="subheading">Name/Value pairs</h3>
@@ -345,7 +351,8 @@
 <tr><td width="16%"><code>'Axes'</code></td><td width="14%"><code>gca</code></td><td width="70%">axes to draw into</td></tr>
 <tr><td width="16%"><code>'LineWidth'</code></td><td width="14%">0.5</td><td width="70%">width in points of every line
  with no line weight of its own or of its layer, which is drawn at that
- weight</td></tr>
+ weight; a weight of 0, DXF&rsquo;s thinnest line, is drawn 0.13 mm wide, the
+ thinnest pen of ISO 128</td></tr>
 <tr><td width="16%"><code>'FontSize'</code></td><td width="14%">8</td><td width="70%">size of text, in points</td></tr>
 <tr><td width="16%"><code>'Layers'</code></td><td width="14%">all</td><td width="70%">cell array of layer names to draw</td></tr>
 <tr><td width="16%"><code>'Arc'</code></td><td width="14%">64</td><td width="70%">segments per full turn when sampling
@@ -390,7 +397,9 @@
  dimension as its extension lines, ticks and label, a spline, path or
  region along its curves, a hatch as its loops and its fill lines, clear
  of its holes, or as its loops alone with <code>'Hatch'</code> set to
- <code>'boundary'</code>.  <code>draw.Drawing.tikz</code> draws the same.
+ <code>'boundary'</code>.  <code>draw.Drawing.tikz</code> draws the same.  Text
+ is drawn as written, not read as TeX, so braces and underscores stay as
+ they are.
 </p>
 <a name="Line-types-are-drawn-properly,-not-approximated"></a>
 <h3 class="subheading">Line types are drawn properly, not approximated</h3>
@@ -411,10 +420,10 @@
  needs
  no adjustment; one spanning metres wants an <code>'LTScale'</code> to match.
 </p>
-<p> The cost is one graphics object per dash.  Set <code>'Linetypes'</code> to
- <code>'approximate'</code> on a large drawing to fall back on the figure&rsquo;s
- four
- styles and one object per entity.
+<p> The dashes are pieces of their layer&rsquo;s line object, split by
+ <code>NaN</code>, so a long dotted line costs points rather than objects.
+ Set <code>'Linetypes'</code> to <code>'approximate'</code> on a large drawing to
+ draw with the figure&rsquo;s four styles instead, and leave the lines whole.
 </p>
 <p> <strong>Text is not to scale by default.</strong> A figure sets font size in
  points,
@@ -442,7 +451,7 @@
   <a href="draw.Drawing.write.html">draw.Drawing.write</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/fff062e/inst/+draw/Drawing.m#L2198">draw.Drawing</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/b937a57/inst/+draw/Drawing.m#L2405">draw.Drawing</a>
 </p>
 </div>
         <div class="card rounded my-4">

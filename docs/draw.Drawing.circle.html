@@ -315,11 +315,18 @@
               </nav>
 
 <p class="h5 fs fs-last"><code>draw.Drawing: <var>D</var> = <b>circle</b> (<var>D</var>, <var>C</var>, <var>R</var>)</code></p>
-<p> Append a full circle centred on <var>C</var> with radius <var>R</var> millimetres.
+<p> Append full circles centred on <var>C</var> with radius <var>R</var> millimetres.
 </p>
 <div class="ms-5">
+<p> <var>C</var> is an N-by-2 matrix, one circle per row; zero rows append
+ nothing.  <var>R</var> is one radius for every circle or a vector of one per
+ row, so a row of equal holes is one call:
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example"> D = draw.Drawing ().circle ([10, 10; 30, 10; 50, 10], 4);
+</pre></td></tr></table>
+
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/fff062e/inst/+draw/Drawing.m#L1169">draw.Drawing</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/b937a57/inst/+draw/Drawing.m#L1259">draw.Drawing</a>
 </p>
 </div>
 

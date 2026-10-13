@@ -235,7 +235,6 @@
 					<li><a href="geom.isrectilinear.html" class="text-decoration-none font-monospace"><small>geom.isrectilinear</small></a></li>
 					<li><a href="geom.offset.html" class="text-decoration-none font-monospace"><small>geom.offset</small></a></li>
 					<li><a href="geom.largestrect.html" class="text-decoration-none font-monospace"><small>geom.largestrect</small></a></li>
-					<li><a href="geom.triangulate.html" class="text-decoration-none font-monospace"><small>geom.triangulate</small></a></li>
 					<li><a href="geom.hatchlines.html" class="text-decoration-none font-monospace"><small>geom.hatchlines</small></a></li>
 				</ul>
 				</div>
@@ -364,6 +363,8 @@
 					<li><a href="solid.sweep.html" class="text-decoration-none font-monospace"><small>solid.sweep</small></a></li>
 					<li><a href="solid.helix.html" class="text-decoration-none font-monospace"><small>solid.helix</small></a></li>
 					<li><a href="solid.read.html" class="text-decoration-none font-monospace"><small>solid.read</small></a></li>
+					<li><a href="solid.threadspec.html" class="text-decoration-none font-monospace"><small>solid.threadspec</small></a></li>
+					<li><a href="solid.holespec.html" class="text-decoration-none font-monospace"><small>solid.holespec</small></a></li>
 				</ul>
 				</div>
 			</div>
@@ -394,29 +395,38 @@
             </div>
             <div class="card-body">
 <p class="h5 description mb-3"><code>drafting: model.Viewer</code></p>
-<p> A window showing a solid or a triangle mesh, in which edges, faces and
- coordinate systems can be picked.
+<p> A window showing a solid, a triangle mesh or an assembly, in which
+ edges, faces, solids and coordinate systems can be picked, and solids
+ hidden or shown through.
 </p>
 <div class="ms-5">
-<p> Assigning a <code>solid.Shape</code> to the <code>Shape</code> of a viewer opens its
+<p> Assigning a <code>solid.Shape</code> to the <code>Model</code> of a viewer opens its
  window, or redraws it in place, keeping the camera where it was; each
  solid is drawn in its colour, grey where it has none.  Nothing
  else redraws it.  A <code>polymesh.Mesh</code> is shown the same way, shaded
  facet by facet, however many triangles it has, in its faces&rsquo; colours
  where it has them, else in its vertices&rsquo;, blended across each facet,
- else in grey.  The <code>show</code> method of a shape or a mesh keeps a
- viewer for each variable and is the usual way in; a viewer of your own
- is for when you want to hold it yourself.
+ else in grey.  A <code>model.Assembly</code> is shown as its shape, each part
+ in its colour.  The <code>show</code> method of a shape, a mesh or an assembly
+ keeps a viewer for each variable and is the usual way in; a viewer of
+ your own is for when you want to hold it yourself.
+</p>
+<p> <code>model.Viewer.opacity</code> hides solids or shows them through, to look
+ inside a model, and <code>pick</code> with <code>'solid'</code> tells which solid
+ is which.  See-through solids are blended so that the nearer reads as
+ in front, whatever order they are drawn in.
 </p>
 <p> The window is drawn by Open CASCADE in a process of its own, so a complex
  model turns smoothly and never holds up the Octave prompt.  The world
  axes are drawn in the lower right corner, turning with the view, <em class="math">x</em>
  red, <em class="math">y</em> green and <em class="math">z</em> blue.  The left mouse button rotates,
- the middle one pans and the wheel zooms.  The view turns about the
- centre of the window, wherever it has been panned to, or about a point
- of the shape chosen by double-clicking it; a double click that misses
- the shape, or fitting the view, returns to the centre of the window.
- During a pick a double click is a click like any other.  Keys:
+ the middle one pans and the wheel zooms.  The view turns keeping
+ <em class="math">z</em> up the window, as Octave&rsquo;s <code>rotate3d</code> turns a plot, until
+ <code>T</code> lets it turn any way.  It turns about the centre of the window,
+ wherever it has been panned to, or about a point of the shape chosen by
+ double-clicking it; a double click that misses the shape, or fitting the
+ view, returns to the centre of the window.  During a pick a double click
+ is a click like any other.  Keys:
 </p>
 <div class="table-responsive">
 <table class="table table-striped table-bordered table-sm">
@@ -426,6 +436,8 @@
 <tr><td width="15%"><code>1</code></td><td width="85%">front view, looking along <em class="math">+y</em></td></tr>
 <tr><td width="15%"><code>2</code></td><td width="85%">top view, looking down <em class="math">z</em></td></tr>
 <tr><td width="15%"><code>3</code></td><td width="85%">right view, looking along <em class="math">-x</em></td></tr>
+<tr><td width="15%"><code>T</code></td><td width="85%">let the mouse turn the view any way, or keep
+ <em class="math">z</em> up again, standing the view upright</td></tr>
 <tr><td width="15%"><code>C</code></td><td width="85%">on a mesh, the next of the colourings it has: its
  faces&rsquo; colours, its vertices&rsquo;, grey</td></tr>
 <tr><td width="15%"><code>E</code></td><td width="85%">on a mesh, its triangle edges drawn or not, not at
@@ -439,15 +451,17 @@
 <p> Closing the window ends the viewer; assigning a shape again opens a new
  one.  The window closes with Octave.
 </p>
-<p> The viewer needs a display to run.  It runs on Linux.
+<p> The viewer needs a display to run.  It runs on Linux and FreeBSD.
 </p>
 <p> <strong>See also: </strong>
   <a href="solid.Shape.show.html">solid.Shape.show</a>, 
   <a href="polymesh.Mesh.html#polymesh_Mesh_show">polymesh.Mesh.show</a>, 
-  <a href="model.Viewer.html#model_Viewer_pick">model.Viewer.pick</a>
+  <a href="model.Assembly.html#model_Assembly_show">model.Assembly.show</a>, 
+  <a href="model.Viewer.html#model_Viewer_pick">model.Viewer.pick</a>, 
+  <a href="model.Viewer.html#model_Viewer_opacity">model.Viewer.opacity</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/fff062e/inst/+model/Viewer.m">model.Viewer</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/b937a57/inst/+model/Viewer.m">model.Viewer</a>
 </p>
 </div>
         <p class="lead my-3">The <code>model.Viewer</code> class contains the following properties:</p>
@@ -455,27 +469,30 @@
         <div class="container-xl my-1">
           <div class="row">
             <button class="btn btn-light btn-sm w-100 text-start" type="button"
-              data-bs-toggle="collapse" data-bs-target="#model_Viewer_Shape"
-              aria-expanded="false" aria-controls="model_Viewer_Shape">
+              data-bs-toggle="collapse" data-bs-target="#model_Viewer_Model"
+              aria-expanded="false" aria-controls="model_Viewer_Model">
               <div class="row align-items-center">
                 <div class="col-4">
                   <h4 class="d-inline-block mr-4">
-                    <b><code>Shape</code></b>
+                    <b><code>Model</code></b>
                   </h4>
                 </div>
                 <div class="col-8">
-Shape shown
+Model shown
                 </div>
               </div>
           </div>
-          <div class="collapse multi-collapse" id="model_Viewer_Shape">
+          <div class="collapse multi-collapse" id="model_Viewer_Model">
             <div class="border-bottom py-2">
 <p> </p>
-<p> The <code>solid.Shape</code> or the <code>polymesh.Mesh</code> shown.  Assigning
- either opens the window if it is not open and redraws it in place if it
- is.  The empty shape opens the window empty, or clears
- it if it is open; the first shape shown after it is fitted to the
- window.
+<p> The <code>solid.Shape</code>, the <code>polymesh.Mesh</code> or the
+ <code>model.Assembly</code> shown.  Assigning any of them opens the window if
+ it is not open and redraws it in place if it is.  An assembly is drawn
+ as <code>model.Assembly.shape</code> gives it, or as one mesh where a part of
+ it is a mesh, and its solids are chosen by name and path in
+ <code>model.Viewer.opacity</code>.  The empty shape opens the window empty,
+ or clears it if it is open; the first shape shown after it is fitted to
+ the window.
 </p>
 
 
@@ -538,11 +555,11 @@ Make a viewer.
 <p> </p>
 <p> <code><var>V</var> = model.Viewer ()</code> returns a viewer that shows nothing
  yet; its window opens when a shape, even the empty one, is assigned to
- its <code>Shape</code>:
+ its <code>Model</code>:
 </p>
 <table><tr><td>&nbsp;</td><td><pre class="example"> V = model.Viewer ();
- V.Shape = solid.box (80, 40, 12);
- V.Shape = hole (V.Shape, [20, 20, 12], 8, Inf);
+ V.Model = solid.box (80, 40, 12);
+ V.Model = hole (V.Model, [20, 20, 12], 8, Inf);
 </pre></td></tr></table>
 
 <p> <code><var>V</var> = model.Viewer (<code>'Hidden'</code>, true)</code> never shows its
@@ -577,6 +594,7 @@ Pick edges and faces of a solid, or points on a mesh, with the mouse.
 <p class="h5 fs"><code>model.Viewer: [<var>E</var>, <var>F</var>, <var>ECODE</var>, <var>FCODE</var>] = <b>pick</b> (<var>V</var>)</code></p>
 <p class="h5 fs"><code>model.Viewer: [<var>E</var>, <var>CODE</var>] = <b>pick</b> (<var>V</var>, <code>'edge'</code>)</code></p>
 <p class="h5 fs"><code>model.Viewer: [<var>F</var>, <var>CODE</var>] = <b>pick</b> (<var>V</var>, <code>'face'</code>)</code></p>
+<p class="h5 fs"><code>model.Viewer: [<var>I</var>, <var>CODE</var>] = <b>pick</b> (<var>V</var>, <code>'solid'</code>)</code></p>
 <p class="h5 fs fs-last"><code>model.Viewer: [<var>P</var>, <var>F</var>] = <b>pick</b> (<var>V</var>)</code></p>
 <p> </p>
 <p> <code>[<var>E</var>, <var>F</var>] = pick (<var>V</var>)</code> waits while you click edges
@@ -610,6 +628,20 @@ Pick edges and faces of a solid, or points on a mesh, with the mouse.
  part = fillet (part, E, 3);
 </pre></td></tr></table>
 
+<p> <code>[<var>I</var>, <var>CODE</var>] = pick (<var>V</var>, <code>'solid'</code>)</code> picks
+ whole solids: a click on any face of a solid selects it, and <var>I</var>
+ returns the indices of the solids picked, in the order
+ <code>solid.Shape.solids</code> and <code>model.Assembly.solids</code> list them,
+ for <code>model.Viewer.opacity</code>.  The face clicked stays drawn in
+ orange.  <var>CODE</var> is what selects the same solids in
+ <code>opacity</code>, as code: the name they share, else the path they
+ share, where either selects them alone, else their indices.
+</p>
+<p> When the viewer shows a <code>model.Assembly</code>, picking only tells its
+ solids apart, since the parts of an assembly are edited as parts, not
+ in the assembly.  <code>pick (<var>V</var>)</code> then picks solids, and
+ <code>'edge'</code> and <code>'face'</code> are refused.
+</p>
 <p> When the viewer shows a <code>polymesh.Mesh</code>, <code>[<var>P</var>, <var>F</var>]
  = pick (<var>V</var>)</code> waits while you click points on it, each marked
  where it lands, and returns them in <var>P</var>, an <em class="math">N</em>-by-3 matrix of
@@ -618,13 +650,14 @@ Pick edges and faces of a solid, or points on a mesh, with the mouse.
  on, a row of the mesh&rsquo;s <code>Faces</code>, and the triangle&rsquo;s unit normal,
  turned as its corners run.  A click that misses the mesh adds nothing.
  <code>Enter</code> finishes and <code>Escape</code> cancels, returning nothing.  A
- mesh has no edges or faces in the sense of a solid, so <code>'edge'</code>
- and <code>'face'</code> are refused.
+ mesh has no edges, faces or solids in the sense of a solid, so
+ <code>'edge'</code>, <code>'face'</code> and <code>'solid'</code> are refused.
 </p>
 <p> <strong>See also: </strong>
   <a href="solid.Shape.edges.html">solid.Shape.edges</a>, 
   <a href="solid.Shape.faces.html">solid.Shape.faces</a>, 
-  <a href="solid.Shape.show.html">solid.Shape.show</a>
+  <a href="solid.Shape.show.html">solid.Shape.show</a>, 
+  <a href="model.Viewer.html#model_Viewer_opacity">model.Viewer.opacity</a>
 </p>
 
 
@@ -708,6 +741,82 @@ Pick a user coordinate system with the mouse.
         <div class="container-xl my-1">
           <div class="row">
             <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#model_Viewer_opacity"
+              aria-expanded="false" aria-controls="model_Viewer_opacity">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>opacity</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+Hide solids, or show them through, to look inside a model.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="model_Viewer_opacity">
+            <div class="border-bottom py-2">
+<p class="h5 fs"><code>model.Viewer: <b>opacity</b> (<var>V</var>, <var>WHAT</var>, <var>A</var>)</code></p>
+<p class="h5 fs fs-last"><code>model.Viewer: <var>A</var> = <b>opacity</b> (<var>V</var>)</code></p>
+<p> </p>
+<p> <code>opacity (<var>V</var>, <var>WHAT</var>, <var>A</var>)</code> draws the solids
+ <var>WHAT</var> chooses at the opacity <var>A</var>, from 1, opaque, as every
+ solid is at first, to 0, hidden.  A hidden solid is neither drawn nor
+ picked, so a click goes through it to what lies behind; a solid shown
+ through is picked as before.  The window changes in place: nothing is
+ drawn again but the solids chosen, and the view stays where it is.
+ This is the viewer&rsquo;s own setting, for looking at a model: it is not
+ kept by the shape, and no file carries it.
+</p>
+<p> <var>WHAT</var> chooses by any of:
+</p>
+<div class="table-responsive">
+<table class="table table-striped table-bordered table-sm">
+<tr><td width="20%">indices</td><td width="80%">the solids of those indices, in the order
+ <code>solid.Shape.solids</code> and <code>model.Assembly.solids</code> list them</td></tr>
+<tr><td width="20%">a name</td><td width="80%">every solid of that <code>solid.Shape.Name</code>, and in
+ an assembly every solid under a placement of that name, at any depth</td></tr>
+<tr><td width="20%">a path</td><td width="80%">a cell row of placement names from the top of the
+ assembly, as the <code>path</code> field of <code>model.Assembly.solids</code>
+ gives it, choosing every solid under the placement it ends at</td></tr>
+<tr><td width="20%"><code>'all'</code></td><td width="80%">every solid</td></tr>
+</table>
+</div>
+
+<p> Names and paths match exactly, case included.  A name or a path that
+ matches nothing is an error.  A mesh has no solids, so it takes one
+ opacity for the whole, through <code>'all'</code> or the index 1.
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example"> V = show (A);
+ opacity (V, 'casing', 0.3);          # see into the casing
+ opacity (V, {'rotor', 'shaft'}, 0);  # and hide the shaft
+ opacity (V, 'all', 1);               # everything solid again
+</pre></td></tr></table>
+
+<p> Assigning <code>Model</code> again, as <code>show</code> does after a change to the
+ model, keeps what was set by a name, a path or <code>'all'</code> and
+ applies it to the new model wherever it still matches.  What was set by
+ indices is dropped, since indices change with the model.
+</p>
+<p> <code><var>A</var> = opacity (<var>V</var>)</code> returns the opacity of every solid
+ as a column, in the order of their indices, or the one of a mesh.  A
+ viewer whose window was closed keeps what is set, for the next model
+ it shows.
+</p>
+<p> <strong>See also: </strong>
+  <a href="model.Viewer.html#model_Viewer_pick">model.Viewer.pick</a>, 
+  <a href="solid.Shape.solids.html">solid.Shape.solids</a>, 
+  <a href="model.Assembly.html#model_Assembly_solids">model.Assembly.solids</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
               data-bs-toggle="collapse" data-bs-target="#model_Viewer_view"
               aria-expanded="false" aria-controls="model_Viewer_view">
               <div class="row align-items-center">
@@ -717,14 +826,16 @@ Pick a user coordinate system with the mouse.
                   </h4>
                 </div>
                 <div class="col-8">
-Set or query the direction the viewer looks from.
+Set or query the direction the viewer looks from, and how close.
                 </div>
               </div>
           </div>
           <div class="collapse multi-collapse" id="model_Viewer_view">
             <div class="border-bottom py-2">
 <p class="h5 fs"><code>model.Viewer: <b>view</b> (<var>V</var>, <var>AZ</var>, <var>EL</var>)</code></p>
-<p class="h5 fs fs-last"><code>model.Viewer: [<var>AZ</var>, <var>EL</var>] = <b>view</b> (<var>V</var>)</code></p>
+<p class="h5 fs"><code>model.Viewer: <b>view</b> (<var>V</var>, <var>AZ</var>, <var>EL</var>, <var>ZOOM</var>)</code></p>
+<p class="h5 fs"><code>model.Viewer: <b>view</b> (<var>V</var>, <var>AZ</var>, <var>EL</var>, <var>ZOOM</var>, <var>TARGET</var>)</code></p>
+<p class="h5 fs fs-last"><code>model.Viewer: [<var>AZ</var>, <var>EL</var>, <var>ZOOM</var>, <var>TARGET</var>] = <b>view</b> (<var>V</var>)</code></p>
 <p> </p>
 <p> <code>view (<var>V</var>, <var>AZ</var>, <var>EL</var>)</code> turns the view to look at the
  shape from azimuth <var>AZ</var> and elevation <var>EL</var>, in degrees, and fits
@@ -736,10 +847,25 @@ Set or query the direction the viewer looks from.
  straight down or up, the <em class="math">y</em> axis does, turned by <var>AZ</var>.  The
  mouse still turns the view afterwards.
 </p>
-<p> <code>[<var>AZ</var>, <var>EL</var>] = view (<var>V</var>)</code> returns the angles the
- view looks from now, however it got there, <var>AZ</var> from -180 to 180,
- so that a view found with the mouse can be kept in a script.  A turn
- about the line of sight, which the mouse can give, is not part of them.
+<p> <code>view (<var>V</var>, <var>AZ</var>, <var>EL</var>, <var>ZOOM</var>)</code> then magnifies
+ the shape <var>ZOOM</var> times about the centre of the window: 1 is the
+ shape fitted, 2 shows it twice as large and 0.5 half as large.
+</p>
+<p> <code>view (<var>V</var>, <var>AZ</var>, <var>EL</var>, <var>ZOOM</var>, <var>TARGET</var>)</code>
+ looks at the point <var>TARGET</var>, a 3-element vector in millimetres,
+ instead of the middle of the shape: the point Octave calls the camera
+ target.  It is put at the centre of the window, <var>ZOOM</var> magnifies
+ about it, and the mouse turns the view about it afterwards, as after a
+ double click.  So a detail is seen close up from a script.
+</p>
+<p> <code>[<var>AZ</var>, <var>EL</var>, <var>ZOOM</var>, <var>TARGET</var>] = view (<var>V</var>)</code>
+ returns the view as it is now, however it got there: the angles it
+ looks from, <var>AZ</var> from -180 to 180, its magnification against the
+ shape fitted, and the point at the centre of the window, wherever the
+ view was panned to.  Given back to <code>view</code>, they restore it, so a
+ view found with the mouse can be kept in a script.  After <code>T</code>,
+ the mouse can also turn the view about the line of sight, which they
+ do not hold, so such a view is restored upright.
 </p>
 <p> The keys of the window give four of these views: <code>0</code> is
  <code>view (<var>V</var>, 45, 35.26)</code>, near enough, the isometric view the
@@ -752,12 +878,69 @@ Set or query the direction the viewer looks from.
  part = solid.box (80, 40, 4);
  V = show (part);
  view (V, 30, 60);
- ## Keep a view found with the mouse
- [az, el] = view (V);
+ ## Closer, on the middle of the part
+ view (V, 30, 60, 2);
+ ## Four times larger, on a corner
+ view (V, 30, 60, 4, [80, 40, 4]);
+ ## Keep a view found with the mouse, and restore it
+ [az, el, zoom, target] = view (V);
+ view (V, az, el, zoom, target);
 </pre></td></tr></table>
 
 <p> <strong>See also: </strong>
   <a href="solid.Shape.show.html">solid.Shape.show</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#model_Viewer_capture"
+              aria-expanded="false" aria-controls="model_Viewer_capture">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>capture</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+The picture the viewer shows, as an image or a file.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="model_Viewer_capture">
+            <div class="border-bottom py-2">
+<p class="h5 fs"><code>model.Viewer: <var>IMG</var> = <b>capture</b> (<var>V</var>)</code></p>
+<p class="h5 fs"><code>model.Viewer: <b>capture</b> (<var>V</var>, <var>FILE</var>)</code></p>
+<p class="h5 fs fs-last"><code>model.Viewer: <b>capture</b> (&hellip;, <code>'Size'</code>, [<var>W</var>, <var>H</var>])</code></p>
+<p> </p>
+<p> <code><var>IMG</var> = capture (<var>V</var>)</code> returns what the window shows, the
+ shape as it is turned and lit, as an <em class="math">H</em>-by-<em class="math">W</em>-by-3
+ <code>uint8</code> image of red, green and blue, the size of the window: the
+ form <code>imread</code> gives and <code>image</code> and <code>imwrite</code> take.
+</p>
+<p> <code>capture (<var>V</var>, <var>FILE</var>)</code> writes it to <var>FILE</var> instead,
+ in the format its extension names, as <code>imwrite</code> writes it; PNG
+ keeps every pixel.
+</p>
+<p> <code>capture (&hellip;, <code>'Size'</code>, [<var>W</var>, <var>H</var>])</code> draws the
+ picture <var>W</var> pixels wide and <var>H</var> high instead, whatever the size
+ of the window, so a picture for print can be finer than the screen.
+ The view keeps its height: a picture of another shape than the window
+ shows more or less at the sides.
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example"> V = show (solid.cylinder (10, 30));
+ view (V, 30, 20);
+ capture (V, 'cylinder.png', 'Size', [1800, 1400]);
+</pre></td></tr></table>
+
+<p> <strong>See also: </strong>
+  <a href="model.Viewer.html#model_Viewer_view">model.Viewer.view</a>, 
+imwrite
 </p>
 
 

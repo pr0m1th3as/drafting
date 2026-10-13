@@ -319,8 +319,10 @@
 <p> Append the small cross that marks the centre of a round feature.
 </p>
 <div class="ms-5">
-<p> <code>centremark (<var>D</var>, <var>C</var>, <var>R</var>)</code> marks one centre, sized to
- a feature of radius <var>R</var>.
+<p> <code>centremark (<var>D</var>, <var>C</var>, <var>R</var>)</code> marks the centres in the
+ rows of the N-by-2 matrix <var>C</var>, each sized to a feature of radius
+ <var>R</var>, one value for every mark or a vector of one per row; zero rows
+ append nothing.
 </p>
 <p> <code>centremark (<var>D</var>)</code> with no centre marks <strong>every</strong> circle
  and arc already in the drawing.  A drawing of a bolt circle or a bore
@@ -332,12 +334,12 @@
  call this once.
 </p>
 <p> <strong>See also: </strong>
-  <a href="draw.Drawing.diam.html">diam</a>, 
-  <a href="draw.Drawing.radius.html">radius</a>, 
+  <a href="draw.Drawing.diam.html">draw.Drawing.diam</a>, 
+  <a href="draw.Drawing.radius.html">draw.Drawing.radius</a>, 
   <a href="draw.linetype.html">draw.linetype</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/fff062e/inst/+draw/Drawing.m#L1635">draw.Drawing</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/b937a57/inst/+draw/Drawing.m#L1743">draw.Drawing</a>
 </p>
 </div>
 

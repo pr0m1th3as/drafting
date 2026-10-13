@@ -235,7 +235,6 @@
 					<li><a href="geom.isrectilinear.html" class="text-decoration-none font-monospace"><small>geom.isrectilinear</small></a></li>
 					<li><a href="geom.offset.html" class="text-decoration-none font-monospace"><small>geom.offset</small></a></li>
 					<li><a href="geom.largestrect.html" class="text-decoration-none font-monospace"><small>geom.largestrect</small></a></li>
-					<li><a href="geom.triangulate.html" class="text-decoration-none font-monospace"><small>geom.triangulate</small></a></li>
 					<li><a href="geom.hatchlines.html" class="text-decoration-none font-monospace"><small>geom.hatchlines</small></a></li>
 				</ul>
 				</div>
@@ -364,6 +363,8 @@
 					<li><a href="solid.sweep.html" class="text-decoration-none font-monospace"><small>solid.sweep</small></a></li>
 					<li><a href="solid.helix.html" class="text-decoration-none font-monospace"><small>solid.helix</small></a></li>
 					<li><a href="solid.read.html" class="text-decoration-none font-monospace"><small>solid.read</small></a></li>
+					<li><a href="solid.threadspec.html" class="text-decoration-none font-monospace"><small>solid.threadspec</small></a></li>
+					<li><a href="solid.holespec.html" class="text-decoration-none font-monospace"><small>solid.holespec</small></a></li>
 				</ul>
 				</div>
 			</div>
@@ -414,21 +415,23 @@
 </p>
 <p> Segments that merely share an end point are not crossings, so consecutive
  segments are never reported, nor are the first and last segments of a closed
- curve.  A curve that touches itself without crossing, where two segments
- meet at a point that is an end of both, is reported, since for the purposes
- this test serves, touching and crossing are equally fatal.  Touching means
- meeting: segments any distance apart, however small, do not touch, where a
- <code>geom.Region</code> counts curves within 1e-7 mm of one another as touching.
+ curve.  A point repeating the one before it adds a segment of no length,
+ which is passed over, so the segments either side of it count as
+ consecutive.  A curve that touches itself without crossing, where two
+ segments meet at a point that is an end of both, is reported, since for the
+ purposes this test serves, touching and crossing are equally fatal.
+ Touching means meeting: segments any distance apart, however small, do not
+ touch, where a <code>geom.Region</code> counts curves within 1e-7 mm of one
+ another as touching.
 </p>
 <p> This is the global companion to the local criterion in
  <code>geom.curveoffset</code>.  An offset curve can satisfy the curvature condition
  at every point and still pinch closed somewhere along its length; only a
  test like this one sees that.
 </p>
-<p> The test is exhaustive over segment pairs, so its cost grows as the square of
- the number of points.  On a profile of a few thousand points that is a
- fraction of a second, but it is not something to call inside a loop over
- candidate designs.
+<p> Only segments whose bounding boxes overlap are tested, found by sweeping
+ along <em class="math">x</em>, so a profile of half a million points takes a few
+ hundredths of a second.
 </p>
 <p> <strong>See also: </strong>
   <a href="geom.curveoffset.html">geom.curveoffset</a>, 
@@ -436,7 +439,7 @@
   <a href="geom.signedarea.html">geom.signedarea</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/fff062e/inst/+geom/selfintersects.m">geom.selfintersects</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/b937a57/inst/+geom/selfintersects.m">geom.selfintersects</a>
 </p>
 </div>
         <div class="card rounded my-4">

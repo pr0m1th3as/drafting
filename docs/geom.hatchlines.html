@@ -235,7 +235,6 @@
 					<li><a href="geom.isrectilinear.html" class="text-decoration-none font-monospace"><small>geom.isrectilinear</small></a></li>
 					<li><a href="geom.offset.html" class="text-decoration-none font-monospace"><small>geom.offset</small></a></li>
 					<li><a href="geom.largestrect.html" class="text-decoration-none font-monospace"><small>geom.largestrect</small></a></li>
-					<li><a href="geom.triangulate.html" class="text-decoration-none font-monospace"><small>geom.triangulate</small></a></li>
 					<li><a href="geom.hatchlines.html" class="text-decoration-none font-monospace fw-bolder"><small>geom.hatchlines</small></a></li>
 				</ul>
 				</div>
@@ -364,6 +363,8 @@
 					<li><a href="solid.sweep.html" class="text-decoration-none font-monospace"><small>solid.sweep</small></a></li>
 					<li><a href="solid.helix.html" class="text-decoration-none font-monospace"><small>solid.helix</small></a></li>
 					<li><a href="solid.read.html" class="text-decoration-none font-monospace"><small>solid.read</small></a></li>
+					<li><a href="solid.threadspec.html" class="text-decoration-none font-monospace"><small>solid.threadspec</small></a></li>
+					<li><a href="solid.holespec.html" class="text-decoration-none font-monospace"><small>solid.holespec</small></a></li>
 				</ul>
 				</div>
 			</div>
@@ -460,7 +461,7 @@ draw.Drawing.entities,
   <a href="geom.selfintersects.html">geom.selfintersects</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/fff062e/inst/+geom/hatchlines.m">geom.hatchlines</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/b937a57/inst/+geom/hatchlines.m">geom.hatchlines</a>
 </p>
 </div>
         <div class="card rounded my-4">
@@ -485,9 +486,7 @@ draw.Drawing.entities,
                 <pre style="overflow-x: auto; white-space: pre; padding: 0.6rem 0.8rem; margin: 0.3rem 0 0.8rem 0; border: 1px solid #e2e2e2; border-left: 4px solid #b7b7b7; border-radius: 4px; background-color: #fafafa;">28 segments fill the outline</pre>
                 <pre style="overflow-x: auto; white-space: pre; padding: 0.6rem 0.8rem; margin: 0.3rem 0; border: 1px solid #cfe0e6; border-left: 4px solid #4a90a4; border-radius: 4px; background-color: #eef5f8;"> D = draw.Drawing ().polyline (geom.Polyline (P, 'Closed', true));
  D.Colour = 'blue';
- for k = 1:rows (S)
-   D = D.line (S(k,1:2), S(k,3:4));
- endfor
+ D = D.line (S(:,1:2), S(:,3:4));
  plot (D);
  title ('ANSI31 clipped around a re-entrant notch');</pre>
                 <div class="text-center">
@@ -531,9 +530,7 @@ draw.Drawing.entities,
    Q = P + [x, 0];
    D = D.polyline (geom.Polyline (Q, 'Closed', true));
    S = geom.hatchlines (Q, nm{1}, 0, 5);
-   for k = 1:rows (S)
-     D = D.line (S(k,1:2), S(k,3:4));
-   endfor
+   D = D.line (S(:,1:2), S(:,3:4));
    D = D.text ([x, -6], nm{1}, 3);
    x += 50;
  endfor

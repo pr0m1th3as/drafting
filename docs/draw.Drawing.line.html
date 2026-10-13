@@ -315,14 +315,18 @@
               </nav>
 
 <p class="h5 fs fs-last"><code>draw.Drawing: <var>D</var> = <b>line</b> (<var>D</var>, <var>P1</var>, <var>P2</var>)</code></p>
-<p> Append a straight line segment from <var>P1</var> to <var>P2</var>.
+<p> Append straight line segments from <var>P1</var> to <var>P2</var>.
 </p>
 <div class="ms-5">
-<p> Both points are 1-by-2 vectors in millimetres.  A zero-length line is an
- error rather than an invisible entity in the output.
+<p> <var>P1</var> and <var>P2</var> are N-by-2 matrices in millimetres, one line per
+ row; zero rows append nothing.  A zero-length line is an error rather
+ than an invisible entity in the output, and the error names its row.
 </p>
+<table><tr><td>&nbsp;</td><td><pre class="example"> D = draw.Drawing ().line ([0, 0; 0, 10], [40, 0; 40, 10]);
+</pre></td></tr></table>
+
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/fff062e/inst/+draw/Drawing.m#L906">draw.Drawing</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/b937a57/inst/+draw/Drawing.m#L971">draw.Drawing</a>
 </p>
 </div>
 

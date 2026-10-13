@@ -235,7 +235,6 @@
 					<li><a href="geom.isrectilinear.html" class="text-decoration-none font-monospace"><small>geom.isrectilinear</small></a></li>
 					<li><a href="geom.offset.html" class="text-decoration-none font-monospace"><small>geom.offset</small></a></li>
 					<li><a href="geom.largestrect.html" class="text-decoration-none font-monospace"><small>geom.largestrect</small></a></li>
-					<li><a href="geom.triangulate.html" class="text-decoration-none font-monospace"><small>geom.triangulate</small></a></li>
 					<li><a href="geom.hatchlines.html" class="text-decoration-none font-monospace"><small>geom.hatchlines</small></a></li>
 				</ul>
 				</div>
@@ -364,6 +363,8 @@
 					<li><a href="solid.sweep.html" class="text-decoration-none font-monospace"><small>solid.sweep</small></a></li>
 					<li><a href="solid.helix.html" class="text-decoration-none font-monospace"><small>solid.helix</small></a></li>
 					<li><a href="solid.read.html" class="text-decoration-none font-monospace"><small>solid.read</small></a></li>
+					<li><a href="solid.threadspec.html" class="text-decoration-none font-monospace"><small>solid.threadspec</small></a></li>
+					<li><a href="solid.holespec.html" class="text-decoration-none font-monospace"><small>solid.holespec</small></a></li>
 				</ul>
 				</div>
 			</div>
@@ -433,9 +434,12 @@
 </table>
 </div>
 
-<p> Indices from 9 to 255 are valid and are carried through, but only the ten
- above have names and known renderings.  An unnamed index renders as a mid
- grey rather than raising, so that a file from elsewhere still draws.
+<p> Indices from 9 to 255 have no names, and render as the AutoCAD colour
+ index draws them, so that a file from elsewhere draws in its colours: 9 a
+ light grey; 10 to 249 twenty-four hues 15 degrees apart, from red, each at
+ five values from bright to dark and alternately full and half saturated,
+ so that 30 is orange, <code>[255, 127, 0] / 255</code>; and 250 to 255 six
+ greys from dark to white.
 </p>
 <p> <strong>No true colour.</strong>  The DXF revision this package writes, R2000,
  carries an index and nothing else, true colour arriving only with R2004, so
@@ -449,7 +453,7 @@
   <a href="draw.Drawing.write.html">draw.Drawing.write</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/fff062e/inst/+draw/colour.m">draw.colour</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/b937a57/inst/+draw/colour.m">draw.colour</a>
 </p>
 </div>
         <div class="card rounded my-4">

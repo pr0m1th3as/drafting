@@ -235,7 +235,6 @@
 					<li><a href="geom.isrectilinear.html" class="text-decoration-none font-monospace"><small>geom.isrectilinear</small></a></li>
 					<li><a href="geom.offset.html" class="text-decoration-none font-monospace"><small>geom.offset</small></a></li>
 					<li><a href="geom.largestrect.html" class="text-decoration-none font-monospace"><small>geom.largestrect</small></a></li>
-					<li><a href="geom.triangulate.html" class="text-decoration-none font-monospace"><small>geom.triangulate</small></a></li>
 					<li><a href="geom.hatchlines.html" class="text-decoration-none font-monospace"><small>geom.hatchlines</small></a></li>
 				</ul>
 				</div>
@@ -364,6 +363,8 @@
 					<li><a href="solid.sweep.html" class="text-decoration-none font-monospace"><small>solid.sweep</small></a></li>
 					<li><a href="solid.helix.html" class="text-decoration-none font-monospace"><small>solid.helix</small></a></li>
 					<li><a href="solid.read.html" class="text-decoration-none font-monospace"><small>solid.read</small></a></li>
+					<li><a href="solid.threadspec.html" class="text-decoration-none font-monospace"><small>solid.threadspec</small></a></li>
+					<li><a href="solid.holespec.html" class="text-decoration-none font-monospace"><small>solid.holespec</small></a></li>
 				</ul>
 				</div>
 			</div>
@@ -445,7 +446,7 @@
   <a href="geom.resample.html">geom.resample</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/fff062e/inst/+draw/coordtable.m">draw.coordtable</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/b937a57/inst/+draw/coordtable.m">draw.coordtable</a>
 </p>
 </div>
         <div class="card rounded my-4">
@@ -469,10 +470,9 @@
  pts = geom.resample (P, 10, true);
  D = draw.Drawing ().polyline (geom.Polyline (P, 'Closed', true));
  D.Colour = 'red';
- for k = 1:rows (pts)
-   D = D.circle (pts(k,:), 1);
-   D = D.text (pts(k,:) + [2, 2], sprintf ('%d', k), 2.5);
- endfor
+ D = D.circle (pts, 1);
+ D = D.text (pts + [2, 2], arrayfun (@num2str, 1:rows (pts), ...
+                                     'UniformOutput', false), 2.5);
  D = D.merge (draw.coordtable (pts, [55, 35], 'Decimals', 2));
  plot (D, 'FontSize', 6);
  title ('the table is the dimension; the view is illustrative');</pre>

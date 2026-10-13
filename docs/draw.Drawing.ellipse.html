@@ -316,9 +316,13 @@
 
 <p class="h5 fs"><code>draw.Drawing: <var>D</var> = <b>ellipse</b> (<var>D</var>, <var>C</var>, <var>A</var>, <var>B</var>)</code></p>
 <p class="h5 fs fs-last"><code>draw.Drawing: <var>D</var> = <b>ellipse</b> (<var>D</var>, <var>C</var>, <var>A</var>, <var>B</var>, <var>ROT</var>)</code></p>
-<p> Append an ellipse centred at <var>C</var> with semi-axes <var>A</var> and <var>B</var>.
+<p> Append ellipses centred at <var>C</var> with semi-axes <var>A</var> and <var>B</var>.
 </p>
 <div class="ms-5">
+<p> <var>C</var> is an N-by-2 matrix in millimetres, one ellipse per row; zero
+ rows append nothing.  <var>A</var>, <var>B</var> and <var>ROT</var> are each one value
+ for every ellipse or a vector of one per row.
+</p>
 <p> <var>ROT</var> turns the first axis away from horizontal, in degrees
  counter-clockwise, and defaults to zero.
 </p>
@@ -327,12 +331,12 @@
  view, and what a chamfer on a cylinder projects to.
 </p>
 <p> <strong>See also: </strong>
-  <a href="draw.Drawing.circle.html">circle</a>, 
-  <a href="draw.Drawing.arc.html">arc</a>, 
-  <a href="draw.Drawing.polyline.html">polyline</a>
+  <a href="draw.Drawing.circle.html">draw.Drawing.circle</a>, 
+  <a href="draw.Drawing.arc.html">draw.Drawing.arc</a>, 
+  <a href="draw.Drawing.polyline.html">draw.Drawing.polyline</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/fff062e/inst/+draw/Drawing.m#L1201">draw.Drawing</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/b937a57/inst/+draw/Drawing.m#L1295">draw.Drawing</a>
 </p>
 </div>
 

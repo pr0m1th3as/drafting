@@ -199,7 +199,7 @@
             </div>
             <div class="col-sm-9 col-md-10">
               <h3 class="d-inline-block mr-2">drafting</h3>
-              <b>0.2.1&nbsp;2026-10-07</b>
+              <b>0.2.2&nbsp;2026-10-13</b>
               <p class="indent">
                 Planar geometry, technical drawing and solid modelling:  polylines, splines, paths and regions with booleans, offsets and hulls;  a technical drawing model plotted, printed to scale, set in TikZ and  written to DXF; DXF read and written from R12 to R2018; triangle meshes  in STL, OBJ, PLY and 3MF; and exact solids through Open CASCADE with  holes, fillets, sections and projections, assemblies in STEP and 3MF,  and a viewer.  Provides the drafting layer for engineering design  packages.
               </p>
@@ -339,14 +339,6 @@ with coordinates of its own.</td>
                    </code></b>
                  </td>
                  <td>Largest axis-aligned rectangle inscribed in a rectilinear polygon.</td>
-               </tr>
-               <tr>
-                 <td>
-                   <b><code>
-                   <a href="geom.triangulate.html">geom.triangulate</a>
-                   </code></b>
-                 </td>
-                 <td>Triangulate a polygon, optionally one with holes.</td>
                </tr>
                <tr>
                  <td>
@@ -724,6 +716,22 @@ with coordinates of its own.</td>
                  </td>
                  <td>Read a solid from a STEP file.</td>
                </tr>
+               <tr>
+                 <td>
+                   <b><code>
+                   <a href="solid.threadspec.html">solid.threadspec</a>
+                   </code></b>
+                 </td>
+                 <td>The dimensions of a metric screw thread, read from its name.</td>
+               </tr>
+               <tr>
+                 <td>
+                   <b><code>
+                   <a href="solid.holespec.html">solid.holespec</a>
+                   </code></b>
+                 </td>
+                 <td>The dimensions of the hole for a metric screw, read from its thread.</td>
+               </tr>
              </tbody>
            </table>
            <h3 class="category">
@@ -753,8 +761,8 @@ with coordinates of its own.</td>
                    <a href="model.Viewer.html">model.Viewer</a>
                    </code></b>
                  </td>
-                 <td>A window showing a solid or a triangle mesh, in which edges, faces and
-coordinate systems can be picked.</td>
+                 <td>A window showing a solid, a triangle mesh or an assembly, in which edges, faces,
+solids and coordinate systems can be picked, and solids hidden or shown through.</td>
                </tr>
              </tbody>
            </table>

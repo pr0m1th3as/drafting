@@ -235,7 +235,6 @@
 					<li><a href="geom.isrectilinear.html" class="text-decoration-none font-monospace"><small>geom.isrectilinear</small></a></li>
 					<li><a href="geom.offset.html" class="text-decoration-none font-monospace"><small>geom.offset</small></a></li>
 					<li><a href="geom.largestrect.html" class="text-decoration-none font-monospace"><small>geom.largestrect</small></a></li>
-					<li><a href="geom.triangulate.html" class="text-decoration-none font-monospace"><small>geom.triangulate</small></a></li>
 					<li><a href="geom.hatchlines.html" class="text-decoration-none font-monospace"><small>geom.hatchlines</small></a></li>
 				</ul>
 				</div>
@@ -364,6 +363,8 @@
 					<li><a href="solid.sweep.html" class="text-decoration-none font-monospace"><small>solid.sweep</small></a></li>
 					<li><a href="solid.helix.html" class="text-decoration-none font-monospace"><small>solid.helix</small></a></li>
 					<li><a href="solid.read.html" class="text-decoration-none font-monospace"><small>solid.read</small></a></li>
+					<li><a href="solid.threadspec.html" class="text-decoration-none font-monospace"><small>solid.threadspec</small></a></li>
+					<li><a href="solid.holespec.html" class="text-decoration-none font-monospace"><small>solid.holespec</small></a></li>
 				</ul>
 				</div>
 			</div>
@@ -432,17 +433,18 @@
  default.</dd>
 <dt> <code>'Version'</code></dt>
 <dd> <code>'R2000'</code> (<code>AC1015</code>), the default, or <code>'R12'</code>
- (<code>AC1009</code>) for a program that reads nothing later.  R12 holds only
- lines and arcs, so only polylines may be written as R12; a spline, a path
- or a region is an error naming it.</dd>
+ (<code>AC1009</code>) for a program that reads nothing later.  R12 has no
+ <code>SPLINE</code>, no groups and no <code>HATCH</code>, so only polylines may be
+ written as R12; a spline, a path or a region is an error naming it.</dd>
 <dt> <code>'LTScale'</code></dt>
 <dd> The drawing&rsquo;s line-type scale, 1 by default, written in the header so
  the dashes look the same wherever the file is opened.</dd>
 </dl>
 
-<p> The drawing units are millimetres.  Text is written with every character
- outside ASCII escaped as <code>\U+XXXX</code>, so the file reads the same
- whatever the reader&rsquo;s code page.
+<p> The drawing units are millimetres.  Layer and line-type names are written
+ with every character outside ASCII escaped as <code>\U+XXXX</code>, so they
+ read the same whatever the reader&rsquo;s code page; a name holding a line
+ break or another control character is an error.
 </p>
 <p> <strong>See also: </strong>
   <a href="geom.read.html">geom.read</a>, 
@@ -453,7 +455,7 @@
   <a href="draw.Drawing.write.html">draw.Drawing.write</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/fff062e/inst/+geom/write.m">geom.write</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/b937a57/inst/+geom/write.m">geom.write</a>
 </p>
 </div>
 

@@ -235,7 +235,6 @@
 					<li><a href="geom.isrectilinear.html" class="text-decoration-none font-monospace"><small>geom.isrectilinear</small></a></li>
 					<li><a href="geom.offset.html" class="text-decoration-none font-monospace"><small>geom.offset</small></a></li>
 					<li><a href="geom.largestrect.html" class="text-decoration-none font-monospace"><small>geom.largestrect</small></a></li>
-					<li><a href="geom.triangulate.html" class="text-decoration-none font-monospace"><small>geom.triangulate</small></a></li>
 					<li><a href="geom.hatchlines.html" class="text-decoration-none font-monospace"><small>geom.hatchlines</small></a></li>
 				</ul>
 				</div>
@@ -364,6 +363,8 @@
 					<li><a href="solid.sweep.html" class="text-decoration-none font-monospace"><small>solid.sweep</small></a></li>
 					<li><a href="solid.helix.html" class="text-decoration-none font-monospace"><small>solid.helix</small></a></li>
 					<li><a href="solid.read.html" class="text-decoration-none font-monospace"><small>solid.read</small></a></li>
+					<li><a href="solid.threadspec.html" class="text-decoration-none font-monospace"><small>solid.threadspec</small></a></li>
+					<li><a href="solid.holespec.html" class="text-decoration-none font-monospace"><small>solid.holespec</small></a></li>
 				</ul>
 				</div>
 			</div>
@@ -423,7 +424,7 @@
   <a href="geom.UCS.html">geom.UCS</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/fff062e/inst/+model/Assembly.m">model.Assembly</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/b937a57/inst/+model/Assembly.m">model.Assembly</a>
 </p>
 </div>
         <p class="lead my-3">The <code>model.Assembly</code> class contains the following properties:</p>
@@ -578,7 +579,10 @@ Place a part in an assembly.
 </p>
 <p> The first use of a name defines the part.  A later use places the same
  part again, and gives the same <var>X</var>, or <code>[]</code> for it; another
- <var>X</var> under a name already used is an error.
+ <var>X</var> under a name already used is an error, and so is an empty one,
+ a shape, a mesh or an assembly with nothing in it.  The same means stored
+ the same, not only shaped the same: a shape read back from a file is
+ another shape, so a part is best placed again with <code>[]</code>.
 </p>
 <p> Each placement is named after its part, <var>NAME</var> the first time and
  then <var>NAME</var><code>:2</code>, <var>NAME</var><code>:3</code> and so on;
@@ -616,16 +620,81 @@ Every part placed, as one shape.
 <p> </p>
 <p> <code><var>S</var> = shape (<var>A</var>)</code> returns a <code>solid.Shape</code> holding
  the solids of every part where the assembly places it, sub-assemblies
- included, each in its part&rsquo;s colour.  The solids are kept apart, not
- united, so parts that touch stay separate solids.  This is the shape
- to measure, cut, show or tessellate.  The empty assembly gives the
- empty shape.  An assembly with a mesh among its parts has no exact
+ included, each with the <code>solid.Shape.Colour</code> and
+ <code>solid.Shape.Name</code> its part gives it.  The solids are kept apart,
+ not united, so parts that touch stay separate solids.  This is the
+ shape to measure, cut, show or tessellate.  The empty assembly gives
+ the empty shape.  An assembly with a mesh among its parts has no exact
  shape and is an error; <code>tessellate</code> gives it whole as a mesh.
 </p>
 <p> <strong>See also: </strong>
   <a href="model.Assembly.html#model_Assembly_tessellate">model.Assembly.tessellate</a>, 
   <a href="model.Assembly.html#model_Assembly_write">model.Assembly.write</a>, 
   <a href="solid.Shape.html">solid.Shape</a>
+</p>
+
+
+            </div>
+          </div>
+        </div>
+
+        <div class="container-xl my-1">
+          <div class="row">
+            <button class="btn btn-light btn-sm w-100 text-start" type="button"
+              data-bs-toggle="collapse" data-bs-target="#model_Assembly_solids"
+              aria-expanded="false" aria-controls="model_Assembly_solids">
+              <div class="row align-items-center">
+                <div class="col-4">
+                  <h4 class="d-inline-block mr-4">
+                    <b><code>solids</code></b>
+                  </h4>
+                </div>
+                <div class="col-8">
+The solids of an assembly, one by one, with where each is placed.
+                </div>
+              </div>
+          </div>
+          <div class="collapse multi-collapse" id="model_Assembly_solids">
+            <div class="border-bottom py-2">
+<p class="h5 fs fs-last"><code>model.Assembly: <var>L</var> = <b>solids</b> (<var>A</var>)</code></p>
+<p> </p>
+<p> <code><var>L</var> = solids (<var>A</var>)</code> returns an <em class="math">N</em>-by-1 struct
+ array, an element for each of the <em class="math">N</em> solids of
+ <code>shape (<var>A</var>)</code>, in that order, with the fields:
+</p>
+<div class="table-responsive">
+<table class="table table-striped table-bordered table-sm">
+<tr><td width="15%"><code>index</code></td><td width="85%">its index in <code>shape (<var>A</var>)</code>, from 1 to
+ <em class="math">N</em></td></tr>
+<tr><td width="15%"><code>name</code></td><td width="85%">the <code>solid.Shape.Name</code> its part gives it,
+ <code>''</code> where it has none</td></tr>
+<tr><td width="15%"><code>colour</code></td><td width="85%">the <code>solid.Shape.Colour</code> its part gives
+ it, a row of <code>NaN</code> where it has none</td></tr>
+<tr><td width="15%"><code>path</code></td><td width="85%">a cell row of placement names, from the
+ placement in <var>A</var> down through each sub-assembly to the placement of
+ its part</td></tr>
+<tr><td width="15%"><code>part</code></td><td width="85%">the name of the part it belongs to</td></tr>
+</table>
+</div>
+
+<p> <code>model.Viewer.opacity</code> takes a path, or a name from either field,
+ to choose which solids to hide or show through.  An assembly with a
+ mesh among its parts has no solids to list and is an error.
+</p>
+<table><tr><td>&nbsp;</td><td><pre class="example"> pin = solid.cylinder (2, 12);
+ B = add (model.Assembly ('stage'), 'pin', pin, geom.UCS ());
+ A = add (model.Assembly ('top'), 'base', solid.box (40, 40, 4), ...
+          geom.UCS ([0, 0, 1], [-20, -20, -4]));
+ A = add (A, 'stage', B, geom.UCS ([0, 0, 1], [0, 0, 10]));
+ L = solids (A);
+ L(2).path
+ &rArr; {'stage', 'pin'}
+</pre></td></tr></table>
+
+<p> <strong>See also: </strong>
+  <a href="model.Assembly.html#model_Assembly_shape">model.Assembly.shape</a>, 
+  <a href="solid.Shape.solids.html">solid.Shape.solids</a>, 
+  <a href="model.Viewer.html#model_Viewer_opacity">model.Viewer.opacity</a>
 </p>
 
 
@@ -694,14 +763,17 @@ Show an assembly in a viewer of its own, redrawing in place.
 <p class="h5 fs"><code>model.Assembly: <b>show</b> (<var>A</var>)</code></p>
 <p class="h5 fs fs-last"><code>model.Assembly: <var>V</var> = <b>show</b> (<var>A</var>)</code></p>
 <p> </p>
-<p> <code>show (<var>A</var>)</code> shows <code>shape (<var>A</var>)</code> in the
- <code>model.Viewer</code> kept for the variable, as
- <code>solid.Shape.show</code> does, each part in its colour, or
- <code>tessellate (<var>A</var>)</code> when a part is a mesh.
- <code><var>V</var> = show (<var>A</var>)</code> also returns the viewer.
+<p> <code>show (<var>A</var>)</code> shows the assembly in the <code>model.Viewer</code>
+ kept for the variable, as <code>solid.Shape.show</code> does: drawn as
+ <code>shape (<var>A</var>)</code>, each part in its colour, or as
+ <code>tessellate (<var>A</var>)</code> when a part is a mesh.  The viewer keeps
+ the assembly, so <code>model.Viewer.opacity</code> can hide its solids or
+ show them through by the names and paths <code>model.Assembly.solids</code>
+ lists.  <code><var>V</var> = show (<var>A</var>)</code> also returns the viewer.
 </p>
 <p> <strong>See also: </strong>
   <a href="model.Viewer.html">model.Viewer</a>, 
+  <a href="model.Viewer.html#model_Viewer_opacity">model.Viewer.opacity</a>, 
   <a href="solid.Shape.show.html">solid.Shape.show</a>
 </p>
 
@@ -733,15 +805,16 @@ Write an assembly to a STEP, 3MF, STL, OBJ or PLY file.
 <p> </p>
 <p> <code>write (<var>A</var>, <var>FILE</var>)</code> writes the assembly in the format
  the extension of <var>FILE</var> names, in either case.  A STEP file,
- <code>.step</code>, keeps its structure: each part once, with its name and
- colours, placed by its placements, which carry their names, and each
- sub-assembly the same way, so that a CAD program opens the product as
- it was built; it cannot hold a mesh part.  A 3MF file,
- the archive slicers take, keeps the same structure, each part a mesh
- written once and placed as a component, in its colours.  3MF has no
- place for the name of a placement, so <code>model.read</code> names the
- placements of a 3MF file after their parts.  An STL, OBJ or PLY file
- holds <code>tessellate (<var>A</var>)</code>.
+ <code>.step</code>, keeps its structure: each part once, with its name, its
+ colours and the <code>solid.Shape.Name</code> of its solids, placed by its
+ placements, which carry their names, and each sub-assembly the same
+ way, so that a CAD program opens the product as it was built; it
+ cannot hold a mesh part.  A 3MF file, the archive slicers take, keeps
+ the same structure, each part a mesh written once and placed as a
+ component, in its colours.  3MF has no place for the name of a
+ placement, so <code>model.read</code> names the placements of a 3MF file
+ after their parts.  An STL, OBJ or PLY file holds
+ <code>tessellate (<var>A</var>)</code>.
 </p>
 <p> <code>write (&hellip;, <code>'Tolerance'</code>, <var>TOL</var>)</code> sets, for a
  mesh, how far its facets may stray from the parts&rsquo; surfaces, as

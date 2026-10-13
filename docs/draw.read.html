@@ -235,7 +235,6 @@
 					<li><a href="geom.isrectilinear.html" class="text-decoration-none font-monospace"><small>geom.isrectilinear</small></a></li>
 					<li><a href="geom.offset.html" class="text-decoration-none font-monospace"><small>geom.offset</small></a></li>
 					<li><a href="geom.largestrect.html" class="text-decoration-none font-monospace"><small>geom.largestrect</small></a></li>
-					<li><a href="geom.triangulate.html" class="text-decoration-none font-monospace"><small>geom.triangulate</small></a></li>
 					<li><a href="geom.hatchlines.html" class="text-decoration-none font-monospace"><small>geom.hatchlines</small></a></li>
 				</ul>
 				</div>
@@ -364,6 +363,8 @@
 					<li><a href="solid.sweep.html" class="text-decoration-none font-monospace"><small>solid.sweep</small></a></li>
 					<li><a href="solid.helix.html" class="text-decoration-none font-monospace"><small>solid.helix</small></a></li>
 					<li><a href="solid.read.html" class="text-decoration-none font-monospace"><small>solid.read</small></a></li>
+					<li><a href="solid.threadspec.html" class="text-decoration-none font-monospace"><small>solid.threadspec</small></a></li>
+					<li><a href="solid.holespec.html" class="text-decoration-none font-monospace"><small>solid.holespec</small></a></li>
 				</ul>
 				</div>
 			</div>
@@ -408,14 +409,14 @@
  type or line weight from its layer keeps doing so, so the drawing looks as
  it did and a layer changed later changes everything on it.
 </p>
-<p> Geometry returns as itself: lines, points, arcs, circles, ellipses,
- polylines with their bulges, splines, text, and inserts of the blocks the
- file defines, nested blocks included.  A <code>HATCH</code> returns as a hatch
- over the regions it fills, its pattern, angle and spacing kept; a pattern
- the package does not define is drawn as <code>'ANSI31'</code>.  A path or a
- region the package wrote, through <code>draw.Drawing.write</code>, returns as
- that path or region.  An <code>MTEXT</code> returns as one line of text, its
- formatting removed.
+<p> Geometry returns as itself: lines, points, arcs, circles, ellipses, polylines
+ with their bulges, splines, text, and inserts of the blocks the file defines,
+ nested blocks included, each block moved so that its base point is its
+ origin, where an insert places it.  A <code>HATCH</code> returns as a hatch over
+ the regions it fills, its pattern, angle and spacing kept; a pattern the
+ package does not define is drawn as <code>'ANSI31'</code>.  A path or a region the
+ package wrote, through <code>draw.Drawing.write</code>, returns as that path or
+ region.  An <code>MTEXT</code> returns as one line of text, its formatting removed.
 </p>
 <p> A <code>DIMENSION</code> returns as a dimension: its definition points name what
  it measures, so a linear, aligned, angular, diameter, radius or ordinate
@@ -429,14 +430,19 @@
  programs treat it; heights are dropped.  An entity on any other plane, a
  mesh, a solid, an entity in paper space, an insert of a block the file
  does not define and an entity type the package does not draw are skipped,
- as is the width of a polyline, which the package does not draw; whatever
- is skipped is reported in one warning, counted by entity type.
+ as is the width of a polyline, which the package does not draw.  So is a
+ mirrored insert, or one scaled unequally in <em class="math">x</em> and <em class="math">y</em>, since
+ a drawing places a block turned and scaled alike in both; rows and
+ columns of an insert are placed one insert each.  Whatever is skipped is
+ reported in one warning, counted by entity type.
 </p>
 <p> Coordinates are converted to millimetres from the units the file declares
- in <code>$INSUNITS</code>; a file declaring none is read as millimetres.  The
- reader takes ASCII DXF from R12 (<code>AC1009</code>) to R2018
- (<code>AC1032</code>); text before R2007 is decoded from the code page the
- header names, and from R2007 on as UTF-8.  A binary DXF is an error.
+ in <code>$INSUNITS</code>, any of those DXF defines; a file declaring none is
+ read as millimetres, and so is one declaring a code DXF does not define,
+ with a warning.  The reader takes ASCII DXF from R12 (<code>AC1009</code>) to
+ R2018 (<code>AC1032</code>); text and names before R2007 are decoded from the
+ code page the header names, and from R2007 on as UTF-8.  A binary DXF is
+ an error.
 </p>
 <p> <strong>See also: </strong>
   <a href="draw.Drawing.html">draw.Drawing</a>, 
@@ -444,7 +450,7 @@
   <a href="geom.read.html">geom.read</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/fff062e/inst/+draw/read.m">draw.read</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/b937a57/inst/+draw/read.m">draw.read</a>
 </p>
 </div>
 

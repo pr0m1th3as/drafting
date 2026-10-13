@@ -315,19 +315,20 @@
               </nav>
 
 <p class="h5 fs fs-last"><code>draw.Drawing: <var>D</var> = <b>point</b> (<var>D</var>, <var>P</var>)</code></p>
-<p> Append a single point.
+<p> Append points.
 </p>
 <div class="ms-5">
-<p> <var>P</var> is a 1-by-2 vector in millimetres.  A point marks a location
- without drawing anything through it &mdash; a setting-out mark, a hole
- centre, the origin a coordinate table is measured from.
+<p> <var>P</var> is an N-by-2 matrix in millimetres, one point per row; zero rows
+ append nothing.  A point marks a location without drawing anything
+ through it &mdash; a setting-out mark, a hole centre, the origin a
+ coordinate table is measured from.
 </p>
 <p> It reaches a DXF file as a <code>POINT</code> entity, which is also how one
  arrives from a file: without it a drawing read back would lose every
  point it was given.
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/fff062e/inst/+draw/Drawing.m#L939">draw.Drawing</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/b937a57/inst/+draw/Drawing.m#L1012">draw.Drawing</a>
 </p>
 </div>
 

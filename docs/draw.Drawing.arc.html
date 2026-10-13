@@ -315,9 +315,13 @@
               </nav>
 
 <p class="h5 fs fs-last"><code>draw.Drawing: <var>D</var> = <b>arc</b> (<var>D</var>, <var>C</var>, <var>R</var>, <var>A1</var>, <var>A2</var>)</code></p>
-<p> Append a circular arc centred on <var>C</var> with radius <var>R</var>.
+<p> Append circular arcs centred on <var>C</var> with radius <var>R</var>.
 </p>
 <div class="ms-5">
+<p> <var>C</var> is an N-by-2 matrix in millimetres, one arc per row; zero rows
+ append nothing.  <var>R</var>, <var>A1</var> and <var>A2</var> are each one value for
+ every arc or a vector of one per row.
+</p>
 <p> <var>A1</var> and <var>A2</var> are the start and end angles in <strong>degrees</strong>,
  measured counter-clockwise from the positive <em class="math">x</em> axis.  The arc is
  always swept counter-clockwise from <var>A1</var> to <var>A2</var>, which is the
@@ -327,7 +331,7 @@
  sweep of 360 degrees.  Prefer <code>circle</code> when that is what is meant.
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/fff062e/inst/+draw/Drawing.m#L1139">draw.Drawing</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/b937a57/inst/+draw/Drawing.m#L1216">draw.Drawing</a>
 </p>
 </div>
 
