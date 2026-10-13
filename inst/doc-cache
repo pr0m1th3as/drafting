@@ -1193,7 +1193,7 @@ draw.Drawing.plot
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 4560
+# length: 4636
 draw.Drawing: plot (D)
 draw.Drawing: plot (HAX, D)
 draw.Drawing: plot (..., Name, Value)
@@ -1209,7 +1209,8 @@ HAX instead
 of the current ones, as every plotting function in Octave accepts an axes
 handle ahead of its data. The 'Axes' pair below does the same
 thing
-and is equivalent.
+and is equivalent. A figure handle draws into that figure's current
+axes, made if it has none.
 
 H = draw.Drawing.plot (...) returns a column of graphics
 handles, one per object created. Every line of one layer, colour, line
@@ -1836,7 +1837,7 @@ draw.Drawing.write
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 2664
+# length: 2862
 draw.Drawing: write (D, FILE)
 draw.Drawing: write (D, FILE, Name, Value, ...)
 Write a drawing to a DXF file.
@@ -1889,9 +1890,12 @@ meant for 1:50 wants 50 here. 1 by default.
 The drawing's line-type scale, 1 by default, written in the header so
 the dashes look the same wherever the file is opened.
 
-Text is written with every character outside ASCII escaped as
-\U+XXXX, so it reads the same whatever the reader's code page.
-Layer, line-type and block names are written as given, in UTF-8.
+Text and the names of layers, line types and blocks are written with
+every character outside ASCII escaped as \U+XXXX, so they read
+the same whatever the reader's code page. A text or a name holding a
+line break or another control character cannot be stored and is an
+error, as are two different blocks of one name, such as one a block
+defines for itself and another the drawing defines.
 
 See also:
 draw.read,
@@ -2138,7 +2142,7 @@ draw.read
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 2591
+# length: 2879
 drafting: D = draw.read (FILE)
 Read a drawing from an ASCII DXF file.
 
@@ -2174,14 +2178,19 @@ down the z axis is mirrored into the plane facing up, as 2-D CAD
 programs treat it; heights are dropped. An entity on any other plane, a
 mesh, a solid, an entity in paper space, an insert of a block the file
 does not define and an entity type the package does not draw are skipped,
-as is the width of a polyline, which the package does not draw; whatever
-is skipped is reported in one warning, counted by entity type.
+as is the width of a polyline, which the package does not draw. So is a
+mirrored insert, or one scaled unequally in x and y, since
+a drawing places a block turned and scaled alike in both; rows and
+columns of an insert are placed one insert each. Whatever is skipped is
+reported in one warning, counted by entity type.
 
 Coordinates are converted to millimetres from the units the file declares
-in $INSUNITS; a file declaring none is read as millimetres. The
-reader takes ASCII DXF from R12 (AC1009) to R2018
-(AC1032); text before R2007 is decoded from the code page the
-header names, and from R2007 on as UTF-8. A binary DXF is an error.
+in $INSUNITS, any of those DXF defines; a file declaring none is
+read as millimetres, and so is one declaring a code DXF does not define,
+with a warning. The reader takes ASCII DXF from R12 (AC1009) to
+R2018 (AC1032); text and names before R2007 are decoded from the
+code page the header names, and from R2007 on as UTF-8. A binary DXF is
+an error.
 
 See also:
 draw.Drawing,
@@ -5879,7 +5888,7 @@ geom.read
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 3255
+# length: 3360
 drafting: C = geom.read (FILE)
 drafting: C = geom.read (FILE, 'Layer', LAYER)
 drafting: G = geom.read (FILE, 'Type', TYPE)
@@ -5942,10 +5951,12 @@ Whatever is skipped, the widths dropped, and with 'Type' whatever
 is left over, are reported in one warning, counted by entity type.
 
 Coordinates are converted to millimetres from the units the file declares
-in $INSUNITS; a file declaring none is read as millimetres. The
-reader takes ASCII DXF from R12 (AC1009) to R2018
-(AC1032). Text before R2007 is decoded from the code page the
-header names, and from R2007 on as UTF-8. A binary DXF is an error.
+in $INSUNITS, any of those DXF defines; a file declaring none is
+read as millimetres, and so is one declaring a code DXF does not define,
+with a warning. The reader takes ASCII DXF from R12 (AC1009) to
+R2018 (AC1032). Text and names before R2007 are decoded from the
+code page the header names, and from R2007 on as UTF-8. A binary DXF is
+an error.
 
 R = geom.Region (geom.Polyline ([0, 0; 60, 0; 60, 40; 0, 40], ...
 'Closed', true));
@@ -6478,7 +6489,7 @@ geom.write
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 2042
+# length: 2202
 drafting: geom.write (C, FILE)
 drafting: geom.write (C, FILE, Name, Value, ...)
 Write several geom objects to one DXF file.
@@ -6524,7 +6535,9 @@ The drawing's line-type scale, 1 by default, written in the header so
 the dashes look the same wherever the file is opened.
 
 The drawing units are millimetres. Layer and line-type names are written
-as given, in UTF-8.
+with every character outside ASCII escaped as \U+XXXX, so they
+read the same whatever the reader's code page; a name holding a line
+break or another control character is an error.
 
 See also:
 geom.read,
