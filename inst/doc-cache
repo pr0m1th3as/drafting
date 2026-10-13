@@ -2,7 +2,7 @@
 # name: cache
 # type: cell
 # rows: 3
-# columns: 242
+# columns: 241
 # name: <cell-element>
 # type: sq_string
 # elements: 1
@@ -410,7 +410,7 @@ draw.Drawing.bbox
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1057
+# length: 1176
 draw.Drawing: B = bbox (D)
 draw.Drawing: [B, W, H] = bbox (D)
 Axis-aligned extents of the drawing, as
@@ -424,7 +424,9 @@ points: a circle contributes its centre displaced by the radius in each
 of the four cardinal directions, and an arc contributes its two
 endpoints together with whichever of those four points its sweep
 actually passes through. Taking the centre alone would understate a
-circle by a radius on every side.
+circle by a radius on every side. An ellipse contributes its extremes
+along each axis, a polyline's bulge its arc, and an insert the
+geometry it places.
 
 Two things are deliberately not accounted for, because the model does
 not know them: the rendered width and height of a text entity, of which
@@ -1768,7 +1770,7 @@ draw.Drawing.transform
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 2175
+# length: 2836
 draw.Drawing: D = transform (D, T)
 draw.Drawing: D = transform (D, OP, VAL)
 draw.Drawing: D = transform (D, OP, VAL, CENTRE)
@@ -1787,13 +1789,19 @@ Entities are transformed, not just their points
 A circle keeps its centre and scales its radius; an arc rotates its
 angles; text moves, rotates and scales its height; a spline, path or
 region moves as the exact curve it is; a hatch moves its region,
-rotates its pattern and scales its spacing. A dimension carries its
-measured points and scales its offset.
+rotates its pattern and scales its spacing. An insert turns and scales
+the block it places. A dimension carries its measured points and its
+offset, a diameter or radius dimension its radius and direction, an
+angular dimension its radius; one with no label of its own is labelled
+with what it measures whenever it is drawn or written, so its label
+follows it.
 
 A reflection reverses the sweep of an arc. Arcs run
 counter-clockwise from the first angle to the second, so mirroring one
 and keeping the order would silently give the complementary arc --- the
-piece that was not there before. The endpoints are exchanged instead.
+piece that was not there before. The endpoints are exchanged instead,
+and for the same reason the bulges of a polyline change sign and the
+arms of an angular dimension are exchanged.
 
 What is refused, and why
 
@@ -1801,8 +1809,14 @@ A non-uniform scaling that would turn a circle into an ellipse
 raises. transform makes no ellipse out of a circle or an arc,
 and quietly scaling the radius by one of the two factors would move the
 geometry off the part. An ellipse, a spline, a path, a region or a
-hatch refuses it too. A drawing of lines and polylines without arcs
-scales anisotropically without complaint.
+hatch refuses it too, as do a polyline with arcs, an insert and a
+diameter, radius or angular dimension. A drawing of lines and
+polylines without arcs scales anisotropically without complaint.
+
+An insert cannot be mirrored, since it places its block turned
+and scaled but never reflected; mirroring one raises, naming it. Expand
+the drawing first with draw.Drawing.expand to mirror what the
+insert places.
 
 A rotation that would leave an axis-locked dimension off its
 axis raises, naming the entity. A 'horizontal' dimension
@@ -1922,7 +1936,7 @@ draw.colour
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1541
+# length: 1705
 drafting: N = draw.colour (NAME)
 drafting: RGB = draw.colour (N)
 drafting: NAMES = draw.colour ()
@@ -1957,9 +1971,12 @@ N Name
 0 'byBlock'
 256 'byLayer' the default
 
-Indices from 9 to 255 are valid and are carried through, but only the ten
-above have names and known renderings. An unnamed index renders as a mid
-grey rather than raising, so that a file from elsewhere still draws.
+Indices from 9 to 255 have no names, and render as the AutoCAD colour
+index draws them, so that a file from elsewhere draws in its colours: 9 a
+light grey; 10 to 249 twenty-four hues 15 degrees apart, from red, each at
+five values from bright to dark and alternately full and half saturated,
+so that 30 is orange, [255, 127, 0] / 255; and 250 to 255 six
+greys from dark to white.
 
 No true colour. The DXF revision this package writes, R2000,
 carries an index and nothing else, true colour arriving only with R2004, so
@@ -6417,75 +6434,6 @@ Apply a planar transformation to a set of points.
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 16
-geom.triangulate
-
-
-# name: <cell-element>
-# type: sq_string
-# elements: 1
-# length: 2107
-drafting: T = geom.triangulate (P)
-drafting: T = geom.triangulate (P, HOLES)
-drafting: [T, V] = geom.triangulate (...)
-drafting: [T, V, COVERAGE] = geom.triangulate (...)
-Triangulate a polygon, optionally one with holes.
-
-T = geom.triangulate (P) returns an M-by-3 matrix
-of vertex indices, one row per triangle, covering the interior of the polygon
-P.
-
-T = geom.triangulate (P, HOLES) excludes the
-interiors of the polygons in HOLES, a cell array of N-by-2
-vertex matrices. Each hole must lie inside P and the holes must not
-overlap one another; neither is checked.
-
-[T, V] = geom.triangulate (...) returns the vertex
-list the indices refer to: P followed by each hole in turn.
-
-[T, V, COVERAGE] = geom.triangulate (...)
-returns the area of the triangles over the area of the polygon, less its
-holes. Read it; see below.
-
-The intended use is generating end caps for an extruded solid, where the
-profile carries a central bore and a ring of holes.
-
-This is not a constrained triangulation, and the distinction
-matters. The triangles come from an unconstrained Delaunay triangulation of
-the vertices, filtered by testing whether each triangle's centroid lies
-inside P and outside every hole. That construction cannot guarantee
-that the edges of P appear in the result, so at a strongly concave part
-of the boundary a sliver of the true area may go uncovered: a triangle
-bridging the concavity has its centroid outside and is discarded, and nothing
-replaces it.
-
-The consequence is that a triangulated region can differ from the polygon
-along a strongly concave boundary: a sliver of the polygon may go
-uncovered, and a triangle bridging the concavity whose centroid lies inside
-covers a sliver outside it. Denser sampling of the boundary shrinks both.
-COVERAGE below 1 shows a shortfall, but a sliver outside can offset
-one missed inside, so it bounds neither on its own. For a printed
-prototype the shortfall is invisible well before it is zero; for anything
-dimensionally critical, a constrained triangulation is the right tool and
-this is not it.
-
-See also:
-geom.signedarea,
-geom.selfintersects,
-geom.bbox
-
-
-# name: <cell-element>
-# type: sq_string
-# elements: 1
-# length: 49
-Triangulate a polygon, optionally one with holes.
-
-
-
-# name: <cell-element>
-# type: sq_string
-# elements: 1
 # length: 10
 geom.write
 
@@ -8314,14 +8262,17 @@ polymesh.Mesh.volume
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 354
+# length: 572
 polymesh.Mesh: V = volume (M)
 The volume a closed mesh encloses, in cubic millimetres.
 
 The mesh must be closed, as isclosed tells; an open mesh
-encloses nothing and is an error. The volume is the same whichever
-way the triangles are turned, as long as they all agree. The empty
-mesh has volume zero.
+encloses nothing and is an error. Each shell, a closed sheet of
+triangles joined to one another, counts by its own volume whichever
+way its triangles are turned: added when it lies inside an even number
+of the other shells, and taken away, as a cavity, when inside an odd
+number. Shells that cross one another are counted as if they did not.
+The empty mesh has volume zero.
 
 See also:
 polymesh.Mesh.isclosed,
