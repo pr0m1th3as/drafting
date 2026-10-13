@@ -14,7 +14,6 @@ Geometry primitives
  geom.isrectilinear
  geom.offset
  geom.largestrect
- geom.triangulate
  geom.hatchlines
 Curve geometry
  geom.curvature
