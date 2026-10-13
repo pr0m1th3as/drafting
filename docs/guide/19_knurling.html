@@ -182,6 +182,7 @@ F = F(! ismember (F, faces (knob, 'Within', [-8, -8, 0, 8, 8, 10])))
 bottom = edges (knob, 'Type', 'circle', 'Within', [-15, -15, 0, 15, 15, 0]);
 bottom = bottom(! ismember (bottom, ...
                             edges (knob, 'Within', [-8, -8, 0, 8, 8, 0])))
+unknurled = knob;
 knob = knurl (knob, F, 0.8, 'Fillet', {bottom, 2});</code></pre>
 <pre class="code-out"><code>F = 1
 bottom = 3</code></pre>
@@ -189,6 +190,8 @@ bottom = 3</code></pre>
 <pre class="code-in"><code>V = show (knob);
 view (V, -37.5, -30);</code></pre>
 <figure class="shot"><img src="img/19_knurling-7.png" alt="Knurling, picture 7"></figure>
+<p>A drawing is made from the shape before knurling too. A projection of the knurled knob would draw every edge of its teeth, thousands of them, and take over half a minute. A drawing shows a knurl as the blank with its type and pitch stated, RGE 0.8 DIN 82, so the knob is drawn from <code>unknurled</code>, the shape kept just before knurling.</p>
+<pre class="code-in"><code>side = projection (unknurled, geom.UCS ([0, -1, 0], [0, 0, 0]));</code></pre>
 <h2>The blank to turn</h2>
 <p>The model is the finished knurl, its points at the diameter of the face, which is the nominal diameter of DIN 82, the one a drawing states. Knurling presses the material up out of the grooves, so the machinist turns the blank smaller before knurling: for RGE, by two thirds of the pitch. The knurled knob holds the volume of that blank, to a few thousandths of a millimetre.</p>
 <pre class="code-in"><code>blank = 28 - 0.67 * 0.8

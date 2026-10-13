@@ -2481,6 +2481,13 @@ classdef Shape
     ## cut, which makes it many times faster than cutting its grooves: a
     ## knob 28 across knurled at 0.8 takes about two seconds.
     ##
+    ## That knob has nearly 5000 faces, and every later operation on the
+    ## shape takes them all in: a boolean or a hole takes seconds, and a
+    ## projection for a drawing over half a minute.  Knurl a part after its
+    ## other features, and draw it from the shape before knurling, as a
+    ## drawing shows a knurl: the blank, with the knurl's type and pitch
+    ## stated, never its teeth.
+    ##
     ## Name/Value pairs choose the knurl and finish its ends:
     ##
     ## @table @asis

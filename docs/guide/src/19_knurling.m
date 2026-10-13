@@ -150,12 +150,22 @@ F = F(! ismember (F, faces (knob, 'Within', [-8, -8, 0, 8, 8, 10])))
 bottom = edges (knob, 'Type', 'circle', 'Within', [-15, -15, 0, 15, 15, 0]);
 bottom = bottom(! ismember (bottom, ...
                             edges (knob, 'Within', [-8, -8, 0, 8, 8, 0])))
+unknurled = knob;
 knob = knurl (knob, F, 0.8, 'Fillet', {bottom, 2});
 
 ## Seen from below, the pocket and the fillet face the reader.
 
 V = show (knob);
 view (V, -37.5, -30);
+
+## A drawing is made from the shape before knurling too. A projection of
+## the knurled knob would draw every edge of its teeth, thousands of them,
+## and take over half a minute.
+## A drawing shows a knurl as the blank with its type and pitch stated, RGE
+## 0.8 DIN 82, so the knob is drawn from `unknurled`, the shape kept just
+## before knurling.
+
+side = projection (unknurled, geom.UCS ([0, -1, 0], [0, 0, 0]));
 
 ## ## The blank to turn
 ##
