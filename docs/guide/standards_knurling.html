@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Knurls - drafting guide</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" integrity="sha512-1ycn6IcaQQ40/MKBW2W4Rhis/DbILU74C1vSrLJxCq57o941Ym01SwNsOMqvEBFlcgUa6xLiPY/NS5R+E6ztJQ==" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/css/bootstrap.min.css" integrity="sha384-KyZXEAg3QhqLMpG8r+8fhAXLRk2vvoC2f3B09zVXn8CA5QIVfZOJ3BCsw2P0p/We" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-U1DAWAznBHeqEIlVSCgzq+c9gqGAJn5c/t99JyeKa9xxaYpSvHU5awsuZVVFIhvj" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="guide.css">
+  </head>
+  <body>
+    <div class="bg-dark">
+      <div class="container-xl">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+          <div class="container-fluid">
+            <a class="navbar-brand" href="index.html">
+              <img src="../assets/drafting.png" alt="drafting" class="d-inline-block align-top" width="25" height="25">
+              drafting guide
+            </a>
+            <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+              <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+              <ul class="navbar-nav">
+                <li class="nav-item">
+                  <a class="nav-link" href="../index.html">
+                    <i class="fas fa-book"></i>
+                    Function reference
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="https://github.com/pr0m1th3as/drafting">
+                    <i class="fab fa-github"></i>
+                    Source
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </nav>
+      </div>
+    </div>
+    <div class="container-xl my-4">
+      <div class="row">
+        <div class="col-md-3 col-lg-2 mb-4">
+          <nav class="guide-nav">
+<!-- guide-nav -->
+            <h6>Guide</h6>
+            <ul>
+              <li><a href="index.html">Overview</a></li>
+              <li><a href="layout.html">Package layout</a></li>
+              <li><a href="dxf.html">DXF and the classes</a></li>
+            </ul>
+            <h6>Octave</h6>
+            <ul>
+              <li><a href="primer.html">A brief Octave primer</a></li>
+            </ul>
+            <h6>Standards</h6>
+            <ul>
+              <li><a href="standards_threads.html">Threads and tapped holes</a></li>
+              <li><a href="standards_holes.html">Clearance holes, counterbores and countersinks</a></li>
+              <li><a href="standards_knurling.html" class="active">Knurls</a></li>
+            </ul>
+            <h6>Tutorials</h6>
+            <ul>
+              <li><a href="01_first_part.html">A first part</a></li>
+              <li><a href="02_outlines.html">Outlines: polylines, splines, paths and regions</a></li>
+              <li><a href="03_regions.html">Working with regions</a></li>
+              <li><a href="04_coordinate_systems.html">Coordinate systems</a></li>
+              <li><a href="05_solids_from_regions.html">Solids from regions</a></li>
+              <li><a href="06_primitives_and_booleans.html">Primitives, booleans and transforms</a></li>
+              <li><a href="07_features.html">Features: holes, pockets, fillets, chamfers and shells</a></li>
+              <li><a href="08_sections_and_projections.html">Sections and projections</a></li>
+              <li><a href="09_drawings.html">Technical drawings</a></li>
+              <li><a href="10_meshes.html">Meshes</a></li>
+              <li><a href="11_assemblies.html">Assemblies</a></li>
+              <li><a href="12_from_openscad.html">For OpenSCAD users</a></li>
+              <li><a href="13_surfaces.html">Surfaces through a grid</a></li>
+              <li><a href="14_parts_as_functions.html">Parts as functions</a></li>
+              <li><a href="15_testing_parts.html">Testing parts</a></li>
+              <li><a href="16_holes_and_threads.html">Holes and threads</a></li>
+              <li><a href="17_clearance_holes.html">Clearance holes, counterbores and countersinks</a></li>
+              <li><a href="18_looking_inside.html">Looking inside a model</a></li>
+              <li><a href="19_knurling.html">Knurling</a></li>
+            </ul>
+<!-- /guide-nav -->
+          </nav>
+        </div>
+        <main class="col-md-9 col-lg-10">
+
+<h1>Knurls</h1>
+<p class="lead">The standard behind <code>solid.Shape.knurl</code>: the
+types of knurl it makes, their profile and pitch, where each number comes
+from, and what the package decides where the standard leaves the choice
+open.</p>
+
+<h2 id="sources">The source</h2>
+
+<p>DIN 82:1973 is the standard for knurls, and it is sold by DIN. It was
+read in IS 3403:1981, which the Bureau of Indian Standards prepared from
+it and publishes free, so any value here can be checked without buying the
+standard.</p>
+
+<table class="guide">
+  <tr><th>Source</th><th>What it gives</th><th>Read in</th></tr>
+  <tr><td>DIN 82:1973</td><td>The seven types of knurl and their letters,
+  in clause 2 of IS 3403; their representation, in 2.1; the profile angle
+  and the pitches, in 3.1 and 3.2; and the initial diameter of the blank,
+  in 3.4.</td><td>IS 3403 (First Revision):1981</td></tr>
+  <tr><td>IS 3403 (First Revision):1981</td><td>In its explanatory note:
+  what the letters of a type stand for, the angle of 30 degrees fixed as
+  the standard value, the normal profile angle, and the pitch of 2 dropped.
+  </td><td>The standard itself</td></tr>
+</table>
+
+<h2 id="types">The types</h2>
+
+<p>As the note of IS 3403 explains them, the first letter, R, marks a knurl, as against the knurling wheel that
+makes it. The second names the basic type: A for grooves along the axis, B
+for one set of grooves at an angle, G for two sets at opposite angles, K
+for a cross knurl of grooves along the axis and round it. The third gives
+the direction or the form: A along the axis, L left-hand, R right-hand, E
+points raised, V points indented.</p>
+
+<table class="guide">
+  <tr><th>Type</th><th>Knurl</th><th>Options of <code>knurl</code></th></tr>
+  <tr><td>RAA</td><td>grooves along the axis</td><td><code>'Pattern',
+  'single', 'Angle', 0</code></td></tr>
+  <tr><td>RBL</td><td>left-hand</td><td><code>'Pattern', 'single',
+  'Angle', -30</code></td></tr>
+  <tr><td>RBR</td><td>right-hand</td><td><code>'Pattern',
+  'single'</code></td></tr>
+  <tr><td>RGE</td><td>left-hand and right-hand, points raised</td><td>none,
+  the default</td></tr>
+  <tr><td>RGV</td><td>left-hand and right-hand, points indented</td>
+  <td><code>'Points', 'indented'</code></td></tr>
+  <tr><td>RKE</td><td>cross knurl, points raised</td><td><code>'Angle', [0,
+  90]</code></td></tr>
+  <tr><td>RKV</td><td>cross knurl, points indented</td><td><code>'Angle',
+  [0, 90], 'Points', 'indented'</code></td></tr>
+</table>
+
+<p>A right-hand knurl runs as a right-hand thread does, so a positive
+<code>'Angle'</code> is right-handed and RBL is RBR seen in a mirror. The
+standard draws the grooves of RBL, RBR, RGE and RGV at 30 degrees from the
+axis, and the note of IS 3403 fixes that angle as the standard value; it is the
+default of <code>'Angle'</code>. Any other angle is taken, and so are two
+sets at different angles, the cross knurl being the two sets at 0 and 90
+degrees.</p>
+
+<h2 id="profile">The profile and the pitch</h2>
+
+<p>The profile angle, between the flanks of a tooth, is 90 degrees, and
+the note of IS 3403 calls that the normal value; <code>'Profile'</code> takes any
+other. The pitch is measured square to the grooves, as the sections of
+the standard draw it, and the standard lists 0.5, 0.6, 0.8, 1.0, 1.2 and
+1.6 millimetres. The note of IS 3403 says a pitch of 2 was dropped as
+scarcely used,
+and that no pitch is recommended for a given diameter, since earlier
+recommendations did not suit every use. <code>knurl</code> takes any
+positive pitch.</p>
+
+<h2 id="count">The count round the face</h2>
+
+<p>The standard does not say how the grooves meet round the face. A knurl
+that closes on itself must hold a whole number of grooves round it, so the
+package fits the pitch to the nearest that gives one: the count of a set
+at the angle <i>A</i> from the axis is &pi; <i>d</i> cos <i>A</i> /
+<i>P</i>, rounded, <i>d</i> the diameter of the face, and the pitch is
+&pi; <i>d</i> cos <i>A</i> over that count. Rings, at 90 degrees, are
+counted along the length of the face the same way. On a face 28 across, a
+pitch of 0.8 at 30 degrees gives 95 grooves each way and a pitch of
+0.80195.</p>
+
+<p>The first groove of every set starts at the lower end of the face, at
+the x direction of its cylinder. The standard sets no phase.</p>
+
+<h2 id="depth">The depth</h2>
+
+<p>The standard gives no depth for the finished knurl. Its nominal
+diameter, the one a drawing states, is the outside diameter of the
+finished knurl, and that is the diameter of the face the package knurls.
+By default the grooves are cut to full depth, where the flanks of two
+grooves meet in a point: <i>P</i> / (2 tan (<i>&alpha;</i> / 2)), half the
+pitch at 90 degrees, with the pitch as fitted. Where two sets fit to
+different pitches, both are cut to the depth of the finer. A
+<code>DEPTH</code> less than that leaves flat lands at the nominal diameter
+between the grooves; a greater one is refused.</p>
+
+<h2 id="blank">The blank to turn</h2>
+
+<p>Knurling presses material up out of the grooves, so the blank is turned
+smaller than the nominal diameter <i>d</i><sub>1</sub>. The standard gives
+its initial diameter <i>d</i><sub>2</sub> for a profile of 90 degrees, and
+notes that the factors take no account of the grooves' rounding or of the
+material:</p>
+
+<ul>
+  <li>RAA, RBL and RBR: <i>d</i><sub>2</sub> = <i>d</i><sub>1</sub>
+  &minus; 0.5 <i>P</i>;</li>
+  <li>RGE and RKE: <i>d</i><sub>2</sub> = <i>d</i><sub>1</sub> &minus; 0.67
+  <i>P</i>;</li>
+  <li>RGV and RKV: <i>d</i><sub>2</sub> = <i>d</i><sub>1</sub> &minus; 0.33
+  <i>P</i>.</li>
+</ul>
+
+<p>These are the factors of the package's full-depth teeth, whose volume is
+that of the blank. A set of V grooves takes half the material between the
+nominal diameter and the root; a raised point is a pyramid on its base,
+which holds a third of the block it stands in, so raised points take two
+thirds; an indented point is the same pyramid sunk into the block, and
+takes a third. Measured on a face 28 across and 10 long at a pitch of 0.8,
+as the diameter of a cylinder of the same length and volume:</p>
+
+<table class="guide">
+  <tr><th>Type</th><th>Blank, IS 3403</th><th>Knurl, as a cylinder</th></tr>
+  <tr><td>RAA</td><td>27.600</td><td>27.601</td></tr>
+  <tr><td>RBL, RBR</td><td>27.600</td><td>27.600</td></tr>
+  <tr><td>RGE</td><td>27.464</td><td>27.466</td></tr>
+  <tr><td>RGV</td><td>27.736</td><td>27.733</td></tr>
+  <tr><td>RKE</td><td>27.464</td><td>27.493</td></tr>
+  <tr><td>RKV</td><td>27.736</td><td>27.739</td></tr>
+</table>
+
+<p>RKE differs most because its rings are fitted along the face's length of
+10, 13 of them at a pitch of 0.769, and both sets are cut to the depth of
+that finer pitch, so its grooves along the axis stop short of full depth.
+The package does not compute the blank; it is on the drawing for the
+machinist, from the formulas above.</p>
+
+<h2 id="ends">The ends</h2>
+
+<p>The standard does not treat the ends of a knurl. The package takes a
+fillet or a 45 degree chamfer at a free end, given to <code>knurl</code>
+with <code>'Fillet'</code> or <code>'Chamfer'</code>, and the knurl runs out
+over it as it does on a blank whose edge was rounded or chamfered before
+knurling. An end that meets a shoulder takes neither. Each end must meet a
+flat face square to the axis, so a fillet or chamfer cut on the blank
+before knurling is refused; it is given to <code>knurl</code> instead.</p>
+
+<h2 id="building">How the knurl is built</h2>
+
+<p>A knurl is not cut. It is laid out on the face unrolled, where every
+flank of a groove is a plane in the angle round the axis and the length
+along it, and each piece of the pattern is built as a face on its true
+surface: a cylinder at the nominal diameter or at the root, a spline
+surface for a flank, a torus for a fillet, a cone for a chamfer. The face
+of the part is replaced by the knurled skin, and each end face takes the
+knurl's outline in place of its circle, so no boolean is run. Over every
+type, with fillets and chamfers above and below the depth, the surface
+lies within 0.0000002 millimetres of the profile computed from its
+formula. A knob 28 across and 10 high knurled RGE at 0.8 takes about two
+seconds. The same knob with a bore and a hexagon pocket, knurled at a
+pitch of 2.07 and 45 degrees, takes under one, against 23 seconds when its
+grooves were cut with booleans.</p>
+
+<h2 id="not-done">What is not done</h2>
+
+<ul>
+  <li><b>The rounding of the grooves:</b> the teeth are cut to the sharp
+  profile, which the standard's factors also take.</li>
+  <li><b>The knurling wheels</b> of IS 6776, and the choice of wheel for
+  each type, which IS 3403 gives in its appendix.</li>
+  <li><b>The designation on a drawing,</b> as <code>Knurl RKV 08 IS :
+  3403</code> in the Indian form, which comes with the drawings of
+  solids.</li>
+  <li><b>Knurls on a cone, on a face that is not whole round its axis, or
+  inside a bore.</b></li>
+</ul>
+
+<h2 id="editions">Editions</h2>
+
+<p>IS 3403 (First Revision):1981 was read, as printed with its
+reaffirmation of 2002. It was prepared from DIN 82 of 1973, whose edition
+of January 1973 DIN lists as current, checked in October 2026; it replaced
+DIN 82 of 1940.</p>
+
+        </main>
+      </div>
+    </div>
+  </body>
+</html>

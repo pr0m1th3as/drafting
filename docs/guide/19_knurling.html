@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Knurling - drafting guide</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" integrity="sha512-1ycn6IcaQQ40/MKBW2W4Rhis/DbILU74C1vSrLJxCq57o941Ym01SwNsOMqvEBFlcgUa6xLiPY/NS5R+E6ztJQ==" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/css/bootstrap.min.css" integrity="sha384-KyZXEAg3QhqLMpG8r+8fhAXLRk2vvoC2f3B09zVXn8CA5QIVfZOJ3BCsw2P0p/We" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-U1DAWAznBHeqEIlVSCgzq+c9gqGAJn5c/t99JyeKa9xxaYpSvHU5awsuZVVFIhvj" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="guide.css">
+  </head>
+  <body>
+    <div class="bg-dark">
+      <div class="container-xl">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+          <div class="container-fluid">
+            <a class="navbar-brand" href="index.html">
+              <img src="../assets/drafting.png" alt="drafting" class="d-inline-block align-top" width="25" height="25">
+              drafting guide
+            </a>
+            <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+              <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+              <ul class="navbar-nav">
+                <li class="nav-item">
+                  <a class="nav-link" href="../index.html">
+                    <i class="fas fa-book"></i>
+                    Function reference
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="https://github.com/pr0m1th3as/drafting">
+                    <i class="fab fa-github"></i>
+                    Source
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </nav>
+      </div>
+    </div>
+    <div class="container-xl my-4">
+      <div class="row">
+        <div class="col-md-3 col-lg-2 mb-4">
+          <nav class="guide-nav">
+<!-- guide-nav -->
+            <h6>Guide</h6>
+            <ul>
+              <li><a href="index.html">Overview</a></li>
+              <li><a href="layout.html">Package layout</a></li>
+              <li><a href="dxf.html">DXF and the classes</a></li>
+            </ul>
+            <h6>Octave</h6>
+            <ul>
+              <li><a href="primer.html">A brief Octave primer</a></li>
+            </ul>
+            <h6>Standards</h6>
+            <ul>
+              <li><a href="standards_threads.html">Threads and tapped holes</a></li>
+              <li><a href="standards_holes.html">Clearance holes, counterbores and countersinks</a></li>
+              <li><a href="standards_knurling.html">Knurls</a></li>
+            </ul>
+            <h6>Tutorials</h6>
+            <ul>
+              <li><a href="01_first_part.html">A first part</a></li>
+              <li><a href="02_outlines.html">Outlines: polylines, splines, paths and regions</a></li>
+              <li><a href="03_regions.html">Working with regions</a></li>
+              <li><a href="04_coordinate_systems.html">Coordinate systems</a></li>
+              <li><a href="05_solids_from_regions.html">Solids from regions</a></li>
+              <li><a href="06_primitives_and_booleans.html">Primitives, booleans and transforms</a></li>
+              <li><a href="07_features.html">Features: holes, pockets, fillets, chamfers and shells</a></li>
+              <li><a href="08_sections_and_projections.html">Sections and projections</a></li>
+              <li><a href="09_drawings.html">Technical drawings</a></li>
+              <li><a href="10_meshes.html">Meshes</a></li>
+              <li><a href="11_assemblies.html">Assemblies</a></li>
+              <li><a href="12_from_openscad.html">For OpenSCAD users</a></li>
+              <li><a href="13_surfaces.html">Surfaces through a grid</a></li>
+              <li><a href="14_parts_as_functions.html">Parts as functions</a></li>
+              <li><a href="15_testing_parts.html">Testing parts</a></li>
+              <li><a href="16_holes_and_threads.html">Holes and threads</a></li>
+              <li><a href="17_clearance_holes.html">Clearance holes, counterbores and countersinks</a></li>
+              <li><a href="18_looking_inside.html">Looking inside a model</a></li>
+              <li><a href="19_knurling.html" class="active">Knurling</a></li>
+            </ul>
+<!-- /guide-nav -->
+          </nav>
+        </div>
+        <main class="col-md-9 col-lg-10">
+<h1>Knurling</h1>
+<p>A knurl gives a turned part its grip: a knob, a thumb screw, the nut that holds a cover down. <code>knurl</code> knurls a cylindrical face with any of the seven types of DIN 82, at any pitch, and finishes its ends with a fillet or a chamfer. Where each number comes from is set out on the standards page <a href="standards_knurling.html">Knurls</a>.</p>
+<h2>A knurled knob</h2>
+<p>A knob 28 across and 10 high takes the default knurl, RGE: two sets of grooves at 30 degrees either side of the axis, teeth of 90 degrees cut to a point, leaving raised points. The face to knurl is picked by its type, as for <code>fillet</code>, and the pitch is 0.8, one of the pitches DIN 82 lists.</p>
+<pre class="code-in"><code>knob = solid.cylinder (14, 10);
+F = faces (knob, 'Type', 'cylinder')
+knob = knurl (knob, F, 0.8);
+show (knob);</code></pre>
+<pre class="code-out"><code>F = 1</code></pre>
+<figure class="shot"><img src="img/19_knurling-1.png" alt="Knurling, picture 1"></figure>
+<h2>The pitch round the face</h2>
+<p>The pitch is measured square to the grooves, as DIN 82 gives it. A whole number of grooves must go round the face, so the pitch is fitted to the nearest that gives one. At 30 degrees from the axis the knob takes 95 grooves each way, a little coarser than 0.8.</p>
+<pre class="code-in"><code>n = round (pi * 28 * cosd (30) / 0.8)
+p = pi * 28 * cosd (30) / n</code></pre>
+<pre class="code-out"><code>n = 95
+p = 0.8019</code></pre>
+<p>By default the grooves are cut to full depth, where the flanks of two grooves meet in a point: half the pitch as fitted, for teeth of 90 degrees.</p>
+<pre class="code-in"><code>full = p / 2</code></pre>
+<pre class="code-out"><code>full = 0.4009</code></pre>
+<p>A shallower <code>DEPTH</code> leaves flat lands at the diameter of the knob between the grooves. A deeper one is refused, since the teeth would have to overlap.</p>
+<pre class="code-in"><code>lands = knurl (solid.cylinder (14, 10), F, 0.8, 0.2);
+show (lands);
+knurl (solid.cylinder (14, 10), F, 0.8, 0.5);</code></pre>
+<pre class="code-out"><code>solid.Shape.knurl: DEPTH must be no more than 0.4009, the full depth of the teeth at the pitch fitted round F.</code></pre>
+<figure class="shot"><img src="img/19_knurling-2.png" alt="Knurling, picture 2"></figure>
+<h2>The seven types</h2>
+<p>DIN 82 names seven knurls, each made by options of <code>knurl</code>:</p>
+<ul>
+<li>RAA, straight grooves along the axis: <code>'Pattern', 'single', 'Angle', 0</code>.</li>
+<li>RBL, left-hand: <code>'Pattern', 'single', 'Angle', -30</code>.</li>
+<li>RBR, right-hand: <code>'Pattern', 'single'</code>.</li>
+<li>RGE, left-hand and right-hand, points raised: the default.</li>
+<li>RGV, left-hand and right-hand, points indented: <code>'Points', 'indented'</code>.</li>
+<li>RKE, cross knurl, points raised: <code>'Angle', [0, 90]</code>.</li>
+<li>RKV, cross knurl, points indented: <code>'Angle', [0, 90], 'Points', 'indented'</code>.</li>
+</ul>
+<p>A positive angle runs right-handed, as a thread does, so RBL is RBR seen in a mirror. Seven small knobs in a row, one of each from left to right, are held in an assembly, which shows them side by side without joining them. The side of a cylinder is its face 1, as above.</p>
+<pre class="code-in"><code>types = {{'Pattern', 'single', 'Angle', 0}, ...
+         {'Pattern', 'single', 'Angle', -30}, ...
+         {'Pattern', 'single'}, ...
+         {}, ...
+         {'Points', 'indented'}, ...
+         {'Angle', [0, 90]}, ...
+         {'Angle', [0, 90], 'Points', 'indented'}};
+names = {'RAA', 'RBL', 'RBR', 'RGE', 'RGV', 'RKE', 'RKV'};
+row = model.Assembly ('knurls');
+for k = 1:7
+  S = knurl (solid.cylinder (6, 8), 1, 1, types{k}{:});
+  row = add (row, names{k}, S, geom.UCS ([0, 0, 1], [16 * (k - 1), 0, 0]));
+endfor
+show (row);</code></pre>
+<figure class="shot"><img src="img/19_knurling-3.png" alt="Knurling, picture 3"></figure>
+<h2>Finishing the ends</h2>
+<p>A knurl is chamfered or rounded at a free end, so that it does not end in a ring of sharp points. One size chamfers or rounds every free end of the face.</p>
+<pre class="code-in"><code>knob = knurl (solid.cylinder (14, 10), F, 0.8, 'Chamfer', 0.5);
+show (knob);</code></pre>
+<figure class="shot"><img src="img/19_knurling-4.png" alt="Knurling, picture 4"></figure>
+<p>A cell array names the end each size goes to, by the edge at that end, picked as for <code>chamfer</code>: here the top is rounded 1 and the bottom chamfered 0.5. Each end takes one or the other.</p>
+<pre class="code-in"><code>blank = solid.cylinder (14, 10);
+top = edges (blank, 'Type', 'circle', 'Within', [-15, -15, 10, 15, 15, 10])
+bottom = edges (blank, 'Type', 'circle', 'Within', [-15, -15, 0, 15, 15, 0])
+knob = knurl (blank, F, 0.8, 'Fillet', {top, 1}, 'Chamfer', {bottom, 0.5});
+show (knob);</code></pre>
+<pre class="code-out"><code>top = 1
+bottom = 3</code></pre>
+<figure class="shot"><img src="img/19_knurling-5.png" alt="Knurling, picture 5"></figure>
+<p>An end named by its edge is treated first, and a single size for the other option takes the free end that is left, so this knob is the same.</p>
+<pre class="code-in"><code>same = knurl (blank, F, 0.8, 'Fillet', 1, 'Chamfer', {bottom, 0.5});
+volume (same) - volume (knob)</code></pre>
+<pre class="code-out"><code>ans = 0</code></pre>
+<h2>Up to a shoulder</h2>
+<p>A knurl that runs up to a shoulder ends at the shoulder's face, and that end can be neither rounded nor chamfered. A single size leaves it as it is and treats the free end only; naming the shoulder's edge is refused.</p>
+<pre class="code-in"><code>shaft = union (solid.cylinder (20, 5, geom.UCS ([0, 0, 1], [0, 0, -5])), ...
+               solid.cylinder (14, 10));
+G = faces (shaft, 'Type', 'cylinder', 'Within', [-15, -15, 0, 15, 15, 10])
+shoulder = edges (shaft, 'Type', 'circle', 'Within', [-15, -15, 0, 15, 15, 0]);
+knurl (shaft, G, 0.8, 'Chamfer', {shoulder, 0.5});
+shaft = knurl (shaft, G, 0.8, 'Chamfer', 0.5);
+show (shaft);</code></pre>
+<pre class="code-out"><code>G = 4
+solid.Shape.knurl: edge 4 is where F meets a shoulder, so it cannot be filleted or chamfered.</code></pre>
+<figure class="shot"><img src="img/19_knurling-6.png" alt="Knurling, picture 6"></figure>
+<h2>Knurl last</h2>
+<p>A knurl adds thousands of faces, and every later boolean has to cut through them, so a part is knurled after its other features. This knob takes an M8 screw from below: a clearance hole right through and a hexagon pocket for the screw's head, then the knurl, rounded 2 at the bottom.</p>
+<pre class="code-in"><code>knob = solid.cylinder (14, 10);
+knob = hole (knob, [0, 0, 10], 'M8', Inf, 'Clearance', 'medium');
+R = geom.Region (13 / sqrt (3) * [cosd(0:60:300)', sind(0:60:300)']);
+R.UCS = geom.UCS ([0, 0, -1], [0, 0, 0]);
+knob = pocket (knob, R, 5.5);
+F = faces (knob, 'Type', 'cylinder', 'Within', [-15, -15, 0, 15, 15, 10]);
+F = F(! ismember (F, faces (knob, 'Within', [-8, -8, 0, 8, 8, 10])))
+bottom = edges (knob, 'Type', 'circle', 'Within', [-15, -15, 0, 15, 15, 0]);
+bottom = bottom(! ismember (bottom, ...
+                            edges (knob, 'Within', [-8, -8, 0, 8, 8, 0])))
+knob = knurl (knob, F, 0.8, 'Fillet', {bottom, 2});</code></pre>
+<pre class="code-out"><code>F = 1
+bottom = 3</code></pre>
+<p>Seen from below, the pocket and the fillet face the reader.</p>
+<pre class="code-in"><code>V = show (knob);
+view (V, -37.5, -30);</code></pre>
+<figure class="shot"><img src="img/19_knurling-7.png" alt="Knurling, picture 7"></figure>
+<h2>The blank to turn</h2>
+<p>The model is the finished knurl, its points at the diameter of the face, which is the nominal diameter of DIN 82, the one a drawing states. Knurling presses the material up out of the grooves, so the machinist turns the blank smaller before knurling: for RGE, by two thirds of the pitch. The knurled knob holds the volume of that blank, to a few thousandths of a millimetre.</p>
+<pre class="code-in"><code>blank = 28 - 0.67 * 0.8
+band = knurl (solid.cylinder (14, 10), 1, 0.8);
+2 * sqrt (volume (band) / (pi * 10))</code></pre>
+<pre class="code-out"><code>blank = 27.464
+ans = 27.466</code></pre>
+<h2>What cannot be knurled</h2>
+<p>The face must be the outside of the part, all the way round its axis, and each of its ends must meet a flat face square to the axis. A bore is refused, and so is a face whose end was rounded before knurling: the fillet belongs to the knurl, given with <code>'Fillet'</code>.</p>
+<pre class="code-in"><code>ring = hole (solid.cylinder (14, 10), [0, 0, 10], 8, Inf);
+bore = faces (ring, 'Type', 'cylinder', 'Within', [-5, -5, 0, 5, 5, 10]);
+knurl (ring, bore, 0.8);
+rounded = fillet (solid.cylinder (14, 10), top, 1);
+knurl (rounded, faces (rounded, 'Type', 'cylinder'), 0.8);</code></pre>
+<pre class="code-out"><code>solid.Shape.knurl: F must be an outside face, not a bore.
+solid.Shape.knurl: each end of F must meet one flat face square to its axis.</code></pre>
+<nav class="d-flex justify-content-between my-5">
+<a href="18_looking_inside.html">&larr; Looking inside a model</a>
+</nav>
+
+        </main>
+      </div>
+    </div>
+  </body>
+</html>
