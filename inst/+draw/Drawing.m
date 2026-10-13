@@ -1724,11 +1724,6 @@ classdef Drawing
         error ("draw.Drawing.diam: invalid number of input arguments.");
       endif
       e = dimcircle (this, 'diam', C, R, ANG, LABEL);
-      if (isempty (e.text))
-        ## Three decimals is a micron in millimetres, finer than anything this
-        ## package's own output is accurate to and past any drawing's need
-        e.text = sprintf ('%%%%c%g', round (2 * R * 1000) / 1000);
-      endif
       this.Entities(end+1) = e;
 
     endfunction
@@ -1753,9 +1748,6 @@ classdef Drawing
         error ("draw.Drawing.radius: invalid number of input arguments.");
       endif
       e = dimcircle (this, 'radius', C, R, ANG, LABEL);
-      if (isempty (e.text))
-        e.text = sprintf ('R%g', round (R * 1000) / 1000);
-      endif
       this.Entities(end+1) = e;
 
     endfunction
@@ -1811,15 +1803,6 @@ classdef Drawing
       e.pts = [V(:)'; P1(:)'; P2(:)'];
       e.radius = RAD;
       e.text = LABEL;
-      if (isempty (e.text))
-        a1 = atan2 (P1(2) - V(2), P1(1) - V(1));
-        a2 = atan2 (P2(2) - V(2), P2(1) - V(1));
-        ## Two decimals: a drawing states an angle to a hundredth at most, and
-        ## the six significant figures %g would give are measurement noise
-        ## rather than a specification
-        e.text = sprintf ('%g%%%%d', ...
-                          round (mod ((a2 - a1) * 180 / pi, 360) * 100) / 100);
-      endif
       this.Entities(end+1) = e;
 
     endfunction
@@ -2032,13 +2015,19 @@ classdef Drawing
     ## A circle keeps its centre and scales its radius; an arc rotates its
     ## angles; text moves, rotates and scales its height; a spline, path or
     ## region moves as the exact curve it is; a hatch moves its region,
-    ## rotates its pattern and scales its spacing.  A dimension carries its
-    ## measured points and scales its offset.
+    ## rotates its pattern and scales its spacing.  An insert turns and scales
+    ## the block it places.  A dimension carries its measured points and its
+    ## offset, a diameter or radius dimension its radius and direction, an
+    ## angular dimension its radius; one with no label of its own is labelled
+    ## with what it measures whenever it is drawn or written, so its label
+    ## follows it.
     ##
     ## @strong{A reflection reverses the sweep of an arc.}  Arcs run
     ## counter-clockwise from the first angle to the second, so mirroring one
     ## and keeping the order would silently give the complementary arc --- the
-    ## piece that was not there before.  The endpoints are exchanged instead.
+    ## piece that was not there before.  The endpoints are exchanged instead,
+    ## and for the same reason the bulges of a polyline change sign and the
+    ## arms of an angular dimension are exchanged.
     ##
     ## @subheading What is refused, and why
     ##
@@ -2046,8 +2035,14 @@ classdef Drawing
     ## raises.  @code{transform} makes no ellipse out of a circle or an arc,
     ## and quietly scaling the radius by one of the two factors would move the
     ## geometry off the part.  An ellipse, a spline, a path, a region or a
-    ## hatch refuses it too.  A drawing of lines and polylines without arcs
-    ## scales anisotropically without complaint.
+    ## hatch refuses it too, as do a polyline with arcs, an insert and a
+    ## diameter, radius or angular dimension.  A drawing of lines and
+    ## polylines without arcs scales anisotropically without complaint.
+    ##
+    ## @strong{An insert cannot be mirrored}, since it places its block turned
+    ## and scaled but never reflected; mirroring one raises, naming it.  Expand
+    ## the drawing first with @code{draw.Drawing.expand} to mirror what the
+    ## insert places.
     ##
     ## @strong{A rotation that would leave an axis-locked dimension off its
     ## axis} raises, naming the entity.  A @qcode{'horizontal'} dimension
@@ -2084,11 +2079,73 @@ classdef Drawing
       for ii = 1:numel (this.Entities)
         e = this.Entities(ii);
 
+        ## The point a linear dimension's line passes through over its first
+        ## point, carried along to find its offset after
+        if (strcmp (e.type, 'dim'))
+          if (strcmp (e.direction, 'horizontal'))
+            U = [1, 0];
+          elseif (strcmp (e.direction, 'vertical'))
+            U = [0, 1];
+          else
+            U = (e.pts(2,:) - e.pts(1,:)) / norm (e.pts(2,:) - e.pts(1,:));
+          endif
+          Q = geom.transform (e.pts(1,:) + e.offset * [-U(2), U(1)], ...
+                              varargin{:});
+        endif
+
         if (! isempty (e.pts))
           e.pts = geom.transform (e.pts, varargin{:});
         endif
 
         switch (e.type)
+          case 'insert'
+            if (reflected)
+              error (strcat ("draw.Drawing.transform: entity %d is an", ...
+                             " insert, which cannot hold a mirror; expand", ...
+                             " it first."), ii);
+            endif
+            if (! uniform)
+              error (strcat ("draw.Drawing.transform: entity %d is an", ...
+                             " insert and the scaling is not uniform."), ii);
+            endif
+            e.angle = dirangle (M, e.angle);
+            e.scale *= sx;
+
+          case 'polyline'
+            ## A bulge is an arc, which a mirror turns the other way round
+            if (any (e.bulge != 0))
+              if (! uniform)
+                error (strcat ("draw.Drawing.transform: entity %d is a", ...
+                               " polyline with arcs and the scaling is not", ...
+                               " uniform; the result would hold ellipses."), ...
+                       ii);
+              endif
+              if (reflected)
+                e.bulge = -e.bulge;
+              endif
+            endif
+
+          case {'diam', 'radius'}
+            if (! uniform)
+              error (strcat ("draw.Drawing.transform: entity %d is a %s", ...
+                             " dimension and the scaling is not uniform."), ...
+                     ii, e.type);
+            endif
+            e.radius *= sx;
+            e.angle = dirangle (M, e.angle);
+
+          case 'angdim'
+            if (! uniform)
+              error (strcat ("draw.Drawing.transform: entity %d is an", ...
+                             " angular dimension and the scaling is not", ...
+                             " uniform."), ii);
+            endif
+            ## A mirror reverses the turn from the first arm to the second
+            e.radius *= sx;
+            if (reflected)
+              e.pts = e.pts([1, 3, 2],:);
+            endif
+
           case {'circle', 'arc'}
             if (! uniform)
               error (strcat ("draw.Drawing.transform: entity %d is a %s", ...
@@ -2150,7 +2207,14 @@ classdef Drawing
                 && ! strcmp (e.direction, 'aligned'))
               e.direction = axisafter (M, e.direction);
             endif
-            e.offset *= sx;
+            if (strcmp (e.direction, 'horizontal'))
+              U = [1, 0];
+            elseif (strcmp (e.direction, 'vertical'))
+              U = [0, 1];
+            else
+              U = (e.pts(2,:) - e.pts(1,:)) / norm (e.pts(2,:) - e.pts(1,:));
+            endif
+            e.offset = (Q - e.pts(1,:)) * [-U(2); U(1)];
 
           case 'ordinate'
             if (! onaxes)
@@ -4319,6 +4383,9 @@ endfunction
 ## beside dimrecord so the two cannot drift apart.
 function t = autolabel (e, kind)
 
+  ## Three decimals is a micron in millimetres, finer than anything this
+  ## package's own output is accurate to and past any drawing's need; two for
+  ## an angle, which a drawing states to a hundredth at most
   switch (kind)
     case 'diam'
       t = sprintf ('%%%%c%g', round (2 * e.radius * 1000) / 1000);
@@ -4392,6 +4459,9 @@ function parts = explodecirc (e, scale)
 
   t = mkent ('TEXT', e, outer + 0.5 * hgt * (u + n));
   t.text = e.text;
+  if (isempty (t.text))
+    t.text = autolabel (e, e.type);
+  endif
   t.height = hgt;
   t.rotation = 0;
   parts(end+1) = t;
@@ -4423,6 +4493,9 @@ function parts = explodeang (e, scale)
   am = a1 + mod (a2 - a1, 360) / 2;
   t = mkent ('TEXT', e, V + (e.radius + 0.5 * hgt) * [cosd(am), sind(am)]);
   t.text = e.text;
+  if (isempty (t.text))
+    t.text = autolabel (e, e.type);
+  endif
   t.height = hgt;
   t.rotation = 0;
   parts(end+1) = t;
@@ -4761,22 +4834,6 @@ function o = dopts (e, ltscale, scale)
 
 endfunction
 
-## The colour number C as a TikZ option: a name for 1 to 8, the colour
-## itself for 9 to 255, and nothing for by layer or by block
-function p = colourpart (c)
-
-  names = {'red', 'yellow', 'green', 'cyan', 'blue', 'magenta', 'black', ...
-           'gray'};
-  p = '';
-  if (c >= 1 && c <= 8)
-    p = names{c};
-  elseif (c >= 9 && c <= 255)
-    p = sprintf ('color={rgb,255:red,%d;green,%d;blue,%d}', ...
-                 round (255 * draw.colour (c)));
-  endif
-
-endfunction
-
 ## Colour C, line type LT and line weight LW as TikZ options, none for what
 ## is by layer, by block or the default.
 ##
@@ -4789,9 +4846,14 @@ function parts = optparts (c, lt, lw, ltscale, scale)
 
   parts = {};
 
-  p = colourpart (c);
-  if (! isempty (p))
-    parts{end+1} = p;
+  ## A colour by name from 1 to 8, as itself from 9 to 255
+  names = {'red', 'yellow', 'green', 'cyan', 'blue', 'magenta', 'black', ...
+           'gray'};
+  if (c >= 1 && c <= 8)
+    parts{end+1} = names{c};
+  elseif (c >= 9 && c <= 255)
+    parts{end+1} = sprintf ('color={rgb,255:red,%d;green,%d;blue,%d}', ...
+                            round (255 * draw.colour (c)));
   endif
 
   if (! any (strcmpi (lt, {'CONTINUOUS', 'byLayer', 'byBlock'})))
@@ -4885,9 +4947,10 @@ function lines = render (e, scale, ltscale)
     case 'TEXT'
       opts = sprintf ('anchor=base west, inner sep=0pt, font=%s', ...
                       fontfor (e.height, scale));
-      p = colourpart (optfield (e, 'colour', 256));
+      p = optparts (optfield (e, 'colour', 256), 'CONTINUOUS', 'byLayer', ...
+                    1, 1);
       if (! isempty (p))
-        opts = sprintf ('%s, %s', opts, p);
+        opts = sprintf ('%s, %s', opts, p{1});
       endif
       if (e.rotation != 0)
         opts = sprintf ('%s, rotate=%s', opts, fmt (e.rotation));

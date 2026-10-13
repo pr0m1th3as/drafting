@@ -826,6 +826,48 @@
 %!error<draw.Drawing.transform: entity 1 is an ellipse and the scaling is not uniform.> ...
 %! draw.Drawing ().ellipse ([0, 0], 10, 5).transform ('scale', [2, 1])
 
+%!test  # an insert turns and scales with the drawing
+%! B = draw.Drawing ().line ([0, 0], [10, 0]);
+%! D = draw.Drawing ().block ('L', B).insert ('L', [5, 5], 30, 2);
+%! T = transform (D, 'rotate', 90);
+%! assert_equal ([T.Entities.angle, T.Entities.scale], [120, 2], 1e-12);
+%! assert_equal (expand (transform (D, 'scale', 2)).Entities.pts, ...
+%!               transform (expand (D), 'scale', 2).Entities.pts, 1e-12);
+
+%!test  # a mirror turns a polyline's arcs the other way
+%! D = draw.Drawing ().polyline (geom.Polyline ([0, 0, 1; 10, 0, 0]));
+%! T = transform (D, 'mirror', 'x');
+%! assert_equal (T.Entities.bulge(1), -1);
+%! assert_equal (bbox (T), [0, 0, 10, 5], 1e-12);
+
+%!test  # a radius dimension scales, and its label follows the measurement
+%! D = draw.Drawing ().radius ([0, 0], 5, 0).transform ('scale', 2);
+%! assert_equal (D.Entities.radius, 10);
+%! E = entities (D, 'Dimensions', 'explode');
+%! assert_equal (E(end).text, 'R10');
+
+%!test  # a given label stays as it was given
+%! D = draw.Drawing ().radius ([0, 0], 5, 0, 'R5 MAX').transform ('scale', 2);
+%! E = entities (D, 'Dimensions', 'explode');
+%! assert_equal (E(end).text, 'R5 MAX');
+
+%!test  # a diameter dimension turns its measuring line with the drawing
+%! D = draw.Drawing ().diam ([0, 0], 5, 0).transform ('rotate', 90);
+%! assert_equal (D.Entities.angle, 90, 1e-12);
+
+%!test  # a mirrored angular dimension measures the same angle
+%! D = draw.Drawing ().angdim ([0, 0], [10, 0], [0, 10], 5);
+%! E = entities (transform (D, 'mirror', 'x'), 'Dimensions', 'explode');
+%! assert_equal (E(end).text, '90%%d');
+
+%!test  # a mirrored dimension keeps its line on the mirrored side
+%! D = draw.Drawing ().dim ([0, 0], [10, 0], 5);
+%! assert_equal (transform (D, 'mirror', 'x').Entities.offset, -5, 1e-12);
+
+%!test  # and a horizontal one mirrored across the vertical keeps its side
+%! D = draw.Drawing ().dim ([0, 0], [10, 3], 5, 'horizontal');
+%! assert_equal (transform (D, 'mirror', 'y').Entities.offset, 5, 1e-12);
+
 %!test  # merge concatenates entities in order
 %! A = draw.Drawing ('a').line ([0, 0], [1, 0]);
 %! B = draw.Drawing ('b').circle ([0, 0], 1);
@@ -902,6 +944,22 @@
 %! D.transform ('scale', [2, 1])
 %!error<draw.Drawing.transform: entity 1 is a hatch and the scaling is not uniform.> ...
 %! D = draw.Drawing ().hatch (geom.Region ([0, 0; 10, 0; 10, 10]));
+%! D.transform ('scale', [2, 1])
+%!error<draw.Drawing.transform: entity 1 is an insert, which cannot hold a mirror; expand it first.> ...
+%! B = draw.Drawing ().line ([0, 0], [10, 0]);
+%! D = draw.Drawing ().block ('L', B).insert ('L', [5, 5]);
+%! D.transform ('mirror', 'x')
+%!error<draw.Drawing.transform: entity 1 is a polyline with arcs and the scaling is not uniform; the result would hold ellipses.> ...
+%! D = draw.Drawing ().polyline (geom.Polyline ([0, 0, 1; 10, 0, 0]));
+%! D.transform ('scale', [2, 1])
+%!error<draw.Drawing.transform: entity 1 is an insert and the scaling is not uniform.> ...
+%! B = draw.Drawing ().line ([0, 0], [10, 0]);
+%! D = draw.Drawing ().block ('L', B).insert ('L', [5, 5]);
+%! D.transform ('scale', [2, 1])
+%!error<draw.Drawing.transform: entity 1 is a radius dimension and the scaling is not uniform.> ...
+%! draw.Drawing ().radius ([0, 0], 5).transform ('scale', [2, 1])
+%!error<draw.Drawing.transform: entity 1 is an angular dimension and the scaling is not uniform.> ...
+%! D = draw.Drawing ().angdim ([0, 0], [10, 0], [0, 10], 5);
 %! D.transform ('scale', [2, 1])
 %!error<draw.Drawing.transform: entity 1 is a 'horizontal' dimension and the transformation would leave it off its axis; make it 'aligned' first.> ...
 %! D = draw.Drawing ().dim ([0, 0], [50, 0], -10, 'horizontal');
@@ -1082,12 +1140,13 @@
 
 %!test  # a diameter dimension labels itself with the symbol and the figure
 %! D = draw.Drawing ().diam ([0, 0], 12.5);
-%! assert_equal (D.Entities(1).text, '%%c25');
+%! E = entities (D, 'Dimensions', 'explode');
+%! assert_equal (E(end).text, '%%c25');
 %! assert_equal (D.Entities(1).radius, 12.5);
 
 %!test  # a radius dimension labels itself with R and the figure
-%! D = draw.Drawing ().radius ([0, 0], 8);
-%! assert_equal (D.Entities(1).text, 'R8');
+%! E = entities (draw.Drawing ().radius ([0, 0], 8), 'Dimensions', 'explode');
+%! assert_equal (E(end).text, 'R8');
 
 %!test  # an explicit label wins over the measurement
 %! D = draw.Drawing ().diam ([0, 0], 5, 45, '%%c10 H7');
@@ -1103,11 +1162,13 @@
 
 %!test  # an angular dimension measures counter-clockwise from the first arm
 %! D = draw.Drawing ().angdim ([0, 0], [10, 0], [0, 10], 5);
-%! assert_equal (D.Entities(1).text, '90%%d');
+%! E = entities (D, 'Dimensions', 'explode');
+%! assert_equal (E(end).text, '90%%d');
 
 %!test  # and giving the arms the other way round dimensions the explement
 %! D = draw.Drawing ().angdim ([0, 0], [0, 10], [10, 0], 5);
-%! assert_equal (D.Entities(1).text, '270%%d');
+%! E = entities (D, 'Dimensions', 'explode');
+%! assert_equal (E(end).text, '270%%d');
 
 %!test  # it lowers to an arc at the stated radius plus ticks and text
 %! E = entities (draw.Drawing ().angdim ([0, 0], [10, 0], [0, 10], 5), ...
@@ -1180,13 +1241,15 @@
 
 %!test  # a measured angle is stated to a hundredth, not to six figures
 %! D = draw.Drawing ().angdim ([0, 0], [40.24, 2.02], [-2.13, 42.23], 30);
-%! assert_equal (numel (strfind (D.Entities(1).text, '.')) <= 1, true);
-%! v = str2double (strrep (D.Entities(1).text, '%%d', ''));
+%! E = entities (D, 'Dimensions', 'explode');
+%! assert_equal (numel (strfind (E(end).text, '.')) <= 1, true);
+%! v = str2double (strrep (E(end).text, '%%d', ''));
 %! assert_equal (abs (v - round (v * 100) / 100) < 1e-12, true);
 
 %!test  # and a measured length to a micron
 %! D = draw.Drawing ().diam ([0, 0], 6.17283945);
-%! assert_equal (D.Entities(1).text, '%%c12.346');
+%! E = entities (D, 'Dimensions', 'explode');
+%! assert_equal (E(end).text, '%%c12.346');
 
 %!test  # an x ordinate is the distance of the feature from the datum in x
 %! D = draw.Drawing ().ordinate ([0, 0], [20, 15], 'x', [20, -10]);
@@ -2351,8 +2414,8 @@
 %! S = tikz (D.text ([0, 0], 'NOTE'));
 %! assert_equal (! isempty (strfind (S, ...
 %!               '\draw[color={rgb,255:red,255;green,127;blue,0}]')), true);
-%! assert_equal (! isempty (strfind (S, '\selectfont, red] at (0,0) {NOTE}')), ...
-%!               true);
+%! N = '\selectfont, red] at (0,0) {NOTE}';
+%! assert_equal (! isempty (strfind (S, N)), true);
 
 %!test  # a default entity carries no options at all
 %! S = tikz (draw.Drawing ().line ([0, 0], [1, 0]));

@@ -401,9 +401,24 @@ classdef Assembly
         endif
         base += numvertices (X);
       endfor
+      ## Colours of the parts that have them, grey on those that have none
+      C = vertcat (C{:});
+      if (all (isnan (C(:))))
+        C = [];
+      else
+        bare = isnan (C(:,1));
+        C(bare,:) = repmat ([0.72, 0.74, 0.78], nnz (bare), 1);
+      endif
+      VC = vertcat (VC{:});
+      if (all (isnan (VC(:))))
+        VC = [];
+      else
+        bare = isnan (VC(:,1));
+        VC(bare,:) = repmat ([0.72, 0.74, 0.78], nnz (bare), 1);
+      endif
       M = polymesh.Mesh (vertcat (V{:}), vertcat (F{:}));
-      M.FaceColour = greyed (vertcat (C{:}));
-      M.VertexColour = greyed (vertcat (VC{:}));
+      M.FaceColour = C;
+      M.VertexColour = VC;
 
     endfunction
 
@@ -690,19 +705,6 @@ classdef Assembly
   endmethods
 
 endclassdef
-
-## The colours C, a row for each triangle or vertex, none where every row is
-## NaN, and a part's rows without a colour grey
-function C = greyed (C)
-
-  if (all (isnan (C(:))))
-    C = [];
-  else
-    bare = isnan (C(:,1));
-    C(bare,:) = repmat ([0.72, 0.74, 0.78], nnz (bare), 1);
-  endif
-
-endfunction
 
 ## The name of the first part of A that is a mesh, its own or one of its
 ## sub-assemblies', or empty when none is

@@ -810,7 +810,6 @@ classdef Mesh
 
 endclassdef
 
-## The corners of every triangle of M, three K-by-3 matrices
 ## The shell of each triangle of the mesh M, numbered from 1: triangles
 ## sharing a vertex are in one shell
 function S = shells (M)
@@ -832,6 +831,7 @@ function S = shells (M)
 
 endfunction
 
+## The corners of every triangle of M, three K-by-3 matrices
 function [a, b, c] = corners (M)
 
   V = M.Vertices;

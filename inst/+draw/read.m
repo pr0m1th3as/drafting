@@ -264,7 +264,9 @@ endfunction
 %! a = D.Entities(strcmp ({D.Entities.type}, 'angdim'));
 %! assert_equal (a.pts, [0, 0; 100, 0; 100, 60], 1e-9);
 %! assert_equal (a.radius, hypot (32, 9), 1e-9);
-%! assert_equal (a.text, '30.96%%d');
+%! assert_equal (a.text, '');
+%! E = entities (D, 'Dimensions', 'explode');
+%! assert_equal (any (strcmp ({E.text}, '30.96%%d')), true);
 
 %!test  # R14 declares no units, and is read as millimetres
 %! fn = fullfile (fileparts (fileparts (which ('draw.read'))), 'tests', ...
@@ -294,7 +296,8 @@ endfunction
 %! unwind_protect
 %!   write (draw.Drawing ().angdim ([0, 0], [0, 10], [10, 0], 5), tmpf);
 %!   R = draw.read (tmpf);
-%!   assert_equal (R.Entities.text, '270%%d');
+%!   E = entities (R, 'Dimensions', 'explode');
+%!   assert_equal (E(end).text, '270%%d');
 %! unwind_protect_cleanup
 %!   [~] = unlink (tmpf);
 %! end_unwind_protect
@@ -468,7 +471,8 @@ endfunction
 %!test  # a block *D1 kept from a file is not taken for a dimension's
 %! fid = fopen (tmpf, 'w');
 %! fputs (fid, ["0\nSECTION\n2\nBLOCKS\n0\nBLOCK\n8\n0\n2\n*D1\n70\n1\n" ...
-%!              "10\n0\n20\n0\n30\n0\n3\n*D1\n0\nCIRCLE\n8\n0\n10\n0\n20\n0\n" ...
+%!              "10\n0\n20\n0\n30\n0\n3\n*D1\n" ...
+%!              "0\nCIRCLE\n8\n0\n10\n0\n20\n0\n" ...
 %!              "30\n0\n40\n3\n0\nENDBLK\n8\n0\n0\nENDSEC\n" ...
 %!              "0\nSECTION\n2\nENTITIES\n0\nINSERT\n8\n0\n2\n*D1\n" ...
 %!              "10\n50\n20\n0\n30\n0\n0\nENDSEC\n0\nEOF\n"]);
