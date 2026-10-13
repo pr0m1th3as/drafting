@@ -176,6 +176,9 @@ or later, install them before the package with:
 If they are elsewhere, name their directories before installing, for example
 `setenv ("OCCT_INC", "/opt/occt/include/opencascade")` and
 `setenv ("OCCT_LIB", "/opt/occt/lib")`, or `X11_INC` and `X11_LIB`.
+The package records where it found the libraries, so they need not be on the
+system's library path, and headers found outside `/usr` without their
+libraries beside them stop the build rather than link another version.
 
 The package builds on Linux and FreeBSD. Its Makefile is GNU make's, so on
 FreeBSD install `gmake` and type `setenv ("MAKE", "gmake")` before

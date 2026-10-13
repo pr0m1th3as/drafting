@@ -23,7 +23,8 @@ X11_PREFIX := $(patsubst %/include,%,$(X11_INC))
 ifndef OCCT_LIB
 OCCT_LIB := $(patsubst %/,%,$(dir $(firstword $(wildcard \
               $(OCCT_PREFIX)/lib/libTKernel.so* \
-              $(OCCT_PREFIX)/lib64/libTKernel.so*))))
+              $(OCCT_PREFIX)/lib64/libTKernel.so* \
+              $(OCCT_PREFIX)/lib/*/libTKernel.so*))))
 endif
 ifndef X11_LIB
 X11_LIB := $(patsubst %/,%,$(dir $(firstword $(wildcard \
@@ -31,6 +32,16 @@ X11_LIB := $(patsubst %/,%,$(dir $(firstword $(wildcard \
              $(X11_PREFIX)/lib64/libX11.so*))))
 endif
 LIB_DIRS = $(addprefix -L,$(sort $(OCCT_LIB) $(X11_LIB)))
+
+# Libraries outside the loader's own directories are found at run time by the
+# path the built files record, as at link time by the -L above.  It is
+# recorded as RPATH, not RUNPATH: a RUNPATH serves only the file's own
+# libraries, and Open CASCADE's record no path for the libraries they load.
+comma := ,
+RPATH_DIRS = $(filter-out /lib /lib64 /usr/lib /usr/lib64 /usr/lib/%, \
+               $(sort $(OCCT_LIB) $(X11_LIB)))
+RPATH = $(if $(RPATH_DIRS),-Wl$(comma)--disable-new-dtags \
+          $(addprefix -Wl$(comma)-rpath$(comma),$(RPATH_DIRS)))
 OCCT_LIBS = -lTKernel -lTKMath -lTKG2d -lTKG3d -lTKGeomBase -lTKGeomAlgo \
             -lTKBRep -lTKTopAlgo -lTKPrim -lTKBO -lTKFillet -lTKOffset \
             -lTKMesh -lTKDESTEP -lTKXSBase -lTKDE -lTKXCAF -lTKLCAF -lTKCAF \
@@ -70,6 +81,15 @@ $(error drafting needs X11, not found in $(or $(X11_INC),$(X11_DIRS)); \
   on Debian or Ubuntu install libx11-dev, or set X11_INC)
 endif
 
+# Headers outside the system's own with no libraries beside them would be
+# linked against the system's Open CASCADE, which may be another version
+ifeq ($(OCCT_LIB),)
+ifneq ($(OCCT_PREFIX),/usr)
+$(error drafting found the Open CASCADE headers in $(OCCT_INC) but not \
+  their libraries in $(OCCT_PREFIX)/lib or lib64; set OCCT_LIB)
+endif
+endif
+
 OCTFILES = __mesh__.oct __dxf__.oct __occt__.oct __occtfont__.oct
 PROGRAMS = __occtview__
 
@@ -83,17 +103,18 @@ __dxf__.oct: __dxf__.cc
 	$(MKOCTFILE) -O2 __dxf__.cc
 
 __occtfont__.oct: __occtfont__.cc shapebytes.h
-	$(MKOCTFILE) -I$(OCCT_INC) __occtfont__.cc $(LIB_DIRS) $(FONT_LIBS)
+	$(MKOCTFILE) -I$(OCCT_INC) __occtfont__.cc $(LIB_DIRS) $(RPATH) \
+	  $(FONT_LIBS)
 
 # Never unloaded: Open CASCADE's worker threads outlive the calls that start
 # them, and would crash Octave at exit if their libraries went first
 __occt__.oct: __occt__.cc shapebytes.h
-	$(MKOCTFILE) -I$(OCCT_INC) __occt__.cc $(LIB_DIRS) $(OCCT_LIBS) \
-	  -Wl,-z,nodelete
+	$(MKOCTFILE) -I$(OCCT_INC) __occt__.cc $(LIB_DIRS) $(RPATH) \
+	  $(OCCT_LIBS) -Wl,-z,nodelete
 
 __occtview__: __occtview__.cc shapebytes.h
 	$(shell $(MKOCTFILE) -p CXX) -O2 -I$(OCCT_INC) -I$(X11_INC) \
-	  -o __occtview__ __occtview__.cc $(LIB_DIRS) $(VIEW_LIBS)
+	  -o __occtview__ __occtview__.cc $(LIB_DIRS) $(RPATH) $(VIEW_LIBS)
 
 # What pkg install copies: exactly what was built
 FILES:
