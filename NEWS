@@ -1,51 +1,130 @@
-Summary of important user-visible changes for drafting 0.2.1:
+Summary of important user-visible changes for drafting 0.2.2:
 -------------------------------------------------------------------
 
- ** New function `solid.surface (X, Y, Z, H)`: a solid made of an exact
-    smooth surface through a grid of points, as `meshgrid` makes them,
-    thickened by `H`; a thickness the surface curves too tightly for is
-    refused.
+ ** New method `solid.Shape.thread (S, P, NAME, DEPTH)`: cuts an ISO metric
+    thread, internal in a bore or external on a cylinder or tube.
 
- ** `model.Viewer.pick` and `pickucs` print nothing after a pick; the code
-    for a script is returned instead, as in `[E, CODE] = pick (V, 'edge')`
-    and `[U, CODE] = pickucs (V)`, and run with `eval (CODE)`.
+ ** New method `solid.Shape.knurl (S, F, PITCH)`: knurls a cylindrical face
+    in every type of DIN 82, straight, single or crossed, with raised or
+    indented points, and a fillet or chamfer at a free end.
 
- ** `model.Viewer.view (V, AZ, EL)` turns a viewer to look from an azimuth
-    and an elevation, as `view` does for a plot; `[AZ, EL] = view (V)`
-    returns the current ones.
+ ** New functions `solid.threadspec (NAME)`, the dimensions of a metric
+    thread, and `solid.holespec (NAME, ...)`, the hole drilled for a metric
+    screw, tapped or clear.
 
- ** `solid.Shape.volume` is far faster: milliseconds for most shapes and
-    seconds, not a minute, for a shape made by `solid.surface`.  `volume`
-    and `centroid` take `'RelTol'`, the relative error aimed at, 1e-9 by
-    default.
+ ** `solid.Shape.hole` takes any ISO 261 thread from M1 to M64, fine ones
+    as `'M10x1.25'`, and any diameter and pitch with `'Custom', true`.  It
+    drills clearance holes by ISO 273 with the standard counterbores and
+    countersinks of IS 3406, places a hole at each point of `'At'`, and
+    chooses the drill in the 6H band with `'Material'` and `'Engagement'`.
 
- ** `geom.text` takes `'Box'`, a size the text is scaled to fit, descenders
-    included.
+ ** New property `Name` of `solid.Shape`, a name for each solid, kept by
+    transforms and booleans and written to STEP and 3MF.  New methods
+    `solid.Shape.solids` and `model.Assembly.solids` list each solid's
+    index, name and colour.
 
- ** Option names are matched without regard to case in every function, and
-    an unknown one is named in the error.
+ ** `model.Viewer` gains `capture`, the picture it shows, and `opacity`,
+    which hides solids or shows them through; `pick (V, 'solid')` picks
+    whole solids, `view` takes a zoom and a target, and the mouse turns the
+    view keeping z up, the T key any way.  The property `Shape` is renamed
+    `Model` and takes a `model.Assembly`; `Shape` works with a warning
+    until 0.3.0.
 
- ** `draw.Drawing.tikz` draws an ellipse as a TikZ ellipse instead of a
-    polyline.
+ ** `line`, `point`, `arc`, `circle`, `ellipse`, `centremark` and `text` of
+    `draw.Drawing` append one entity per row of their points.
 
- ** The guide gains a brief Octave primer, tutorials on surfaces through a
-    grid (13), parts as functions (14) and testing parts (15), and picking
-    with the mouse in tutorials 4 and 10.
+ ** Large drawings are much faster to plot, print, merge, hatch, and read
+    and write as DXF, often ten times or more; `geom.largestrect` too.
+    `solid.Shape.union` keeps a solid that meets no other as it is: seven
+    knurled knobs side by side took 95 s and take 1 s.
+
+ ** The package builds against Open CASCADE 8.0 as well as 7.8 and later,
+    finds it and X11 where distributions and source builds install them,
+    with new `OCCT_LIB` and `X11_LIB` to set them by hand, and runs against
+    one installed outside the system's library path.
+
+ ** Every true or false input must be logical, every input holding
+    geometry floating point, and an empty value for a Name/Value option
+    that would mean the option left out is an error.
+
+ ** The guide gains tutorials on holes and threads (16), clearance holes
+    (17), looking inside a model (18) and knurling (19), and a Standards
+    section on threads, holes and knurls.
 
  ** Bug fixes:
-    - `model.Viewer.pick` returned code that could select more than was
-      picked, such as all four top edges of a block for two of them.
-    - `geom.Region.fit` broke a fillet between straight sides into short
-      pieces of the wrong radius; it now fits one arc.
-    - `draw.Drawing.print` wrote A3 PDF pages 0.9 mm short, with a warning
-      that the figure would be cropped.
-    - `draw.Drawing.print` under fltk failed with `unlink: operation
-      failed`; it now raises an error naming the remedy.
-    - `draw.Drawing.plot`, `print` and `tikz` gave needless warnings about
-      ellipses and hatch fills.
+    - `solid.Shape.subtract` and `intersect` returned the part uncut, or
+      nothing, with a shape whose solids overlap, as an assembly's.
+    - `solid.Shape.subtract`, and `pocket`, `hole` and `thread` with it,
+      raise an error where Open CASCADE 7.8 drops a cut silently.
+    - `solid.Shape.union` dropped an operand of several solids made by
+      `solid.surface`.
+    - `solid.Shape.hole` refuses a hole that misses the part.
+    - A `solid.Shape` holds solids only: `solid.read` and `model.read` leave
+      out surfaces, curves and points with a warning, on which booleans
+      failed or were wrong.
+    - `model.read` failed on STEP names that repeat or are missing and on a
+      3MF placement after a scaled or mirrored one, copied a part placed
+      with a six-digit rotation, and named the build `_2` after a part.
+    - `model.Assembly.tessellate` dropped the vertex colours of meshes;
+      `model.Assembly.add` refuses an empty sub-assembly.
+    - `model.Viewer.Model` lost `Colour` and `Name`, and a pick on an
+      assembly returned code that could not run.
+    - Octave crashed on exit after meshing a solid where Octave builds
+      packages with link-time optimisation, as Ubuntu's does, and crashed
+      or hung on damaged DXF, PLY or 3MF input.
+    - `polymesh.Mesh.volume` cancelled two shells turned opposite ways; it
+      counts each shell, and one inside another as a cavity.
+    - `polymesh.read` read a binary STL padded after its triangles as
+      ASCII; it skips OBJ lines and points and PLY edges with a warning.
+    - `draw.linetype` held inch values as millimetres, so every dash was
+      25.4 times too short; `print` and `tikz` drew dashes and dimension
+      text far too small at any scale but 1:1; a line of more than 1e5
+      dashes stopped partway.
+    - `draw.Drawing.transform` moved only the points of inserts, ellipses,
+      arcs and dimensions, so inserts landed in the wrong place and a
+      mirrored angle measured its explement; it refuses to mirror an
+      insert.  Dimensions given no label kept the one measured when made.
+    - `draw.Drawing.bbox` took an ellipse's centre, a bulge's chord and an
+      insert's point.
+    - Colours 9 to 255 were drawn mid grey, and `tikz` dropped the colour
+      of text.
+    - `plot` and `print` read braces and underscores in text as TeX and
+      failed on a line weight of 0; `plot` failed under `hold` and takes a
+      figure handle; `print` wrote a blank page with every layer hidden.
+    - `hatch` took an unknown pattern and `angdim` arms on one ray.
+    - `draw.read` placed blocks by the origin instead of their base point,
+      one insert for a grid of rows and columns, and mirrored inserts
+      wrongly, which it now skips with a warning; it read uncommon
+      `$INSUNITS` as millimetres and failed on a byte-order mark or bytes
+      after `EOF`.
+    - DXF names outside ASCII came back garbled and are written as
+      `\U+XXXX`; a line break in a name or text, or two blocks of one
+      name, is an error on writing; dimension pictures clashed with a
+      kept `*D` block.
+    - `geom.signedarea` and `centroid` lost the area far from the origin,
+      `intersectlines` crossed nearly parallel lines near 1e15,
+      `hatchlines` made pieces of no length, `simplify` dropped a curve's
+      turn back, `curveoffset` missed a negative offset folding, `offset`
+      let the outline cross itself, and `selfintersects` reported a
+      crossing at a repeated point.
+    - A nearly flat arc made a region refuse its outline, and
+      `geom.Polyline.fillet` and `chamfer` left a repeated vertex.
+    - `polymesh.read` names a vertex that is not finite, and `geom.UCS`
+      refuses extra arguments.
 
 
 Backwards incompatible improvements:
 
- ** `draw.Drawing.entities` returns an ellipse as an `ELLIPSE` record
-    (centre, semi-axes, rotation) instead of a closed polyline.
+ ** `geom.triangulate` is removed; `tessellate (solid.extrude (R, H))`
+    triangulates a region exactly, holes included.
+
+ ** `solid.Shape.hole` with a thread name drills the tapping drill of ISO
+    2306, M8 at 6.8 instead of 6.75, countersinks a tapped hole at each
+    open end, and ends a blind one in a 118 degree drill point;
+    `'Countersink', false` and `'Tip', false` drill as before.
+
+ ** The bytes a `solid.Shape` holds end with a check; damaged bytes, and
+    bytes saved from 0.2.1, are refused.
+
+ ** `draw.Drawing.plot` returns one handle per layer and appearance, plus
+    one per text, instead of one per entity and per dash.
