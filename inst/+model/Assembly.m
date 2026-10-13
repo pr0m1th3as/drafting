@@ -380,7 +380,7 @@ classdef Assembly
       if (n == 0)
         return;
       endif
-      [V, F, C] = deal (cell (n, 1));
+      [V, F, C, VC] = deal (cell (n, 1));
       base = 0;
       for k = 1:n
         p = strcmp (this.Instances(k).part, {this.Parts.name});
@@ -395,17 +395,15 @@ classdef Assembly
         if (isempty (C{k}))
           C{k} = NaN (numfaces (X), 3);
         endif
+        VC{k} = X.VertexColour;
+        if (isempty (VC{k}))
+          VC{k} = NaN (numvertices (X), 3);
+        endif
         base += numvertices (X);
       endfor
-      C = vertcat (C{:});
-      if (all (isnan (C(:))))
-        C = [];
-      else
-        bare = isnan (C(:,1));
-        C(bare,:) = repmat ([0.72, 0.74, 0.78], nnz (bare), 1);
-      endif
       M = polymesh.Mesh (vertcat (V{:}), vertcat (F{:}));
-      M.FaceColour = C;
+      M.FaceColour = greyed (vertcat (C{:}));
+      M.VertexColour = greyed (vertcat (VC{:}));
 
     endfunction
 
@@ -655,7 +653,12 @@ classdef Assembly
           name = T{1}{C(k,1)};
           R = reshape (C(k,2:10), 3, 3)';
           O = C(k,11:13);
-          if (norm (R * R' - eye (3), Inf) < 1e-9 && det (R) > 0)
+          ## A rotation written to six digits, as slicers write one, is
+          ## orthonormal to about 1e-6; within 1e-5 it is taken as the
+          ## rotation it rounds, made exactly orthonormal
+          if (norm (R * R' - eye (3), Inf) < 1e-5 && det (R) > 0)
+            [u, ~, v] = svd (R);
+            R = u * v';
             A = add (A, name, X, geom.UCS (R(3,:), O, O + R(1,:)));
           else
             if (isa (X, 'model.Assembly'))
@@ -665,9 +668,9 @@ classdef Assembly
             if (det (R) < 0)
               F = F(:,[1, 3, 2]);
             endif
-            C = X.FaceColour;
+            FC = X.FaceColour;
             X = polymesh.Mesh (X.Vertices * R + O, F);
-            X.FaceColour = C;
+            X.FaceColour = FC;
             used = {A.Parts.name};
             name = [name, ' (placed)'];
             m = 1;
@@ -687,6 +690,19 @@ classdef Assembly
   endmethods
 
 endclassdef
+
+## The colours C, a row for each triangle or vertex, none where every row is
+## NaN, and a part's rows without a colour grey
+function C = greyed (C)
+
+  if (all (isnan (C(:))))
+    C = [];
+  else
+    bare = isnan (C(:,1));
+    C(bare,:) = repmat ([0.72, 0.74, 0.78], nnz (bare), 1);
+  endif
+
+endfunction
 
 ## The name of the first part of A that is a mesh, its own or one of its
 ## sub-assemblies', or empty when none is
@@ -990,6 +1006,15 @@ endfunction
 %! assert_equal (numfaces (M), 16);
 %! assert_equal (sortrows (unique (M.FaceColour, 'rows')), ...
 %!               [0.72, 0.74, 0.78; 1, 0, 0]);
+
+%!test  # tessellate: the colours of vertices go with them
+%! T = tetrapart ();
+%! T.VertexColour = [1, 0, 0; 0, 1, 0; 0, 0, 1; 1, 1, 0];
+%! A = add (model.Assembly (), 'tet', T, geom.UCS ([0, 0, 1], [5, 0, 0]));
+%! A = add (A, 'box', solid.box (1, 1, 1), geom.UCS ());
+%! M = tessellate (A);
+%! assert_equal (M.VertexColour(1:4,:), T.VertexColour);
+%! assert_equal (unique (M.VertexColour(5:end,:), 'rows'), [0.72, 0.74, 0.78]);
 
 %!test  # tessellate: the empty assembly
 %! assert_equal (isempty (tessellate (model.Assembly ())), true);

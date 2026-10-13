@@ -634,9 +634,12 @@ classdef Mesh
     ## The volume a closed mesh encloses, in cubic millimetres.
     ##
     ## The mesh must be closed, as @code{isclosed} tells; an open mesh
-    ## encloses nothing and is an error.  The volume is the same whichever
-    ## way the triangles are turned, as long as they all agree.  The empty
-    ## mesh has volume zero.
+    ## encloses nothing and is an error.  Each shell, a closed sheet of
+    ## triangles joined to one another, counts by its own volume whichever
+    ## way its triangles are turned: added when it lies inside an even number
+    ## of the other shells, and taken away, as a cavity, when inside an odd
+    ## number.  Shells that cross one another are counted as if they did not.
+    ## The empty mesh has volume zero.
     ##
     ## @seealso{polymesh.Mesh.isclosed, polymesh.Mesh.area}
     ## @end deftypefn
@@ -648,7 +651,42 @@ classdef Mesh
                        " ways."));
       endif
       [a, b, c] = corners (this);
-      V = abs (sum (dot (a, cross (b, c, 2), 2))) / 6;
+      v = dot (a, cross (b, c, 2), 2);
+      S = shells (this);
+      n = max ([0; S]);
+      if (n <= 1)
+        V = abs (sum (v)) / 6;
+        return;
+      endif
+      ## How many other shells enclose each, by the winding number of one of
+      ## its points about them, those whose boxes hold the point alone
+      tlo = min (min (a, b), c);
+      thi = max (max (a, b), c);
+      [lo, hi] = deal (zeros (n, 3));
+      for d = 1:3
+        lo(:,d) = accumarray (S, tlo(:,d), [n, 1], @min);
+        hi(:,d) = accumarray (S, thi(:,d), [n, 1], @max);
+      endfor
+      depth = zeros (n, 1);
+      for i = 1:n
+        q = a(find (S == i, 1),:);
+        for j = find (all (lo <= q & hi >= q, 2))'
+          if (j == i)
+            continue;
+          endif
+          A = a(S == j,:) - q;
+          B = b(S == j,:) - q;
+          C = c(S == j,:) - q;
+          lA = sqrt (sum (A .^ 2, 2));
+          lB = sqrt (sum (B .^ 2, 2));
+          lC = sqrt (sum (C .^ 2, 2));
+          w = sum (2 * atan2 (dot (A, cross (B, C, 2), 2),
+                              lA .* lB .* lC + dot (A, B, 2) .* lC
+                              + dot (A, C, 2) .* lB + dot (B, C, 2) .* lA));
+          depth(i) += abs (w) > 2 * pi;
+        endfor
+      endfor
+      V = sum ((-1) .^ depth .* abs (accumarray (S, v, [n, 1]))) / 6;
 
     endfunction
 
@@ -773,6 +811,27 @@ classdef Mesh
 endclassdef
 
 ## The corners of every triangle of M, three K-by-3 matrices
+## The shell of each triangle of the mesh M, numbered from 1: triangles
+## sharing a vertex are in one shell
+function S = shells (M)
+
+  F = M.Faces;
+  if (isempty (F))
+    S = zeros (0, 1);
+    return;
+  endif
+  nv = rows (M.Vertices);
+  G = sparse (F(:), [F(:,2); F(:,3); F(:,1)], 1, nv, nv);
+  [p, ~, r] = dmperm (G + G' + speye (nv));
+  comp = zeros (nv, 1);
+  for i = 1:numel (r) - 1
+    comp(p(r(i):r(i+1)-1)) = i;
+  endfor
+  [~, ~, S] = unique (comp(F(:,1)));
+  S = S(:);
+
+endfunction
+
 function [a, b, c] = corners (M)
 
   V = M.Vertices;
@@ -898,6 +957,19 @@ endfunction
 %!test  # the volume does not depend on which way all triangles are turned
 %! M = unitcube ();
 %! assert_equal (volume (polymesh.Mesh (M.Vertices, fliplr (M.Faces))), 1);
+
+%!test  # each shell counts by its own volume, however it is turned
+%! M = unitcube ();
+%! V = [M.Vertices; M.Vertices + [5, 0, 0]];
+%! N = polymesh.Mesh (V, [M.Faces; fliplr(M.Faces) + 8]);
+%! assert_equal (volume (N), 2, 1e-12);
+
+%!test  # a shell inside another is a cavity, however it is turned
+%! M = unitcube ();
+%! V = [2 * M.Vertices; M.Vertices + 0.5];
+%! assert_equal (volume (polymesh.Mesh (V, [M.Faces; M.Faces + 8])), 7, 1e-12);
+%! assert_equal (volume (polymesh.Mesh (V, [M.Faces; fliplr(M.Faces) + 8])), ...
+%!               7, 1e-12);
 
 %!test  # the empty mesh: no extent, area or volume
 %! M = polymesh.Mesh ();

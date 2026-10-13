@@ -4262,9 +4262,11 @@ read3mftree (const string& file, const string& name, const string& caller)
   }
   const bool alone = (idx.size () == 1 && top.items[0].m == identity
                       && children[idx[0]].matrix_value ().rows () > 0);
+  // The build is named after the file, as it is: an assembly may share its
+  // name with one of its parts
   if (! alone)
   {
-    names.push_back (distinct (name));
+    names.push_back (name);
     vs.push_back (Matrix ());
     fs.push_back (Matrix ());
     fcs.push_back (Matrix ());
