@@ -1481,6 +1481,12 @@
 %! assert_equal (volume (S), 4638.466155, 1e-5);
 %! assert_equal (isvalid (S), true);
 
+%!test  # a tube knurled over a wall just thicker than the teeth are deep
+%! S = subtract (solid.cylinder (5, 6), solid.cylinder (4.45, 6));
+%! S = knurl (S, 1, 1, 0.5);
+%! assert_equal (volume (S), 37.62373148, 1e-5);
+%! assert_equal (isvalid (S), true);
+
 %!test  # a knurl up to a shoulder, chamfered at its free end
 %! S = union (solid.cylinder (7, 2, geom.UCS ([0, 0, 1], [0, 0, -2])), ...
 %!            solid.cylinder (5, 6));
@@ -1784,6 +1790,10 @@
 %!error<solid.Shape.thread: M6 at \(0, 0, 20\): the thread would cut through the cylinder of 5.500 round the bore.> ...
 %! thread (subtract (solid.cylinder (2.75, 20), solid.cylinder (2.5, 20)), ...
 %!         [0, 0, 20], 'M6', 10)
+%!error<solid.Shape.thread: M10 at \(0, 0, 12\): the thread would cut through the wall round the bore, 4.850 from the axis at its nearest.> ...
+%! R = geom.Region (5.6 * [cosd(0:60:300)', sind(0:60:300)']);
+%! S = hole (solid.extrude (R, 12), [0, 0, 12], 'M10', Inf);
+%! thread (S, [0, 0, 12], 'M10', Inf)
 %!error<solid.Shape.thread: M10 at \(0, 0, 40\): the thread runs past the end of the cylinder.> ...
 %! thread (union (solid.cylinder (5, 40), solid.cylinder (8, 20)), ...
 %!         [0, 0, 40], 'M10', 25)
@@ -1887,6 +1897,11 @@
 %! knurl (solid.cylinder (5, 6), 1, 1, 'Fillet', {1, 5})
 %!error<solid.Shape.knurl: the fillets or chamfers at the two ends of F overlap.> ...
 %! knurl (solid.cylinder (5, 6), 1, 1, 'Fillet', 3.5)
+%!error<solid.Shape.knurl: the teeth, 0.5 deep, would cut into a bore of S.> ...
+%! knurl (subtract (solid.cylinder (5, 6), solid.cylinder (4.5, 6)), 1, 1, 0.5)
+%!error<solid.Shape.knurl: the chamfer of 1 at an end of F would cut into a bore of S.> ...
+%! knurl (subtract (solid.cylinder (5, 6), solid.cylinder (4.2, 6)), 1, 1, ...
+%!        0.5, 'Chamfer', 1)
 
 %!test  # a box cut through the middle
 %! U = geom.UCS ([0, 0, 1], [0, 0, 15]);

@@ -3866,25 +3866,15 @@ groove (const sheet& p, double ca, double sa, double R, double w0, double w1,
                                   cols[0]->Degree (), rows[0]->Degree ());
 }
 
-// The knurled skin of the cylinder of radius R from Z0 to Z1 about the z
-// axis, the low point of its first set of grooves at theta 0 and Z0, as a
-// shell open at both ends
-static TopoDS_Shape
-skin (double R, double z0, double z1, const knurlspec& spec,
-      const string& caller)
+// The sets of grooves of the knurl SPEC on the cylinder of radius R and
+// length H, each pitch fitted to a whole count round the face, or along it
+// for rings, and the depth D they are cut to
+static vector<grooveset>
+groovesets (double R, double H, const knurlspec& spec, double& D,
+            const string& caller)
 {
-  blank K;
-  K.R = R;
-  K.z0 = z0;
-  K.z1 = z1;
   const double L = 2 * M_PI * R;
-  const double H = z1 - z0;
   const double prof = spec.profile * M_PI / 180;
-  const double ct = 1 / tan (prof / 2);       // the slope of a flank, dr/dw
-  const bool indented = spec.indented;
-
-  // The sets of grooves, each pitch fitted to a whole count round the face,
-  // or along it for rings
   vector<grooveset> sets;
   double full = 1e300;
   for (double a : spec.angles)
@@ -3907,12 +3897,33 @@ skin (double R, double z0, double z1, const knurlspec& spec,
     full = std::min (full, s.P / (2 * tan (prof / 2)));
     sets.push_back (s);
   }
-  const double D = spec.depth > 0 ? spec.depth : full;
+  D = spec.depth > 0 ? spec.depth : full;
   if (D > full * (1 + 1e-12))
   {
     error ("%s: DEPTH must be no more than %.4g, the full depth of the"
            " teeth at the pitch fitted round F.", caller.c_str (), full);
   }
+  return sets;
+}
+
+// The knurled skin of the cylinder of radius R from Z0 to Z1 about the z
+// axis, the low point of its first set of grooves at theta 0 and Z0, as a
+// shell open at both ends
+static TopoDS_Shape
+skin (double R, double z0, double z1, const knurlspec& spec,
+      const string& caller)
+{
+  blank K;
+  K.R = R;
+  K.z0 = z0;
+  K.z1 = z1;
+  const double L = 2 * M_PI * R;
+  const double H = z1 - z0;
+  const double prof = spec.profile * M_PI / 180;
+  const double ct = 1 / tan (prof / 2);       // the slope of a flank, dr/dw
+  const bool indented = spec.indented;
+  double D;
+  vector<grooveset> sets = groovesets (R, H, spec, D, caller);
   const double e = D / ct;                  // half the width of a groove at R
 
   // The surfaces of the skin, numbered by name
@@ -4672,6 +4683,27 @@ wirearea (const TopoDS_Wire& w, const gp_Ax3& ax)
   return a / 2;
 }
 
+// Whether the solid S fills the ring about the axes AX from radius R0 to R1
+// and from Z0 to Z1 along the axis
+static bool
+wholering (const TopoDS_Shape& s, const gp_Ax3& ax, double r0, double r1,
+           double z0, double z1, const string& caller)
+{
+  const gp_Ax2 a (ax.Location ().Translated (gp_Vec (ax.Direction ()) * z0),
+                  ax.Direction ());
+  TopoDS_Shape ring = BRepPrimAPI_MakeCylinder (a, r1, z1 - z0).Shape ();
+  if (r0 > 0)
+  {
+    BRepAlgoAPI_Cut cut (ring,
+                         BRepPrimAPI_MakeCylinder (a, r0, z1 - z0).Shape ());
+    ring = boolean (cut, caller, "knurl");
+  }
+  BRepAlgoAPI_Common op (s, ring);
+  const double v = volumeprops (ring, false, 1e-9).Mass ();
+  return volumeprops (boolean (op, caller, "knurl"), false, 1e-9).Mass ()
+         >= v * (1 - 1e-6);
+}
+
 // The solid SO with its face F knurled: F replaced by the knurled skin, the
 // flat face at each end of F given the knurl's outline in place of its
 // circle, and every other face kept.  TREAT has a row for each treatment,
@@ -4862,6 +4894,35 @@ knurlsolid (const TopoDS_Shape& so, const TopoDS_Face& F, const ShapeMap& emap,
     {
       error ("%s: F has no free end left to %s.", who,
              treat(i,1) == 1 ? "fillet" : "chamfer");
+    }
+  }
+
+  // The teeth reach in to R - D along F, a fillet or chamfer of size T to
+  // R - T at its end, and the material there must be whole: a bore reaching
+  // into it would be cut through.  The rings stop GAP short of F and its
+  // ends, so as not to lie on them, and a wall under them thinner than GAP
+  // counts as none.
+  const double gap = 1e-3;
+  double D;
+  groovesets (R, z1 - z0, spec, D, caller);
+  if (! wholering (so, ax, R - D - gap, R - gap, z0 + gap, z1 - gap,
+                   caller))
+  {
+    error ("%s: the teeth, %.4g deep, would cut into a bore of S.", who, D);
+  }
+  for (int k = 0; k < 2; k++)
+  {
+    const double t = spec.ends[k][1];
+    if (spec.ends[k][0] == 0 || t >= R || t >= z1 - z0)
+    {
+      continue;
+    }
+    if (! wholering (so, ax, R - t - gap, R - gap,
+                     k == 0 ? z0 + gap : z1 - t,
+                     k == 0 ? z0 + t : z1 - gap, caller))
+    {
+      error ("%s: the %s of %.4g at an end of F would cut into a bore of S.",
+             who, spec.ends[k][0] == 1 ? "fillet" : "chamfer", t);
     }
   }
 

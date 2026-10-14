@@ -2174,7 +2174,8 @@ classdef Shape
     ## cylinder fits: a tube of 6 with a bore of 2 takes an external M6.  A
     ## wall whose bore and cylinder both fit is thinner than either thread is
     ## deep, and is an error, as is an internal thread that would cut through
-    ## the cylinder round its bore.
+    ## the wall round its bore: a cylinder, or any other outline, as the flats
+    ## of a hexagon or the teeth of a knurl.
     ##
     ## The profile is the basic profile of ISO 68-1, its 60 degree flanks
     ## swept round the axis by @code{solid.helix}: an internal thread's root
@@ -2279,7 +2280,7 @@ classdef Shape
         L = max (min (DEPTH, far + p), p);
         ## The bores and cylinders about the axis that fit a thread; a wall
         ## that fits both is thinner than either thread is deep
-        [bores, rods] = axisrings (this, P(i,:), v, min (L / 2, p));
+        [bores, rods, walls] = axisrings (this, P(i,:), v, min (L / 2, p));
         inner = bores(2 * bores >= D1 - tol & 2 * bores < d - tol);
         outer = rods(2 * rods >= d0 - tol & 2 * rods <= d + tol);
         if (! isempty (inner) && ! isempty (outer))
@@ -2301,6 +2302,15 @@ classdef Shape
                            " would cut through the cylinder of %.3f round", ...
                            " the bore."), t.name, pointstr (P(i,:)), ...
                    2 * min (wall));
+          endif
+          ## So would any other outline round it, as the flats of a hexagon
+          ## or the teeth of a knurl, coming inside the root
+          near = min (walls(bores == r));
+          if (2 * near < d + tol)
+            error (strcat ("solid.Shape.thread: %s at (%s): the thread", ...
+                           " would cut through the wall round the bore,", ...
+                           " %.3f from the axis at its nearest."), t.name, ...
+                   pointstr (P(i,:)), near);
           endif
           specs{i} = {p, r, d / 2, true, L};
           K = solid.cylinder (r, len);
@@ -2459,7 +2469,9 @@ classdef Shape
     ## leaving raised points.  @var{F} must be the outside of the part, a
     ## cylinder all the way round its axis, and must end at each end in a
     ## circle on one flat face square to the axis: the free end of the part,
-    ## or a shoulder.
+    ## or a shoulder.  The wall under @var{F} must be thicker than the teeth
+    ## are deep, and than a fillet or chamfer at an end of @var{F} is large:
+    ## a bore, its thread or anything else reaching into it is an error.
     ##
     ## @var{PITCH} is in millimetres, measured square to the grooves as DIN 82
     ## gives it, whose series is 0.5, 0.6, 0.8, 1.0, 1.2 and 1.6.  A whole
@@ -3697,25 +3709,40 @@ endfunction
 
 ## The radii of the circles about the axis at P along V in the section of S
 ## a distance Z along it: BORES those that bound a hole of the section, RODS
-## those that are the outline of the material round the axis
-function [bores, rods] = axisrings (S, P, V, Z)
+## those that are the outline of the material round the axis, and WALLS for
+## each bore the nearest the other loops of its piece come to the axis
+function [bores, rods, walls] = axisrings (S, P, V, Z)
 
   bores = [];
   rods = [];
+  walls = [];
   regions = section (S, geom.UCS (V, P + Z * V));
   for i = 1:numel (regions)
     loops = [{regions{i}.Outline}, regions{i}.Holes];
-    for j = 1:numel (loops)
-      r = ring (loops{j});
-      if (isinf (r))
-        continue;
-      elseif (j == 1)
-        rods(end+1) = r;
+    r = cellfun (@ring, loops);
+    for j = find (! isinf (r))
+      if (j == 1)
+        rods(end+1) = r(j);
       else
-        bores(end+1) = r;
+        bores(end+1) = r(j);
+        others = loops([1:j-1, j+1:end]);
+        walls(end+1) = min (cellfun (@nearest, others));
       endif
     endfor
   endfor
+
+endfunction
+
+## The nearest the closed path L comes to the origin of its plane, measured
+## to the chords of its arcs and splines, which lie nearer than they do
+function r = nearest (L)
+
+  A = __sample__ (L);
+  A = A(:,1:2);
+  B = circshift (A, -1);
+  U = B - A;
+  t = min (max (-sum (A .* U, 2) ./ max (sum (U .^ 2, 2), eps), 0), 1);
+  r = min (sqrt (sum ((A + t .* U) .^ 2, 2)));
 
 endfunction
 
