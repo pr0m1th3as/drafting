@@ -2020,7 +2020,10 @@ classdef Drawing
     ## offset, a diameter or radius dimension its radius and direction, an
     ## angular dimension its radius; one with no label of its own is labelled
     ## with what it measures whenever it is drawn or written, so its label
-    ## follows it.
+    ## follows it.  A dimension's ticks and text, a centre mark and a leader
+    ## keep their size: they are sized only when drawn, by
+    ## @qcode{'DimScale'}, so they reach the sheet at the same size at any
+    ## scale, as @code{draw.Drawing.print} describes.
     ##
     ## @strong{A reflection reverses the sweep of an arc.}  Arcs run
     ## counter-clockwise from the first angle to the second, so mirroring one
