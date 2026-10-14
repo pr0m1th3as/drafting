@@ -1904,8 +1904,10 @@ classdef Shape
     ## only to a blind hole.  The standard ones need a named thread, and
     ## those for a screw head @qcode{'Clearance'}, fine or medium;
     ## @code{solid.holespec} gives their sizes, and the sizes of every hole
-    ## for a named thread, before it is drilled.  Drilling the empty shape
-    ## leaves it empty.
+    ## for a named thread, before it is drilled.  A hole may break into
+    ## another, but holes that would cut a solid of @var{S} into pieces are an
+    ## error, as a bore reaching the roots of a knurl, which leaves its teeth
+    ## loose.  Drilling the empty shape leaves it empty.
     ##
     ## @example
     ## @group
@@ -2086,6 +2088,7 @@ classdef Shape
           tools{(i - 1) * numel (T) + j} = translate (T{j}, P(i,:));
         endfor
       endfor
+      owner = repelem (1:rows (P), numel (T));
 
       ## A hole that would remove nothing misses the part
       for i = 1:rows (P)
@@ -2121,10 +2124,25 @@ classdef Shape
           E = aim (E, opt.Direction);
           for j = 1:numel (E)
             tools{end+1} = translate (E{j}, P(i,:));
+            owner(end+1) = i;
           endfor
         endfor
       endif
-      this = subtract (this, tools{:});
+
+      ## A hole may break into another, never cut a solid into pieces, as
+      ## one drilled through the roots of a knurl leaves its teeth loose
+      N = numsolids (this);
+      C = subtract (this, tools{:});
+      if (numsolids (C) > N)
+        for i = 1:rows (P)
+          if (numsolids (subtract (this, tools{owner == i})) > N)
+            error (strcat ("solid.Shape.hole: the hole at (%s) would cut S", ...
+                           " into pieces."), pointstr (P(i,:)));
+          endif
+        endfor
+        error ("solid.Shape.hole: the holes would cut S into pieces.");
+      endif
+      this = C;
 
     endfunction
 

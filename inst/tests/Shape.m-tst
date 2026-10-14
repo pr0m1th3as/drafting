@@ -538,6 +538,12 @@
 %! assert_equal (volume (B) - volume (T), 16 * pi * 10, -1e-8);
 %! assert_equal (isvalid (T), true);
 
+%!test  # breaking out of an edge, the part left whole
+%! S = hole (solid.box (30, 10, 4), [15, 3, 4], 7, Inf);
+%! A = pi * 3.5 ^ 2 - (3.5 ^ 2 * acos (3 / 3.5) - 3 * sqrt (3.5 ^ 2 - 9));
+%! assert_equal (volume (S), 1200 - 4 * A, 1e-9);
+%! assert_equal (numsolids (S), 1);
+
 %!test  # counterbored
 %! S = hole (solid.box (80, 40, 12), [20, 20, 12], 8, Inf, ...
 %!           'Counterbore', [14, 4]);
@@ -1752,6 +1758,10 @@
 %! hole (solid.box (20, 20, 10), [10, 10, 15], 5, 3)
 %!error<solid.Shape.hole: the hole at \(50, 10, 10\) misses the part.> ...
 %! hole (solid.box (20, 20, 10), [10, 10, 10; 50, 10, 10], 5, Inf)
+%!error<solid.Shape.hole: the hole at \(15, 3, 4\) would cut S into pieces.> ...
+%! hole (solid.box (30, 6, 4), [15, 3, 4], 7, Inf)
+%!error<solid.Shape.hole: the holes would cut S into pieces.> ...
+%! hole (solid.box (30, 10, 4), [15, 3, 4; 15, 7, 4], 7, Inf)
 %!error<solid.Shape.hole: Tip applies to blind holes only.> ...
 %! hole (solid.Shape (), [0, 0, 0], 5, Inf, 'Tip', 118)
 %!error<solid.Shape.thread: invalid number of input arguments.> ...
