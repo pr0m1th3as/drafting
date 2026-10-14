@@ -1729,8 +1729,12 @@ facesout (const TopoDS_Shape& c, double scale)
 static TopoDS_Face
 withoutinternal (const TopoDS_Face& f)
 {
+  // G is built unplaced, its wires as they lie in F, and placed as F at the
+  // end: Add would otherwise take each wire back by the placing of G
   BRep_Builder b;
   TopoDS_Face g = TopoDS::Face (f.EmptyCopied ());
+  g.Location (TopLoc_Location ());
+  g.Orientation (TopAbs_FORWARD);
   for (TopoDS_Iterator w (f, false, false); w.More ();
        w.Next ())
   {
@@ -1750,10 +1754,13 @@ withoutinternal (const TopoDS_Face& f)
     if (n > 0)
     {
       nw.Orientation (w.Value ().Orientation ());
+      nw.Location (w.Value ().Location ());
       nw.Closed (true);
       b.Add (g, nw);
     }
   }
+  g.Location (f.Location ());
+  g.Orientation (f.Orientation ());
   return g;
 }
 
@@ -5799,7 +5806,8 @@ function directly. \n\
     // y axis and normal: the shape is carried into the frame, where the plane
     // is z = 0, and what it has in common with a face of that plane larger
     // than the shape is the cut, a face lying in the plane included.  Each
-    // face of it comes back as its outer loop and its inner loops.
+    // face of it, without the edges lying inside it, comes back as its outer
+    // loop and its inner loops.
     else if (cmd == "section")
     {
       const Matrix f = args(3).matrix_value ();
@@ -5820,7 +5828,14 @@ function directly. \n\
           = BRepBuilderAPI_MakeFace (gp_Pln (gp::XOY ()), x0 - r, x1 + r,
                                      y0 - r, y1 + r).Face ();
         BRepAlgoAPI_Common op (s, plane);
-        const TopoDS_Shape c = boolean (op, caller, "section");
+        BRep_Builder b;
+        TopoDS_Compound c;
+        b.MakeCompound (c);
+        for (TopExp_Explorer x (boolean (op, caller, "section"), TopAbs_FACE);
+             x.More (); x.Next ())
+        {
+          b.Add (c, withoutinternal (TopoDS::Face (x.Current ())));
+        }
         out = facesout (c, (x1 - x0) * (y1 - y0) + 1);
       }
       else

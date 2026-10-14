@@ -1978,6 +1978,13 @@
 %! R = section (solid.extrude (Q, 6), geom.UCS ([0, 0, 1], [0, 0, 3]));
 %! assert_equal (__area__ (R{1}.Holes{1}), __area__ (Q.Holes{1}), -1e-9);
 
+%!test  # through a thread near its root, the edges inside the cut left out
+%! S = hole (solid.cylinder (5, 12.7), [0, 0, 12.7], 'M6', Inf);
+%! S = thread (S, [0, 0, 12.7], 'M6', Inf);
+%! R = section (S, geom.UCS ([1, 0, 0], [-2.5, 0, 0]));
+%! assert_equal (numel (R{1}.Holes), 11);
+%! assert_equal (volume (solid.extrude (R{1}, 1)), 87.8442, -1e-5);
+
 %!error<solid.Shape.section: invalid number of input arguments.> ...
 %! section (solid.Shape ())
 %!error<solid.Shape.section: U must be a geom.UCS object.> ...
