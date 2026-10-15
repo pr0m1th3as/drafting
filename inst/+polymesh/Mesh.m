@@ -1241,7 +1241,7 @@ endfunction
 %! assert_equal (isempty (writeread (polymesh.Mesh (), '.obj')), true);
 %! assert_equal (isempty (writeread (polymesh.Mesh (), '.ply')), true);
 
-%!testif ; ! isempty (getenv ('DISPLAY'))
+%!testif ; ispc () || ! isempty (getenv ('DISPLAY'))
 %! ## show: the mesh in its variable's viewer
 %! old = getappdata (0, 'drafting_model_show');
 %! VP = model.Viewer ('Hidden', true);

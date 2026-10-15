@@ -4791,6 +4791,19 @@ write3mf (const string& file, const Cell& names, const Cell& vs,
 }
 }
 
+#if defined (_WIN32)
+// The three Win32 calls the alive command needs, declared here rather than
+// through <windows.h>, whose macros clash with names in this file
+extern "C"
+{
+  __declspec (dllimport) void * __stdcall
+  OpenProcess (unsigned long access, int inherit, unsigned long pid);
+  __declspec (dllimport) int __stdcall
+  GetExitCodeProcess (void *process, unsigned long *code);
+  __declspec (dllimport) int __stdcall CloseHandle (void *handle);
+}
+#endif
+
 DEFUN_DLD (__mesh__, args, ,
            "-*- texinfo -*-\n\
 @deftypefn {} {@dots{} =} __mesh__ (@var{cmd}, @var{caller}, @dots{})\n\
@@ -4969,6 +4982,33 @@ Undocumented internal function.\n\
   else if (cmd == "crossings")
   {
     return ovl (crossings (args(2).matrix_value (), args(3).bool_value ()));
+  }
+
+  // TF = __mesh__ ('alive', caller, PID): whether the process PID is still
+  // running, on Windows, where Octave's waitpid ignores WNOHANG and waits
+  // for the process to end
+  else if (cmd == "alive")
+  {
+    if (args.length () != 3)
+    {
+      print_usage ();
+    }
+#if defined (_WIN32)
+    const unsigned long pid
+      = static_cast<unsigned long> (args(2).idx_type_value ());
+    // PROCESS_QUERY_LIMITED_INFORMATION, and STILL_ACTIVE for the exit code
+    void *h = OpenProcess (0x1000, 0, pid);
+    bool running = false;
+    if (h != nullptr)
+    {
+      unsigned long code = 0;
+      running = GetExitCodeProcess (h, &code) != 0 && code == 259;
+      CloseHandle (h);
+    }
+    return ovl (running);
+#else
+    error ("%s: the alive command is for Windows only.", caller.c_str ());
+#endif
   }
 
   error ("__mesh__: unknown command '%s'.", cmd.c_str ());

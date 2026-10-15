@@ -116,8 +116,22 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <string>
 #include <vector>
 
-#include <sys/select.h>
-#include <unistd.h>
+#if defined (_WIN32)
+#  include <mutex>
+#  include <thread>
+#  include <fcntl.h>
+#  include <io.h>
+#  ifndef NOMINMAX
+#    define NOMINMAX
+#  endif
+#  include <windows.h>
+// 16-bit leftovers that would empty any name near or far
+#  undef near
+#  undef far
+#else
+#  include <sys/select.h>
+#  include <unistd.h>
+#endif
 
 #include <AIS_InteractiveContext.hxx>
 #include <AIS_ColoredShape.hxx>
@@ -172,15 +186,35 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <V3d_Viewer.hxx>
 
 // Xlib defines macros, Status among them, that break Open CASCADE headers
-// included after it, so it comes last, before the two that need it
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
-#include <Aspect_DisplayConnection.hxx>
-#include <Xw_Window.hxx>
+// included after it, so it comes last, before the two that need it; on
+// Windows the window is Open CASCADE's own Win32 one
+#if defined (_WIN32)
+#  include <Aspect_DisplayConnection.hxx>
+#  include <WNT_WClass.hxx>
+#  include <WNT_Window.hxx>
+#else
+#  include <X11/Xlib.h>
+#  include <X11/Xutil.h>
+#  include <Aspect_DisplayConnection.hxx>
+#  include <Xw_Window.hxx>
+#endif
 
 #include "shapebytes.h"
 
 using namespace std;
+
+#if defined (_WIN32)
+using nativewindow = WNT_Window;
+
+// Win32 delivers closing, resizing and painting to the window's procedure,
+// not to the queue the main loop reads, so the procedure hands every message
+// to the viewer
+class viewer;
+static viewer *g_viewer = nullptr;
+static LRESULT WINAPI wndproc (HWND w, UINT m, WPARAM wp, LPARAM lp);
+#else
+using nativewindow = Xw_Window;
+#endif
 
 // The message of an Open CASCADE exception, which 8.0 made a std::exception
 static const char *
@@ -347,10 +381,13 @@ public:
       {
         continue;
       }
+      // From decomposition, as Open CASCADE's own tool marks a face, so that
+      // a highlight shows the face, not the whole shape
       Handle (StdSelect_BRepOwner) owner
         = new StdSelect_BRepOwner (f, this,
                                    StdSelect_BRepSelectionTool::
-                                   GetStandardPriority (f, TopAbs_FACE));
+                                   GetStandardPriority (f, TopAbs_FACE),
+                                   true);
       sel->Add (new Select3D_SensitiveTriangulation (owner, tri, loc,
                                                      true));
     }
@@ -368,9 +405,23 @@ public:
     m_viewer->SetDefaultLights ();
     m_viewer->SetLightOn ();
     m_context = new AIS_InteractiveContext (m_viewer);
+#if defined (_WIN32)
+    Handle (WNT_WClass) wc
+      = new WNT_WClass ("drafting", (void *) wndproc, CS_VREDRAW | CS_HREDRAW,
+                        0, 0, LoadCursor (nullptr, IDC_ARROW));
+    // Open CASCADE adds the frame to the size asked for, and a hidden window
+    // reports that outer size as its own; without a frame the two agree
+    m_window = new WNT_Window ("drafting", wc,
+                               hidden ? WS_POPUP : WS_OVERLAPPEDWINDOW, 0, 0,
+                               900, 700, Quantity_NOC_BLACK);
+#else
     m_window = new Xw_Window (m_display, "drafting", 0, 0, 900, 700);
+#endif
     m_view = m_viewer->CreateView ();
     m_view->SetWindow (m_window);
+#if defined (_WIN32)
+    g_viewer = this;
+#endif
     m_view->SetBgGradientColors (Quantity_Color (0.85, 0.87, 0.9,
                                                  Quantity_TOC_sRGB),
                                  Quantity_Color (0.55, 0.6, 0.66,
@@ -404,6 +455,9 @@ public:
     }
     else
     {
+#if defined (_WIN32)
+      m_window->Map ();
+#else
       Display *d = (Display *) m_display->GetDisplayAspect ();
       Window w = static_cast<Window> (m_window->NativeHandle ());
       XSelectInput (d, w, ExposureMask | KeyPressMask | KeyReleaseMask
@@ -413,6 +467,7 @@ public:
       Atom close = XInternAtom (d, "WM_DELETE_WINDOW", False);
       XSetWMProtocols (d, w, &close, 1);
       m_window->Map ();
+#endif
     }
 
     // Draw sharp and tangent edges over the shading, but not the seams where
@@ -449,10 +504,19 @@ public:
                                          AIS_SelectionScheme_XOR);
   }
 
+#if defined (_WIN32)
+  // A message the window procedure received, handled as Open CASCADE does;
+  // false leaves it to Windows
+  bool message (MSG& msg)
+  {
+    return m_window->ProcessMessage (*this, msg);
+  }
+#else
   int fd () const
   {
     return ConnectionNumber ((Display *) m_display->GetDisplayAspect ());
   }
+#endif
 
   bool done () const
   {
@@ -462,6 +526,14 @@ public:
   // Every pending window event, then a redraw if anything needs one
   void events ()
   {
+#if defined (_WIN32)
+    MSG msg;
+    while (PeekMessageW (&msg, nullptr, 0, 0, PM_REMOVE))
+    {
+      TranslateMessage (&msg);
+      DispatchMessageW (&msg);
+    }
+#else
     Display *d = (Display *) m_display->GetDisplayAspect ();
     while (XPending (d) > 0)
     {
@@ -469,6 +541,7 @@ public:
       XNextEvent (d, &e);
       m_window->ProcessMessage (*this, e);
     }
+#endif
     FlushViewEvents (m_context, m_view, true);
   }
 
@@ -760,6 +833,15 @@ public:
     }
     else if (cmd == "gettitle")
     {
+#if defined (_WIN32)
+      wchar_t name[1024];
+      const int n = GetWindowTextW ((HWND) m_window->HWindow (), name, 1024);
+      string utf8 (4 * n, '\0');
+      const int k = WideCharToMultiByte (CP_UTF8, 0, name, n, &utf8[0],
+                                         4 * n, nullptr, nullptr);
+      utf8.resize (k > 0 ? k : 0);
+      reply ("title " + utf8);
+#else
       char *name = nullptr;
       XFetchName ((Display *) m_display->GetDisplayAspect (),
                   static_cast<Window> (m_window->NativeHandle ()), &name);
@@ -768,6 +850,7 @@ public:
       {
         XFree (name);
       }
+#endif
     }
     else if (cmd == "close")
     {
@@ -1681,7 +1764,7 @@ private:
   Handle (Aspect_DisplayConnection) m_display;
   Handle (V3d_Viewer) m_viewer;
   Handle (AIS_InteractiveContext) m_context;
-  Handle (Xw_Window) m_window;
+  Handle (nativewindow) m_window;
   Handle (V3d_View) m_view;
   Handle (AIS_Shape) m_shape;
   Handle (AIS_TextLabel) m_label;
@@ -1714,11 +1797,72 @@ private:
   bool m_edgeson = false;
 };
 
+#if defined (_WIN32)
+// Every message to the window, offered to the viewer first; a failure while
+// handling it loses that one message, as in the main loop
+static LRESULT WINAPI
+wndproc (HWND w, UINT m, WPARAM wp, LPARAM lp)
+{
+  if (g_viewer != nullptr)
+  {
+    MSG msg = {};
+    msg.hwnd = w;
+    msg.message = m;
+    msg.wParam = wp;
+    msg.lParam = lp;
+    msg.time = GetMessageTime ();
+    try
+    {
+      if (g_viewer->message (msg))
+      {
+        return 0;
+      }
+    }
+    catch (const Standard_Failure&)
+    { }
+  }
+  return DefWindowProcW (w, m, wp, lp);
+}
+
+// What a thread reads from stdin, since Win32 cannot wait on a pipe and the
+// window's messages together: the bytes not yet taken, whether stdin ended,
+// and an event set whenever either changes
+static struct
+{
+  std::mutex lock;
+  string bytes;
+  bool ended = false;
+  HANDLE ready = nullptr;
+} g_in;
+
+static void
+readstdin ()
+{
+  const HANDLE h = GetStdHandle (STD_INPUT_HANDLE);
+  char buf[65536];
+  DWORD n = 0;
+  while (ReadFile (h, buf, sizeof (buf), &n, nullptr) && n > 0)
+  {
+    std::lock_guard<std::mutex> g (g_in.lock);
+    g_in.bytes.append (buf, n);
+    SetEvent (g_in.ready);
+  }
+  std::lock_guard<std::mutex> g (g_in.lock);
+  g_in.ended = true;
+  SetEvent (g_in.ready);
+}
+#endif
+
 int
 main (int argc, char **argv)
 {
   const bool hidden = (argc > 1 && string (argv[1]) == "--hidden");
   Message::DefaultMessenger ()->ChangePrinters ().Clear ();
+#if defined (_WIN32)
+  // Shapes and images travel as raw bytes, which text mode would alter
+  _setmode (_fileno (stdin), _O_BINARY);
+  _setmode (_fileno (stdout), _O_BINARY);
+#endif
 
   viewer *v = nullptr;
   try
@@ -1734,7 +1878,12 @@ main (int argc, char **argv)
 
   // Commands arrive as lines; a shape's or a mesh's bytes follow its line
   string pending;
+#if defined (_WIN32)
+  g_in.ready = CreateEventW (nullptr, FALSE, FALSE, nullptr);
+  std::thread (readstdin).detach ();
+#else
   char buf[65536];
+#endif
   bool open = true;
   while (open && ! v->done ())
   {
@@ -1747,6 +1896,22 @@ main (int argc, char **argv)
     catch (const Standard_Failure&)
     { }
 
+#if defined (_WIN32)
+    MsgWaitForMultipleObjects (1, &g_in.ready, FALSE, 20, QS_ALLINPUT);
+    {
+      std::lock_guard<std::mutex> g (g_in.lock);
+      if (g_in.bytes.empty ())
+      {
+        if (g_in.ended)
+        {
+          break;
+        }
+        continue;
+      }
+      pending.append (g_in.bytes);
+      g_in.bytes.clear ();
+    }
+#else
     fd_set fds;
     FD_ZERO (&fds);
     FD_SET (0, &fds);
@@ -1766,6 +1931,7 @@ main (int argc, char **argv)
       break;
     }
     pending.append (buf, n);
+#endif
     for (;;)
     {
       const size_t eol = pending.find ('\n');
@@ -1816,6 +1982,13 @@ main (int argc, char **argv)
   }
 
   reply ("closed");
+#if defined (_WIN32)
+  // A graphics driver can hang while Windows unloads it at exit, leaving the
+  // viewer half ended and Octave waiting on it; nothing is left to save, and
+  // Windows reclaims the window and the drawing, so the viewer ends at once
+  // without unloading anything
+  TerminateProcess (GetCurrentProcess (), 0);
+#endif
   delete v;
   return 0;
 }

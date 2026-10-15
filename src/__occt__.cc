@@ -29,6 +29,17 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <vector>
 
 #include <octave/oct.h>
+#if defined (_WIN32)
+// The thread pool brings in <windows.h>: its min and max kept out, and two
+// 16-bit leftovers that would empty any name near or far undone after it
+#  ifndef NOMINMAX
+#    define NOMINMAX
+#  endif
+#  include <octave/parse.h>
+#  include <OSD_ThreadPool.hxx>
+#  undef near
+#  undef far
+#endif
 
 #include <APIHeaderSection_MakeHeader.hxx>
 #include <BRepAdaptor_Curve.hxx>
@@ -5118,6 +5129,30 @@ function directly. \n\
 \n\
 @end deftypefn")
 {
+#if defined (_WIN32)
+  // Never unloaded, as -z nodelete keeps it on Linux: Open CASCADE's worker
+  // threads outlive the calls that start them, and unloading its libraries
+  // under them hangs Octave at exit.  Its shared thread pool also waits for
+  // its workers when its library is unloaded at exit, which Windows has
+  // ended by then; so the pool is let go while they still run, by an exit
+  // hook calling this function with no arguments
+  static bool pinned = false;
+  if (! pinned)
+  {
+    HMODULE self = nullptr;
+    GetModuleHandleExW (GET_MODULE_HANDLE_EX_FLAG_PIN
+                        | GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
+                        reinterpret_cast<LPCWSTR> (&pinned), &self);
+    octave::feval ("atexit", ovl ("__occt__"));
+    pinned = true;
+  }
+  if (given.length () == 0)
+  {
+    OSD_ThreadPool::DefaultPool ()->Init (1);
+    return ovl ();
+  }
+#endif
+
   // Validate input
   if (given.length () < 2 || ! given(0).is_string ()
       || ! given(1).is_string ())
