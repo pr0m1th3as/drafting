@@ -4969,6 +4969,18 @@ knurlsolid (const TopoDS_Shape& so, const TopoDS_Face& F, const ShapeMap& emap,
                                     + c.LastParameter ()) / 2));
     const int k = std::abs (z - z0) < 1e-6 ? 0
                   : (std::abs (z - z1) < 1e-6 ? 1 : -1);
+    // An edge that reaches neither end bounds a hole or pocket in F
+    bool inside = k < 0;
+    for (TopExp_Explorer y (e, TopAbs_VERTEX); inside && y.More (); y.Next ())
+    {
+      const double zv = zof (BRep_Tool::Pnt (TopoDS::Vertex (y.Current ())));
+      inside = zv > z0 + 1e-6 && zv < z1 - 1e-6;
+    }
+    if (inside)
+    {
+      error ("%s: F has a hole or pocket in it; knurl F first, then cut it.",
+             who);
+    }
     if (k < 0 || c.GetType () != GeomAbs_Circle)
     {
       error ("%s: F must end in a circle at each end.", who);

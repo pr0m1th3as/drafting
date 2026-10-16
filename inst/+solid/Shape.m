@@ -2491,7 +2491,8 @@ classdef Shape
     ## circle on one flat face square to the axis: the free end of the part,
     ## or a shoulder.  The wall under @var{F} must be thicker than the teeth
     ## are deep, and than a fillet or chamfer at an end of @var{F} is large:
-    ## a bore, its thread or anything else reaching into it is an error.
+    ## a bore, its thread or anything else reaching into it is an error.  So
+    ## is a hole or pocket in @var{F}: knurl first, then cut it.
     ##
     ## @var{PITCH} is in millimetres, measured square to the grooves as DIN 82
     ## gives it, whose series is 0.5, 0.6, 0.8, 1.0, 1.2 and 1.6.  A whole
