@@ -5,14 +5,16 @@ MKOCTFILE ?= mkoctfile
 # Open CASCADE 7.8 or later, its visualization libraries and X11 are
 # required.  They are looked for where distributions and source builds put
 # them; set OCCT_INC, OCCT_LIB, X11_INC or X11_LIB to use other locations.
-# On Windows Open CASCADE is looked for first in Octave's own mingw64 folder,
-# where its headers, import libraries and DLLs belong, and X11 is not used.
+# On Windows Open CASCADE is looked for first in occt, where pre_install.m
+# unpacks the build it fetches, then in Octave's own mingw64 folder, where
+# its headers, import libraries and DLLs belong, and X11 is not used.
 OCCT_DIRS = /usr/local/include/opencascade /usr/local/include/OpenCASCADE \
             /usr/include/opencascade
 X11_DIRS = /usr/include /usr/local/include
 ifeq ($(OS),Windows_NT)
 WINDOWS := yes
-OCCT_DIRS := /mingw64/include/opencascade $(OCCT_DIRS)
+OCCT_DIRS := occt/include/opencascade /mingw64/include/opencascade \
+             $(OCCT_DIRS)
 endif
 ifndef OCCT_INC
 OCCT_INC := $(patsubst %/Standard_Version.hxx,%,$(firstword \
@@ -125,6 +127,13 @@ endif
 OCTFILES = __mesh__.oct __dxf__.oct __occt__.oct __occtfont__.oct
 PROGRAMS = $(VIEWER)
 
+# The DLLs of the build pre_install.m fetched install beside the oct files,
+# where Octave looks for what an oct file needs, and the viewer finds them
+# on the PATH it is started with
+ifeq ($(OCCT_INC),occt/include/opencascade)
+DLLS = $(wildcard occt/bin/*.dll)
+endif
+
 .PHONY: all FILES
 all: $(OCTFILES) $(PROGRAMS) FILES
 
@@ -149,9 +158,9 @@ $(VIEWER): __occtview__.cc shapebytes.h
 	$(shell $(MKOCTFILE) -p CXX) -O2 -I$(OCCT_INC) $(addprefix -I,$(X11_INC)) \
 	  -o $(VIEWER) __occtview__.cc $(LIB_DIRS) $(RPATH) $(VIEW_LIBS)
 
-# What pkg install copies: exactly what was built
+# What pkg install copies: exactly what was built, and the fetched DLLs
 FILES:
-	@printf '%s\n' $(OCTFILES) $(PROGRAMS) > FILES
+	@printf '%s\n' $(OCTFILES) $(PROGRAMS) $(DLLS) > FILES
 
 .PHONY: clean
 clean:

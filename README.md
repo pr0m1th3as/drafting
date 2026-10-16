@@ -182,9 +182,14 @@ The package records where it found the libraries, so they need not be on the
 system's library path, and headers found outside `/usr` without their
 libraries beside them stop the build rather than link another version.
 
-The package builds on Linux and FreeBSD. Its Makefile is GNU make's, so on
-FreeBSD install `gmake` and type `setenv ("MAKE", "gmake")` before
-`pkg install`. Ports to Windows and macOS are not planned.
+The package builds on Linux, FreeBSD and Windows. Its Makefile is GNU make's,
+so on FreeBSD install `gmake` and type `setenv ("MAKE", "gmake")` before
+`pkg install`. On Windows, with GNU Octave 11.1.0 or 11.3.0 from
+[octave.org](https://octave.org/download), `pkg install` fetches a build of
+Open CASCADE made with Octave's own compiler and installs it with the
+package, so nothing else is needed; Open CASCADE already in Octave's
+`mingw64` folder, or named by `OCCT_INC`, is used instead. A port to macOS
+is not planned.
 
 After installation, type:
 - `pkg load drafting` to load the **drafting** package.

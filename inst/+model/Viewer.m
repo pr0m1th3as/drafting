@@ -1411,7 +1411,19 @@ classdef Viewer < handle
       if (st.hidden)
         args = {'--hidden'};
       endif
-      [st.in, st.out, st.pid] = popen2 (exe, args);
+      if (ispc ())
+        ## Open CASCADE's DLLs may sit beside the oct files, not the viewer
+        old = getenv ('PATH');
+        octdir = fileparts (file_in_loadpath ('__occt__.oct'));
+        setenv ('PATH', [octdir, pathsep(), old]);
+        unwind_protect
+          [st.in, st.out, st.pid] = popen2 (exe, args);
+        unwind_protect_cleanup
+          setenv ('PATH', old);
+        end_unwind_protect
+      else
+        [st.in, st.out, st.pid] = popen2 (exe, args);
+      endif
       setstate (this, st);
       r = receive (this, 30);
       if (! strcmp (r, 'ready'))

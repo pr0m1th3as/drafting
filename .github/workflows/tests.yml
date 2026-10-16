@@ -167,3 +167,116 @@ jobs:
             exit 1
           fi
           echo "$pass tests passed"
+
+  # GNU Octave for Windows from octave-ci; pkg install runs pre_install.m,
+  # which fetches the Open CASCADE built with that Octave.  The runners have
+  # no GPU, so the viewer is given the software OpenGL that comes with
+  # Octave, as opengl32.dll beside it.
+  windows:
+    name: Windows, Octave ${{ matrix.version }}
+    runs-on: windows-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ['11.1.0', '11.3.0']
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Octave
+        uses: pr0m1th3as/octave-ci/windows@v1
+        with:
+          version: ${{ matrix.version }}
+
+      - name: Build the package archive
+        id: archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          git archive --format=tar.gz --prefix=package/ -o package.tar.gz HEAD
+          name="$(tr -d '\r' < DESCRIPTION \
+                  | sed -n 's/^Name: *//p' | tr '[:upper:]' '[:lower:]')"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+
+      - name: Install and test
+        shell: bash
+        env:
+          NAME: ${{ steps.archive.outputs.name }}
+        run: |
+          set -euo pipefail
+          archive="$(cygpath -w "$PWD/package.tar.gz")"
+          code="pkg ('install', '-local', '$archive'); pkg ('load', '$NAME'); "
+          code+="gl = fullfile (OCTAVE_HOME (), 'bin', 'opengl32sw.dll'); "
+          code+="if (! exist (gl, 'file')); error ('no %s', gl); endif; "
+          code+="copyfile (gl, fullfile (fileparts (file_in_loadpath "
+          code+="('__occtview__.exe')), 'opengl32.dll')); "
+          code+="pkg ('test', '$NAME');"
+          octave-launch --no-gui --norc --silent --no-history --eval "$code" \
+            2>&1 | tee test.log
+
+      - name: Show the failed tests
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p test-logs
+          see='s/^See the file (.*) for additional details\.$/\1/p'
+          log=""
+          if [ -f test.log ]; then
+            log="$(tr -d '\r' < test.log | sed -nE "$see" \
+                   | tail -1 | sed 's#.*[\\/]##')"
+          fi
+          for f in "$log" test_suite.log fntests.log; do
+            if [ -n "$f" ] && [ -f "$f" ]; then
+              cp "$f" test-logs/
+              tr -d '\r' < "$f" | awk '
+                function flush() {
+                  if (bad) {
+                    if (!shown) { print "==> " file; shown = 1 }
+                    printf "%s", block
+                  }
+                  block = ""; bad = 0
+                }
+                /^>>>>> processing / {
+                  flush(); file = substr ($0, 18); shown = 0; next
+                }
+                /^Files with no tests:/ { flush(); exit }
+                /^\*\*\*\*\* / { flush(); block = $0 "\n"; next }
+                block != "" { block = block $0 "\n"; if (/^!!!!! /) bad = 1 }
+                END { flush() }'
+              break
+            fi
+          done
+          if [ -f test.log ]; then
+            cp test.log test-logs/
+          fi
+
+      - name: Upload the test logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-logs-windows-${{ matrix.version }}
+          path: test-logs/
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Check the test results
+        shell: bash
+        run: |
+          set -euo pipefail
+          summary="$(tr -d '\r' < test.log | sed -n '/^Summary:$/,$p')"
+          count () {
+            printf '%s\n' "$summary" | sed -nE "s/^  $1 +([0-9]+)\$/\1/p"
+          }
+          pass="$(count PASS)"
+          fail="$(count FAIL)"
+          regr="$(count REGRESSION)"
+          if [ -z "$pass" ] || [ "$pass" -eq 0 ]; then
+            echo "::error::no test passed"
+            exit 1
+          fi
+          if [ "${fail:-1}" -ne 0 ] || [ "${regr:-0}" -ne 0 ]; then
+            echo "::error::${fail:-unknown} failed, ${regr:-0} regressions"
+            exit 1
+          fi
+          echo "$pass tests passed"
