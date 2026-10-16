@@ -919,12 +919,12 @@ classdef Shape
     ## The surface area of a shape in square millimetres.
     ##
     ## The area is the sum over every face, computed from the exact surfaces.
-    ## A flat face is measured to a relative error of about 1e-9, whatever its
-    ## edges, except a face bounded by the curves of text: on round glyphs,
-    ## such as an @samp{O} or an @samp{8}, to about 3e-6.  A curved face is
-    ## measured as Open CASCADE integrates it: exactly for a cylinder, a cone,
-    ## a sphere or a torus, to about 1e-4 for a face swept from a spline.  The
-    ## empty shape has area zero.
+    ## A flat face is measured exactly, whatever its edges, and so is a
+    ## cylinder, a cone, a sphere, a torus, or a face extruded or revolved from
+    ## a spline, the walls of text included.  Any other curved face, as a loft,
+    ## a sweep along a curve or a surface through a grid makes, is measured as
+    ## Open CASCADE integrates it, to about 1e-6.  The empty shape has area
+    ## zero.
     ##
     ## It is what a coating, a plating or a coat of paint is reckoned by.
     ##

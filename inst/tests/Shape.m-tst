@@ -296,7 +296,13 @@
 %! S = solid.extrude (R, 6);
 %! assert_equal (volume (S), 6 * A, -1e-9);
 %! assert_equal (centroid (S)(3), 3, 1e-9);
-%! assert_equal (area (S), 2 * A + 6 * (260 + length (H)), -1e-5);
+%! assert_equal (area (S), 2 * A + 6 * (260 + length (H)), -1e-12);
+%!test  # the area of a round glyph extruded, flat faces and spline walls
+%! R = geom.text ('O');
+%! S = solid.extrude (R{1}, 1);
+%! A = abs (__area__ (R{1}.Outline) + __area__ (R{1}.Holes{1}));
+%! L = length (R{1}.Outline) + length (R{1}.Holes{1});
+%! assert_equal (area (S), 2 * A + L, -1e-12);
 %!test  # a looser RelTol holds on a spline face
 %! C = resize (solid.cylinder (5, 10), [20, 0, 0], 'Uniform', false);
 %! assert_equal (volume (C, 'RelTol', 1e-6), 500 * pi, -1e-6);

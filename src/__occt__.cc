@@ -85,6 +85,12 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <BRepExtrema_DistShapeShape.hxx>
 #include <BRep_Builder.hxx>
 #include <ShapeUpgrade_UnifySameDomain.hxx>
+#include <ShapeUpgrade_FaceDivide.hxx>
+#include <ShapeUpgrade_SplitSurface.hxx>
+#include <ShapeBuild_ReShape.hxx>
+#include <ShapeExtend.hxx>
+#include <GeomAdaptor_Surface.hxx>
+#include <TColStd_HSequenceOfReal.hxx>
 #include <BRepFilletAPI_MakeChamfer.hxx>
 #include <BRepFilletAPI_MakeFillet.hxx>
 #include <BRepGProp.hxx>
@@ -1026,35 +1032,82 @@ volumeprops (const TopoDS_Shape& s, bool cg, double eps)
   return p;
 }
 
-// The area of S, face by face.  A planar face's area is the volume of the
-// prism of unit height on it, which the adaptive volume integration finds
-// exactly however its edges curve; a curved face takes Open CASCADE's surface
-// integration, the only one it has.
+// A surface split at each of its knots inside the range it is given, for
+// ShapeUpgrade_FaceDivide
+class knotsplit : public ShapeUpgrade_SplitSurface
+{
+public:
+  void Compute (const Standard_Boolean) override
+  {
+    const GeomAdaptor_Surface a (mySurface);
+    const int nu = a.NbUIntervals (GeomAbs_CN);
+    const int nv = a.NbVIntervals (GeomAbs_CN);
+    TColStd_Array1OfReal u (1, nu + 1), v (1, nv + 1);
+    a.UIntervals (u, GeomAbs_CN);
+    a.VIntervals (v, GeomAbs_CN);
+    Handle (TColStd_HSequenceOfReal) us = new TColStd_HSequenceOfReal;
+    Handle (TColStd_HSequenceOfReal) vs = new TColStd_HSequenceOfReal;
+    for (int i = 2; i <= nu; i++)
+      us->Append (u(i));
+    for (int i = 2; i <= nv; i++)
+      vs->Append (v(i));
+    SetUSplitValues (us);
+    SetVSplitValues (vs);
+    myStatus = ShapeExtend::EncodeStatus (ShapeExtend_DONE1);
+  }
+};
+
+// The area of a face.  A planar face is integrated adaptively, exactly
+// however its edges curve.  Open CASCADE integrates a B-spline surface span
+// by span, but a surface extruded or revolved from a curve across the
+// curve's knots, erring up to 1e-2; such a face is measured on a copy split
+// at them, each piece then exact.  Any other face takes Open CASCADE's
+// integration as it is.
+static double
+facearea (const TopoDS_Face& f)
+{
+  GProp_GProps p;
+  const BRepAdaptor_Surface g (f);
+  const GeomAbs_SurfaceType t = g.GetType ();
+  if (t == GeomAbs_Plane && BRepGProp::SurfaceProperties (f, p, 1e-9) >= 0)
+    return p.Mass ();
+  if ((t == GeomAbs_SurfaceOfExtrusion || t == GeomAbs_SurfaceOfRevolution)
+      && (g.NbUIntervals (GeomAbs_CN) > 1 || g.NbVIntervals (GeomAbs_CN) > 1))
+  {
+    try
+    {
+      ShapeUpgrade_FaceDivide d (f);
+      d.SetSplitSurfaceTool (new knotsplit);
+      d.SetContext (new ShapeBuild_ReShape);
+      d.Perform ();
+      if (! d.Status (ShapeExtend_FAIL))
+      {
+        double a = 0;
+        for (TopExp_Explorer x (d.Result (), TopAbs_FACE); x.More (); x.Next ())
+        {
+          GProp_GProps q;
+          BRepGProp::SurfaceProperties (x.Current (), q);
+          a += q.Mass ();
+        }
+        return a;
+      }
+    }
+    catch (const Standard_Failure&)
+    {
+    }
+  }
+  p = GProp_GProps ();
+  BRepGProp::SurfaceProperties (f, p);
+  return p.Mass ();
+}
+
+// The area of S, face by face
 static double
 area (const TopoDS_Shape& s)
 {
   double a = 0;
   for (TopExp_Explorer x (s, TopAbs_FACE); x.More (); x.Next ())
-  {
-    const TopoDS_Face f = TopoDS::Face (x.Current ());
-    const BRepAdaptor_Surface g (f, false);
-    if (g.GetType () == GeomAbs_Plane)
-    {
-      BRepPrimAPI_MakePrism prism (f, gp_Vec (g.Plane ().Axis ().Direction ()));
-      if (prism.IsDone ())
-      {
-        GProp_GProps p;
-        if (BRepGProp::VolumePropertiesGK (prism.Shape (), p, 1e-9) >= 0)
-        {
-          a += std::abs (p.Mass ());
-          continue;
-        }
-      }
-    }
-    GProp_GProps p;
-    BRepGProp::SurfaceProperties (f, p);
-    a += p.Mass ();
-  }
+    a += facearea (TopoDS::Face (x.Current ()));
   return a;
 }
 
