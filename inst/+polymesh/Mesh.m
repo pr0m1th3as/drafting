@@ -464,8 +464,7 @@ classdef Mesh
     ## mesh and @code{pickucs} a coordinate system.
     ##
     ## The viewer is built with the package, and needs a display to run.  It
-    ## runs on Linux, FreeBSD and Windows; on macOS it is not yet available,
-    ## and is refused.
+    ## runs on Linux, FreeBSD, Windows and macOS.
     ##
     ## @seealso{model.Viewer, solid.Shape.show}
     ## @end deftypefn
@@ -1242,7 +1241,7 @@ endfunction
 %! assert_equal (isempty (writeread (polymesh.Mesh (), '.obj')), true);
 %! assert_equal (isempty (writeread (polymesh.Mesh (), '.ply')), true);
 
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## show: the mesh in its variable's viewer
 %! old = getappdata (0, 'drafting_model_show');
 %! VP = model.Viewer ('Hidden', true);

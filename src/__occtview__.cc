@@ -132,6 +132,9 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #  include <sys/select.h>
 #  include <unistd.h>
 #endif
+#if defined (__APPLE__)
+#  import <Cocoa/Cocoa.h>
+#endif
 
 #include <AIS_InteractiveContext.hxx>
 #include <AIS_ColoredShape.hxx>
@@ -187,11 +190,15 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 
 // Xlib defines macros, Status among them, that break Open CASCADE headers
 // included after it, so it comes last, before the two that need it; on
-// Windows the window is Open CASCADE's own Win32 one
+// Windows the window is Open CASCADE's own Win32 one, and on macOS its Cocoa
+// one, around a view of the viewer's own
 #if defined (_WIN32)
 #  include <Aspect_DisplayConnection.hxx>
 #  include <WNT_WClass.hxx>
 #  include <WNT_Window.hxx>
+#elif defined (__APPLE__)
+#  include <Aspect_DisplayConnection.hxx>
+#  include <Cocoa_Window.hxx>
 #else
 #  include <X11/Xlib.h>
 #  include <X11/Xutil.h>
@@ -212,6 +219,36 @@ using nativewindow = WNT_Window;
 class viewer;
 static viewer *g_viewer = nullptr;
 static LRESULT WINAPI wndproc (HWND w, UINT m, WPARAM wp, LPARAM lp);
+#elif defined (__APPLE__)
+using nativewindow = Cocoa_Window;
+
+// Cocoa delivers the mouse, the keys, resizing, drawing and closing to the
+// window's view and its delegate, not to a queue the main loop reads, so a
+// view of the viewer's own hands each to it
+class viewer;
+@interface draftingview : NSView <NSWindowDelegate>
+{
+@public
+  viewer *owner;
+}
+@end
+
+// Whether the Mac has accelerated OpenGL; a virtual machine without a GPU,
+// as a CI runner, has only Apple's software one
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+static bool
+accelerated ()
+{
+  const NSOpenGLPixelFormatAttribute a[] = {NSOpenGLPFAAccelerated,
+                                            NSOpenGLPFADoubleBuffer,
+                                            NSOpenGLPFADepthSize, 24, 0};
+  NSOpenGLPixelFormat *f = [[NSOpenGLPixelFormat alloc] initWithAttributes: a];
+  const bool yes = (f != nil);
+  [f release];
+  return yes;
+}
+#pragma clang diagnostic pop
 #else
 using nativewindow = Xw_Window;
 #endif
@@ -401,7 +438,11 @@ public:
   viewer (bool hidden)
   {
     m_display = new Aspect_DisplayConnection ();
-    m_viewer = new V3d_Viewer (new OpenGl_GraphicDriver (m_display));
+    Handle (OpenGl_GraphicDriver) driver = new OpenGl_GraphicDriver (m_display);
+#if defined (__APPLE__)
+    driver->ChangeOptions ().contextNoAccel = ! accelerated ();
+#endif
+    m_viewer = new V3d_Viewer (driver);
     m_viewer->SetDefaultLights ();
     m_viewer->SetLightOn ();
     m_context = new AIS_InteractiveContext (m_viewer);
@@ -414,6 +455,24 @@ public:
     m_window = new WNT_Window ("drafting", wc,
                                hidden ? WS_POPUP : WS_OVERLAPPEDWINDOW, 0, 0,
                                900, 700, Quantity_NOC_BLACK);
+#elif defined (__APPLE__)
+    const NSRect r = NSMakeRect (0, 0, 900, 700);
+    NSWindow *nw = [[NSWindow alloc]
+                     initWithContentRect: r
+                     styleMask: NSWindowStyleMaskTitled
+                                | NSWindowStyleMaskClosable
+                                | NSWindowStyleMaskMiniaturizable
+                                | NSWindowStyleMaskResizable
+                     backing: NSBackingStoreBuffered defer: NO];
+    draftingview *dv = [[draftingview alloc] initWithFrame: r];
+    [nw setContentView: dv];
+    [nw setDelegate: dv];
+    [nw setAcceptsMouseMovedEvents: YES];
+    [nw setReleasedWhenClosed: NO];
+    [nw setTitle: @"drafting"];
+    [nw center];
+    [dv release];
+    m_window = new Cocoa_Window (dv);
 #else
     m_window = new Xw_Window (m_display, "drafting", 0, 0, 900, 700);
 #endif
@@ -421,6 +480,8 @@ public:
     m_view->SetWindow (m_window);
 #if defined (_WIN32)
     g_viewer = this;
+#elif defined (__APPLE__)
+    dv->owner = this;
 #endif
     m_view->SetBgGradientColors (Quantity_Color (0.85, 0.87, 0.9,
                                                  Quantity_TOC_sRGB),
@@ -457,6 +518,10 @@ public:
     {
 #if defined (_WIN32)
       m_window->Map ();
+#elif defined (__APPLE__)
+      m_window->Map ();
+      [[dv window] makeKeyAndOrderFront: nil];
+      [NSApp activateIgnoringOtherApps: YES];
 #else
       Display *d = (Display *) m_display->GetDisplayAspect ();
       Window w = static_cast<Window> (m_window->NativeHandle ());
@@ -511,7 +576,7 @@ public:
   {
     return m_window->ProcessMessage (*this, msg);
   }
-#else
+#elif ! defined (__APPLE__)
   int fd () const
   {
     return ConnectionNumber ((Display *) m_display->GetDisplayAspect ());
@@ -532,6 +597,17 @@ public:
     {
       TranslateMessage (&msg);
       DispatchMessageW (&msg);
+    }
+#elif defined (__APPLE__)
+    @autoreleasepool
+    {
+      NSEvent *e;
+      while ((e = [NSApp nextEventMatchingMask: NSEventMaskAny
+                         untilDate: [NSDate distantPast]
+                         inMode: NSDefaultRunLoopMode dequeue: YES]) != nil)
+      {
+        [NSApp sendEvent: e];
+      }
     }
 #else
     Display *d = (Display *) m_display->GetDisplayAspect ();
@@ -841,6 +917,12 @@ public:
                                          4 * n, nullptr, nullptr);
       utf8.resize (k > 0 ? k : 0);
       reply ("title " + utf8);
+#elif defined (__APPLE__)
+      @autoreleasepool
+      {
+        NSWindow *nw = [(NSView *) m_window->HView () window];
+        reply (string ("title ") + [[nw title] UTF8String]);
+      }
 #else
       char *name = nullptr;
       XFetchName ((Display *) m_display->GetDisplayAspect (),
@@ -1797,6 +1879,177 @@ private:
   bool m_edgeson = false;
 };
 
+#if defined (__APPLE__)
+// The pixel an event lands on, counted from the top left as Open CASCADE
+// counts them, in the pixels of the backing store, two to a point on a
+// Retina screen
+static Graphic3d_Vec2i
+pixel (NSView *v, NSEvent *e)
+{
+  const NSPoint p = [v convertPointToBacking:
+                       [v convertPoint: [e locationInWindow] fromView: nil]];
+  const NSSize s = [v convertSizeToBacking: [v bounds].size];
+  return Graphic3d_Vec2i ((int) p.x, (int) (s.height - p.y));
+}
+
+static Aspect_VKeyFlags
+modifiers (NSEvent *e)
+{
+  const NSEventModifierFlags f = [e modifierFlags];
+  Aspect_VKeyFlags k = Aspect_VKeyFlags_NONE;
+  if (f & NSEventModifierFlagShift)
+    k |= Aspect_VKeyFlags_SHIFT;
+  if (f & NSEventModifierFlagControl)
+    k |= Aspect_VKeyFlags_CTRL;
+  if (f & NSEventModifierFlagOption)
+    k |= Aspect_VKeyFlags_ALT;
+  if (f & NSEventModifierFlagCommand)
+    k |= Aspect_VKeyFlags_META;
+  return k;
+}
+
+// The buttons held, by Cocoa's numbering: 0 left, 1 right, 2 middle
+static Aspect_VKeyMouse
+buttons ()
+{
+  const NSUInteger b = [NSEvent pressedMouseButtons];
+  Aspect_VKeyMouse m = Aspect_VKeyMouse_NONE;
+  if (b & 1)
+    m |= Aspect_VKeyMouse_LeftButton;
+  if (b & 2)
+    m |= Aspect_VKeyMouse_RightButton;
+  if (b & 4)
+    m |= Aspect_VKeyMouse_MiddleButton;
+  return m;
+}
+
+static Aspect_VKeyMouse
+button (NSEvent *e)
+{
+  switch ([e buttonNumber])
+  {
+    case 0:
+      return Aspect_VKeyMouse_LeftButton;
+    case 1:
+      return Aspect_VKeyMouse_RightButton;
+    default:
+      return Aspect_VKeyMouse_MiddleButton;
+  }
+}
+
+@implementation draftingview
+
+- (BOOL) acceptsFirstResponder
+{
+  return YES;
+}
+
+- (BOOL) acceptsFirstMouse: (NSEvent *) e
+{
+  return YES;
+}
+
+- (void) press: (NSEvent *) e
+{
+  if (owner != nullptr)
+    owner->PressMouseButton (pixel (self, e), button (e), modifiers (e),
+                             false);
+}
+
+- (void) letgo: (NSEvent *) e
+{
+  if (owner != nullptr)
+    owner->ReleaseMouseButton (pixel (self, e), button (e), modifiers (e),
+                               false);
+}
+
+- (void) move: (NSEvent *) e
+{
+  if (owner != nullptr)
+    owner->UpdateMousePosition (pixel (self, e), buttons (), modifiers (e),
+                                false);
+}
+
+- (void) mouseDown: (NSEvent *) e { [self press: e]; }
+- (void) rightMouseDown: (NSEvent *) e { [self press: e]; }
+- (void) otherMouseDown: (NSEvent *) e { [self press: e]; }
+- (void) mouseUp: (NSEvent *) e { [self letgo: e]; }
+- (void) rightMouseUp: (NSEvent *) e { [self letgo: e]; }
+- (void) otherMouseUp: (NSEvent *) e { [self letgo: e]; }
+- (void) mouseMoved: (NSEvent *) e { [self move: e]; }
+- (void) mouseDragged: (NSEvent *) e { [self move: e]; }
+- (void) rightMouseDragged: (NSEvent *) e { [self move: e]; }
+- (void) otherMouseDragged: (NSEvent *) e { [self move: e]; }
+
+// A wheel's notch is a step of 1, as on the other systems; a trackpad's
+// fine deltas, in points, are scaled down to match
+- (void) scrollWheel: (NSEvent *) e
+{
+  double d = [e scrollingDeltaY];
+  if ([e hasPreciseScrollingDeltas])
+    d /= 10;
+  if (owner != nullptr && d != 0)
+    owner->UpdateMouseScroll (Aspect_ScrollDelta (pixel (self, e), d,
+                                                  modifiers (e)));
+}
+
+- (void) keyDown: (NSEvent *) e
+{
+  if (owner != nullptr)
+    owner->KeyDown (Cocoa_Window::VirtualKeyFromNative ([e keyCode]),
+                    owner->EventTime (), 1.0);
+}
+
+- (void) keyUp: (NSEvent *) e
+{
+  if (owner != nullptr)
+    owner->KeyUp (Cocoa_Window::VirtualKeyFromNative ([e keyCode]),
+                  owner->EventTime ());
+}
+
+- (void) setFrameSize: (NSSize) s
+{
+  [super setFrameSize: s];
+  if (owner != nullptr)
+    owner->ProcessConfigure (true);
+}
+
+- (void) viewDidChangeBackingProperties
+{
+  [super viewDidChangeBackingProperties];
+  if (owner != nullptr)
+    owner->ProcessConfigure (true);
+}
+
+- (void) drawRect: (NSRect) r
+{
+  if (owner != nullptr)
+    owner->ProcessExpose ();
+}
+
+// Closing the window ends the viewer, which closes it itself
+- (BOOL) windowShouldClose: (NSWindow *) w
+{
+  if (owner != nullptr)
+    owner->ProcessClose ();
+  return NO;
+}
+
+- (void) windowDidResignKey: (NSNotification *) n
+{
+  if (owner != nullptr)
+    owner->ProcessFocus (false);
+}
+
+- (void) windowDidBecomeKey: (NSNotification *) n
+{
+  if (owner != nullptr)
+    owner->ProcessFocus (true);
+}
+
+@end
+#endif
+
 #if defined (_WIN32)
 // Every message to the window, offered to the viewer first; a failure while
 // handling it loses that one message, as in the main loop
@@ -1862,6 +2115,13 @@ main (int argc, char **argv)
   // Shapes and images travel as raw bytes, which text mode would alter
   _setmode (_fileno (stdin), _O_BINARY);
   _setmode (_fileno (stdout), _O_BINARY);
+#elif defined (__APPLE__)
+  // A program run from a terminal, not an application bundle: a hidden
+  // viewer stays out of the Dock and the menu bar
+  [NSApplication sharedApplication];
+  [NSApp setActivationPolicy: hidden ? NSApplicationActivationPolicyAccessory
+                                     : NSApplicationActivationPolicyRegular];
+  [NSApp finishLaunching];
 #endif
 
   viewer *v = nullptr;
@@ -1915,9 +2175,15 @@ main (int argc, char **argv)
     fd_set fds;
     FD_ZERO (&fds);
     FD_SET (0, &fds);
+#  if defined (__APPLE__)
+    // Cocoa's events come through no descriptor; the timeout returns to them
+    const int top = 0;
+#  else
     FD_SET (v->fd (), &fds);
+    const int top = v->fd ();
+#  endif
     timeval tv = {0, 20000};
-    if (select (v->fd () + 1, &fds, nullptr, nullptr, &tv) < 0)
+    if (select (top + 1, &fds, nullptr, nullptr, &tv) < 0)
     {
       break;
     }

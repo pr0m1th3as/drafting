@@ -281,8 +281,8 @@ jobs:
           fi
           echo "$pass tests passed"
 
-  # Octave and Open CASCADE from Homebrew.  The viewer is not yet ported to
-  # macOS, so it is not built there and its tests are skipped.
+  # Octave and Open CASCADE from Homebrew.  The runner has no GPU, so the
+  # viewer draws with Apple's software OpenGL.
   macos:
     name: macOS, Octave from Homebrew
     runs-on: macos-latest

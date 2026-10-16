@@ -523,8 +523,7 @@ classdef Shape
     ## changing the variable that was shown does not, until it is shown again.
     ##
     ## The viewer is built with the package, and needs a display to run.  It
-    ## runs on Linux, FreeBSD and Windows; on macOS it is not yet available,
-    ## and is refused.
+    ## runs on Linux, FreeBSD, Windows and macOS.
     ##
     ## @seealso{model.Viewer, model.Viewer.pick, polymesh.Mesh.show}
     ## @end deftypefn

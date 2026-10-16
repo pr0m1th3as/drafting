@@ -8,8 +8,8 @@ MKOCTFILE ?= mkoctfile
 # On Windows Open CASCADE is looked for first in occt, where pre_install.m
 # unpacks the build it fetches, then in Octave's own mingw64 folder, where
 # its headers, import libraries and DLLs belong, and X11 is not used.  On
-# macOS it is looked for first where Homebrew puts it, and X11 is not used:
-# the viewer, which needs it, is not built there.
+# macOS it is looked for first where Homebrew puts it, and X11 is not used
+# either.
 OCCT_DIRS = /usr/local/include/opencascade /usr/local/include/OpenCASCADE \
             /usr/include/opencascade
 X11_DIRS = /usr/include /usr/local/include
@@ -68,7 +68,7 @@ RPATH = $(if $(RPATH_DIRS),-Wl$(comma)--disable-new-dtags \
 # Windows records no paths in its DLLs, finding them on PATH, and the
 # viewer draws in a Win32 window, not an X11 one.  macOS's linker takes a
 # plain -rpath and has no nodelete, so __occt__.oct pins itself there, and
-# no viewer is built.
+# the viewer draws in a Cocoa window, its source compiled as Objective-C++.
 ifdef WINDOWS
 RPATH =
 NODELETE =
@@ -77,7 +77,9 @@ VIEWER = __occtview__.exe
 else ifdef MACOS
 RPATH = $(addprefix -Wl$(comma)-rpath$(comma),$(RPATH_DIRS))
 NODELETE =
-VIEWER =
+WINDOW_LIBS = -framework Cocoa
+VIEW_FLAGS = -ObjC++
+VIEWER = __occtview__
 else
 NODELETE = -Wl,-z,nodelete
 WINDOW_LIBS = -lX11
@@ -173,11 +175,10 @@ __occt__.oct: __occt__.cc shapebytes.h
 	$(MKOCTFILE) -I$(OCCT_INC) __occt__.cc $(LIB_DIRS) $(RPATH) \
 	  $(OCCT_LIBS) $(NODELETE)
 
-ifdef VIEWER
 $(VIEWER): __occtview__.cc shapebytes.h
-	$(shell $(MKOCTFILE) -p CXX) -O2 -I$(OCCT_INC) $(addprefix -I,$(X11_INC)) \
-	  -o $(VIEWER) __occtview__.cc $(LIB_DIRS) $(RPATH) $(VIEW_LIBS)
-endif
+	$(shell $(MKOCTFILE) -p CXX) -O2 $(VIEW_FLAGS) -I$(OCCT_INC) \
+	  $(addprefix -I,$(X11_INC)) -o $(VIEWER) __occtview__.cc $(LIB_DIRS) \
+	  $(RPATH) $(VIEW_LIBS)
 
 # What pkg install copies: exactly what was built, and the fetched DLLs
 FILES:

@@ -72,8 +72,8 @@ classdef Viewer < handle
   ## Closing the window ends the viewer; assigning a shape again opens a new
   ## one.  The window closes with Octave.
   ##
-  ## The viewer needs a display to run.  It runs on Linux, FreeBSD and
-  ## Windows; on macOS it is not yet available, and is refused.
+  ## The viewer needs a display to run.  It runs on Linux, FreeBSD, Windows
+  ## and macOS.
   ##
   ## @seealso{solid.Shape.show, polymesh.Mesh.show, model.Assembly.show,
   ## model.Viewer.pick, model.Viewer.opacity}
@@ -1399,10 +1399,7 @@ classdef Viewer < handle
 
     function launch (this)
 
-      if (ismac ())
-        error ("model.Viewer: the viewer is not yet available on macOS.");
-      endif
-      if (! ispc () && isempty (getenv ('DISPLAY')))
+      if (! ispc () && ! ismac () && isempty (getenv ('DISPLAY')))
         error ("model.Viewer: the viewer needs a display, and none is set.");
       endif
       exe = '__occtview__';
@@ -1766,7 +1763,7 @@ function TF = hasmesh (A)
 
 endfunction
 
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## The window opens with the first shape and closes on demand
 %! V = model.Viewer ('Hidden', true);
 %! assert_equal (isopen (V), false);
@@ -1776,7 +1773,7 @@ endfunction
 %! close (V);
 %! assert_equal (isopen (V), false);
 
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## A shape read back keeps its colours and names
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
@@ -1790,7 +1787,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## A double click takes the point of the shape under it
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
@@ -1801,7 +1798,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## and the view turns about it: the point stays where it is on screen
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
@@ -1814,7 +1811,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## The mouse turns the view keeping z up the window
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
@@ -1827,7 +1824,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## so a view the mouse found is restored as it was
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
@@ -1841,7 +1838,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## T lets the mouse turn the view any way
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
@@ -1855,7 +1852,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## and T again stands the view upright
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
@@ -1870,7 +1867,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## A double click that misses the shape takes nothing
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
@@ -1880,7 +1877,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## The window opens on the isometric view
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
@@ -1891,7 +1888,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## A view set reads back as given
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
@@ -1903,7 +1900,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## Straight down, the azimuth is kept
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
@@ -1915,7 +1912,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## The azimuth reads back from -180 to 180
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
@@ -1927,7 +1924,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## Seen from above, x runs right and y up the window
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
@@ -1941,7 +1938,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## Seen from the front, z runs up the window
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
@@ -1954,7 +1951,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## and looks along y
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
@@ -1965,7 +1962,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## A zoom set reads back as given
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
@@ -1977,7 +1974,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## A view set without a zoom fits the shape
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
@@ -1990,7 +1987,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## A zoom of 2 shows the shape twice as large
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
@@ -2004,7 +2001,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## A target set reads back as given
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
@@ -2016,7 +2013,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## The target is at the centre of the window
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
@@ -2027,7 +2024,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## Without a target, the middle of the shape is
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
@@ -2039,7 +2036,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## A view read back and set again draws the same picture
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
@@ -2084,7 +2081,7 @@ endfunction
 %!error<model.Viewer.view: invalid number of output arguments.> ...
 %! A = view (model.Viewer ('Hidden', true), 30, 60, 2);
 
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## capture: the window's picture, the right way up
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
@@ -2096,7 +2093,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## capture: Size draws the picture at any size
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
@@ -2106,7 +2103,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## capture: a file holds the picture
 %! V = model.Viewer ('Hidden', true);
 %! f = [tempname(), '.png'];
@@ -2138,7 +2135,7 @@ endfunction
 %!error<model.Viewer.view: the viewer's window is not open.> ...
 %! view (model.Viewer ('Hidden', true))
 
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## A pixel picks the face and the edge the queries name
 %! B = solid.box (10, 20, 30);
 %! V = model.Viewer ('Hidden', true);
@@ -2154,7 +2151,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## The seam of a cylinder is never offered
 %! C = solid.cylinder (4, 12);
 %! V = model.Viewer ('Hidden', true);
@@ -2167,7 +2164,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## A new shape replaces the old one, and the empty shape clears the view
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
@@ -2181,7 +2178,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## What a pick holds is drawn in orange, so that a click visibly took
 %! orange = @(I) I(:,:,1) > 200 & I(:,:,2) < 150 & I(:,:,3) < 60;
 %! near = @(M, p) any (any (M(round (p(2)) + (-3:5), round (p(1)) + (-3:5))));
@@ -2203,7 +2200,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## A bore cut by a tool longer than the part is picked where it is, not in
 %! ## the air beside the part (Open CASCADE 7.8 places its analytic cylinder
 %! ## where the untrimmed surface begins)
@@ -2250,7 +2247,7 @@ endfunction
 %! Q = model.Viewer.__query__ (B, 'edge', E, 'B');
 %! assert_equal (strncmp (Q, "[edges(B, ", 10), true);
 
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## The window is titled with the name, before it opens and after
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
@@ -2263,7 +2260,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## The empty shape opens the window empty
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
@@ -2297,7 +2294,7 @@ endfunction
 %! assert_equal (U.XAxis, [1, 0, 0]);
 %! assert_equal (U.Normal, [0, 0, 1]);
 
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## A face and two corners, then a hole's rim for the origin: its centre
 %! B = hole (solid.box (80, 40, 12), [20, 20, 12], 8, Inf);
 %! V = model.Viewer ('Hidden', true);
@@ -2321,7 +2318,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## A curved face is refused and asked for again; a datum corner from a
 %! ## point on the right face and one on the front
 %! B = hole (solid.box (80, 40, 12), [20, 20, 12], 8, Inf);
@@ -2338,7 +2335,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## Three corners, Enter keeping the first: the code of the UCS picked
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
@@ -2351,7 +2348,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## The code makes the UCS picked on a sloping face again
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
@@ -2366,7 +2363,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## A pick prints nothing
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
@@ -2378,7 +2375,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## Escape cancels the pick with an error, and the viewer goes on
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
@@ -2406,7 +2403,7 @@ endfunction
 %!  M = polymesh.Mesh (P, F);
 %!endfunction
 
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## A mesh is shown and handed back; a click on it is a facet or a point
 %! M = boxmesh (80, 40, 12);
 %! V = model.Viewer ('Hidden', true);
@@ -2430,7 +2427,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## A UCS picked on a mesh: a facet and two corners, Enter for the origin
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
@@ -2449,7 +2446,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## Points picked on a mesh, with the triangle each lies on and its normal;
 %! ## a click that misses adds nothing, and a shape replaces the mesh.  The
 %! ## top's triangles 3 and 4 meet on its diagonal, y = x / 2; the side's 7
@@ -2473,7 +2470,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## Each solid is shown in its colour, one without a colour in grey
 %! B = solid.box (10, 10, 10);
 %! U = union (B, translate (B, [20, 0, 0]));
@@ -2491,7 +2488,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## A mesh is shown in its faces' colours, its vertices' or grey
 %! M = boxmesh (80, 40, 12);
 %! M.FaceColour = repmat ([1, 0, 0], 12, 1);
@@ -2515,7 +2512,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## A colouring chosen holds for the meshes after that have it; one that
 %! ## lacks it is shown in the first it has
 %! M = boxmesh (10, 20, 30);
@@ -2534,7 +2531,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## A mesh's triangle edges are drawn when asked for, and only then
 %! dark = @(I) all (I < 90, 3);
 %! near = @(D, p) any (any (D(round (p(2)) + (-3:3), round (p(1)) + (-3:3))));
@@ -2566,7 +2563,7 @@ endfunction
 %!error<model.Viewer: unknown option 'Visible'.> model.Viewer ('Visible', true)
 %!error<model.Viewer: option names must be character vectors.> model.Viewer (1, true)
 ## Option names ignore case
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! V = model.Viewer ('hidden', true);
 %! assert_equal (isopen (V), false);
 %!error<model.Viewer: Hidden must be true or false.> ...
@@ -2586,7 +2583,7 @@ endfunction
 %!error<model.Viewer: Name must be a valid variable name.>
 %! V = model.Viewer ();
 %! V.Name = '1part';
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## An edge clicked, then Enter: the code that selects it
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
@@ -2599,7 +2596,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## A pick of edges prints nothing
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
@@ -2610,7 +2607,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## Escape picks nothing
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
@@ -2632,11 +2629,9 @@ endfunction
 %!                                               V.Id)), 'mesh', ...
 %!                       polymesh.Mesh ()));
 %! pick (V, 'edge')
-%!testif ; ismac ()
-%! fail ("V = model.Viewer (); V.Model = solid.box (1, 1, 1);", ...
-%!       "model.Viewer: the viewer is not yet available on macOS.");
 %!testif ; ! ispc () && ! ismac ()
-%! ## Windows needs no DISPLAY, so only elsewhere is its absence an error
+%! ## Windows and macOS need no DISPLAY, so only elsewhere is its absence an
+%! ## error
 %! d = getenv ('DISPLAY');
 %! unwind_protect
 %!   setenv ('DISPLAY', '');
@@ -2679,7 +2674,7 @@ endfunction
 %!  setappdata (0, key, st);
 %!endfunction
 
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## A hidden solid is neither drawn nor picked: the one behind shows
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
@@ -2698,7 +2693,7 @@ endfunction
 %! unwind_protect_cleanup
 %!   close (V);
 %! end_unwind_protect
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## A solid shown through blends with the one behind and is still picked
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
@@ -2715,7 +2710,7 @@ endfunction
 %! unwind_protect_cleanup
 %!   close (V);
 %! end_unwind_protect
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## A pick of solids: the indices, and the name that selects them again
 %! S = frontback ();
 %! S.Name = {'front'; 'back'};
@@ -2731,7 +2726,7 @@ endfunction
 %! unwind_protect_cleanup
 %!   close (V);
 %! end_unwind_protect
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## Unnamed solids are given back by index
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
@@ -2742,7 +2737,7 @@ endfunction
 %! unwind_protect_cleanup
 %!   close (V);
 %! end_unwind_protect
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## An assembly: kept as itself, picked by solid, its path given back
 %! A = add (model.Assembly ('pair'), 'front', solid.box (20, 10, 20), ...
 %!          geom.UCS ());
@@ -2760,7 +2755,7 @@ endfunction
 %! unwind_protect_cleanup
 %!   close (V);
 %! end_unwind_protect
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## A new model keeps what was set by name, path or 'all', not by index
 %! S = frontback ();
 %! S.Name = {'front'; 'back'};
@@ -2778,7 +2773,7 @@ endfunction
 %! unwind_protect_cleanup
 %!   close (V);
 %! end_unwind_protect
-%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## A mesh is hidden or shown through as a whole
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect

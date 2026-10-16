@@ -190,8 +190,7 @@ Open CASCADE made with Octave's own compiler and installs it with the package,
 so nothing else is needed; Open CASCADE already in Octave's `mingw64` folder,
 or named by `OCCT_INC`, is used instead. On macOS, install Octave and Open
 CASCADE with [Homebrew](https://brew.sh), `brew install octave opencascade`,
-before `pkg install`; everything but the viewer is built and runs there, and
-the viewer is not yet available on macOS.
+before `pkg install`.
 
 After installation, type:
 - `pkg load drafting` to load the **drafting** package.
