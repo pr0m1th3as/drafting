@@ -572,8 +572,7 @@
 %!test  # an M6 countersunk screw in a fine clearance hole
 %! S = hole (solid.box (80, 40, 12), [20, 20, 12], 'M6', Inf, ...
 %!           'Clearance', 'fine', 'Countersink', true);
-%! V = pi * (5.75 ^ 2 * 0.45 + 2.55 / 3 * (5.75 ^ 2 + 5.75 * 3.2 + 3.2 ^ 2) ...
-%!          + 3.2 ^ 2 * 9);
+%! V = pi * ((6.2 ^ 2 + 6.2 * 3.2 + 3.2 ^ 2) + 3.2 ^ 2 * 9);
 %! assert_equal (volume (S), 38400 - V, 1e-9);
 
 %!test  # tapping size for M6, drilled from the side

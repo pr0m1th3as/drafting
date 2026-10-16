@@ -76,9 +76,8 @@ W.counterbore
 ## heads ISO 7721 gives, and `'Countersink', 'socket'` the one for hexagon
 ## socket countersunk screws, whose heads are larger. Each is given as its
 ## diameter at the surface, its angle and the depth of a cylinder above the
-## cone. In the medium series the countersink is a plain cone; in the fine
-## series it sits under a short cylinder, so that the head can sit just
-## below the surface.
+## cone, which none of the standard ones has. The fine series differs from
+## the medium in its closer hole; for M6 the two countersinks are the same.
 
 A = solid.holespec ('M6', 'Clearance', 'medium', 'Countersink', true);
 B = solid.holespec ('M6', 'Clearance', 'fine', 'Countersink', true);

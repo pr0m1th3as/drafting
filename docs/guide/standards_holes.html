@@ -202,31 +202,34 @@ gives one for each family of heads, all at 90 degrees:</p>
 </ul>
 
 <p>Type A has a series for each clearance hole, chosen by
-<code>'Clearance'</code>. In the medium series it is a plain cone, d2
-across at the surface. In the fine series it is a cone below a short
-cylinder of the same diameter, d3 across and t2 deep, which lets a head sit
-just below the surface. Type B is drawn in the fine series only. Neither
+<code>'Clearance'</code>. Both are plain cones. The medium series gives
+d2, the diameter at the surface. The fine series gives d3, the cone's
+diameter t2 below the surface, where the head's top sits, so it is d3 + 2
+t2 across at the surface; the table shows that width, with d3 and t2 after
+it. At 13 of the 20 sizes it equals the medium d2, and is within 0.5 of it
+at the rest. Type
+B is drawn in the fine series only, in the same way. Neither
 gives a countersink over a coarse hole, and type B none over a medium one;
 those are refused.</p>
 
 <table class="guide">
   <tr><th>Thread</th><th>Type A, medium</th><th>Type A, fine</th>
   <th>Type B, fine</th></tr>
-  <tr><td>M3</td><td>6.5</td><td>6, 0.25 deep</td><td>6.3, 0.2 deep</td></tr>
-  <tr><td>M4</td><td>8.6</td><td>8, 0.3 deep</td><td>8.3, 0.3 deep</td></tr>
-  <tr><td>M5</td><td>10.4</td><td>10, 0.2 deep</td><td>10.4, 0.3 deep</td></tr>
-  <tr><td>M6</td><td>12.4</td><td>11.5, 0.45 deep</td><td>12.4, 0.3 deep</td></tr>
-  <tr><td>M8</td><td>16.4</td><td>15, 0.7 deep</td><td>16.5, 0.4 deep</td></tr>
-  <tr><td>M10</td><td>20.4</td><td>19, 0.7 deep</td><td>20.5, 0.5 deep</td></tr>
-  <tr><td>M12</td><td>23.9</td><td>23, 0.7 deep</td><td>25, 0.5 deep</td></tr>
-  <tr><td>M16</td><td>31.9</td><td>30, 1.2 deep</td><td>31, 0.5 deep</td></tr>
-  <tr><td>M20</td><td>40.4</td><td>37, 1.7 deep</td><td>37, 0.5 deep</td></tr>
+  <tr><td>M3</td><td>6.5</td><td>6.5 (6 at 0.25)</td><td>6.7 (6.3 at 0.2)</td></tr>
+  <tr><td>M4</td><td>8.6</td><td>8.6 (8 at 0.3)</td><td>8.9 (8.3 at 0.3)</td></tr>
+  <tr><td>M5</td><td>10.4</td><td>10.4 (10 at 0.2)</td><td>11 (10.4 at 0.3)</td></tr>
+  <tr><td>M6</td><td>12.4</td><td>12.4 (11.5 at 0.45)</td><td>13 (12.4 at 0.3)</td></tr>
+  <tr><td>M8</td><td>16.4</td><td>16.4 (15 at 0.7)</td><td>17.3 (16.5 at 0.4)</td></tr>
+  <tr><td>M10</td><td>20.4</td><td>20.4 (19 at 0.7)</td><td>21.5 (20.5 at 0.5)</td></tr>
+  <tr><td>M12</td><td>23.9</td><td>24.4 (23 at 0.7)</td><td>26 (25 at 0.5)</td></tr>
+  <tr><td>M16</td><td>31.9</td><td>32.4 (30 at 1.2)</td><td>32 (31 at 0.5)</td></tr>
+  <tr><td>M20</td><td>40.4</td><td>40.4 (37 at 1.7)</td><td>38 (37 at 0.5)</td></tr>
 </table>
 
 <p>The depth of the cone follows from the diameters at 90 degrees: half the
-difference between the countersink and the clearance hole, below the
-cylinder. The approximate depths t1 the tables print agree with it, and
-are not used. Type B steps up between M20 and M22, from 37 to 48.2 across,
+difference between the countersink at the surface and the clearance hole.
+The approximate depths t1 the tables print agree with it, and
+are not used. Type B's d3 steps up between M20 and M22, from 37 to 48.2,
 and on to 52 at M24. The depths printed for both are 0.5 less than their
 diameters give, where the smaller sizes agree exactly; as the two rows agree
 with each other, neither stands out as a misprint, and both are taken as
@@ -238,8 +241,8 @@ printed.</p>
 which are taken as given, with any clearance hole and with a plain
 diameter: <code>[CD, CDEPTH]</code> for a counterbore, and
 <code>CD</code>, <code>[CD, ANGLE]</code> or <code>[CD, ANGLE,
-CDEPTH]</code> for a countersink, the last a cylinder above the cone as in
-the fine series. A deeper counterbore, so that a screw of a standard length
+CDEPTH]</code> for a countersink, the last a cylinder above the cone. A
+deeper counterbore, so that a screw of a standard length
 reaches, is the common case.</p>
 
 <h2 id="not-done">What is not done</h2>

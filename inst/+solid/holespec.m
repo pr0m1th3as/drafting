@@ -74,10 +74,9 @@
 ## countersunk heads of ISO 7721, as on ISO 2009, ISO 7046, ISO 14581 and
 ## their raised kinds, from M1 to M20.  @qcode{'socket'} for its type B,
 ## for the hexagon socket countersunk screws of ISO 10642, from M3 to M24.
-## Type A has a medium and a fine series, chosen by @qcode{'Clearance'}:
-## a plain cone in the medium series, 12.4 wide at the surface for M6, and
-## in the fine series a cone below a short cylinder of the same width, 11.5
-## wide and 0.45 deep for M6.  Type B is in the fine series only.  Or
+## Type A has a medium and a fine series, chosen by @qcode{'Clearance'},
+## each a plain cone: 12.4 wide at the surface for M6 in both, 23.9 and 24.4
+## for M12.  Type B is in the fine series only, 13 wide for M6.  Or
 ## @var{CD}, @code{[@var{CD}, @var{ANGLE}]} or @code{[@var{CD},
 ## @var{ANGLE}, @var{CDEPTH}]}, taken as given, with an angle of 90 and no
 ## cylinder by default.
@@ -355,8 +354,9 @@ endfunction
 
 ## The countersink [CD, ANGLE, CDEPTH] IS 3406 (Part 1):1986 gives the
 ## nominal diameter D: type A for the heads of ISO 7721, medium, d2, or with
-## FINE fine, d3 and t2; or with SOCKET type B for ISO 10642, fine only, d3
-## and t2; empty for a diameter or a series it does not give
+## FINE fine; or with SOCKET type B for ISO 10642, fine only; empty for a
+## diameter or a series it does not give.  The fine series gives d3, the
+## cone's diameter t2 below the surface, so CD is d3 + 2 t2.
 function cs = csink (D, SOCKET, FINE)
 
   if (SOCKET)
@@ -367,7 +367,7 @@ function cs = csink (D, SOCKET, FINE)
     k = find (T(:,1) == D);
     cs = [];
     if (FINE && ! isempty (k))
-      cs = [T(k,2), 90, T(k,3)];
+      cs = [T(k,2) + 2 * T(k,3), 90, 0];
     endif
   else
     ## Nominal diameter, d2 of the medium series, d3 and t2 of the fine
@@ -381,7 +381,7 @@ function cs = csink (D, SOCKET, FINE)
     k = find (T(:,1) == D);
     cs = [];
     if (! isempty (k) && FINE)
-      cs = [T(k,3), 90, T(k,4)];
+      cs = [T(k,3) + 2 * T(k,4), 90, 0];
     elseif (! isempty (k))
       cs = [T(k,2), 90, 0];
     endif
@@ -460,17 +460,17 @@ endfunction
 %! H = solid.holespec ('M6', 'Clearance', 'medium', 'Countersink', true);
 %! assert_equal (H.countersink, [12.4, 90, 0], 1e-12);
 
-%!test  # the countersink of type A, fine: a cone below a cylinder
-%! H = solid.holespec ('M6', 'Clearance', 'fine', 'Countersink', true);
-%! assert_equal (H.countersink, [11.5, 90, 0.45], 1e-12);
+%!test  # the countersink of type A, fine: d3 + 2 t2 across
+%! H = solid.holespec ('M12', 'Clearance', 'fine', 'Countersink', true);
+%! assert_equal (H.countersink, [24.4, 90, 0], 1e-12);
 
 %!test  # the countersink of type B, for a hexagon socket screw
 %! H = solid.holespec ('M6', 'Clearance', 'fine', 'Countersink', 'socket');
-%! assert_equal (H.countersink, [12.4, 90, 0.3], 1e-12);
+%! assert_equal (H.countersink, [13, 90, 0], 1e-12);
 
 %!test  # the largest countersink of type B
 %! H = solid.holespec ('M24', 'Clearance', 'fine', 'Countersink', 'socket');
-%! assert_equal (H.countersink, [52, 90, 1]);
+%! assert_equal (H.countersink, [54, 90, 0]);
 
 %!test  # the countersink at the entry of a tapped hole, IS 1369 (Part 3)
 %! H = solid.holespec ('M6', 'Countersink', true);

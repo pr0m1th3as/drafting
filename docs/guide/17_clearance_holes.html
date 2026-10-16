@@ -138,7 +138,7 @@ W.counterbore</code></pre>
 
    13.0000    8.5000</code></pre>
 <h2>Countersunk screws</h2>
-<p>A countersink seats a countersunk head. <code>'Countersink', true</code> is the one for the slotted, cross recessed and hexalobular countersunk screws, whose heads ISO 7721 gives, and <code>'Countersink', 'socket'</code> the one for hexagon socket countersunk screws, whose heads are larger. Each is given as its diameter at the surface, its angle and the depth of a cylinder above the cone. In the medium series the countersink is a plain cone; in the fine series it sits under a short cylinder, so that the head can sit just below the surface.</p>
+<p>A countersink seats a countersunk head. <code>'Countersink', true</code> is the one for the slotted, cross recessed and hexalobular countersunk screws, whose heads ISO 7721 gives, and <code>'Countersink', 'socket'</code> the one for hexagon socket countersunk screws, whose heads are larger. Each is given as its diameter at the surface, its angle and the depth of a cylinder above the cone, which none of the standard ones has. The fine series differs from the medium in its closer hole; for M6 the two countersinks are the same.</p>
 <pre class="code-in"><code>A = solid.holespec ('M6', 'Clearance', 'medium', 'Countersink', true);
 B = solid.holespec ('M6', 'Clearance', 'fine', 'Countersink', true);
 C = solid.holespec ('M6', 'Clearance', 'fine', 'Countersink', 'socket');
@@ -146,8 +146,8 @@ C = solid.holespec ('M6', 'Clearance', 'fine', 'Countersink', 'socket');
 <pre class="code-out"><code>ans =
 
    12.4000   90.0000         0
-   11.5000   90.0000    0.4500
-   12.4000   90.0000    0.3000</code></pre>
+   12.4000   90.0000         0
+   13.0000   90.0000         0</code></pre>
 <p>The three side by side in a strip, cut in half along their row.</p>
 <pre class="code-in"><code>strip = solid.box (90, 30, 10);
 strip = hole (strip, [15, 15, 10], 'M6', Inf, 'Clearance', 'medium', ...
