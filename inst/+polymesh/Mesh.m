@@ -463,8 +463,9 @@ classdef Mesh
     ## @code{model.Viewer}, whose @code{pick} returns points clicked on the
     ## mesh and @code{pickucs} a coordinate system.
     ##
-    ## The viewer is built with the package when Open CASCADE and X11 are
-    ## found, and needs a display to run.  It runs on Linux and FreeBSD.
+    ## The viewer is built with the package, and needs a display to run.  It
+    ## runs on Linux, FreeBSD and Windows; on macOS it is not yet available,
+    ## and is refused.
     ##
     ## @seealso{model.Viewer, solid.Shape.show}
     ## @end deftypefn
@@ -1241,7 +1242,7 @@ endfunction
 %! assert_equal (isempty (writeread (polymesh.Mesh (), '.obj')), true);
 %! assert_equal (isempty (writeread (polymesh.Mesh (), '.ply')), true);
 
-%!testif ; ispc () || ! isempty (getenv ('DISPLAY'))
+%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
 %! ## show: the mesh in its variable's viewer
 %! old = getappdata (0, 'drafting_model_show');
 %! VP = model.Viewer ('Hidden', true);

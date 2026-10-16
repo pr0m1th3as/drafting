@@ -39,6 +39,8 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #  include <OSD_ThreadPool.hxx>
 #  undef near
 #  undef far
+#elif defined (__APPLE__)
+#  include <dlfcn.h>
 #endif
 
 #include <APIHeaderSection_MakeHeader.hxx>
@@ -5328,6 +5330,17 @@ function directly. \n\
   {
     OSD_ThreadPool::DefaultPool ()->Init (1);
     return ovl ();
+  }
+#elif defined (__APPLE__)
+  // Never unloaded, as -z nodelete keeps it on Linux, which macOS's linker
+  // cannot ask: the file opens itself once more, never to be closed
+  static bool pinned = false;
+  if (! pinned)
+  {
+    Dl_info self;
+    if (dladdr (reinterpret_cast<void *> (&pinned), &self) && self.dli_fname)
+      dlopen (self.dli_fname, RTLD_NOW | RTLD_NODELETE);
+    pinned = true;
   }
 #endif
 

@@ -7,20 +7,28 @@ MKOCTFILE ?= mkoctfile
 # them; set OCCT_INC, OCCT_LIB, X11_INC or X11_LIB to use other locations.
 # On Windows Open CASCADE is looked for first in occt, where pre_install.m
 # unpacks the build it fetches, then in Octave's own mingw64 folder, where
-# its headers, import libraries and DLLs belong, and X11 is not used.
+# its headers, import libraries and DLLs belong, and X11 is not used.  On
+# macOS it is looked for first where Homebrew puts it, and X11 is not used:
+# the viewer, which needs it, is not built there.
 OCCT_DIRS = /usr/local/include/opencascade /usr/local/include/OpenCASCADE \
             /usr/include/opencascade
 X11_DIRS = /usr/include /usr/local/include
+X11 := yes
 ifeq ($(OS),Windows_NT)
 WINDOWS := yes
+X11 :=
 OCCT_DIRS := occt/include/opencascade /mingw64/include/opencascade \
              $(OCCT_DIRS)
+else ifeq ($(shell uname -s),Darwin)
+MACOS := yes
+X11 :=
+OCCT_DIRS := /opt/homebrew/include/opencascade $(OCCT_DIRS)
 endif
 ifndef OCCT_INC
 OCCT_INC := $(patsubst %/Standard_Version.hxx,%,$(firstword \
               $(wildcard $(addsuffix /Standard_Version.hxx,$(OCCT_DIRS)))))
 endif
-ifndef WINDOWS
+ifdef X11
 ifndef X11_INC
 X11_INC := $(patsubst %/X11/Xlib.h,%,$(firstword \
              $(wildcard $(addsuffix /X11/Xlib.h,$(X11_DIRS)))))
@@ -35,9 +43,10 @@ OCCT_LIB := $(patsubst %/,%,$(dir $(firstword $(wildcard \
               $(OCCT_PREFIX)/lib/libTKernel.so* \
               $(OCCT_PREFIX)/lib64/libTKernel.so* \
               $(OCCT_PREFIX)/lib/*/libTKernel.so* \
-              $(OCCT_PREFIX)/lib/libTKernel.dll.a))))
+              $(OCCT_PREFIX)/lib/libTKernel.dll.a \
+              $(OCCT_PREFIX)/lib/libTKernel.dylib))))
 endif
-ifndef WINDOWS
+ifdef X11
 ifndef X11_LIB
 X11_LIB := $(patsubst %/,%,$(dir $(firstword $(wildcard \
              $(X11_PREFIX)/lib/libX11.so* \
@@ -57,12 +66,18 @@ RPATH = $(if $(RPATH_DIRS),-Wl$(comma)--disable-new-dtags \
           $(addprefix -Wl$(comma)-rpath$(comma),$(RPATH_DIRS)))
 
 # Windows records no paths in its DLLs, finding them on PATH, and the
-# viewer draws in a Win32 window, not an X11 one
+# viewer draws in a Win32 window, not an X11 one.  macOS's linker takes a
+# plain -rpath and has no nodelete, so __occt__.oct pins itself there, and
+# no viewer is built.
 ifdef WINDOWS
 RPATH =
 NODELETE =
 WINDOW_LIBS = -luser32 -lgdi32
 VIEWER = __occtview__.exe
+else ifdef MACOS
+RPATH = $(addprefix -Wl$(comma)-rpath$(comma),$(RPATH_DIRS))
+NODELETE =
+VIEWER =
 else
 NODELETE = -Wl,-z,nodelete
 WINDOW_LIBS = -lX11
@@ -88,6 +103,10 @@ ifdef WINDOWS
 $(error drafting needs Open CASCADE, not found in \
   $(or $(OCCT_INC),$(OCCT_DIRS)); unpack it into Octave's mingw64 folder, or \
   set OCCT_INC)
+else ifdef MACOS
+$(error drafting needs Open CASCADE, not found in \
+  $(or $(OCCT_INC),$(OCCT_DIRS)); install opencascade with Homebrew, or set \
+  OCCT_INC)
 else
 $(error drafting needs Open CASCADE, not found in \
   $(or $(OCCT_INC),$(OCCT_DIRS)); on Debian or Ubuntu install $(APT), or set \
@@ -108,7 +127,7 @@ ifeq ($(wildcard $(OCCT_INC)/StdPrs_BRepFont.hxx),)
 $(error drafting needs the visualization libraries of Open CASCADE, not \
   found in $(OCCT_INC); on Debian or Ubuntu install libocct-visualization-dev)
 endif
-ifndef WINDOWS
+ifdef X11
 ifeq ($(wildcard $(X11_INC)/X11/Xlib.h),)
 $(error drafting needs X11, not found in $(or $(X11_INC),$(X11_DIRS)); \
   on Debian or Ubuntu install libx11-dev, or set X11_INC)
@@ -149,14 +168,16 @@ __occtfont__.oct: __occtfont__.cc shapebytes.h
 
 # Never unloaded: Open CASCADE's worker threads outlive the calls that start
 # them, and would crash Octave at exit if their libraries went first; on
-# Windows the file pins itself
+# Windows and macOS the file pins itself
 __occt__.oct: __occt__.cc shapebytes.h
 	$(MKOCTFILE) -I$(OCCT_INC) __occt__.cc $(LIB_DIRS) $(RPATH) \
 	  $(OCCT_LIBS) $(NODELETE)
 
+ifdef VIEWER
 $(VIEWER): __occtview__.cc shapebytes.h
 	$(shell $(MKOCTFILE) -p CXX) -O2 -I$(OCCT_INC) $(addprefix -I,$(X11_INC)) \
 	  -o $(VIEWER) __occtview__.cc $(LIB_DIRS) $(RPATH) $(VIEW_LIBS)
+endif
 
 # What pkg install copies: exactly what was built, and the fetched DLLs
 FILES:

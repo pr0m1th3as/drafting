@@ -846,7 +846,7 @@
 %! assert_equal (isvalid (S), true);
 
 
-%!testif ; ispc () || ! isempty (getenv ('DISPLAY'))
+%!testif ; ! ismac () && (ispc () || ! isempty (getenv ('DISPLAY')))
 %! ## show: each variable has a viewer of its own, titled with its name, and
 %! ## shapes without a name share one
 %! old = getappdata (0, 'drafting_model_show');
