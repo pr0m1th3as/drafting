@@ -941,6 +941,15 @@
 %!   [~] = unlink (f);
 %! end_unwind_protect
 
+%!test  # STEP written to a file ending in .stp
+%! f = [tempname(), '.stp'];
+%! unwind_protect
+%!   write (solid.cylinder (4, 12), f);
+%!   assert_equal (volume (solid.read (f)), 192 * pi, 1e-9);
+%! unwind_protect_cleanup
+%!   [~] = unlink (f);
+%! end_unwind_protect
+
 %!test  # STEP carries a solid's colour
 %! f = [tempname(), '.step'];
 %! S = solid.box (1, 2, 3);
@@ -1161,10 +1170,10 @@
 %!   [~] = unlink (f1);
 %!   [~] = unlink (f2);
 %! end_unwind_protect
-%!error<solid.Shape.write: FILE must end in .step, .stl, .obj, .ply or .3mf.> ...
+%!error<solid.Shape.write: FILE must end in .step, .stp, .stl, .obj, .ply or .3mf.> ...
 %! write (solid.Shape (), 'a.dxf')
-%!error<solid.Shape.write: FILE must end in .step, .stl, .obj, .ply or .3mf.> ...
-%! write (solid.Shape (), 'a.stp')
+%!error<solid.Shape.write: FILE must end in .step, .stp, .stl, .obj, .ply or .3mf.> ...
+%! write (solid.Shape (), 'a.igs')
 %!error<solid.Shape.write: Tolerance applies to meshes only.> ...
 %! write (solid.Shape (), 'a.step', 'Tolerance', 0.1)
 %!error<solid.Shape.write: Tolerance must be a positive and finite real scalar.> ...

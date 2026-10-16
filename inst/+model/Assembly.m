@@ -454,18 +454,17 @@ classdef Assembly
     ##
     ## Write an assembly to a STEP, 3MF, STL, OBJ or PLY file.
     ##
-    ## @code{write (@var{A}, @var{FILE})} writes the assembly in the format
-    ## the extension of @var{FILE} names, in either case.  A STEP file,
-    ## @file{.step}, keeps its structure: each part once, with its name, its
+    ## @code{write (@var{A}, @var{FILE})} writes the assembly in the format the
+    ## extension of @var{FILE} names, in either case.  A STEP file, @file{.step}
+    ## or @file{.stp}, keeps its structure: each part once, with its name, its
     ## colours and the @code{solid.Shape.Name} of its solids, placed by its
-    ## placements, which carry their names, and each sub-assembly the same
-    ## way, so that a CAD program opens the product as it was built; it
-    ## cannot hold a mesh part.  A 3MF file, the archive slicers take, keeps
-    ## the same structure, each part a mesh written once and placed as a
-    ## component, in its colours.  3MF has no place for the name of a
-    ## placement, so @code{model.read} names the placements of a 3MF file
-    ## after their parts.  An STL, OBJ or PLY file holds
-    ## @code{tessellate (@var{A})}.
+    ## placements, which carry their names, and each sub-assembly the same way,
+    ## so that a CAD program opens the product as it was built; it cannot hold a
+    ## mesh part.  A 3MF file, the archive slicers take, keeps the same
+    ## structure, each part a mesh written once and placed as a component, in
+    ## its colours.  3MF has no place for the name of a placement, so
+    ## @code{model.read} names the placements of a 3MF file after their
+    ## parts.  An STL, OBJ or PLY file holds @code{tessellate (@var{A})}.
     ##
     ## @code{write (@dots{}, @qcode{'Tolerance'}, @var{TOL})} sets, for a
     ## mesh, how far its facets may stray from the parts' surfaces, as
@@ -485,11 +484,12 @@ classdef Assembly
       endif
       [~, ~, ext] = fileparts (FILE);
       fmt = lower (ext);
-      if (! any (strcmpi (fmt, {'.step', '.3mf', '.stl', '.obj', '.ply'})))
+      if (! any (strcmpi (fmt, {'.step', '.stp', '.3mf', '.stl', '.obj', ...
+                                '.ply'})))
         error (strcat ("model.Assembly.write: FILE must end in .step,", ...
-                       " .3mf, .stl, .obj or .ply."));
+                       " .stp, .3mf, .stl, .obj or .ply."));
       endif
-      isstep = any (strcmpi (fmt, '.step'));
+      isstep = any (strcmpi (fmt, {'.step', '.stp'}));
       if (mod (numel (varargin), 2) != 0)
         error (strcat ("model.Assembly.write: Name/Value arguments must", ...
                        " come in pairs."));
@@ -891,6 +891,19 @@ endfunction
 %!   [~] = unlink (f);
 %! end_unwind_protect
 
+%!test  # write: STEP to a file ending in .stp
+%! A = add (model.Assembly ('ring'), 'pin', solid.cylinder (2, 12), ...
+%!          geom.UCS ());
+%! f = [tempname(), '.stp'];
+%! unwind_protect
+%!   write (A, f);
+%!   R = model.read (f);
+%!   assert_equal ([numparts(R), numinstances(R)], [1, 1]);
+%!   assert_equal (volume (shape (R)), 48 * pi, -1e-12);
+%! unwind_protect_cleanup
+%!   [~] = unlink (f);
+%! end_unwind_protect
+
 %!test  # write: STEP names a part's solids by their Name
 %! pin = solid.cylinder (2, 12);
 %! pin.Name = 'Pin ISO 2338 - 4 m6 x 12';
@@ -1070,12 +1083,12 @@ endfunction
 %! write (model.Assembly (), 'a.step', 'Tolerance', 0.1)
 %!error<model.Assembly.write: Tolerance applies to meshes only.> ...
 %! write (model.Assembly (), 'a.STEP', 'Tolerance', 0.1)
-%!error<model.Assembly.write: FILE must end in .step, .3mf, .stl, .obj or .ply.> ...
+%!error<model.Assembly.write: FILE must end in .step, .stp, .3mf, .stl, .obj or .ply.> ...
 %! write (model.Assembly (), 'a.dxf')
-%!error<model.Assembly.write: FILE must end in .step, .3mf, .stl, .obj or .ply.> ...
-%! write (model.Assembly (), 'a.stp')
-%!error<model.Assembly.write: FILE must end in .step, .3mf, .stl, .obj or .ply.> ...
-%! write (model.Assembly (), 'a.STP')
+%!error<model.Assembly.write: FILE must end in .step, .stp, .3mf, .stl, .obj or .ply.> ...
+%! write (model.Assembly (), 'a.igs')
+%!error<model.Assembly.write: Tolerance applies to meshes only.> ...
+%! write (model.Assembly (), 'a.stp', 'Tolerance', 0.1)
 %!error<model.Assembly.write: unknown option 'Angle'.> ...
 %! write (model.Assembly (), 'a.3mf', 'Angle', 0.1)
 %!error<model.Assembly.write: option names must be character vectors.> ...

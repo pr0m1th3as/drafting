@@ -547,7 +547,7 @@ classdef Shape
     ## named by the extension of @var{FILE}, in either case:
     ##
     ## @table @asis
-    ## @item @file{.step}
+    ## @item @file{.step}, @file{.stp}
     ## STEP (ISO 10303-21, application protocol 214), in millimetres.  The
     ## exact geometry is kept, so this is the file to send to a CAD program or
     ## to another manufacturer.  The part is named after the base name of
@@ -620,11 +620,11 @@ classdef Shape
         endswitch
       endfor
       [folder, base, ext] = fileparts (FILE);
-      isstep = strcmpi (ext, '.step');
+      isstep = any (strcmpi (ext, {'.step', '.stp'}));
       if (! isstep
           && ! any (strcmpi (ext, {'.stl', '.obj', '.ply', '.3mf'})))
-        error (strcat ("solid.Shape.write: FILE must end in .step, .stl,", ...
-                       " .obj, .ply or .3mf."));
+        error (strcat ("solid.Shape.write: FILE must end in .step, .stp,", ...
+                       " .stl, .obj, .ply or .3mf."));
       endif
       if (isstep && ! isempty (opt.Tolerance))
         error ("solid.Shape.write: Tolerance applies to meshes only.");
