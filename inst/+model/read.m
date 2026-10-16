@@ -21,12 +21,12 @@
 ## Read an assembly from a STEP or 3MF file.
 ##
 ## @code{@var{A} = model.read (@var{FILE})} returns the product the STEP file
-## @var{FILE} holds as a @code{model.Assembly}, in millimetres whatever unit
-## the file was written in: its parts with their names and the colours and
-## @code{solid.Shape.Name} of their solids, placed where the file places
-## them and named as it names the placements, and its sub-assemblies the
-## same way.  A part the file places
-## several times is one part placed several times.  Several products at the
+## @var{FILE}, @file{.step} or @file{.stp}, holds as a @code{model.Assembly},
+## in millimetres whatever unit the file was written in: its parts with their
+## names and the colours and @code{solid.Shape.Name} of their solids, placed
+## where the file places them and named as it names the placements, and its
+## sub-assemblies the same way.  A part the file places several times is one
+## part placed several times.  Several products at the
 ## top of the file are placed where they are in one assembly, and a file of
 ## a single part gives an assembly placing it once; either is named after
 ## the base name of @var{FILE}.  A part without a name is named
@@ -70,8 +70,8 @@ function A = read (FILE)
   [~, base, ext] = fileparts (FILE);
   if (any (strcmpi (ext, {'.stl', '.obj', '.ply'})))
     error ("model.read: '%s' is a mesh: polymesh.read reads it.", FILE);
-  elseif (! any (strcmpi (ext, {'.step', '.3mf'})))
-    error ("model.read: FILE must end in .step or .3mf.");
+  elseif (! any (strcmpi (ext, {'.step', '.stp', '.3mf'})))
+    error ("model.read: FILE must end in .step, .stp or .3mf.");
   endif
   if (! isfile (FILE))
     error ("model.read: cannot find file '%s'.", FILE);
@@ -177,6 +177,20 @@ endfunction
 %!   assert_equal (volume (shape (R)), 6, -1e-12);
 %! unwind_protect_cleanup
 %!   [~] = unlink (f);
+%! end_unwind_protect
+
+%!test  # the extension .stp
+%! f = [tempname(), '.step'];
+%! g = [f(1:end-5), '.stp'];
+%! unwind_protect
+%!   write (solid.box (1, 2, 3), f);
+%!   movefile (f, g);
+%!   R = model.read (g);
+%!   assert_equal ([numparts(R), numinstances(R)], [1, 1]);
+%!   assert_equal (volume (shape (R)), 6, -1e-12);
+%! unwind_protect_cleanup
+%!   [~] = unlink (f);
+%!   [~] = unlink (g);
 %! end_unwind_protect
 
 ## A 3MF package of the model MODEL, zipped, its file NAME of the text TEXT
@@ -316,6 +330,6 @@ endfunction
 %!error<model.read: invalid number of input arguments.> model.read ()
 %!error<model.read: FILE must be a non-empty character vector.> model.read (1)
 %!error<model.read: 'a.stl' is a mesh: polymesh.read reads it.> model.read ('a.stl')
-%!error<model.read: FILE must end in .step or .3mf.> model.read ('a.stp')
+%!error<model.read: FILE must end in .step, .stp or .3mf.> model.read ('a.igs')
 %!error<model.read: cannot find file 'no_such_part_7e1a.step'.> ...
 %! model.read ('no_such_part_7e1a.step')
