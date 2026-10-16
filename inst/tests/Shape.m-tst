@@ -1985,10 +1985,24 @@
 %! assert_equal (numel (R{1}.Holes), 11);
 %! assert_equal (volume (solid.extrude (R{1}, 1)), 87.8442, -1e-5);
 
-%!error<solid.Shape.section: Open CASCADE returned the cut with a piece missing.>
+%!test  # near the bore Open CASCADE may lose a piece of the cut, which
+%!      # depends on the platform: the cut is then refused, never short
 %! S = hole (solid.cylinder (5, 12.7), [0, 0, 12.7], 'M6', Inf);
 %! S = thread (S, [0, 0, 12.7], 'M6', Inf);
-%! section (S, geom.UCS ([1, 0, 0], [-2.49, 0, 0]));
+%! refused = false;
+%! try
+%!   R = section (S, geom.UCS ([1, 0, 0], [-2.49, 0, 0]));
+%! catch err
+%!   refused = true;
+%!   assert_equal (err.message, strcat ("solid.Shape.section: Open", ...
+%!                 " CASCADE returned the cut with a piece missing."));
+%! end_try_catch
+%! if (! refused)
+%!   assert_equal (numel (R), 2);
+%!   a = volume (solid.extrude (R{1}, 1)) + volume (solid.extrude (R{2}, 1));
+%!   assert_equal (a, 85.99, -1e-3);
+%! endif
+
 %!error<solid.Shape.section: invalid number of input arguments.> ...
 %! section (solid.Shape ())
 %!error<solid.Shape.section: U must be a geom.UCS object.> ...

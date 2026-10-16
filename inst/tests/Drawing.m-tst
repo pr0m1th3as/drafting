@@ -2319,7 +2319,7 @@
 %!       # generates, the same ones the DXF file carries.  The native TikZ
 %!       # pattern this replaced stroked no boundary at all and ignored the
 %!       # angle and spacing the hatch was given.
-%! S = tikz (draw.Drawing ().hatch (geom.Region ([0, 0; 10, 0; 10, 10])));
+%! S = tikz (draw.Drawing ().hatch (geom.Region ([1, 0; 11, 0; 11, 10])));
 %! assert_equal (! isempty (strfind (S, '-- cycle;')), true);
 %! assert_equal (numel (strfind (S, '\draw')) > 3, true);
 %! assert_equal (isempty (strfind (S, 'pattern=')), true);
