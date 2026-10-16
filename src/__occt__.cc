@@ -90,7 +90,6 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <ShapeBuild_ReShape.hxx>
 #include <ShapeExtend.hxx>
 #include <GeomAdaptor_Surface.hxx>
-#include <TColStd_HSequenceOfReal.hxx>
 #include <BRepFilletAPI_MakeChamfer.hxx>
 #include <BRepFilletAPI_MakeFillet.hxx>
 #include <BRepGProp.hxx>
@@ -1033,26 +1032,29 @@ volumeprops (const TopoDS_Shape& s, bool cg, double eps)
 }
 
 // A surface split at each of its knots inside the range it is given, for
-// ShapeUpgrade_FaceDivide
+// ShapeUpgrade_FaceDivide.  The knots go into the split values Init leaves,
+// the range's two ends, in order.
 class knotsplit : public ShapeUpgrade_SplitSurface
 {
 public:
-  void Compute (const Standard_Boolean) override
+  void Compute (const bool) override
   {
     const GeomAdaptor_Surface a (mySurface);
+    const double eps = Precision::PConfusion ();
     const int nu = a.NbUIntervals (GeomAbs_CN);
-    const int nv = a.NbVIntervals (GeomAbs_CN);
-    TColStd_Array1OfReal u (1, nu + 1), v (1, nv + 1);
+    NCollection_Array1<double> u (1, nu + 1);
     a.UIntervals (u, GeomAbs_CN);
-    a.VIntervals (v, GeomAbs_CN);
-    Handle (TColStd_HSequenceOfReal) us = new TColStd_HSequenceOfReal;
-    Handle (TColStd_HSequenceOfReal) vs = new TColStd_HSequenceOfReal;
     for (int i = 2; i <= nu; i++)
-      us->Append (u(i));
+      if (u(i) > myUSplitValues->First () + eps
+          && u(i) < myUSplitValues->Last () - eps)
+        myUSplitValues->InsertBefore (myUSplitValues->Length (), u(i));
+    const int nv = a.NbVIntervals (GeomAbs_CN);
+    NCollection_Array1<double> v (1, nv + 1);
+    a.VIntervals (v, GeomAbs_CN);
     for (int i = 2; i <= nv; i++)
-      vs->Append (v(i));
-    SetUSplitValues (us);
-    SetVSplitValues (vs);
+      if (v(i) > myVSplitValues->First () + eps
+          && v(i) < myVSplitValues->Last () - eps)
+        myVSplitValues->InsertBefore (myVSplitValues->Length (), v(i));
     myStatus = ShapeExtend::EncodeStatus (ShapeExtend_DONE1);
   }
 };
