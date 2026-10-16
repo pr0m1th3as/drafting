@@ -2740,7 +2740,7 @@ iscolour (const double *c)
 
 // "N things", or "1 thing"
 static string
-howmany (size_t n, const char *one, const char *many)
+counted (size_t n, const char *one, const char *many)
 {
   return std::to_string (n) + " " + (n == 1 ? one : many);
 }
@@ -2757,12 +2757,12 @@ leftout (size_t lines, size_t points, bool faces, const string& caller)
   string what;
   if (lines > 0)
   {
-    what = howmany (lines, "line", "lines");
+    what = counted (lines, "line", "lines");
   }
   if (points > 0)
   {
     what += (what.empty () ? "" : " and ");
-    what += howmany (points, "point", "points");
+    what += counted (points, "point", "points");
   }
   if (! faces)
   {
