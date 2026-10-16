@@ -86,6 +86,7 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <BRep_Builder.hxx>
 #include <ShapeUpgrade_UnifySameDomain.hxx>
 #include <ShapeUpgrade_FaceDivide.hxx>
+#include <ShapeUpgrade_ShapeDivide.hxx>
 #include <ShapeUpgrade_SplitSurface.hxx>
 #include <ShapeBuild_ReShape.hxx>
 #include <ShapeExtend.hxx>
@@ -1013,26 +1014,9 @@ faceinfo (const TopoDS_Shape& s)
   return Cell (ovl (type, normal, axis, box));
 }
 
-// The volume of S, and its centre of volume when CG is true, integrated
-// adaptively to a relative error of EPS on every face.  The default
-// integration, of fixed order, errs by up to a part in a thousand on spline
-// faces.  The centre costs most of the time, so it is computed only when
-// asked for.  Should the adaptive integration fail, the default is taken.
-static GProp_GProps
-volumeprops (const TopoDS_Shape& s, bool cg, double eps)
-{
-  GProp_GProps p;
-  if (BRepGProp::VolumePropertiesGK (s, p, eps, false,
-                                     true, cg) < 0)
-  {
-    p = GProp_GProps ();
-    BRepGProp::VolumeProperties (s, p);
-  }
-  return p;
-}
-
-// A surface split at each of its knots inside the range it is given, for
-// ShapeUpgrade_FaceDivide.  The knots go into the split values Init leaves,
+// A surface extruded or revolved from a curve split at each of the curve's
+// knots inside the range it is given, for ShapeUpgrade_FaceDivide; any other
+// surface is left whole.  The knots go into the split values Init leaves,
 // the range's two ends, in order.
 class knotsplit : public ShapeUpgrade_SplitSurface
 {
@@ -1040,6 +1024,12 @@ public:
   void Compute (const bool) override
   {
     const GeomAdaptor_Surface a (mySurface);
+    if (a.GetType () != GeomAbs_SurfaceOfExtrusion
+        && a.GetType () != GeomAbs_SurfaceOfRevolution)
+    {
+      myStatus = ShapeExtend::EncodeStatus (ShapeExtend_OK);
+      return;
+    }
     const double eps = Precision::PConfusion ();
     const int nu = a.NbUIntervals (GeomAbs_CN);
     NCollection_Array1<double> u (1, nu + 1);
@@ -1059,6 +1049,57 @@ public:
   }
 };
 
+// True for a face on a surface extruded or revolved from a curve with a
+// knot of the curve inside the face
+static bool
+swept (const TopoDS_Face& f)
+{
+  const BRepAdaptor_Surface g (f);
+  const GeomAbs_SurfaceType t = g.GetType ();
+  return ((t == GeomAbs_SurfaceOfExtrusion || t == GeomAbs_SurfaceOfRevolution)
+          && (g.NbUIntervals (GeomAbs_CN) > 1
+              || g.NbVIntervals (GeomAbs_CN) > 1));
+}
+
+// The volume of S, and its centre of volume when CG is true, integrated
+// adaptively to a relative error of EPS on every face.  The default
+// integration, of fixed order, errs by up to a part in a thousand on spline
+// faces.  Both err across the knots of a curve a face is extruded or
+// revolved from, to 3e-6 of the volume of text, so a shape with such a face
+// is integrated as a copy with those faces split at the knots.  The centre
+// costs most of the time, so it is computed only when asked for.  Should
+// the adaptive integration fail, the default is taken.
+static GProp_GProps
+volumeprops (const TopoDS_Shape& s, bool cg, double eps)
+{
+  TopoDS_Shape t = s;
+  for (TopExp_Explorer x (s, TopAbs_FACE); x.More (); x.Next ())
+    if (swept (TopoDS::Face (x.Current ())))
+    {
+      try
+      {
+        ShapeUpgrade_ShapeDivide d (s);
+        Handle (ShapeUpgrade_FaceDivide) f = new ShapeUpgrade_FaceDivide;
+        f->SetSplitSurfaceTool (new knotsplit);
+        d.SetSplitFaceTool (f);
+        if (d.Perform () && ! d.Status (ShapeExtend_FAIL))
+          t = d.Result ();
+      }
+      catch (const Standard_Failure&)
+      {
+      }
+      break;
+    }
+  GProp_GProps p;
+  if (BRepGProp::VolumePropertiesGK (t, p, eps, false,
+                                     true, cg) < 0)
+  {
+    p = GProp_GProps ();
+    BRepGProp::VolumeProperties (t, p);
+  }
+  return p;
+}
+
 // The area of a face.  A planar face is integrated adaptively, exactly
 // however its edges curve.  Open CASCADE integrates a B-spline surface span
 // by span, but a surface extruded or revolved from a curve across the
@@ -1073,8 +1114,7 @@ facearea (const TopoDS_Face& f)
   const GeomAbs_SurfaceType t = g.GetType ();
   if (t == GeomAbs_Plane && BRepGProp::SurfaceProperties (f, p, 1e-9) >= 0)
     return p.Mass ();
-  if ((t == GeomAbs_SurfaceOfExtrusion || t == GeomAbs_SurfaceOfRevolution)
-      && (g.NbUIntervals (GeomAbs_CN) > 1 || g.NbVIntervals (GeomAbs_CN) > 1))
+  if (swept (f))
   {
     try
     {
