@@ -282,7 +282,9 @@ jobs:
           echo "$pass tests passed"
 
   # Octave and Open CASCADE from Homebrew.  The runner has no GPU, so the
-  # viewer draws with Apple's software OpenGL.
+  # viewer draws with Apple's software OpenGL.  Drawings print through
+  # gnuplot and its cairo terminals, as octave-cli has no qt; it is chosen
+  # after the first figure, which would set fltk.
   macos:
     name: macOS, Octave from Homebrew
     runs-on: macos-latest
@@ -290,12 +292,19 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Install Octave and Open CASCADE
+      - name: Install Octave, Open CASCADE and gnuplot
         shell: bash
         run: |
           set -euo pipefail
-          brew install octave opencascade
-          brew list --versions octave opencascade
+          brew install octave opencascade gnuplot
+          brew list --versions octave opencascade gnuplot
+          terms="$(gnuplot -e 'set terminal' 2>&1)"
+          for t in pngcairo pdfcairo; do
+            if ! grep -qw "$t" <<< "$terms"; then
+              echo "::error::gnuplot has no $t terminal"
+              exit 1
+            fi
+          done
 
       - name: Build the package archive
         id: archive
@@ -314,6 +323,8 @@ jobs:
         run: |
           set -euo pipefail
           code="printf ('Octave %s\\n', version ()); "
+          code+="close (figure ('visible', 'off')); "
+          code+="graphics_toolkit ('gnuplot'); "
           code+="pkg ('install', '-local', '$PWD/package.tar.gz'); "
           code+="pkg ('load', '$NAME'); pkg ('test', '$NAME');"
           octave-cli --norc --no-history --eval "$code" 2>&1 | tee test.log
