@@ -641,6 +641,62 @@
 %! E = entities (D.line ([0, 0], [1, 0]), 'layers', 'keep');
 %! assert_equal ({E.linetype, E.colour}, {'byLayer', 256});
 
+%!test  # referenced, what is by block in a block is left for the insert
+%! [~, ~, BL] = entities (placed (), 'blocks', 'reference');
+%! e = BL(1).entities(1);
+%! assert_equal ({e.colour, e.linetype, e.lineweight}, ...
+%!               {0, 'byBlock', 'byBlock'});
+
+%!test  # referenced, what is by layer on layer 0 in a block is left so
+%! B = draw.Drawing ().line ([0, 0], [1, 0]);
+%! D = draw.Drawing ().layer ('0', 'Colour', 3).block ('b', B);
+%! [~, ~, BL] = entities (D, 'blocks', 'reference');
+%! assert_equal (BL(1).entities.colour, 256);
+
+%!test  # referenced, what is by layer on another layer takes its properties
+%! [~, ~, BL] = entities (placed (), 'blocks', 'reference');
+%! e = BL(1).entities(2);
+%! assert_equal ({e.colour, e.linetype}, {7, 'CONTINUOUS'});
+
+%!test  # referenced, a block's records on layer 0 stay when it is hidden
+%! D = draw.Drawing ().layer ('0', 'Visible', false);
+%! D = D.block ('b', draw.Drawing ().line ([0, 0], [1, 0]));
+%! [~, ~, BL] = entities (D, 'blocks', 'reference');
+%! assert_equal (numel (BL(1).entities), 1);
+
+%!test  # referenced, a dimension in a block brings its block
+%! B = draw.Drawing ().dim ([0, 0], [10, 0], 5);
+%! D = draw.Drawing ().block ('b', B);
+%! [~, ~, BL] = entities (D, 'blocks', 'reference');
+%! assert_equal ({BL.name}, {'b', '*D1'});
+%! assert_equal (BL(1).entities.block, '*D1');
+
+%!test  # referenced, a block's dimension blocks follow the drawing's
+%! B = draw.Drawing ().dim ([0, 0], [10, 0], 5);
+%! D = draw.Drawing ().block ('b', B).dim ([0, 0], [20, 0], 5);
+%! [E, ~, BL] = entities (D, 'blocks', 'reference');
+%! assert_equal ({BL.name}, {'b', '*D1', '*D2'});
+%! assert_equal ({E.block, BL(1).entities.block}, {'*D1', '*D2'});
+
+%!test  # referenced, a block's dimensions are exploded when asked
+%! B = draw.Drawing ().dim ([0, 0], [10, 0], 5);
+%! D = draw.Drawing ().block ('b', B);
+%! [~, ~, BL] = entities (D, 'blocks', 'reference', 'dimensions', 'explode');
+%! assert_equal (numel (BL), 1);
+%! assert_equal (any (strcmp ({BL.entities.type}, 'DIMENSION')), false);
+
+%!test  # referenced, a block's arcs are flattened when asked
+%! B = draw.Drawing ().polyline (geom.Polyline ([0, 0, 1; 20, 0, 0]));
+%! D = draw.Drawing ().block ('b', B);
+%! [~, ~, BL] = entities (D, 'blocks', 'reference', 'bulges', 'flatten');
+%! assert_equal (rows (BL(1).entities.pts) > 2, true);
+
+%!test  # referenced, what a block loses names the block
+%! P = geom.Polyline ([0, 0; 1, 0; 1, 1], 'Closed', true);
+%! D = draw.Drawing ().block ('h', draw.Drawing ().hatch (geom.Region (P)));
+%! [~, L] = entities (D, 'blocks', 'reference', 'hatch', 'boundary');
+%! assert_equal (L.reason, "fill dropped, boundary drawn, in block 'h'");
+
 %!error<draw.Drawing.entities: Layers must be 'resolve' or 'keep'.> ...
 %! entities (draw.Drawing (), 'layers', 'all')
 

@@ -373,9 +373,18 @@ classdef Drawing
     ## @code{[@var{E}, @var{LOST}] = entities (@dots{})} returns what was drawn
     ## otherwise than it is held, with fields @code{index}, @code{type} and
     ## @code{reason}; omit @var{LOST} and each distinct reason is warned about
-    ## once.  @var{BLOCKS} holds the block definitions, broken down the same
-    ## way, when @qcode{'Blocks'} is @qcode{'reference'}, and the blocks of
-    ## the dimensions.
+    ## once.  For an entity in a block, @code{index} counts in the block and
+    ## the reason names it.
+    ##
+    ## @var{BLOCKS} holds the blocks of the dimensions and, when
+    ## @qcode{'Blocks'} is @qcode{'reference'}, the block definitions first,
+    ## each broken down with the same options, the blocks it inserts expanded
+    ## in it.  The blocks of the dimensions in a block are numbered on from
+    ## those of the drawing.  What the insert gives a block's records is left
+    ## for the insert, as a CAD program places a block: @qcode{'byBlock'}
+    ## stays, and a record on layer @qcode{'0'} keeps its layer, colour, line
+    ## type and line weight as drawn and is returned whether or not layer
+    ## @qcode{'0'} is visible, since it takes the layer of each insert.
     ##
     ## Name/Value pairs:
     ##
@@ -510,189 +519,43 @@ classdef Drawing
         endswitch
       endfor
 
-      E = emptyentity ();
-      LOST = struct ('index', {}, 'type', {}, 'reason', {});
-      BLOCKS = struct ('name', {}, 'entities', {});
-      nDim = 0;
-
       ## An insert is a reference the caller may want kept, but every other
       ## consumer needs the geometry, so expansion is the default
       if (strcmp (blockMode, 'expand'))
         D = D.expand ();
-      else
+      endif
+      opt = struct ('dimScale', dimScale, 'hatchMode', hatchMode, ...
+                    'chordTol', chordTol, 'bulgeMode', bulgeMode, ...
+                    'dimMode', dimMode);
+      resolve = strcmp (layerMode, 'resolve');
+      [E, LOST, DIMS] = breakdown (D.Entities, opt, 0);
+      E = resolvelayers (E, D.Layers, resolve, false);
+
+      ## Each block broken down as the drawing is, through the blocks it
+      ## inserts, its dimensions' blocks numbered on from the drawing's
+      BLOCKS = struct ('name', {}, 'entities', {});
+      if (strcmp (blockMode, 'reference'))
         for bb = 1:numel (D.Blocks)
+          sub = D.Blocks(bb).drawing;
+          for kk = 1:numel (D.Blocks)
+            if (isempty (sub.Blocks)
+                || ! any (strcmpi (D.Blocks(kk).name, {sub.Blocks.name})))
+              sub.Blocks(end+1) = D.Blocks(kk);
+            endif
+          endfor
+          sub = sub.expand ();
+          [Eb, Lb, Db] = breakdown (sub.Entities, opt, numel (DIMS));
+          for jj = 1:numel (Lb)
+            Lb(jj).reason = sprintf ("%s, in block '%s'", Lb(jj).reason, ...
+                                     D.Blocks(bb).name);
+          endfor
           BLOCKS(bb).name = D.Blocks(bb).name;
-          BLOCKS(bb).entities = entities (D.Blocks(bb).drawing.expand (), ...
-                                               'dimscale', dimScale, ...
-                                               'hatch', hatchMode);
+          BLOCKS(bb).entities = resolvelayers (Eb, D.Layers, resolve, true);
+          LOST = [LOST, Lb];
+          DIMS = [DIMS, Db];
         endfor
       endif
-
-      src = D.Entities;
-      for ii = 1:numel (src)
-
-        e = src(ii);
-
-        switch (e.type)
-
-          case 'line'
-            E(end+1) = mkent ('LINE', e, e.pts);
-
-          case 'polyline'
-            if (! isempty (e.bulge) && strcmp (bulgeMode, 'flatten'))
-              p = mkent ('POLYLINE', e, flattenbulge (e, chordTol));
-              p.closed = e.closed;
-            else
-              p = mkent ('POLYLINE', e, e.pts);
-              p.closed = e.closed;
-              p.bulge = e.bulge;
-            endif
-            E(end+1) = p;
-
-          case 'arc'
-            a = mkent ('ARC', e, e.pts);
-            a.radius = e.radius;
-            a.angles = e.angles;
-            E(end+1) = a;
-
-          case 'point'
-            E(end+1) = mkent ('POINT', e, e.pts);
-
-          case 'circle'
-            c = mkent ('CIRCLE', e, e.pts);
-            c.radius = e.radius;
-            E(end+1) = c;
-
-          case 'text'
-            t = mkent ('TEXT', e, e.pts);
-            t.text = e.text;
-            t.height = e.height;
-            t.rotation = e.angle;
-            E(end+1) = t;
-
-          case 'ellipse'
-            q = mkent ('ELLIPSE', e, e.pts);
-            q.radius = e.radius;
-            q.rotation = e.angle;
-            E(end+1) = q;
-
-          case 'spline'
-            Q = __sample__ (e.shape)(:,1:2);
-            if (e.closed)
-              Q(end,:) = [];
-            endif
-            q = mkent ('POLYLINE', e, Q);
-            q.closed = e.closed;
-            E(end+1) = q;
-
-          case 'path'
-            [Q, b] = pathlower (e.shape);
-            E(end+1) = lowerpoly (e, Q, b, e.closed, bulgeMode, chordTol);
-
-          case 'region'
-            L = [{e.shape.Outline}, e.shape.Holes(:)'];
-            for jj = 1:numel (L)
-              [Q, b] = pathlower (L{jj});
-              E(end+1) = lowerpoly (e, Q, b, true, bulgeMode, chordTol);
-            endfor
-
-          case {'diam', 'radius'}
-            parts = explodecirc (e, dimScale);
-            if (strcmp (dimMode, 'associative'))
-              nDim++;
-              bn = sprintf ('*D%d', nDim);
-              BLOCKS(end+1) = struct ('name', bn, 'entities', {parts});
-              E(end+1) = dimrecord (e, bn, e.type);
-            else
-              for kk = 1:numel (parts)
-                E(end+1) = parts(kk);
-              endfor
-            endif
-
-          case 'angdim'
-            parts = explodeang (e, dimScale);
-            if (strcmp (dimMode, 'associative'))
-              nDim++;
-              bn = sprintf ('*D%d', nDim);
-              BLOCKS(end+1) = struct ('name', bn, 'entities', {parts});
-              E(end+1) = dimrecord (e, bn, 'angdim');
-              continue;
-            endif
-            for kk = 1:numel (parts)
-              E(end+1) = parts(kk);
-            endfor
-
-          case 'ordinate'
-            parts = explodeord (e, dimScale);
-            if (strcmp (dimMode, 'associative'))
-              nDim++;
-              bn = sprintf ('*D%d', nDim);
-              BLOCKS(end+1) = struct ('name', bn, 'entities', {parts});
-              E(end+1) = dimrecord (e, bn, 'ordinate');
-            else
-              for kk = 1:numel (parts)
-                E(end+1) = parts(kk);
-              endfor
-            endif
-
-          case 'centremark'
-            parts = explodemark (e, dimScale);
-            for kk = 1:numel (parts)
-              E(end+1) = parts(kk);
-            endfor
-
-          case 'leader'
-            parts = explodeleader (e, dimScale);
-            for kk = 1:numel (parts)
-              E(end+1) = parts(kk);
-            endfor
-
-          case 'insert'
-            s = mkent ('INSERT', e, e.pts);
-            s.block = e.block;
-            s.rotation = e.angle;
-            s.radius = e.scale;
-            E(end+1) = s;
-
-          case 'hatch'
-            ## The loops, then the fill lines inside the outline and clear of
-            ## every hole
-            L = [{e.shape.Outline}, e.shape.Holes(:)'];
-            for jj = 1:numel (L)
-              [Q, b] = pathlower (L{jj});
-              E(end+1) = lowerpoly (e, Q, b, true, bulgeMode, chordTol);
-            endfor
-            if (strcmp (hatchMode, 'lines'))
-              H = cellfun (@(h) __sample__ (h)(:,1:2), L(2:end), ...
-                           'UniformOutput', false);
-              S = geom.hatchlines (__sample__ (L{1})(:,1:2), e.pattern, ...
-                                   e.angle, e.spacing);
-              S = clipholes (S, H);
-              for jj = 1:rows (S)
-                E(end+1) = mkent ('LINE', e, [S(jj,1:2); S(jj,3:4)]);
-              endfor
-            else
-              LOST(end+1) = struct ('index', ii, 'type', 'hatch', 'reason', ...
-                                    'fill dropped, boundary drawn');
-            endif
-
-          case 'dim'
-            parts = explodedim (e, dimScale);
-            if (strcmp (dimMode, 'associative'))
-              nDim++;
-              bn = sprintf ('*D%d', nDim);
-              BLOCKS(end+1) = struct ('name', bn, 'entities', {parts});
-              E(end+1) = dimrecord (e, bn, 'dim');
-            else
-              for jj = 1:numel (parts)
-                E(end+1) = parts(jj);
-              endfor
-            endif
-
-        endswitch
-
-      endfor
-      E = resolvelayers (E, D.Layers, strcmp (layerMode, 'resolve'));
+      BLOCKS = [BLOCKS, DIMS];
 
       ## Warn only when the caller has not asked to be told properly.
       if (nargout < 2 && ! isempty (LOST))
@@ -3625,15 +3488,199 @@ function S = fromblock (S, E)
 
 endfunction
 
+## The records the entities SRC lower to, before their layers are
+## resolved, with what was drawn otherwise than it is held and the blocks
+## of the dimensions, numbered on from NDIM
+function [E, LOST, DIMS] = breakdown (src, opt, nDim)
+
+  dimScale = opt.dimScale;
+  hatchMode = opt.hatchMode;
+  chordTol = opt.chordTol;
+  bulgeMode = opt.bulgeMode;
+  dimMode = opt.dimMode;
+  E = emptyentity ();
+  LOST = struct ('index', {}, 'type', {}, 'reason', {});
+  DIMS = struct ('name', {}, 'entities', {});
+  for ii = 1:numel (src)
+
+    e = src(ii);
+
+    switch (e.type)
+
+      case 'line'
+        E(end+1) = mkent ('LINE', e, e.pts);
+
+      case 'polyline'
+        if (! isempty (e.bulge) && strcmp (bulgeMode, 'flatten'))
+          p = mkent ('POLYLINE', e, flattenbulge (e, chordTol));
+          p.closed = e.closed;
+        else
+          p = mkent ('POLYLINE', e, e.pts);
+          p.closed = e.closed;
+          p.bulge = e.bulge;
+        endif
+        E(end+1) = p;
+
+      case 'arc'
+        a = mkent ('ARC', e, e.pts);
+        a.radius = e.radius;
+        a.angles = e.angles;
+        E(end+1) = a;
+
+      case 'point'
+        E(end+1) = mkent ('POINT', e, e.pts);
+
+      case 'circle'
+        c = mkent ('CIRCLE', e, e.pts);
+        c.radius = e.radius;
+        E(end+1) = c;
+
+      case 'text'
+        t = mkent ('TEXT', e, e.pts);
+        t.text = e.text;
+        t.height = e.height;
+        t.rotation = e.angle;
+        E(end+1) = t;
+
+      case 'ellipse'
+        q = mkent ('ELLIPSE', e, e.pts);
+        q.radius = e.radius;
+        q.rotation = e.angle;
+        E(end+1) = q;
+
+      case 'spline'
+        Q = __sample__ (e.shape)(:,1:2);
+        if (e.closed)
+          Q(end,:) = [];
+        endif
+        q = mkent ('POLYLINE', e, Q);
+        q.closed = e.closed;
+        E(end+1) = q;
+
+      case 'path'
+        [Q, b] = pathlower (e.shape);
+        E(end+1) = lowerpoly (e, Q, b, e.closed, bulgeMode, chordTol);
+
+      case 'region'
+        L = [{e.shape.Outline}, e.shape.Holes(:)'];
+        for jj = 1:numel (L)
+          [Q, b] = pathlower (L{jj});
+          E(end+1) = lowerpoly (e, Q, b, true, bulgeMode, chordTol);
+        endfor
+
+      case {'diam', 'radius'}
+        parts = explodecirc (e, dimScale);
+        if (strcmp (dimMode, 'associative'))
+          nDim++;
+          bn = sprintf ('*D%d', nDim);
+          DIMS(end+1) = struct ('name', bn, 'entities', {parts});
+          E(end+1) = dimrecord (e, bn, e.type);
+        else
+          for kk = 1:numel (parts)
+            E(end+1) = parts(kk);
+          endfor
+        endif
+
+      case 'angdim'
+        parts = explodeang (e, dimScale);
+        if (strcmp (dimMode, 'associative'))
+          nDim++;
+          bn = sprintf ('*D%d', nDim);
+          DIMS(end+1) = struct ('name', bn, 'entities', {parts});
+          E(end+1) = dimrecord (e, bn, 'angdim');
+          continue;
+        endif
+        for kk = 1:numel (parts)
+          E(end+1) = parts(kk);
+        endfor
+
+      case 'ordinate'
+        parts = explodeord (e, dimScale);
+        if (strcmp (dimMode, 'associative'))
+          nDim++;
+          bn = sprintf ('*D%d', nDim);
+          DIMS(end+1) = struct ('name', bn, 'entities', {parts});
+          E(end+1) = dimrecord (e, bn, 'ordinate');
+        else
+          for kk = 1:numel (parts)
+            E(end+1) = parts(kk);
+          endfor
+        endif
+
+      case 'centremark'
+        parts = explodemark (e, dimScale);
+        for kk = 1:numel (parts)
+          E(end+1) = parts(kk);
+        endfor
+
+      case 'leader'
+        parts = explodeleader (e, dimScale);
+        for kk = 1:numel (parts)
+          E(end+1) = parts(kk);
+        endfor
+
+      case 'insert'
+        s = mkent ('INSERT', e, e.pts);
+        s.block = e.block;
+        s.rotation = e.angle;
+        s.radius = e.scale;
+        E(end+1) = s;
+
+      case 'hatch'
+        ## The loops, then the fill lines inside the outline and clear of
+        ## every hole
+        L = [{e.shape.Outline}, e.shape.Holes(:)'];
+        for jj = 1:numel (L)
+          [Q, b] = pathlower (L{jj});
+          E(end+1) = lowerpoly (e, Q, b, true, bulgeMode, chordTol);
+        endfor
+        if (strcmp (hatchMode, 'lines'))
+          H = cellfun (@(h) __sample__ (h)(:,1:2), L(2:end), ...
+                       'UniformOutput', false);
+          S = geom.hatchlines (__sample__ (L{1})(:,1:2), e.pattern, ...
+                               e.angle, e.spacing);
+          S = clipholes (S, H);
+          for jj = 1:rows (S)
+            E(end+1) = mkent ('LINE', e, [S(jj,1:2); S(jj,3:4)]);
+          endfor
+        else
+          LOST(end+1) = struct ('index', ii, 'type', 'hatch', 'reason', ...
+                                'fill dropped, boundary drawn');
+        endif
+
+      case 'dim'
+        parts = explodedim (e, dimScale);
+        if (strcmp (dimMode, 'associative'))
+          nDim++;
+          bn = sprintf ('*D%d', nDim);
+          DIMS(end+1) = struct ('name', bn, 'entities', {parts});
+          E(end+1) = dimrecord (e, bn, 'dim');
+        else
+          for jj = 1:numel (parts)
+            E(end+1) = parts(jj);
+          endfor
+        endif
+
+    endswitch
+
+  endfor
+
+endfunction
+
 ## The lowered records E without those on a layer of the table T that is not
 ## visible, and with RESOLVE, each 'byLayer' colour, line type and line
 ## weight taken from its layer and each 'byBlock' one at its default, since
-## nothing places these records
-function E = resolvelayers (E, T, resolve)
+## nothing places these records.  The records of a block, INBLOCK, are placed
+## by their inserts, which give 'byBlock', and the layer of what is on layer
+## '0', so those are left for the inserts.
+function E = resolvelayers (E, T, resolve, inblock)
 
   names = {T.name};
   keep = true (1, numel (E));
   for k = 1:numel (E)
+    if (inblock && strcmp (E(k).layer, '0'))
+      continue;
+    endif
     j = find (strcmpi (E(k).layer, names), 1);
     if (isempty (j))
       L = newlayer (E(k).layer);
@@ -3649,18 +3696,18 @@ function E = resolvelayers (E, T, resolve)
     endif
     if (E(k).colour == 256)
       E(k).colour = L.colour;
-    elseif (E(k).colour == 0)
+    elseif (E(k).colour == 0 && ! inblock)
       E(k).colour = 7;
     endif
     if (strcmp (E(k).linetype, 'byLayer'))
       E(k).linetype = L.linetype;
-    elseif (strcmp (E(k).linetype, 'byBlock'))
+    elseif (strcmp (E(k).linetype, 'byBlock') && ! inblock)
       E(k).linetype = 'CONTINUOUS';
     endif
     if (ischar (E(k).lineweight))
       if (strcmp (E(k).lineweight, 'byLayer'))
         E(k).lineweight = L.lineweight;
-      else
+      elseif (! inblock)
         E(k).lineweight = [];
       endif
     endif
