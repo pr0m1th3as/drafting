@@ -1735,6 +1735,47 @@ facesout (const TopoDS_Shape& c, double scale)
   return out;
 }
 
+// Whether a section edge of OP, a Common of the shape S and the plane
+// z = 0 not yet simplified, bounds no face of its result although the plane
+// holds material of S on one side of it only: the face it bounds was lost.
+// Open CASCADE loses one, silently, where the plane meets a face at a
+// grazing angle near edges approximated within their tolerance.  An edge
+// where the plane only touches S has material on neither side, and one
+// inside the cut, as where the plane is tangent to a bore, on both.  H is
+// how far beside the edge to look.
+static bool
+cutbroken (const TopoDS_Shape& s, BRepAlgoAPI_Common& op, double h)
+{
+  ShapeMap used;
+  TopExp::MapShapes (op.Shape (), TopAbs_EDGE, used);
+  BRepClass3d_SolidClassifier c (s);
+  for (const TopoDS_Shape& x : op.SectionEdges ())
+  {
+    if (used.Contains (x))
+    {
+      continue;
+    }
+    BRepAdaptor_Curve a (TopoDS::Edge (x));
+    gp_Pnt p;
+    gp_Vec t;
+    a.D1 ((a.FirstParameter () + a.LastParameter ()) / 2, p, t);
+    gp_Vec d = gp_Vec (0, 0, 1).Crossed (t);
+    if (d.Magnitude () <= gp::Resolution ())
+    {
+      continue;
+    }
+    d.Normalize ();
+    c.Perform (p.Translated (-h * d), Precision::Confusion ());
+    const bool left = c.State () == TopAbs_IN;
+    c.Perform (p.Translated (h * d), Precision::Confusion ());
+    if (left != (c.State () == TopAbs_IN))
+    {
+      return true;
+    }
+  }
+  return false;
+}
+
 // The face F without the edges lying inside it, such as an edge drawn on a
 // projection that ends within the outline; a wire left with none is dropped
 static TopoDS_Face
@@ -5862,12 +5903,25 @@ function directly. \n\
         const TopoDS_Face plane
           = BRepBuilderAPI_MakeFace (gp_Pln (gp::XOY ()), x0 - r, x1 + r,
                                      y0 - r, y1 + r).Face ();
+        // As boolean, checked before the result is simplified
         BRepAlgoAPI_Common op (s, plane);
+        op.Build ();
+        if (op.HasErrors () || ! op.IsDone ())
+        {
+          error ("%s: Open CASCADE could not compute the section.",
+                 caller.c_str ());
+        }
+        if (cutbroken (s, op, 1e-5 * std::sqrt (box.SquareExtent ())))
+        {
+          error ("%s: Open CASCADE returned the cut with a piece missing.",
+                 caller.c_str ());
+        }
+        op.SimplifyResult ();
         BRep_Builder b;
         TopoDS_Compound c;
         b.MakeCompound (c);
-        for (TopExp_Explorer x (boolean (op, caller, "section"), TopAbs_FACE);
-             x.More (); x.Next ())
+        for (TopExp_Explorer x (op.Shape (), TopAbs_FACE); x.More ();
+             x.Next ())
         {
           b.Add (c, withoutinternal (TopoDS::Face (x.Current ())));
         }

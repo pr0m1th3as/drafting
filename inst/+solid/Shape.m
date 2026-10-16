@@ -2733,6 +2733,11 @@ classdef Shape
     ## only touches @var{S}, along an edge or at a point, or misses it, the cut
     ## has no area and @var{R} is the empty @code{cell (1, 0)}.
     ##
+    ## Open CASCADE can lose a piece of the cut where the plane meets a curved
+    ## face at a grazing angle, as a plane within a few hundredths of a
+    ## millimetre of the wall of a tapped bore does.  @code{section} then
+    ## raises an error rather than return the cut with the piece missing.
+    ##
     ## The cut is exact enough to build from again.  Straight edges are
     ## straight segments and circles are arcs, a whole circle two half arcs.
     ## An ellipse or another conic, as a plane cuts from a cylinder or a cone at
