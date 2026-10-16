@@ -882,7 +882,9 @@ classdef Shape
     ## @code{solid.surface} take seconds, and there a @qcode{'RelTol'} of 1e-6
     ## is about three times faster, at an error of up to about 1e-7 on spline
     ## faces.  @var{TOL} is a target, not a guarantee: on the hardest faces the
-    ## integration may stop short of it.
+    ## integration may stop short of it.  Faces bounded by the curves of text
+    ## are one such case: on round glyphs, such as an @samp{O} or an @samp{8},
+    ## Open CASCADE errs by up to about 3e-6 of the volume.
     ##
     ## @example
     ## @group
@@ -918,9 +920,11 @@ classdef Shape
     ##
     ## The area is the sum over every face, computed from the exact surfaces.
     ## A flat face is measured to a relative error of about 1e-9, whatever its
-    ## edges.  A curved face is measured as Open CASCADE integrates it: exactly
-    ## for a cylinder, a cone, a sphere or a torus, to about 1e-4 for a face
-    ## swept from a spline.  The empty shape has area zero.
+    ## edges, except a face bounded by the curves of text: on round glyphs,
+    ## such as an @samp{O} or an @samp{8}, to about 3e-6.  A curved face is
+    ## measured as Open CASCADE integrates it: exactly for a cylinder, a cone,
+    ## a sphere or a torus, to about 1e-4 for a face swept from a spline.  The
+    ## empty shape has area zero.
     ##
     ## It is what a coating, a plating or a coat of paint is reckoned by.
     ##

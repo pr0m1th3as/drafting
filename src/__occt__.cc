@@ -367,6 +367,45 @@ bspline (const octave_scalar_map& s)
   return new Geom_BSplineCurve (poles, weights, knots, mults, degree);
 }
 
+// The B-spline C in pieces between the knots where it turns a corner, its
+// direction on either side differing; C whole when it has none.  Open
+// CASCADE's adaptive volume integration errs on font outlines held as one
+// curve through their corners, by up to a part in two thousand; on the
+// pieces it errs by 3e-6 at most, on round glyphs with no corner to split.
+static vector<Handle (Geom_BSplineCurve)>
+atcorners (const Handle (Geom_BSplineCurve)& c)
+{
+  vector<int> cut = {1};
+  for (int k = 2; k < c->NbKnots (); k++)
+  {
+    if (c->Multiplicity (k) < c->Degree ())
+    {
+      continue;
+    }
+    gp_Pnt p;
+    gp_Vec a, b;
+    c->LocalD1 (c->Knot (k), k - 1, k, p, a);
+    c->LocalD1 (c->Knot (k), k, k + 1, p, b);
+    if (a.Magnitude () > gp::Resolution () && b.Magnitude () > gp::Resolution ()
+        && a.Angle (b) > Precision::Angular ())
+    {
+      cut.push_back (k);
+    }
+  }
+  cut.push_back (c->NbKnots ());
+  if (cut.size () == 2)
+  {
+    return {c};
+  }
+  vector<Handle (Geom_BSplineCurve)> out;
+  for (size_t i = 0; i + 1 < cut.size (); i++)
+  {
+    out.push_back (GeomConvert::SplitBSplineCurve (c, cut[i], cut[i + 1],
+                                                   true));
+  }
+  return out;
+}
+
 // Whether the arc from A through M to B bows less than a millionth of its
 // chord, and so is built as the straight segment it is in effect: Open
 // CASCADE puts such an arc on a circle so large that its ends stray
@@ -409,8 +448,11 @@ chain (const octave_value& p)
     const gp_Pnt b (v(j,0), v(j,1), v(j,2));
     if (! sp(i).isempty ())
     {
-      w.Add (BRepBuilderAPI_MakeEdge (bspline (sp(i).scalar_map_value ()))
-             .Edge ());
+      for (const Handle (Geom_BSplineCurve)& c
+             : atcorners (bspline (sp(i).scalar_map_value ())))
+      {
+        w.Add (BRepBuilderAPI_MakeEdge (c).Edge ());
+      }
     }
     else if (octave::math::isnan (m(i,0)))
     {
