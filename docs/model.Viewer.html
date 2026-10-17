@@ -462,7 +462,7 @@
   <a href="model.Viewer.html#model_Viewer_opacity">model.Viewer.opacity</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/1eb675a/inst/+model/Viewer.m">model.Viewer</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/29043ef/inst/+model/Viewer.m">model.Viewer</a>
 </p>
 </div>
         <p class="lead my-3">The <code>model.Viewer</code> class contains the following properties:</p>
@@ -600,11 +600,11 @@ Pick edges and faces of a solid, or points on a mesh, with the mouse.
 <p> </p>
 <p> <code>[<var>E</var>, <var>F</var>] = pick (<var>V</var>)</code> waits while you click edges
  and faces in the viewer&rsquo;s window, then returns the indices of the edges
- in <var>E</var> and of the faces in <var>F</var>, in the numbering
- <code>solid.Shape.edges</code> and <code>solid.Shape.faces</code> use.  A click
- selects what is under the pointer, which stays drawn in orange, a
- selected edge thick and a selected face filled, and a second click on
- it lets it go; the shape can still be turned between clicks.
+ in <var>E</var> and of the faces in <var>F</var>, in the order you picked them,
+ in the numbering <code>solid.Shape.edges</code> and <code>solid.Shape.faces</code>
+ use.  A click selects what is under the pointer, which stays drawn in
+ orange, a selected edge thick and a selected face filled, and a second
+ click on it lets it go; the shape can still be turned between clicks.
  <code>Enter</code> finishes and <code>Escape</code> cancels, returning nothing.  With
  <code>'edge'</code> or <code>'face'</code> only that kind can be picked, and its
  indices are the first output.
@@ -618,8 +618,10 @@ Pick edges and faces of a solid, or points on a mesh, with the mouse.
  query where what they share finds them alone, else one query for each,
  joined, and their indices only where an item cannot be told apart from
  the others by any query.  It names the shape by the variable the viewer
- shows, and <code>eval (<var>CODE</var>)</code> gives the indices again.  Put it in
- the script in place of the numbers:
+ shows, and <code>eval (<var>CODE</var>)</code> gives the indices again: in the
+ order picked where it names the items one by one, and in increasing
+ order where one query names them all.  Put it in the script in place
+ of the numbers:
 </p>
 <table><tr><td>&nbsp;</td><td><pre class="example"> ## Four upright edges picked on a block 80 by 40 by 12
  [E, CODE] = pick (V, 'edge');
@@ -631,10 +633,10 @@ Pick edges and faces of a solid, or points on a mesh, with the mouse.
 
 <p> <code>[<var>I</var>, <var>CODE</var>] = pick (<var>V</var>, <code>'solid'</code>)</code> picks
  whole solids: a click on any face of a solid selects it, and <var>I</var>
- returns the indices of the solids picked, in the order
- <code>solid.Shape.solids</code> and <code>model.Assembly.solids</code> list them,
- for <code>model.Viewer.opacity</code>.  The face clicked stays drawn in
- orange.  <var>CODE</var> is what selects the same solids in
+ returns the indices of the solids picked, in the order you picked them,
+ numbered as <code>solid.Shape.solids</code> and <code>model.Assembly.solids</code>
+ list them, for <code>model.Viewer.opacity</code>.  The face clicked stays
+ drawn in orange.  <var>CODE</var> is what selects the same solids in
  <code>opacity</code>, as code: the name they share, else the path they
  share, where either selects them alone, else their indices.
 </p>

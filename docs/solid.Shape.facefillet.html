@@ -385,6 +385,8 @@
  Open CASCADE.  <var>M</var> must meet each side at an outside corner, and
  the round must touch each face within it.  Rows may share sides, but
  the middle face of a row cannot appear in another row.
+ <code>model.Viewer.pick</code> returns faces in the order they are clicked,
+ so a row can be picked side, middle, side.
 </p>
 <p> <code><var>S</var> = facefillet (<var>S</var>, <var>F</var>, <var>R</var>)</code> rounds, on each
  row of the <em class="math">N</em>-by-2 matrix <var>F</var>, the edges the two faces of
@@ -412,7 +414,7 @@
   <a href="solid.Shape.fillet.html">solid.Shape.fillet</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/1eb675a/inst/+solid/Shape.m#L1456">solid.Shape</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/29043ef/inst/+solid/Shape.m#L1458">solid.Shape</a>
 </p>
 </div>
 
