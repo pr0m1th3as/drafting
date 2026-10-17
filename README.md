@@ -15,11 +15,11 @@ millimetres.
   regions with holes, which combine, offset, round, hull, mirror and repeat as
   OpenSCAD's 2-D shapes do, their arcs kept exact; text as outlines.
 - **Solids:** primitives, and extrusions, revolutions, lofts, sweeps and
-  helices of regions; booleans; holes, pockets, fillets, chamfers and shells
-  on edges and faces chosen by what they are; tapped holes and ISO metric
-  threads, internal and external, and clearance holes with the counterbores
-  and countersinks of the standards; sections and projections that are
-  regions again; STEP in and out.
+  helices of regions; booleans; holes, pockets, fillets, full rounds,
+  chamfers and shells on edges and faces chosen by what they are; tapped
+  holes and ISO metric threads, internal and external, clearance holes with
+  the counterbores and countersinks of the standards, and the knurls of DIN
+  82; sections and projections that are regions again; STEP in and out.
 - **Meshes:** STL, OBJ, PLY and 3MF read and written with their colours, cut
   into regions and fitted back to lines and arcs, and taken into booleans.
 - **Assemblies:** named parts placed together, written to STEP and 3MF with
@@ -65,7 +65,9 @@ the package decides where the standard leaves the choice open.
 covers ISO 261, ISO 68-1, ISO 965-1 and ISO 2306, and the countersink of a
 tapped hole from IS 1369 (Part 3), prepared from DIN 76-1;
 [Clearance holes, counterbores and countersinks](https://pr0m1th3as.github.io/drafting/guide/standards_holes.html)
-covers ISO 273 and IS 3406, prepared from DIN 74. Each is read in an Indian
+covers ISO 273 and IS 3406, prepared from DIN 74; and
+[Knurls](https://pr0m1th3as.github.io/drafting/guide/standards_knurling.html)
+covers DIN 82, read in IS 3403, prepared from it. Each is read in an Indian
 Standard that anyone can download free.
 
 ## Tutorials
@@ -153,8 +155,8 @@ solver, each with the reason it was ruled out.
 ## Install
 
 To install the latest release, you need Octave (>=11.1.0) installed on your
-system, and the Open CASCADE and X11 libraries set out below. Install it by
-typing:
+system, and on Linux, FreeBSD and macOS the libraries set out below. Install
+it by typing:
 
   `pkg install drafting`
 
@@ -167,30 +169,37 @@ If you need to install a specific release, for example `0.2.0`, type:
 
   `pkg install "https://github.com/pr0m1th3as/drafting/archive/refs/tags/release-0.2.0.tar.gz"`
 
-The package needs Open CASCADE 7.8 or later, with its visualization
-libraries, the X11 headers and zlib at build time. The headers are looked for
-in `/usr/local/include/opencascade` and `/usr/include/opencascade`, and the
-libraries next to them. On Debian or Ubuntu, where the packaged version is 7.8
-or later, install them before the package with:
+The package builds on Linux, FreeBSD, Windows and macOS. Everywhere it needs
+Open CASCADE 7.8 or later, 8.0 included, with its visualization libraries;
+what else it needs, and where Open CASCADE comes from, depends on the system:
+
+- **Linux and FreeBSD:** Open CASCADE, the X11 headers and zlib at build
+  time. The headers are looked for in `/usr/local/include/opencascade` and
+  `/usr/include/opencascade`, and the libraries next to them. On Debian or
+  Ubuntu, where the packaged version is 7.8 or later, install them before
+  the package with:
 
   `sudo apt install libocct-foundation-dev libocct-modeling-data-dev libocct-modeling-algorithms-dev libocct-data-exchange-dev libocct-visualization-dev libx11-dev zlib1g-dev`
 
-If they are elsewhere, name their directories before installing, for example
-`setenv ("OCCT_INC", "/opt/occt/include/opencascade")` and
-`setenv ("OCCT_LIB", "/opt/occt/lib")`, or `X11_INC` and `X11_LIB`.
-The package records where it found the libraries, so they need not be on the
-system's library path, and headers found outside `/usr` without their
-libraries beside them stop the build rather than link another version.
+  The Makefile is GNU make's, so on FreeBSD install `gmake` and type
+  `setenv ("MAKE", "gmake")` before `pkg install`.
+- **Windows:** with GNU Octave 11.1.0 or 11.3.0 from
+  [octave.org](https://octave.org/download), `pkg install` fetches a build of
+  Open CASCADE made with Octave's own compiler and installs it with the
+  package, so nothing else is needed; Open CASCADE already in Octave's
+  `mingw64` folder, or named by `OCCT_INC`, is used instead.
+- **macOS:** install Octave and Open CASCADE with
+  [Homebrew](https://brew.sh), `brew install octave opencascade`, before
+  `pkg install`; they are looked for in `/opt/homebrew` first. The viewer
+  uses a window of macOS's own, so X11 is not needed.
 
-The package builds on Linux, FreeBSD, Windows and macOS. Its Makefile is GNU
-make's, so on FreeBSD install `gmake` and type `setenv ("MAKE", "gmake")`
-before `pkg install`. On Windows, with GNU Octave 11.1.0 or 11.3.0 from
-[octave.org](https://octave.org/download), `pkg install` fetches a build of
-Open CASCADE made with Octave's own compiler and installs it with the package,
-so nothing else is needed; Open CASCADE already in Octave's `mingw64` folder,
-or named by `OCCT_INC`, is used instead. On macOS, install Octave and Open
-CASCADE with [Homebrew](https://brew.sh), `brew install octave opencascade`,
-before `pkg install`.
+If Open CASCADE is elsewhere, name its directories before installing, for
+example `setenv ("OCCT_INC", "/opt/occt/include/opencascade")` and
+`setenv ("OCCT_LIB", "/opt/occt/lib")`; on Linux and FreeBSD, `X11_INC` and
+`X11_LIB` do the same for X11. The package records where it found the
+libraries, so they need not be on the system's library path, and headers
+found outside `/usr` without their libraries beside them stop the build
+rather than link another version.
 
 After installation, type:
 - `pkg load drafting` to load the **drafting** package.
