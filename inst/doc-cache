@@ -2,7 +2,7 @@
 # name: cache
 # type: cell
 # rows: 3
-# columns: 241
+# columns: 242
 # name: <cell-element>
 # type: sq_string
 # elements: 1
@@ -1770,7 +1770,7 @@ draw.Drawing.transform
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 2836
+# length: 3045
 draw.Drawing: D = transform (D, T)
 draw.Drawing: D = transform (D, OP, VAL)
 draw.Drawing: D = transform (D, OP, VAL, CENTRE)
@@ -1794,7 +1794,10 @@ the block it places. A dimension carries its measured points and its
 offset, a diameter or radius dimension its radius and direction, an
 angular dimension its radius; one with no label of its own is labelled
 with what it measures whenever it is drawn or written, so its label
-follows it.
+follows it. A dimension's ticks and text, a centre mark and a leader
+keep their size: they are sized only when drawn, by
+'DimScale', so they reach the sheet at the same size at any
+scale, as draw.Drawing.print describes.
 
 A reflection reverses the sweep of an arc. Arcs run
 counter-clockwise from the first angle to the second, so mirroring one
@@ -6964,23 +6967,22 @@ model.Assembly.write
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1024
+# length: 1032
 model.Assembly: write (A, FILE)
 model.Assembly: write (A, FILE, 'Tolerance', TOL)
 Write an assembly to a STEP, 3MF, STL, OBJ or PLY file.
 
-write (A, FILE) writes the assembly in the format
-the extension of FILE names, in either case. A STEP file,
-.step, keeps its structure: each part once, with its name, its
+write (A, FILE) writes the assembly in the format the
+extension of FILE names, in either case. A STEP file, .step
+or .stp, keeps its structure: each part once, with its name, its
 colours and the solid.Shape.Name of its solids, placed by its
-placements, which carry their names, and each sub-assembly the same
-way, so that a CAD program opens the product as it was built; it
-cannot hold a mesh part. A 3MF file, the archive slicers take, keeps
-the same structure, each part a mesh written once and placed as a
-component, in its colours. 3MF has no place for the name of a
-placement, so model.read names the placements of a 3MF file
-after their parts. An STL, OBJ or PLY file holds
-tessellate (A).
+placements, which carry their names, and each sub-assembly the same way,
+so that a CAD program opens the product as it was built; it cannot hold a
+mesh part. A 3MF file, the archive slicers take, keeps the same
+structure, each part a mesh written once and placed as a component, in
+its colours. 3MF has no place for the name of a placement, so
+model.read names the placements of a 3MF file after their
+parts. An STL, OBJ or PLY file holds tessellate (A).
 
 write (..., 'Tolerance', TOL) sets, for a
 mesh, how far its facets may stray from the parts' surfaces, as
@@ -7009,7 +7011,7 @@ model.Viewer
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 2568
+# length: 2584
 drafting: model.Viewer
 A window showing a solid, a triangle mesh or an assembly, in which
 edges, faces, solids and coordinate systems can be picked, and solids
@@ -7062,7 +7064,8 @@ after, where the mesh has that colouring.
 Closing the window ends the viewer; assigning a shape again opens a new
 one. The window closes with Octave.
 
-The viewer needs a display to run. It runs on Linux and FreeBSD.
+The viewer needs a display to run. It runs on Linux, FreeBSD, Windows
+and macOS.
 
 See also:
 solid.Shape.show,
@@ -7586,17 +7589,17 @@ model.read
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1944
+# length: 1960
 drafting: A = model.read (FILE)
 Read an assembly from a STEP or 3MF file.
 
 A = model.read (FILE) returns the product the STEP file
-FILE holds as a model.Assembly, in millimetres whatever unit
-the file was written in: its parts with their names and the colours and
-solid.Shape.Name of their solids, placed where the file places
-them and named as it names the placements, and its sub-assemblies the
-same way. A part the file places
-several times is one part placed several times. Several products at the
+FILE, .step or .stp, holds as a model.Assembly,
+in millimetres whatever unit the file was written in: its parts with their
+names and the colours and solid.Shape.Name of their solids, placed
+where the file places them and named as it names the placements, and its
+sub-assemblies the same way. A part the file places several times is one
+part placed several times. Several products at the
 top of the file are placed where they are in one assembly, and a file of
 a single part gives an assembly placing it once; either is named after
 the base name of FILE. A part without a name is named
@@ -8188,7 +8191,7 @@ polymesh.Mesh.show
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 877
+# length: 857
 polymesh.Mesh: show (M)
 polymesh.Mesh: V = show (M)
 Show a mesh in a viewer of its own, redrawing in place.
@@ -8206,8 +8209,8 @@ V = show (M) also returns the viewer, a
 model.Viewer, whose pick returns points clicked on the
 mesh and pickucs a coordinate system.
 
-The viewer is built with the package when Open CASCADE and X11 are
-found, and needs a display to run. It runs on Linux and FreeBSD.
+The viewer is built with the package, and needs a display to run. It
+runs on Linux, FreeBSD, Windows and macOS.
 
 See also:
 model.Viewer,
@@ -8668,15 +8671,17 @@ solid.Shape.area
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 597
+# length: 687
 solid.Shape: A = area (S)
 The surface area of a shape in square millimetres.
 
 The area is the sum over every face, computed from the exact surfaces.
-A flat face is measured to a relative error of about 1e-9, whatever its
-edges. A curved face is measured as Open CASCADE integrates it: exactly
-for a cylinder, a cone, a sphere or a torus, to about 1e-4 for a face
-swept from a spline. The empty shape has area zero.
+A flat face is measured exactly, whatever its edges, and so is a
+cylinder, a cone, a sphere, a torus, or a face extruded or revolved from
+a spline, the walls of text included. Any other curved face, as a loft,
+a sweep along a curve or a surface through a grid makes, is measured as
+Open CASCADE integrates it, to about 1e-6. The empty shape has area
+zero.
 
 It is what a coating, a plating or a coat of paint is reckoned by.
 
@@ -8957,6 +8962,72 @@ Choose edges of a shape, to round, chamfer or inspect.
 # name: <cell-element>
 # type: sq_string
 # elements: 1
+# length: 22
+solid.Shape.facefillet
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 1848
+solid.Shape: S = facefillet (S, F)
+solid.Shape: S = facefillet (S, F, R)
+Round a shape between faces chosen by index.
+
+S = facefillet (S, F) makes a full round on
+each row of the N-by-3 matrix F, a row of face indices
+[A, M, B] as solid.Shape.faces returns
+them: the middle face M is replaced by a round tangent to the
+sides A and B and to the face M itself, so the end of
+a wall becomes a half cylinder. There is no radius to give: between
+parallel sides it is half the distance between them.
+
+The three faces must be flat, and parallel to the edges M shares
+with A and B, so that the round is part of a cylinder;
+sides need not be parallel to each other. Every other face M
+borders must be flat and square to those edges, as the front and back
+of a wall are to its end. Parallel and square are judged across each
+face: a face may stray from them by 1e-7 millimetres, the precision of
+Open CASCADE. M must meet each side at an outside corner, and
+the round must touch each face within it. Rows may share sides, but
+the middle face of a row cannot appear in another row.
+
+S = facefillet (S, F, R) rounds, on each
+row of the N-by-2 matrix F, the edges the two faces of
+the row share, to the radius R millimetres, as
+solid.Shape.fillet rounds them. The two faces must share at
+least one edge.
+
+solid.Shape.fillet cannot use up a face: two fillets that would
+meet across it, such as two of radius 10 on the ends of a face 20
+wide, raise an error. A full round builds that shape.
+
+## A wall 50 long, 5 thick and 20 high with rounded ends
+W = solid.box (50, 5, 20);
+top = faces (W, 'Normal', [0, 0, 1]);
+bottom = faces (W, 'Normal', [0, 0, -1]);
+left = faces (W, 'Normal', [-1, 0, 0]);
+right = faces (W, 'Normal', [1, 0, 0]);
+W = facefillet (W, [top, left, bottom; top, right, bottom]);
+numfaces (W)
+=> 6
+
+See also:
+solid.Shape.faces,
+solid.Shape.fillet
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 44
+Round a shape between faces chosen by index.
+
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
 # length: 17
 solid.Shape.faces
 
@@ -9027,7 +9098,7 @@ solid.Shape.fillet
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 939
+# length: 1168
 solid.Shape: S = fillet (S, E, R)
 Round edges of a shape to a radius.
 
@@ -9044,7 +9115,10 @@ a box whose upright edges are already rounded, choosing one top edge
 rounds the whole top rim.
 
 A radius too large for the faces beside an edge cannot be built and
-raises an error, as does an edge that cannot be rounded at all.
+raises an error, as does an edge that cannot be rounded at all. Nor
+can fillets use up a face: two of radius 10 on the long edges of a face
+20 wide would meet across it and leave none of it, and raise an error.
+solid.Shape.facefillet builds that shape as a full round.
 
 ## A block with its four upright edges rounded to 5
 S = solid.box (40, 30, 10);
@@ -9054,6 +9128,7 @@ numfaces (S)
 
 See also:
 solid.Shape.edges,
+solid.Shape.facefillet,
 solid.Shape.chamfer
 
 
@@ -9075,7 +9150,7 @@ solid.Shape.hole
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 7890
+# length: 8056
 solid.Shape: S = hole (S, P, D, DEPTH)
 solid.Shape: S = hole (..., Name, Value, ...)
 Drill holes into a shape.
@@ -9218,8 +9293,10 @@ A counterbore and a countersink cannot both be given, and a tip applies
 only to a blind hole. The standard ones need a named thread, and
 those for a screw head 'Clearance', fine or medium;
 solid.holespec gives their sizes, and the sizes of every hole
-for a named thread, before it is drilled. Drilling the empty shape
-leaves it empty.
+for a named thread, before it is drilled. A hole may break into
+another, but holes that would cut a solid of S into pieces are an
+error, as a bore reaching the roots of a knurl, which leaves its teeth
+loose. Drilling the empty shape leaves it empty.
 
 ## A plate with four counterbored holes for M6 cap screws
 S = solid.box (80, 40, 12);
@@ -9438,7 +9515,7 @@ solid.Shape.knurl
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 4442
+# length: 4675
 solid.Shape: S = knurl (S, F, PITCH)
 solid.Shape: S = knurl (S, F, PITCH, DEPTH)
 solid.Shape: S = knurl (..., Name, Value, ...)
@@ -9451,7 +9528,10 @@ degrees either side of the axis, teeth of 90 degrees, cut to full depth,
 leaving raised points. F must be the outside of the part, a
 cylinder all the way round its axis, and must end at each end in a
 circle on one flat face square to the axis: the free end of the part,
-or a shoulder.
+or a shoulder. The wall under F must be thicker than the teeth
+are deep, and than a fillet or chamfer at an end of F is large:
+a bore, its thread or anything else reaching into it is an error. So
+is a hole or pocket in F: knurl first, then cut it.
 
 PITCH is in millimetres, measured square to the grooves as DIN 82
 gives it, whose series is 0.5, 0.6, 0.8, 1.0, 1.2 and 1.6. A whole
@@ -10064,7 +10144,7 @@ solid.Shape.section
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1242
+# length: 1506
 solid.Shape: R = section (S, U)
 Cut a shape with a plane.
 
@@ -10077,6 +10157,11 @@ of its own. A face of S lying in the plane is part of the cut, so
 a box cut in the plane of its base gives its base. Where the plane
 only touches S, along an edge or at a point, or misses it, the cut
 has no area and R is the empty cell (1, 0).
+
+Open CASCADE can lose a piece of the cut where the plane meets a curved
+face at a grazing angle, as a plane within a few hundredths of a
+millimetre of the wall of a tapped bore does. section then
+raises an error rather than return the cut with the piece missing.
 
 The cut is exact enough to build from again. Straight edges are
 straight segments and circles are arcs, a whole circle two half arcs.
@@ -10177,7 +10262,7 @@ solid.Shape.show
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1798
+# length: 1778
 solid.Shape: show (S)
 solid.Shape: V = show (S)
 Show a shape in a viewer of its own, redrawing in place.
@@ -10215,8 +10300,8 @@ Calling show (S) is the same as assigning S to the
 Model of the variable's viewer. Nothing else redraws it:
 changing the variable that was shown does not, until it is shown again.
 
-The viewer is built with the package when Open CASCADE and X11 are
-found, and needs a display to run. It runs on Linux and FreeBSD.
+The viewer is built with the package, and needs a display to run. It
+runs on Linux, FreeBSD, Windows and macOS.
 
 See also:
 model.Viewer,
@@ -10396,7 +10481,7 @@ solid.Shape.thread
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 3990
+# length: 4071
 solid.Shape: S = thread (S, P, NAME, DEPTH)
 solid.Shape: S = thread (..., Name, Value, ...)
 Cut screw threads into a shape.
@@ -10441,7 +10526,8 @@ A tube is threaded inside or outside, by whichever of its bore and its
 cylinder fits: a tube of 6 with a bore of 2 takes an external M6. A
 wall whose bore and cylinder both fit is thinner than either thread is
 deep, and is an error, as is an internal thread that would cut through
-the cylinder round its bore.
+the wall round its bore: a cylinder, or any other outline, as the flats
+of a hexagon or the teeth of a knurl.
 
 The profile is the basic profile of ISO 68-1, its 60 degree flanks
 swept round the axis by solid.helix: an internal thread's root
@@ -10633,7 +10719,7 @@ solid.Shape.write
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1865
+# length: 1871
 solid.Shape: write (S, FILE)
 solid.Shape: write (S, FILE, 'Tolerance', TOL)
 Write a solid to a STEP, STL, OBJ, PLY or 3MF file.
@@ -10641,7 +10727,7 @@ Write a solid to a STEP, STL, OBJ, PLY or 3MF file.
 write (S, FILE) writes the shape S in the format
 named by the extension of FILE, in either case:
 
-.step
+.step, .stp
 STEP (ISO 10303-21, application protocol 214), in millimetres. The
 exact geometry is kept, so this is the file to send to a CAD program or
 to another manufacturer. The part is named after the base name of
@@ -11036,7 +11122,7 @@ solid.holespec
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 3975
+# length: 3902
 drafting: H = solid.holespec (NAME)
 drafting: H = solid.holespec (NAME, Name, Value, ...)
 The dimensions of the hole for a metric screw, read from its thread.
@@ -11089,10 +11175,9 @@ True for the countersink of IS 3406 (Part 1):1986, type A, for the
 countersunk heads of ISO 7721, as on ISO 2009, ISO 7046, ISO 14581 and
 their raised kinds, from M1 to M20. 'socket' for its type B,
 for the hexagon socket countersunk screws of ISO 10642, from M3 to M24.
-Type A has a medium and a fine series, chosen by 'Clearance':
-a plain cone in the medium series, 12.4 wide at the surface for M6, and
-in the fine series a cone below a short cylinder of the same width, 11.5
-wide and 0.45 deep for M6. Type B is in the fine series only. Or
+Type A has a medium and a fine series, chosen by 'Clearance',
+each a plain cone: 12.4 wide at the surface for M6 in both, 23.9 and 24.4
+for M12. Type B is in the fine series only, 13 wide for M6. Or
 CD, [CD, ANGLE] or [CD,
 ANGLE, CDEPTH], taken as given, with an angle of 90 and no
 cylinder by default.
@@ -11263,7 +11348,7 @@ solid.read
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1448
+# length: 1456
 drafting: S = solid.read (FILE)
 Read a solid from a STEP file.
 
@@ -11278,9 +11363,9 @@ solid.Shape.Name.
 
 STEP (ISO 10303-21) is the format every mechanical CAD program exchanges
 solids in, and it keeps their exact geometry: a hole read from it is a true
-cylinder, as it was modelled. A STEP file must end in .step, in
-either case, and open with the keyword ISO-10303-21;, which may
-follow white space and comments.
+cylinder, as it was modelled. A STEP file must end in .step or
+.stp, in either case, and open with the keyword
+ISO-10303-21;, which may follow white space and comments.
 
 Only solids are read, since a solid.Shape holds solids only. A
 closed shell, which some programs write in place of a solid, is read as
