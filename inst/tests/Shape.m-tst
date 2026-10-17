@@ -422,6 +422,78 @@
 %! assert_equal (numfaces (S), 4);
 %! assert_equal (isvalid (S), true);
 
+%!test  # a full round at one end of a wall
+%! W = solid.box (50, 5, 20);
+%! S = facefillet (W, [6, 1, 5]);
+%! assert_equal (volume (S), 5000 - (200 - 50 * pi) * 5, 1e-9);
+%! assert_equal (numfaces (S), 6);
+%! assert_equal (isvalid (S), true);
+
+%!test  # full rounds at both ends of a wall
+%! W = solid.box (50, 5, 20);
+%! S = facefillet (W, [6, 1, 5; 6, 2, 5]);
+%! assert_equal (volume (S), 3000 + 500 * pi, 1e-9);
+%! assert_equal (bbox (S), [0, 0, 0, 50, 5, 20], 1e-6);
+%! assert_equal (numfaces (S), 6);
+
+%!test  # full rounds that meet all round make one cylinder
+%! W = solid.box (20, 5, 20);
+%! S = facefillet (W, [6, 1, 5; 6, 2, 5]);
+%! assert_equal (volume (S), 500 * pi, 1e-9);
+%! assert_equal (numfaces (S), numfaces (solid.cylinder (10, 5)));
+%! assert_equal (numedges (S), numedges (solid.cylinder (10, 5)));
+
+%!test  # face indices may be integers
+%! W = solid.box (50, 5, 20);
+%! S = facefillet (W, int32 ([6, 1, 5]));
+%! assert_equal (volume (S), 5000 - (200 - 50 * pi) * 5, 1e-9);
+
+%!test  # a full round on a wall placed at an angle
+%! W = rotate (translate (solid.box (50, 5, 20), [3, -7, 2]), 37, [1, 2, 3]);
+%! S = facefillet (W, [6, 1, 5; 6, 2, 5]);
+%! assert_equal (volume (S), 3000 + 500 * pi, 1e-9);
+%! assert_equal (numfaces (S), 6);
+
+%!test  # a full round between sides closing in
+%! P = [0, 2; 50, 0; 50, 20; 0, 18];
+%! S = facefillet (solid.extrude (geom.Region (P), 5), [1, 4, 3]);
+%! ## The circle tangent to the three lines; each corner loses the kite of
+%! ## its two tangent lengths less the sector between them
+%! nb = [-2, -50] / norm ([-2, -50]);
+%! nt = [-2, 50] / norm ([-2, 50]);
+%! x = [nb, 1; -1, 0, 1; nt, 1] \ [nb * [0; 2]; 0; nt * [0; 18]];
+%! r = x(3);
+%! L = [norm([0, 2] - x(1:2)' + [r, 0]), norm([0, 18] - x(1:2)' + [r, 0])];
+%! cut = r * sum (L) - r ^ 2 * (acos (-nb(1)) + acos (-nt(1))) / 2;
+%! assert_equal (volume (S), (polyarea (P(:,1), P(:,2)) - cut) * 5, 1e-9);
+%! assert_equal (numfaces (S), 6);
+%! assert_equal (isvalid (S), true);
+
+%!test  # a side leaning off by less than 1e-7 over the face is parallel
+%! ## A block 10 x 2 x 4 whose top rises 8e-9 across its width
+%! V = [0, 0, 0; 10, 0, 0; 10, 2, 0; 0, 2, 0; ...
+%!      0, 0, 4; 10, 0, 4; 10, 2, 4 + 8e-9; 0, 2, 4 + 8e-9];
+%! F = [1, 3, 2; 1, 4, 3; 5, 6, 7; 5, 7, 8; 1, 2, 6; 1, 6, 5; ...
+%!      2, 3, 7; 2, 7, 6; 3, 4, 8; 3, 8, 7; 4, 1, 5; 4, 5, 8];
+%! B = solid.polyhedron (polymesh.Mesh (V, F));
+%! S = facefillet (B, [faces(B, 'Normal', [0, 0, 1]), ...
+%!                     faces(B, 'Normal', [-1, 0, 0]), ...
+%!                     faces(B, 'Normal', [0, 0, -1])]);
+%! assert_equal (volume (S), 80 - (8 - 2 * pi) * 2, 1e-6);
+%! assert_equal (isvalid (S), true);
+
+%!test  # two faces rounded along the edge they share
+%! B = solid.box (10, 20, 30);
+%! S = facefillet (B, [6, 3], 2);
+%! assert_equal (volume (S), 6000 - (4 - pi) * 10, 1e-9);
+%! assert_equal (numfaces (S), 7);
+
+%!test  # two pairs of faces rounded at once
+%! B = solid.box (10, 20, 30);
+%! S = facefillet (B, [6, 3; 6, 4], 2);
+%! assert_equal (volume (S), 6000 - 2 * (4 - pi) * 10, 1e-9);
+%! assert_equal (numfaces (S), 8);
+
 %!test  # four parallel edges bevelled
 %! B = solid.box (10, 20, 30);
 %! S = chamfer (B, edges (B, 'Direction', [0, 0, 1]), 2);
@@ -1254,6 +1326,12 @@
 %! F = fillet (A, edges (A, 'Direction', [0, 0, 1]), 1);
 %! assert_equal (F.Colour, [0, 1, 0]);
 
+%!test  # Colour: a full round keeps it
+%! A = solid.box (50, 5, 20);
+%! A.Colour = [0, 1, 0];
+%! F = facefillet (A, [6, 1, 5]);
+%! assert_equal (F.Colour, [0, 1, 0]);
+
 %!test  # Colour: a shell keeps it
 %! A = solid.box (10, 10, 10);
 %! A.Colour = [0, 1, 0];
@@ -1352,6 +1430,12 @@
 %! A = solid.box (10, 10, 10);
 %! A.Name = 'a';
 %! F = fillet (A, edges (A, 'Direction', [0, 0, 1]), 1);
+%! assert_equal (F.Name, {'a'});
+
+%!test  # Name: a full round keeps it
+%! A = solid.box (50, 5, 20);
+%! A.Name = 'a';
+%! F = facefillet (A, [6, 1, 5]);
 %! assert_equal (F.Name, {'a'});
 
 %!test  # Name: a chamfer keeps it
@@ -1651,6 +1735,55 @@
 %! fillet (solid.Shape (), 1, 2)
 %!error<solid.Shape.fillet: E must be a vector of edge indices of S.> ...
 %! fillet (solid.Shape (), [], 2)
+%!error<solid.Shape.facefillet: invalid number of input arguments.> ...
+%! facefillet (solid.Shape ())
+%!error<solid.Shape.facefillet: F must be an N-by-3 matrix of face indices of S.> ...
+%! facefillet (solid.Shape (), [1, 2, 3])
+%!error<solid.Shape.facefillet: F must be an N-by-3 matrix of face indices of S.> ...
+%! facefillet (solid.box (50, 5, 20), [6, 1, 5, 2])
+%!error<solid.Shape.facefillet: F must be an N-by-3 matrix of face indices of S.> ...
+%! facefillet (solid.box (50, 5, 20), [6, 1.5, 5])
+%!error<solid.Shape.facefillet: with a radius R, F must be an N-by-2 matrix of face indices of S.> ...
+%! facefillet (solid.box (50, 5, 20), [6, 1, 5], 2)
+%!error<solid.Shape.facefillet: R must be a positive and finite real scalar.> ...
+%! facefillet (solid.box (50, 5, 20), [6, 1], 0)
+%!error<solid.Shape.facefillet: the faces in row 1 of F must be different.> ...
+%! facefillet (solid.box (50, 5, 20), [6, 6, 5])
+%!error<solid.Shape.facefillet: the faces in row 2 of F share no edge.> ...
+%! facefillet (solid.box (50, 5, 20), [6, 1; 6, 5], 2)
+%!error<solid.Shape.facefillet: the faces in row 1 of F must be flat.> ...
+%! facefillet (solid.cylinder (5, 10), [1, 2, 3])
+%!error<solid.Shape.facefillet: the middle face in row 1 of F must share an edge with each side.> ...
+%! facefillet (solid.box (50, 5, 20), [6, 1, 2])
+%!error<solid.Shape.facefillet: the faces in row 1 of F must all be parallel to one direction.> ...
+%! facefillet (solid.box (50, 5, 20), [6, 1, 3])
+%!error<solid.Shape.facefillet: the faces in row 1 of F must all be parallel to one direction.> ...
+%! V = [0, 0, 0; 10, 0, 0; 10, 2, 0; 0, 2, 0; ...
+%!      0, 0, 4; 10, 0, 4; 10, 2, 4 + 8e-8; 0, 2, 4 + 8e-8];
+%! F = [1, 3, 2; 1, 4, 3; 5, 6, 7; 5, 7, 8; 1, 2, 6; 1, 6, 5; ...
+%!      2, 3, 7; 2, 7, 6; 3, 4, 8; 3, 8, 7; 4, 1, 5; 4, 5, 8];
+%! B = solid.polyhedron (polymesh.Mesh (V, F));
+%! facefillet (B, [faces(B, 'Normal', [0, 0, 1]), ...
+%!                 faces(B, 'Normal', [-1, 0, 0]), ...
+%!                 faces(B, 'Normal', [0, 0, -1])])
+%!error<solid.Shape.facefillet: the middle face in row 1 of F must end on flat faces square to the edges it shares with its sides.> ...
+%! W = solid.box (50, 5, 20);
+%! E = edges (W, 'Direction', [0, 0, 1], 'Within', [0, 0, 0, 0, 0, 20]);
+%! W = chamfer (W, E, 1);
+%! F = [faces(W, 'Normal', [0, 0, 1]), faces(W, 'Normal', [-1, 0, 0]), ...
+%!      faces(W, 'Normal', [0, 0, -1])];
+%! facefillet (W, F)
+%!error<solid.Shape.facefillet: the middle face in row 1 of F appears in another row.> ...
+%! facefillet (solid.box (50, 5, 20), [6, 1, 5; 1, 6, 2])
+%!error<solid.Shape.facefillet: the round in row 1 of F reaches past its faces.> ...
+%! facefillet (solid.box (50, 5, 20), [1, 6, 2])
+%!error<solid.Shape.facefillet: no round is tangent to all three faces in row 1 of F.> ...
+%! S = subtract (solid.box (30, 5, 20), ...
+%!               solid.box (10, 5, 10, geom.UCS ([0, 0, 1], [10, 0, 10])));
+%! F = [faces(S, 'Normal', [1, 0, 0], 'Within', [10, 0, 10, 10, 5, 20]), ...
+%!      faces(S, 'Normal', [0, 0, 1], 'Within', [10, 0, 10, 20, 5, 10]), ...
+%!      faces(S, 'Normal', [-1, 0, 0], 'Within', [20, 0, 10, 20, 5, 20])];
+%! facefillet (S, F)
 %!error<solid.Shape.chamfer: invalid number of input arguments.> ...
 %! chamfer (solid.Shape ())
 %!error<solid.Shape.chamfer: E must be a vector of edge indices of S.> ...

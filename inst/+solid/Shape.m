@@ -1460,8 +1460,8 @@ classdef Shape
 ################################################################################
 ##                             Available Methods                              ##
 ##                                                                            ##
-## 'fillet'          'chamfer'         'shell'           'hole'               ##
-## 'pocket'          'knurl'                                                  ##
+## 'fillet'          'facefillet'      'chamfer'         'shell'              ##
+## 'hole'            'pocket'          'knurl'                                ##
 ################################################################################
 
   methods (Access = public)
@@ -1484,7 +1484,10 @@ classdef Shape
     ## rounds the whole top rim.
     ##
     ## A radius too large for the faces beside an edge cannot be built and
-    ## raises an error, as does an edge that cannot be rounded at all.
+    ## raises an error, as does an edge that cannot be rounded at all.  Nor
+    ## can fillets use up a face: two of radius 10 on the long edges of a face
+    ## 20 wide would meet across it and leave none of it, and raise an error.
+    ## @code{solid.Shape.facefillet} builds that shape as a full round.
     ##
     ## @example
     ## @group
@@ -1496,7 +1499,7 @@ classdef Shape
     ## @end group
     ## @end example
     ##
-    ## @seealso{solid.Shape.edges, solid.Shape.chamfer}
+    ## @seealso{solid.Shape.edges, solid.Shape.facefillet, solid.Shape.chamfer}
     ## @end deftypefn
     function this = fillet (this, E, R)
 
@@ -1514,6 +1517,98 @@ classdef Shape
 
       r = occt ('solid.Shape.fillet', 'fillet', this.Data, ...
                 unique (double (E)), double (R));
+      A = this;
+      this.Data = r{1};
+      [this.Colour, this.Name] = inherit (r{2}, A);
+
+    endfunction
+
+    ## -*- texinfo -*-
+    ## @deftypefn  {solid.Shape} {@var{S} =} facefillet (@var{S}, @var{F})
+    ## @deftypefnx {solid.Shape} {@var{S} =} facefillet (@var{S}, @var{F}, @var{R})
+    ##
+    ## Round a shape between faces chosen by index.
+    ##
+    ## @code{@var{S} = facefillet (@var{S}, @var{F})} makes a full round on
+    ## each row of the @math{N}-by-3 matrix @var{F}, a row of face indices
+    ## @code{[@var{A}, @var{M}, @var{B}]} as @code{solid.Shape.faces} returns
+    ## them: the middle face @var{M} is replaced by a round tangent to the
+    ## sides @var{A} and @var{B} and to the face @var{M} itself, so the end of
+    ## a wall becomes a half cylinder.  There is no radius to give: between
+    ## parallel sides it is half the distance between them.
+    ##
+    ## The three faces must be flat, and parallel to the edges @var{M} shares
+    ## with @var{A} and @var{B}, so that the round is part of a cylinder;
+    ## sides need not be parallel to each other.  Every other face @var{M}
+    ## borders must be flat and square to those edges, as the front and back
+    ## of a wall are to its end.  Parallel and square are judged across each
+    ## face: a face may stray from them by 1e-7 millimetres, the precision of
+    ## Open CASCADE@.  @var{M} must meet each side at an outside corner, and
+    ## the round must touch each face within it.  Rows may share sides, but
+    ## the middle face of a row cannot appear in another row.
+    ##
+    ## @code{@var{S} = facefillet (@var{S}, @var{F}, @var{R})} rounds, on each
+    ## row of the @math{N}-by-2 matrix @var{F}, the edges the two faces of
+    ## the row share, to the radius @var{R} millimetres, as
+    ## @code{solid.Shape.fillet} rounds them.  The two faces must share at
+    ## least one edge.
+    ##
+    ## @code{solid.Shape.fillet} cannot use up a face: two fillets that would
+    ## meet across it, such as two of radius 10 on the ends of a face 20
+    ## wide, raise an error.  A full round builds that shape.
+    ##
+    ## @example
+    ## @group
+    ## ## A wall 50 long, 5 thick and 20 high with rounded ends
+    ## W = solid.box (50, 5, 20);
+    ## top = faces (W, 'Normal', [0, 0, 1]);
+    ## bottom = faces (W, 'Normal', [0, 0, -1]);
+    ## left = faces (W, 'Normal', [-1, 0, 0]);
+    ## right = faces (W, 'Normal', [1, 0, 0]);
+    ## W = facefillet (W, [top, left, bottom; top, right, bottom]);
+    ## numfaces (W)
+    ## @result{} 6
+    ## @end group
+    ## @end example
+    ##
+    ## @seealso{solid.Shape.faces, solid.Shape.fillet}
+    ## @end deftypefn
+    function this = facefillet (this, F, R)
+
+      ## Input validation
+      if (nargin < 2 || nargin > 3)
+        error ("solid.Shape.facefillet: invalid number of input arguments.");
+      endif
+      full = nargin == 2;
+      if (! isnumeric (F) || ! isreal (F) || ndims (F) != 2 || isempty (F)
+          || columns (F) != 3 - ! full || any (F(:) != fix (F(:)))
+          || any (F(:) < 1) || any (F(:) > numfaces (this)))
+        if (full)
+          error (strcat ("solid.Shape.facefillet: F must be an N-by-3", ...
+                         " matrix of face indices of S."));
+        else
+          error (strcat ("solid.Shape.facefillet: with a radius R, F must", ...
+                         " be an N-by-2 matrix of face indices of S."));
+        endif
+      endif
+      if (! full)
+        errmsg = solid.__checkpos__ (R, 'R');
+        if (! isempty (errmsg))
+          error ("solid.Shape.facefillet: %s", errmsg);
+        endif
+      endif
+      F = double (F);
+      [errmsg, E] = checkrounds (this, F);
+      if (! isempty (errmsg))
+        error ("solid.Shape.facefillet: %s", errmsg);
+      endif
+
+      if (full)
+        r = occt ('solid.Shape.facefillet', 'fullround', this.Data, F);
+      else
+        r = occt ('solid.Shape.facefillet', 'fillet', this.Data, E, ...
+                  double (R));
+      endif
       A = this;
       this.Data = r{1};
       [this.Colour, this.Name] = inherit (r{2}, A);
@@ -3589,6 +3684,68 @@ function errmsg = checkindex (I, N, name, what, emptyok)
       || any (I > N))
     errmsg = sprintf ("%s must be a vector of %s indices of S.", name, what);
   endif
+
+endfunction
+
+## The rows of faces F of S checked for facefillet: as full rounds with three
+## columns, and with two, as pairs of faces sharing edges, which come back in
+## E.  Returns an error message body, empty when F is valid.
+function [errmsg, E] = checkrounds (S, F)
+
+  errmsg = '';
+  E = zeros (1, 0);
+  info = occt ('solid.Shape.facefillet', 'edges', S.Data);
+  [seam, onfaces] = info{4:5};
+  onfaces(seam) = {[]};
+  info = occt ('solid.Shape.facefillet', 'faces', S.Data);
+  [type, normal, ~, box] = info{:};
+  ## A face leaning off the direction of a round, over the diagonal of its
+  ## box, may stray from the round's cylinder by no more than Open CASCADE's
+  ## precision, 1e-7 millimetres
+  span = sqrt (sumsq (box(:,4:6) - box(:,1:3), 2));
+  for i = 1:rows (F)
+    f = F(i,:);
+    if (numel (unique (f)) != numel (f))
+      errmsg = sprintf ("the faces in row %d of F must be different.", i);
+    elseif (columns (F) == 2)
+      k = find (cellfun (@(o) all (ismember (f, o)), onfaces))';
+      if (isempty (k))
+        errmsg = sprintf ("the faces in row %d of F share no edge.", i);
+      endif
+      E = [E, k];
+    elseif (! all (strcmp (type(f), 'plane')))
+      errmsg = sprintf ("the faces in row %d of F must be flat.", i);
+    else
+      m = f(2);
+      near = unique ([onfaces{cellfun (@(o) any (o == m), onfaces)}]);
+      if (! all (ismember (f([1, 3]), near)))
+        errmsg = sprintf (strcat ("the middle face in row %d of F must", ...
+                                  " share an edge with each side."), i);
+      else
+        d = cross (normal(f(1),:), normal(m,:));
+        d /= norm (d);
+        ends = setdiff (near, f);
+        lean = sqrt (sumsq (cross (normal(ends,:), ...
+                                   repmat (d, numel (ends), 1), 2), 2));
+        if (abs (dot (d, normal(f(3),:))) * span(m) > 1e-7)
+          errmsg = sprintf (strcat ("the faces in row %d of F must all be", ...
+                                    " parallel to one direction."), i);
+        elseif (! all (strcmp (type(ends), 'plane'))
+                || any (lean .* span(ends) > 1e-7))
+          errmsg = sprintf (strcat ("the middle face in row %d of F must", ...
+                                    " end on flat faces square to the", ...
+                                    " edges it shares with its sides."), i);
+        elseif (nnz (F == m) > 1)
+          errmsg = sprintf (strcat ("the middle face in row %d of F", ...
+                                    " appears in another row."), i);
+        endif
+      endif
+    endif
+    if (! isempty (errmsg))
+      return;
+    endif
+  endfor
+  E = unique (E);
 
 endfunction
 

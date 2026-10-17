@@ -169,6 +169,26 @@ volume (K) - volume (A)
 show (A);</code></pre>
 <pre class="code-out"><code>ans = 360.00</code></pre>
 <figure class="shot"><img src="img/07_features-4.png" alt="Features: holes, pockets, fillets, chamfers and shells, picture 4"></figure>
+<h2>Full rounds and fillets between faces</h2>
+<p><code>fillet</code> cannot round both long edges of a face to half its width: the two fillets would meet across the face and leave none of it. A full round replaces the face with one surface tangent to it and to the two faces beside it, and <code>facefillet</code> makes one from each row of three face indices <code>[side, middle, side]</code>. No radius is given: between parallel sides it is half the distance between them. A wall 5 thick and 20 high, rounded at both ends:</p>
+<pre class="code-in"><code>W = solid.box (50, 5, 20);
+top = faces (W, 'Normal', [0, 0, 1]);
+bottom = faces (W, 'Normal', [0, 0, -1]);
+left = faces (W, 'Normal', [-1, 0, 0]);
+right = faces (W, 'Normal', [1, 0, 0]);
+W = facefillet (W, [top, left, bottom; top, right, bottom]);
+show (W);</code></pre>
+<figure class="shot"><img src="img/07_features-5.png" alt="Features: holes, pockets, fillets, chamfers and shells, picture 5"></figure>
+<p>Each end is now half a cylinder of radius 10, so the wall holds a block 30 long and one whole cylinder:</p>
+<pre class="code-in"><code>volume (W)
+30 * 20 * 5 + pi * 10 ^ 2 * 5</code></pre>
+<pre class="code-out"><code>ans = 4570.8
+ans = 4570.8</code></pre>
+<p>With a radius, <code>facefillet</code> takes rows of two faces instead and rounds the edges each pair shares, as <code>fillet</code> rounds them, so the faces name the edge. The top edge along the front of the block above, to 3:</p>
+<pre class="code-in"><code>F = [faces(K, 'Normal', [0, 0, 1]), faces(K, 'Normal', [0, -1, 0])];
+A = facefillet (K, F, 3);
+volume (K) - volume (A)</code></pre>
+<pre class="code-out"><code>ans = 77.257</code></pre>
 <h2>Shells</h2>
 <p><code>shell</code> hollows a shape to walls of a given thickness and opens the faces named. A box with rounded upright edges, open at the top, with walls of 2 and a floor of 4:</p>
 <pre class="code-in"><code>B = solid.box (80, 50, 30);
@@ -177,7 +197,7 @@ top = faces (B, 'Normal', [0, 0, 1]);
 bottom = faces (B, 'Normal', [0, 0, -1]);
 C = shell (B, top, 2, 'Thickness', {bottom, 4});
 show (C);</code></pre>
-<figure class="shot"><img src="img/07_features-5.png" alt="Features: holes, pockets, fillets, chamfers and shells, picture 5"></figure>
+<figure class="shot"><img src="img/07_features-6.png" alt="Features: holes, pockets, fillets, chamfers and shells, picture 6"></figure>
 <p>The walls grow inwards, so the outside keeps the size of the box. With <code>'Outward', true</code> they grow outwards instead, so the inside keeps it: the way to make a case that a part of that shape fits into.</p>
 <pre class="code-in"><code>[~, sz] = bbox (C)
 O = shell (B, top, 2, 'Outward', true);

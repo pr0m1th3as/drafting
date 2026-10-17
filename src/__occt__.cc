@@ -120,6 +120,7 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <BRep_Tool.hxx>
 #include <BinTools.hxx>
 #include <Bnd_Box.hxx>
+#include <ElCLib.hxx>
 #include <GC_MakeArcOfCircle.hxx>
 #include <GeomConvert.hxx>
 #include <GeomConvert_ApproxCurve.hxx>
@@ -2707,6 +2708,136 @@ cutall (const TopoDS_Shape& s, const vector<TopoDS_Shape>& tools,
   op.SetArguments (objects);
   op.SetTools (list);
   return boolean (op, caller, "holes");
+}
+
+// The two pieces a full round cuts away where the middle face M meets its
+// sides A and B, the three flat and parallel to the direction D of their
+// edges.  The round is the cylinder tangent to all three; each piece lies
+// between it and one corner, along the length of M.  ROW numbers the faces
+// in the messages.
+static vector<TopoDS_Shape>
+roundtools (const TopoDS_Face& A, const TopoDS_Face& M, const TopoDS_Face& B,
+            int row, const string& caller)
+{
+  const TopoDS_Face face[3] = {A, M, B};
+  gp_Dir n[3];
+  gp_Pnt o[3];
+  for (int i = 0; i < 3; i++)
+  {
+    const gp_Pln p = BRepAdaptor_Surface (face[i]).Plane ();
+    n[i] = p.Axis ().Direction ();
+    if (face[i].Orientation () == TopAbs_REVERSED)
+    {
+      n[i].Reverse ();
+    }
+    o[i] = p.Location ();
+  }
+  // D with its first nonzero component positive, so that rounds on one axis
+  // are built on one circle, and two meeting all round merge into one face
+  gp_Dir d = n[0].Crossed (n[1]);
+  const gp_XYZ v = d.XYZ ();
+  for (int k = 1; k <= 3; k++)
+  {
+    if (std::abs (v.Coord (k)) > 1e-9)
+    {
+      if (v.Coord (k) < 0)
+      {
+        d.Reverse ();
+      }
+      break;
+    }
+  }
+
+  // The length of M along D
+  double s0 = octave_Inf;
+  double s1 = - s0;
+  for (TopExp_Explorer x (M, TopAbs_VERTEX); x.More (); x.Next ())
+  {
+    const double t = d.XYZ ().Dot (BRep_Tool::Pnt (TopoDS::Vertex
+                                                   (x.Current ())).XYZ ());
+    s0 = std::min (s0, t);
+    s1 = std::max (s1, t);
+  }
+
+  // The point at S0 along D on each of the planes listed or, with RADIUS and
+  // the radius as a fourth unknown, at that distance inside each of them
+  auto solve = [&] (const vector<int>& planes, bool radius)
+  {
+    Matrix K (planes.size () + 1, 3 + radius, 0.0);
+    ColumnVector b (K.rows ());
+    for (size_t i = 0; i < planes.size (); i++)
+    {
+      const gp_Dir& v = n[planes[i]];
+      K(i,0) = v.X ();
+      K(i,1) = v.Y ();
+      K(i,2) = v.Z ();
+      if (radius)
+      {
+        K(i,3) = 1;
+      }
+      b(i) = v.XYZ ().Dot (o[planes[i]].XYZ ());
+    }
+    const octave_idx_type last = planes.size ();
+    K(last,0) = d.X ();
+    K(last,1) = d.Y ();
+    K(last,2) = d.Z ();
+    b(last) = s0;
+    octave_idx_type info;
+    double rcond;
+    const ColumnVector x = K.solve (b, info, rcond, [] (double) {});
+    return (info != 0 || rcond < 1e-12) ? ColumnVector () : x;
+  };
+  const ColumnVector x = solve ({0, 1, 2}, true);
+  if (x.numel () == 0 || ! (x(3) > Precision::Confusion ()))
+  {
+    error ("%s: no round is tangent to all three faces in row %d of F.",
+           caller.c_str (), row);
+  }
+  const gp_Pnt c (x(0), x(1), x(2));
+  const double r = x(3);
+  // The round touches each face within it, checked half way along M; at an
+  // inside corner it touches the side beyond the face
+  const gp_Vec along = gp_Vec (d) * (s1 - s0);
+  gp_Pnt t[3];
+  for (int i = 0; i < 3; i++)
+  {
+    t[i] = c.Translated (gp_Vec (n[i]) * r);
+    if (BRepClass_FaceClassifier (face[i], t[i].Translated (along / 2),
+                                  Precision::Confusion ()).State ()
+        == TopAbs_OUT)
+    {
+      error ("%s: the round in row %d of F reaches past its faces.",
+             caller.c_str (), row);
+    }
+  }
+
+  // Each corner piece: the corner Q, the round's tangent points either side
+  // of it, and the arc between them, the one through the middle A, which
+  // runs from T[1] to T[SIDE] or back round the circle's axis
+  const gp_Circ circle (gp_Ax2 (c, d), r);
+  vector<TopoDS_Shape> tools;
+  for (int side : {0, 2})
+  {
+    const ColumnVector y = solve ({side, 1}, false);
+    const gp_Pnt q (y(0), y(1), y(2));
+    gp_XYZ m = n[side].XYZ () + n[1].XYZ ();
+    m.Normalize ();
+    const gp_Pnt a = c.Translated (gp_Vec (m) * r);
+    const double u1 = ElCLib::Parameter (circle, t[1]);
+    const double u2 = ElCLib::InPeriod (ElCLib::Parameter (circle, t[side]),
+                                        u1, u1 + 2 * M_PI);
+    const double ua = ElCLib::InPeriod (ElCLib::Parameter (circle, a),
+                                        u1, u1 + 2 * M_PI);
+    BRepBuilderAPI_MakeWire w;
+    w.Add (BRepBuilderAPI_MakeEdge (t[side], q).Edge ());
+    w.Add (BRepBuilderAPI_MakeEdge (q, t[1]).Edge ());
+    w.Add (ua < u2
+           ? BRepBuilderAPI_MakeEdge (circle, u1, u2).Edge ()
+           : BRepBuilderAPI_MakeEdge (circle, u2, u1 + 2 * M_PI).Edge ());
+    const TopoDS_Face f = BRepBuilderAPI_MakeFace (w.Wire (), true).Face ();
+    tools.push_back (BRepPrimAPI_MakePrism (f, along).Shape ());
+  }
+  return tools;
 }
 
 // A wire swept along SPINE into a solid, with sharp corners or, along a
@@ -5661,6 +5792,38 @@ function directly. \n\
         L = lineage (op, {s}, r);
       }
       out = traced (r, L);
+    }
+    else if (cmd == "fullround")
+    {
+      // Each row of faces [A, M, B] rounded across M, the pieces of every row
+      // cut in one operation
+      const TopoDS_Shape s = toshape (args(2), caller);
+      const Matrix F = args(3).matrix_value ();
+      ShapeMap fmap;
+      TopExp::MapShapes (s, TopAbs_FACE, fmap);
+      auto face = [&] (octave_idx_type i, int j)
+      {
+        return TopoDS::Face (fmap (static_cast<int> (F(i,j))));
+      };
+      ShapeList objects, tools;
+      objects.Append (s);
+      for (octave_idx_type i = 0; i < F.rows (); i++)
+      {
+        for (const TopoDS_Shape& t : roundtools (face (i, 0), face (i, 1),
+                                                 face (i, 2), i + 1, caller))
+        {
+          tools.Append (t);
+        }
+      }
+      BRepAlgoAPI_Cut op;
+      op.SetArguments (objects);
+      op.SetTools (tools);
+      const TopoDS_Shape r = boolean (op, caller, "full round");
+      if (! BRepCheck_Analyzer (r).IsValid ())
+      {
+        error ("%s: Open CASCADE could not round the faces.", caller.c_str ());
+      }
+      out = traced (r, lineage (op, {s}, r));
     }
     else if (cmd == "shell")
     {

@@ -140,6 +140,38 @@ A = chamfer (K, E, [3, 6], F);
 volume (K) - volume (A)
 show (A);
 
+## ## Full rounds and fillets between faces
+##
+## `fillet` cannot round both long edges of a face to half its width: the
+## two fillets would meet across the face and leave none of it. A full round
+## replaces the face with one surface tangent to it and to the two faces
+## beside it, and `facefillet` makes one from each row of three face indices
+## `[side, middle, side]`. No radius is given: between parallel sides it is
+## half the distance between them. A wall 5 thick and 20 high, rounded at
+## both ends:
+
+W = solid.box (50, 5, 20);
+top = faces (W, 'Normal', [0, 0, 1]);
+bottom = faces (W, 'Normal', [0, 0, -1]);
+left = faces (W, 'Normal', [-1, 0, 0]);
+right = faces (W, 'Normal', [1, 0, 0]);
+W = facefillet (W, [top, left, bottom; top, right, bottom]);
+show (W);
+
+## Each end is now half a cylinder of radius 10, so the wall holds a block
+## 30 long and one whole cylinder:
+
+volume (W)
+30 * 20 * 5 + pi * 10 ^ 2 * 5
+
+## With a radius, `facefillet` takes rows of two faces instead and rounds the
+## edges each pair shares, as `fillet` rounds them, so the faces name the
+## edge. The top edge along the front of the block above, to 3:
+
+F = [faces(K, 'Normal', [0, 0, 1]), faces(K, 'Normal', [0, -1, 0])];
+A = facefillet (K, F, 3);
+volume (K) - volume (A)
+
 ## ## Shells
 ##
 ## `shell` hollows a shape to walls of a given thickness and opens the faces
