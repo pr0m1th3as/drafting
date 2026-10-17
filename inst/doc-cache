@@ -7353,7 +7353,7 @@ model.Viewer.pick
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 3130
+# length: 3302
 model.Viewer: [E, F] = pick (V)
 model.Viewer: [E, F, ECODE, FCODE] = pick (V)
 model.Viewer: [E, CODE] = pick (V, 'edge')
@@ -7364,11 +7364,11 @@ Pick edges and faces of a solid, or points on a mesh, with the mouse.
 
 [E, F] = pick (V) waits while you click edges
 and faces in the viewer's window, then returns the indices of the edges
-in E and of the faces in F, in the numbering
-solid.Shape.edges and solid.Shape.faces use. A click
-selects what is under the pointer, which stays drawn in orange, a
-selected edge thick and a selected face filled, and a second click on
-it lets it go; the shape can still be turned between clicks.
+in E and of the faces in F, in the order you picked them,
+in the numbering solid.Shape.edges and solid.Shape.faces
+use. A click selects what is under the pointer, which stays drawn in
+orange, a selected edge thick and a selected face filled, and a second
+click on it lets it go; the shape can still be turned between clicks.
 Enter finishes and Escape cancels, returning nothing. With
 'edge' or 'face' only that kind can be picked, and its
 indices are the first output.
@@ -7382,8 +7382,10 @@ where none was picked. The code selects exactly the items picked: one
 query where what they share finds them alone, else one query for each,
 joined, and their indices only where an item cannot be told apart from
 the others by any query. It names the shape by the variable the viewer
-shows, and eval (CODE) gives the indices again. Put it in
-the script in place of the numbers:
+shows, and eval (CODE) gives the indices again: in the
+order picked where it names the items one by one, and in increasing
+order where one query names them all. Put it in the script in place
+of the numbers:
 
 ## Four upright edges picked on a block 80 by 40 by 12
 [E, CODE] = pick (V, 'edge');
@@ -7394,10 +7396,10 @@ part = fillet (part, E, 3);
 
 [I, CODE] = pick (V, 'solid') picks
 whole solids: a click on any face of a solid selects it, and I
-returns the indices of the solids picked, in the order
-solid.Shape.solids and model.Assembly.solids list them,
-for model.Viewer.opacity. The face clicked stays drawn in
-orange. CODE is what selects the same solids in
+returns the indices of the solids picked, in the order you picked them,
+numbered as solid.Shape.solids and model.Assembly.solids
+list them, for model.Viewer.opacity. The face clicked stays
+drawn in orange. CODE is what selects the same solids in
 opacity, as code: the name they share, else the path they
 share, where either selects them alone, else their indices.
 
@@ -8969,7 +8971,7 @@ solid.Shape.facefillet
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1848
+# length: 1954
 solid.Shape: S = facefillet (S, F)
 solid.Shape: S = facefillet (S, F, R)
 Round a shape between faces chosen by index.
@@ -8991,6 +8993,8 @@ face: a face may stray from them by 1e-7 millimetres, the precision of
 Open CASCADE. M must meet each side at an outside corner, and
 the round must touch each face within it. Rows may share sides, but
 the middle face of a row cannot appear in another row.
+model.Viewer.pick returns faces in the order they are clicked,
+so a row can be picked side, middle, side.
 
 S = facefillet (S, F, R) rounds, on each
 row of the N-by-2 matrix F, the edges the two faces of
