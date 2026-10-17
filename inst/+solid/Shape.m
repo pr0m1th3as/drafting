@@ -1546,6 +1546,8 @@ classdef Shape
     ## Open CASCADE@.  @var{M} must meet each side at an outside corner, and
     ## the round must touch each face within it.  Rows may share sides, but
     ## the middle face of a row cannot appear in another row.
+    ## @code{model.Viewer.pick} returns faces in the order they are clicked,
+    ## so a row can be picked side, middle, side.
     ##
     ## @code{@var{S} = facefillet (@var{S}, @var{F}, @var{R})} rounds, on each
     ## row of the @math{N}-by-2 matrix @var{F}, the edges the two faces of

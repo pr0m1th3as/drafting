@@ -541,18 +541,19 @@ classdef Viewer < handle
 
     ## The code that selects exactly the items IDX of KIND, edge or face, of
     ## the shape S held in the variable NAME: one query by what they share
-    ## where it finds them alone, else one query for each, joined, and their
-    ## indices only where an item cannot be told apart by any query
+    ## where it finds them alone, which gives them in increasing order, else
+    ## one query for each, joined in the order of IDX, and their indices only
+    ## where an item cannot be told apart by any query
     function Q = __query__ (S, KIND, IDX, NAME)
 
-      IDX = unique (IDX(:)');
+      IDX = unique (IDX(:)', 'stable');
       if (strcmp (KIND, 'edge'))
         info = __occt__ ('edges', 'model.Viewer.pick', S.Data);
       else
         info = __occt__ ('faces', 'model.Viewer.pick', S.Data);
       endif
       Q = itemquery (KIND, info, IDX, 1000, ' ');
-      if (! isequal (chosen (S, Q), IDX))
+      if (! isequal (sort (chosen (S, Q)), sort (IDX)))
         parts = cell (1, numel (IDX));
         for k = 1:numel (IDX)
           for digits = [1000, 1e6]
@@ -786,11 +787,11 @@ classdef Viewer < handle
     ##
     ## @code{[@var{E}, @var{F}] = pick (@var{V})} waits while you click edges
     ## and faces in the viewer's window, then returns the indices of the edges
-    ## in @var{E} and of the faces in @var{F}, in the numbering
-    ## @code{solid.Shape.edges} and @code{solid.Shape.faces} use.  A click
-    ## selects what is under the pointer, which stays drawn in orange, a
-    ## selected edge thick and a selected face filled, and a second click on
-    ## it lets it go; the shape can still be turned between clicks.
+    ## in @var{E} and of the faces in @var{F}, in the order you picked them,
+    ## in the numbering @code{solid.Shape.edges} and @code{solid.Shape.faces}
+    ## use.  A click selects what is under the pointer, which stays drawn in
+    ## orange, a selected edge thick and a selected face filled, and a second
+    ## click on it lets it go; the shape can still be turned between clicks.
     ## @kbd{Enter} finishes and @kbd{Escape} cancels, returning nothing.  With
     ## @qcode{'edge'} or @qcode{'face'} only that kind can be picked, and its
     ## indices are the first output.
@@ -804,8 +805,10 @@ classdef Viewer < handle
     ## query where what they share finds them alone, else one query for each,
     ## joined, and their indices only where an item cannot be told apart from
     ## the others by any query.  It names the shape by the variable the viewer
-    ## shows, and @code{eval (@var{CODE})} gives the indices again.  Put it in
-    ## the script in place of the numbers:
+    ## shows, and @code{eval (@var{CODE})} gives the indices again: in the
+    ## order picked where it names the items one by one, and in increasing
+    ## order where one query names them all.  Put it in the script in place
+    ## of the numbers:
     ##
     ## @example
     ## @group
@@ -820,10 +823,10 @@ classdef Viewer < handle
     ##
     ## @code{[@var{I}, @var{CODE}] = pick (@var{V}, @qcode{'solid'})} picks
     ## whole solids: a click on any face of a solid selects it, and @var{I}
-    ## returns the indices of the solids picked, in the order
-    ## @code{solid.Shape.solids} and @code{model.Assembly.solids} list them,
-    ## for @code{model.Viewer.opacity}.  The face clicked stays drawn in
-    ## orange.  @var{CODE} is what selects the same solids in
+    ## returns the indices of the solids picked, in the order you picked them,
+    ## numbered as @code{solid.Shape.solids} and @code{model.Assembly.solids}
+    ## list them, for @code{model.Viewer.opacity}.  The face clicked stays
+    ## drawn in orange.  @var{CODE} is what selects the same solids in
     ## @code{opacity}, as code: the name they share, else the path they
     ## share, where either selects them alone, else their indices.
     ##
@@ -1526,7 +1529,8 @@ function TF = alive (pid)
 
 endfunction
 
-## The edges E and the faces F a pick replied with in the lines R
+## The edges E and the faces F a pick replied with in the lines R, in the
+## order they were picked
 function [E, F, I] = items (R)
 
   E = zeros (1, 0);
@@ -1541,9 +1545,9 @@ function [E, F, I] = items (R)
       I(end+1) = str2double (R{k}(7:end));
     endif
   endfor
-  E = unique (E);
-  F = unique (F);
-  I = unique (I);
+  E = unique (E, 'stable');
+  F = unique (F, 'stable');
+  I = unique (I, 'stable');
 
 endfunction
 
@@ -1660,11 +1664,12 @@ function Q = itemquery (KIND, info, IDX, DIGITS, SP)
 
 endfunction
 
-## The indices the code Q selects on the shape S, run as written
+## The indices the code Q selects on the shape S, run as written, in the
+## order it gives them
 function I = chosen (__shape__, Q)
 
   I = eval (Q);
-  I = sort (I(:)');
+  I = I(:)';
 
 endfunction
 
@@ -1728,7 +1733,7 @@ function CODE = solidcode (st, I)
   L = st.list;
   names = unique ({L(I).name});
   if (numel (names) == 1 && ! isempty (names{1})
-      && isequal (matching (st, names{1}), I))
+      && isequal (matching (st, names{1}), sort (I)))
     CODE = literal (names{1});
     return;
   endif
@@ -1741,7 +1746,7 @@ function CODE = solidcode (st, I)
     endwhile
     P = P(1:m);
   endfor
-  if (! isempty (P) && isequal (matching (st, P), I))
+  if (! isempty (P) && isequal (matching (st, P), sort (I)))
     CODE = literal (P);
   else
     CODE = literal (I);
@@ -2592,6 +2597,53 @@ endfunction
 %!   [~, CODE] = V.__pick__ ('edge', C);
 %!   assert_equal (CODE, ["edges (S, 'Type', 'line', 'Direction',", ...
 %!                        " [1, 0, 0], 'Within', [0, 0, 12, 80, 0, 12])"]);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
+%! ## Faces come back in the order picked, and so does their code
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   S = solid.box (50, 5, 20);
+%!   V.Model = S;
+%!   C = [V.__project__([25, 2.5, 20]); V.__project__([50, 2.5, 10]); ...
+%!        V.__project__([25, 0, 10]); NaN, NaN];
+%!   [F, CODE] = V.__pick__ ('face', C);
+%!   assert_equal (F, [6, 2, 3]);
+%!   assert_equal (eval (CODE), [6, 2, 3]);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
+%! ## Edges one query names all come back in the order picked, their code
+%! ## in increasing order
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   S = solid.box (50, 5, 20);
+%!   V.Model = S;
+%!   C = [V.__project__([50, 2.5, 20]); V.__project__([25, 0, 20]); ...
+%!        V.__project__([0, 2.5, 20]); V.__project__([25, 5, 20]); NaN, NaN];
+%!   [E, CODE] = V.__pick__ ('edge', C);
+%!   assert_equal (E, [6, 10, 2, 12]);
+%!   assert_equal (CODE, ["edges (S, 'Type', 'line',", ...
+%!                        " 'Within', [0, 0, 20, 50, 5, 20])"]);
+%!   assert_equal (eval (CODE), [2, 6, 10, 12]);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
+%! ## Edges come back in the order picked, and so does their code
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   S = solid.box (50, 5, 20);
+%!   V.Model = S;
+%!   C = [V.__project__([25, 0, 20]); V.__project__([0, 0, 10]); NaN, NaN];
+%!   [E, CODE] = V.__pick__ ('edge', C);
+%!   assert_equal (E, [10, 1]);
+%!   assert_equal (eval (CODE), [10, 1]);
 %! unwind_protect_cleanup
 %!   close (V);
 %! end_unwind_protect

@@ -111,7 +111,7 @@ picked = E;                                                      #: hidden
 ## `CODE` goes into the script, and the rim is rounded to 1.
 
 E = edges (bracket, 'Within', [22.27, 15.999, 13.659, 50.568, 24, 30.638]);
-assert_equal (E, picked);                                        #: hidden
+assert_equal (E, sort (picked));                                 #: hidden
 bracket = fillet (bracket, E, 1);
 show (bracket);
 
