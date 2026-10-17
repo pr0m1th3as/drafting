@@ -172,6 +172,12 @@ F = [faces(K, 'Normal', [0, 0, 1]), faces(K, 'Normal', [0, -1, 0])];
 A = facefillet (K, F, 3);
 volume (K) - volume (A)
 
+## A full round needs its three faces to run along one direction, and the
+## faces where it starts and stops square to them. A wall with a mitred end is
+## rounded with square ends first and mitred after, with `subtract`; a wall
+## that tapers along the round, 20 high at the front and 16 at the back, is a
+## `solid.loft` between rounded outlines of its front and back.
+##
 ## ## Shells
 ##
 ## `shell` hollows a shape to walls of a given thickness and opens the faces

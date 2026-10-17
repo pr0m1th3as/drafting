@@ -189,6 +189,7 @@ ans = 4570.8</code></pre>
 A = facefillet (K, F, 3);
 volume (K) - volume (A)</code></pre>
 <pre class="code-out"><code>ans = 77.257</code></pre>
+<p>A full round needs its three faces to run along one direction, and the faces where it starts and stops square to them. A wall with a mitred end is rounded with square ends first and mitred after, with <code>subtract</code>; a wall that tapers along the round, 20 high at the front and 16 at the back, is a <a href="../solid.loft.html"><code>solid.loft</code></a> between rounded outlines of its front and back.</p>
 <h2>Shells</h2>
 <p><code>shell</code> hollows a shape to walls of a given thickness and opens the faces named. A box with rounded upright edges, open at the top, with walls of 2 and a floor of 4:</p>
 <pre class="code-in"><code>B = solid.box (80, 50, 30);
