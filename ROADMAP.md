@@ -7,11 +7,11 @@ indicative. Anything here may be reordered by what turns out to be needed.
 Version 0.2.0 made the package an alternative to OpenSCAD: exact solids,
 meshes, assemblies and a viewer, built on the outline classes of `+geom`, with
 DXF read and written by compiled code and a layer table in every drawing.
-Version 0.2.1 added solids made of an exact surface through a grid of points.
-Holes tapped and threaded to the ISO standards are built for the next
-release. How it fits together, what each class becomes in a DXF file, and
-how each standard is applied, is set out in the
-[guide](https://pr0m1th3as.github.io/drafting/guide/).
+Version 0.2.1 added solids made of an exact surface through a grid of points,
+0.2.2 threads, holes and knurls to the ISO and DIN standards, and 0.2.3
+brought the package to Windows and macOS. How it fits together, what each
+class becomes in a DXF file, and how each standard is applied, is set out in
+the [guide](https://pr0m1th3as.github.io/drafting/guide/).
 
 The geometry half of the package is strong. The drafting half, the part that
 encodes what a technical drawing *means* rather than what shape it is, is
@@ -80,6 +80,20 @@ Tolerances and feature control frames come first: without them the output
 cannot specify a part. `draw.coordtable` and `draw.titleblock` set the pattern
 the new work follows: a function that returns a `Drawing`, on layers of its
 own, to be merged onto the sheet.
+
+Alongside the drawing work, 0.3.0 completes what is read from DXF and what
+solids can be rounded:
+
+- A mirrored insert stays an insert, holding the mirror as it holds its
+  angle and scale, so mirrored blocks are read, written and transformed
+  without being expanded; an insert scaled unequally in x and y is expanded
+  on reading.
+- `solid.Shape.facefillet` rounds flat faces whose thickness changes along
+  the edge, with a cone where a cylinder no longer fits, and ends a round
+  flush with end faces at any angle.
+- `solid.surface` takes grids closed in one direction or both.
+- The property `Shape` of `model.Viewer`, renamed `Model` in 0.2.2, is
+  removed.
 
 ## Exact curve operations
 
@@ -181,10 +195,12 @@ everyone without a CAD program.
 
 ## Other platforms
 
-The package builds on Linux, and ports to Windows and macOS are not planned.
-A port is welcome as a contribution. Windows needs Open CASCADE built with the
-MinGW that builds Octave, since the MSVC binaries do not link against it, and
-on both the viewer, written for X11, needs a window of the platform's own.
+The package builds and runs on Linux, FreeBSD, Windows and macOS, the viewer
+included. On Windows, `pkg install` fetches Open CASCADE built with the MinGW
+that builds Octave, since the MSVC binaries do not link against it; on macOS,
+Octave and Open CASCADE come from Homebrew, and the viewer has a Cocoa window
+of its own. Bug-fix releases of 0.2 follow what users of the two new ports
+report.
 
 ## Deliberately out of scope
 
