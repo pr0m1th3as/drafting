@@ -304,6 +304,7 @@
 				<div class="list">
 				<ul style="list-style-type: none; padding-left: 20px;">
 					<li><a href="solid.Shape.fillet.html" class="text-decoration-none font-monospace"><small>fillet</small></a></li>
+					<li><a href="solid.Shape.facefillet.html" class="text-decoration-none font-monospace"><small>facefillet</small></a></li>
 					<li><a href="solid.Shape.chamfer.html" class="text-decoration-none font-monospace"><small>chamfer</small></a></li>
 					<li><a href="solid.Shape.shell.html" class="text-decoration-none font-monospace"><small>shell</small></a></li>
 					<li><a href="solid.Shape.hole.html" class="text-decoration-none font-monospace"><small>hole</small></a></li>
@@ -407,7 +408,8 @@
  cylinder fits: a tube of 6 with a bore of 2 takes an external M6.  A
  wall whose bore and cylinder both fit is thinner than either thread is
  deep, and is an error, as is an internal thread that would cut through
- the cylinder round its bore.
+ the wall round its bore: a cylinder, or any other outline, as the flats
+ of a hexagon or the teeth of a knurl.
 </p>
 <p> The profile is the basic profile of ISO 68-1, its 60 degree flanks
  swept round the axis by <code>solid.helix</code>: an internal thread&rsquo;s root
@@ -455,7 +457,7 @@
   <a href="solid.helix.html">solid.helix</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/b937a57/inst/+solid/Shape.m#L2092">solid.Shape</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/1eb675a/inst/+solid/Shape.m#L2203">solid.Shape</a>
 </p>
 </div>
 

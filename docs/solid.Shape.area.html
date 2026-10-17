@@ -304,6 +304,7 @@
 				<div class="list">
 				<ul style="list-style-type: none; padding-left: 20px;">
 					<li><a href="solid.Shape.fillet.html" class="text-decoration-none font-monospace"><small>fillet</small></a></li>
+					<li><a href="solid.Shape.facefillet.html" class="text-decoration-none font-monospace"><small>facefillet</small></a></li>
 					<li><a href="solid.Shape.chamfer.html" class="text-decoration-none font-monospace"><small>chamfer</small></a></li>
 					<li><a href="solid.Shape.shell.html" class="text-decoration-none font-monospace"><small>shell</small></a></li>
 					<li><a href="solid.Shape.hole.html" class="text-decoration-none font-monospace"><small>hole</small></a></li>
@@ -367,10 +368,12 @@
 </p>
 <div class="ms-5">
 <p> The area is the sum over every face, computed from the exact surfaces.
- A flat face is measured to a relative error of about 1e-9, whatever its
- edges.  A curved face is measured as Open CASCADE integrates it: exactly
- for a cylinder, a cone, a sphere or a torus, to about 1e-4 for a face
- swept from a spline.  The empty shape has area zero.
+ A flat face is measured exactly, whatever its edges, and so is a
+ cylinder, a cone, a sphere, a torus, or a face extruded or revolved from
+ a spline, the walls of text included.  Any other curved face, as a loft,
+ a sweep along a curve or a surface through a grid makes, is measured as
+ Open CASCADE integrates it, to about 1e-6.  The empty shape has area
+ zero.
 </p>
 <p> It is what a coating, a plating or a coat of paint is reckoned by.
 </p>
@@ -383,7 +386,7 @@
   <a href="solid.Shape.volume.html">solid.Shape.volume</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/b937a57/inst/+solid/Shape.m#L865">solid.Shape</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/1eb675a/inst/+solid/Shape.m#L867">solid.Shape</a>
 </p>
 </div>
 

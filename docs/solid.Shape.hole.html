@@ -304,6 +304,7 @@
 				<div class="list">
 				<ul style="list-style-type: none; padding-left: 20px;">
 					<li><a href="solid.Shape.fillet.html" class="text-decoration-none font-monospace"><small>fillet</small></a></li>
+					<li><a href="solid.Shape.facefillet.html" class="text-decoration-none font-monospace"><small>facefillet</small></a></li>
 					<li><a href="solid.Shape.chamfer.html" class="text-decoration-none font-monospace"><small>chamfer</small></a></li>
 					<li><a href="solid.Shape.shell.html" class="text-decoration-none font-monospace"><small>shell</small></a></li>
 					<li><a href="solid.Shape.hole.html" class="text-decoration-none font-monospace fw-bolder"><small>hole</small></a></li>
@@ -508,8 +509,10 @@
  only to a blind hole.  The standard ones need a named thread, and
  those for a screw head <code>'Clearance'</code>, fine or medium;
  <code>solid.holespec</code> gives their sizes, and the sizes of every hole
- for a named thread, before it is drilled.  Drilling the empty shape
- leaves it empty.
+ for a named thread, before it is drilled.  A hole may break into
+ another, but holes that would cut a solid of <var>S</var> into pieces are an
+ error, as a bore reaching the roots of a knurl, which leaves its teeth
+ loose.  Drilling the empty shape leaves it empty.
 </p>
 <table><tr><td>&nbsp;</td><td><pre class="example"> ## A plate with four counterbored holes for M6 cap screws
  S = solid.box (80, 40, 12);
@@ -532,7 +535,7 @@
   <a href="solid.cylinder.html">solid.cylinder</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/b937a57/inst/+solid/Shape.m#L1804">solid.Shape</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/1eb675a/inst/+solid/Shape.m#L1899">solid.Shape</a>
 </p>
 </div>
 

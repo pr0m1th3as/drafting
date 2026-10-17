@@ -304,6 +304,7 @@
 				<div class="list">
 				<ul style="list-style-type: none; padding-left: 20px;">
 					<li><a href="solid.Shape.fillet.html" class="text-decoration-none font-monospace"><small>fillet</small></a></li>
+					<li><a href="solid.Shape.facefillet.html" class="text-decoration-none font-monospace"><small>facefillet</small></a></li>
 					<li><a href="solid.Shape.chamfer.html" class="text-decoration-none font-monospace"><small>chamfer</small></a></li>
 					<li><a href="solid.Shape.shell.html" class="text-decoration-none font-monospace"><small>shell</small></a></li>
 					<li><a href="solid.Shape.hole.html" class="text-decoration-none font-monospace"><small>hole</small></a></li>
@@ -376,6 +377,11 @@
  only touches <var>S</var>, along an edge or at a point, or misses it, the cut
  has no area and <var>R</var> is the empty <code>cell (1, 0)</code>.
 </p>
+<p> Open CASCADE can lose a piece of the cut where the plane meets a curved
+ face at a grazing angle, as a plane within a few hundredths of a
+ millimetre of the wall of a tapped bore does.  <code>section</code> then
+ raises an error rather than return the cut with the piece missing.
+</p>
 <p> The cut is exact enough to build from again.  Straight edges are
  straight segments and circles are arcs, a whole circle two half arcs.
  An ellipse or another conic, as a plane cuts from a cylinder or a cone at
@@ -396,7 +402,7 @@
   <a href="solid.extrude.html">solid.extrude</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/b937a57/inst/+solid/Shape.m#L2568">solid.Shape</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/1eb675a/inst/+solid/Shape.m#L2696">solid.Shape</a>
 </p>
 </div>
 

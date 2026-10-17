@@ -339,7 +339,10 @@
  offset, a diameter or radius dimension its radius and direction, an
  angular dimension its radius; one with no label of its own is labelled
  with what it measures whenever it is drawn or written, so its label
- follows it.
+ follows it.  A dimension&rsquo;s ticks and text, a centre mark and a leader
+ keep their size: they are sized only when drawn, by
+ <code>'DimScale'</code>, so they reach the sheet at the same size at any
+ scale, as <code>draw.Drawing.print</code> describes.
 </p>
 <p> <strong>A reflection reverses the sweep of an arc.</strong>  Arcs run
  counter-clockwise from the first angle to the second, so mirroring one
@@ -379,7 +382,7 @@
   <a href="draw.Drawing.bbox.html">draw.Drawing.bbox</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/b937a57/inst/+draw/Drawing.m#L1875">draw.Drawing</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/1eb675a/inst/+draw/Drawing.m#L1764">draw.Drawing</a>
 </p>
 </div>
 

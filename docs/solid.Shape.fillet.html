@@ -304,6 +304,7 @@
 				<div class="list">
 				<ul style="list-style-type: none; padding-left: 20px;">
 					<li><a href="solid.Shape.fillet.html" class="text-decoration-none font-monospace fw-bolder"><small>fillet</small></a></li>
+					<li><a href="solid.Shape.facefillet.html" class="text-decoration-none font-monospace"><small>facefillet</small></a></li>
 					<li><a href="solid.Shape.chamfer.html" class="text-decoration-none font-monospace"><small>chamfer</small></a></li>
 					<li><a href="solid.Shape.shell.html" class="text-decoration-none font-monospace"><small>shell</small></a></li>
 					<li><a href="solid.Shape.hole.html" class="text-decoration-none font-monospace"><small>hole</small></a></li>
@@ -379,7 +380,10 @@
  rounds the whole top rim.
 </p>
 <p> A radius too large for the faces beside an edge cannot be built and
- raises an error, as does an edge that cannot be rounded at all.
+ raises an error, as does an edge that cannot be rounded at all.  Nor
+ can fillets use up a face: two of radius 10 on the long edges of a face
+ 20 wide would meet across it and leave none of it, and raise an error.
+ <code>solid.Shape.facefillet</code> builds that shape as a full round.
 </p>
 <table><tr><td>&nbsp;</td><td><pre class="example"> ## A block with its four upright edges rounded to 5
  S = solid.box (40, 30, 10);
@@ -390,10 +394,11 @@
 
 <p> <strong>See also: </strong>
   <a href="solid.Shape.edges.html">solid.Shape.edges</a>, 
+  <a href="solid.Shape.facefillet.html">solid.Shape.facefillet</a>, 
   <a href="solid.Shape.chamfer.html">solid.Shape.chamfer</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/b937a57/inst/+solid/Shape.m#L1383">solid.Shape</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/1eb675a/inst/+solid/Shape.m#L1388">solid.Shape</a>
 </p>
 </div>
 

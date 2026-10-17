@@ -304,6 +304,7 @@
 				<div class="list">
 				<ul style="list-style-type: none; padding-left: 20px;">
 					<li><a href="solid.Shape.fillet.html" class="text-decoration-none font-monospace"><small>fillet</small></a></li>
+					<li><a href="solid.Shape.facefillet.html" class="text-decoration-none font-monospace"><small>facefillet</small></a></li>
 					<li><a href="solid.Shape.chamfer.html" class="text-decoration-none font-monospace"><small>chamfer</small></a></li>
 					<li><a href="solid.Shape.shell.html" class="text-decoration-none font-monospace"><small>shell</small></a></li>
 					<li><a href="solid.Shape.hole.html" class="text-decoration-none font-monospace"><small>hole</small></a></li>
@@ -375,7 +376,10 @@
  leaving raised points.  <var>F</var> must be the outside of the part, a
  cylinder all the way round its axis, and must end at each end in a
  circle on one flat face square to the axis: the free end of the part,
- or a shoulder.
+ or a shoulder.  The wall under <var>F</var> must be thicker than the teeth
+ are deep, and than a fillet or chamfer at an end of <var>F</var> is large:
+ a bore, its thread or anything else reaching into it is an error.  So
+ is a hole or pocket in <var>F</var>: knurl first, then cut it.
 </p>
 <p> <var>PITCH</var> is in millimetres, measured square to the grooves as DIN 82
  gives it, whose series is 0.5, 0.6, 0.8, 1.0, 1.2 and 1.6.  A whole
@@ -476,7 +480,7 @@
   <a href="solid.Shape.chamfer.html">solid.Shape.chamfer</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/b937a57/inst/+solid/Shape.m#L2421">solid.Shape</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/1eb675a/inst/+solid/Shape.m#L2544">solid.Shape</a>
 </p>
 </div>
 

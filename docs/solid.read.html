@@ -409,9 +409,9 @@
 </p>
 <p> STEP (ISO 10303-21) is the format every mechanical CAD program exchanges
  solids in, and it keeps their exact geometry: a hole read from it is a true
- cylinder, as it was modelled.  A STEP file must end in <code>.step</code>, in
- either case, and open with the keyword <code>ISO-10303-21;</code>, which may
- follow white space and comments.
+ cylinder, as it was modelled.  A STEP file must end in <code>.step</code> or
+ <code>.stp</code>, in either case, and open with the keyword
+ <code>ISO-10303-21;</code>, which may follow white space and comments.
 </p>
 <p> Only solids are read, since a <code>solid.Shape</code> holds solids only.  A
  closed shell, which some programs write in place of a solid, is read as
@@ -431,7 +431,7 @@
   <a href="polymesh.read.html">polymesh.read</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/b937a57/inst/+solid/read.m">solid.read</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/1eb675a/inst/+solid/read.m">solid.read</a>
 </p>
 </div>
 

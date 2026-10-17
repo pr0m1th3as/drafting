@@ -424,7 +424,7 @@
   <a href="geom.UCS.html">geom.UCS</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/b937a57/inst/+model/Assembly.m">model.Assembly</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/1eb675a/inst/+model/Assembly.m">model.Assembly</a>
 </p>
 </div>
         <p class="lead my-3">The <code>model.Assembly</code> class contains the following properties:</p>
@@ -803,18 +803,17 @@ Write an assembly to a STEP, 3MF, STL, OBJ or PLY file.
 <p class="h5 fs"><code>model.Assembly: <b>write</b> (<var>A</var>, <var>FILE</var>)</code></p>
 <p class="h5 fs fs-last"><code>model.Assembly: <b>write</b> (<var>A</var>, <var>FILE</var>, <code>'Tolerance'</code>, <var>TOL</var>)</code></p>
 <p> </p>
-<p> <code>write (<var>A</var>, <var>FILE</var>)</code> writes the assembly in the format
- the extension of <var>FILE</var> names, in either case.  A STEP file,
- <code>.step</code>, keeps its structure: each part once, with its name, its
+<p> <code>write (<var>A</var>, <var>FILE</var>)</code> writes the assembly in the format the
+ extension of <var>FILE</var> names, in either case.  A STEP file, <code>.step</code>
+ or <code>.stp</code>, keeps its structure: each part once, with its name, its
  colours and the <code>solid.Shape.Name</code> of its solids, placed by its
- placements, which carry their names, and each sub-assembly the same
- way, so that a CAD program opens the product as it was built; it
- cannot hold a mesh part.  A 3MF file, the archive slicers take, keeps
- the same structure, each part a mesh written once and placed as a
- component, in its colours.  3MF has no place for the name of a
- placement, so <code>model.read</code> names the placements of a 3MF file
- after their parts.  An STL, OBJ or PLY file holds
- <code>tessellate (<var>A</var>)</code>.
+ placements, which carry their names, and each sub-assembly the same way,
+ so that a CAD program opens the product as it was built; it cannot hold a
+ mesh part.  A 3MF file, the archive slicers take, keeps the same
+ structure, each part a mesh written once and placed as a component, in
+ its colours.  3MF has no place for the name of a placement, so
+ <code>model.read</code> names the placements of a 3MF file after their
+ parts.  An STL, OBJ or PLY file holds <code>tessellate (<var>A</var>)</code>.
 </p>
 <p> <code>write (&hellip;, <code>'Tolerance'</code>, <var>TOL</var>)</code> sets, for a
  mesh, how far its facets may stray from the parts&rsquo; surfaces, as
