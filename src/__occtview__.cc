@@ -1881,15 +1881,13 @@ private:
 
 #if defined (__APPLE__)
 // The pixel an event lands on, counted from the top left as Open CASCADE
-// counts them, in the pixels of the backing store, two to a point on a
-// Retina screen
+// counts them, in points, as Cocoa_Window measures the window: never in the
+// pixels of the backing store, two to a point on a Retina screen
 static Graphic3d_Vec2i
 pixel (NSView *v, NSEvent *e)
 {
-  const NSPoint p = [v convertPointToBacking:
-                       [v convertPoint: [e locationInWindow] fromView: nil]];
-  const NSSize s = [v convertSizeToBacking: [v bounds].size];
-  return Graphic3d_Vec2i ((int) p.x, (int) (s.height - p.y));
+  const NSPoint p = [v convertPoint: [e locationInWindow] fromView: nil];
+  return Graphic3d_Vec2i ((int) p.x, (int) ([v bounds].size.height - p.y));
 }
 
 static Aspect_VKeyFlags
