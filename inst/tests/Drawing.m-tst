@@ -186,10 +186,21 @@
 %! D = draw.Drawing ().region (R);
 %! assert_equal (D.Entities(1).shape.UCS == geom.UCS (), true);
 %! assert_equal (bbox (D), [10, 0, 20, 5], 1e-12);
+%!test  # a cell of regions, one entity each
+%! R = {geom.Region([0, 0; 10, 0; 10, 5]), geom.Region([20, 0; 30, 0; 30, 5])};
+%! D = draw.Drawing ().region (R);
+%! assert_equal ({D.Entities.type}, {'region', 'region'});
+%! assert_equal ([D.Entities.closed], [true, true]);
+%! assert_equal (D.Entities(2).shape.Outline.Vertices, R{2}.Outline.Vertices);
 %!error<draw.Drawing.region: invalid number of input arguments.> ...
 %! draw.Drawing ().region ()
 %!error<draw.Drawing.region: R must be a geom.Region object.> ...
 %! draw.Drawing ().region ([0, 0; 1, 0; 1, 1])
+%!error<draw.Drawing.region: R must not be an empty cell array.> ...
+%! draw.Drawing ().region (cell (1, 0))
+%!error<draw.Drawing.region: R must lie in the xy plane.> ...
+%! draw.Drawing ().region ({geom.Region([0, 0; 1, 0; 1, 1]), ...
+%!                          __tiltedregion__()})
 %!error<draw.Drawing.region: R must lie in the xy plane.> ...
 %! draw.Drawing ().region (__tiltedregion__ ())
 
@@ -314,6 +325,13 @@
 %! D = draw.Drawing ().hatch (R);
 %! assert_equal (D.Entities(1).shape.UCS == geom.UCS (), true);
 %! assert_equal (bbox (D), [10, 0, 20, 5], 1e-12);
+%!test  # a cell of regions, one entity each, filled alike
+%! R = {geom.Region([0, 0; 10, 0; 10, 5]), geom.Region([20, 0; 30, 0; 30, 5])};
+%! D = draw.Drawing ().hatch (R, 'ANSI37', 45, 4);
+%! assert_equal ({D.Entities.pattern}, {'ANSI37', 'ANSI37'});
+%! assert_equal ([D.Entities.angle], [45, 45]);
+%! assert_equal ([D.Entities.spacing], [4, 4]);
+%! assert_equal (D.Entities(2).shape.Outline.Vertices, R{2}.Outline.Vertices);
 %!error<draw.Drawing.hatch: invalid number of input arguments.> ...
 %! draw.Drawing ().hatch ()
 %!error<draw.Drawing.hatch: ANGLE and SPACING must be given together.> ...
@@ -322,6 +340,8 @@
 %! draw.Drawing ().hatch ([0, 0; 1, 0; 1, 1])
 %!error<draw.Drawing.hatch: R must be a geom.Region object.> ...
 %! draw.Drawing ().hatch (geom.Polyline ([0, 0; 1, 0; 1, 1], 'Closed', true))
+%!error<draw.Drawing.hatch: R must not be an empty cell array.> ...
+%! draw.Drawing ().hatch (cell (1, 0))
 %!error<draw.Drawing.hatch: PATTERN must be a non-empty character vector.> ...
 %! draw.Drawing ().hatch (geom.Region ([0, 0; 1, 0; 1, 1]), '')
 %!error<draw.Drawing.hatch: 'TARTAN' is not a defined pattern; use geom.hatchlines \(\) for the list.> ...

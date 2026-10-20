@@ -370,9 +370,10 @@ classdef Assembly
     function M = tessellate (this, TOL = 0.01)
 
       ## Input validation
-      errmsg = solid.__checkpos__ (TOL, 'TOL');
-      if (! isempty (errmsg))
-        error ("model.Assembly.tessellate: %s", errmsg);
+      if (! (isfloat (TOL) && isreal (TOL) && isscalar (TOL) &&
+             isfinite (TOL) && TOL > 0))
+        error (strcat ("model.Assembly.tessellate: TOL must be a positive", ...
+                       " and finite real scalar."));
       endif
 
       M = polymesh.Mesh ();
@@ -509,9 +510,10 @@ classdef Assembly
                              " meshes only."));
             endif
             TOL = val;
-            errmsg = solid.__checkpos__ (TOL, 'TOL');
-            if (! isempty (errmsg))
-              error ("model.Assembly.write: %s", errmsg);
+            if (! (isfloat (TOL) && isreal (TOL) && isscalar (TOL) &&
+                   isfinite (TOL) && TOL > 0))
+              error (strcat ("model.Assembly.write: TOL must be a positive", ...
+                             " and finite real scalar."));
             endif
           otherwise
             error ("model.Assembly.write: unknown option '%s'.", name);

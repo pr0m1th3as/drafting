@@ -1148,7 +1148,9 @@ classdef Drawing
     ## @code{@var{D} = region (@var{D}, @var{R})} appends the
     ## @code{geom.Region} @var{R}.  It is drawn as its loops, the outline and
     ## every hole, and kept as one region, so a plate and its bores stay one
-    ## entity:
+    ## entity.  @var{R} may also be a non-empty cell array of regions, such as
+    ## @code{geom.text} and @code{geom.Region.union} return, appended as one
+    ## entity each:
     ##
     ## @example
     ## @group
@@ -1171,6 +1173,15 @@ classdef Drawing
 
       if (nargin != 2)
         error ("draw.Drawing.region: invalid number of input arguments.");
+      endif
+      if (iscell (R))
+        if (isempty (R))
+          error ("draw.Drawing.region: R must not be an empty cell array.");
+        endif
+        for k = 1:numel (R)
+          this = region (this, R{k});
+        endfor
+        return;
       endif
       if (! isa (R, 'geom.Region') || ! isscalar (R))
         error ("draw.Drawing.region: R must be a geom.Region object.");
@@ -1394,9 +1405,11 @@ classdef Drawing
     ## Append a hatched region.
     ##
     ## @code{@var{D} = hatch (@var{D}, @var{R})} fills the @code{geom.Region}
-    ## @var{R} with a hatch pattern, its holes left clear.  The region may
-    ## have arcs and splines; a polygon is made into one with
-    ## @code{geom.Region (@var{P})}:
+    ## @var{R} with a hatch pattern, its holes left clear.  @var{R} may also be
+    ## a non-empty cell array of regions, such as @code{geom.text} and
+    ## @code{geom.Region.union} return, each filled alike and appended as an
+    ## entity of its own.  The regions may have arcs and splines; a polygon is
+    ## made into one with @code{geom.Region (@var{P})}:
     ##
     ## @example
     ## @group
@@ -1428,6 +1441,15 @@ classdef Drawing
       if (nargin == 4)
         error (strcat ("draw.Drawing.hatch: ANGLE and SPACING must be", ...
                        " given together."));
+      endif
+      if (iscell (R))
+        if (isempty (R))
+          error ("draw.Drawing.hatch: R must not be an empty cell array.");
+        endif
+        for k = 1:numel (R)
+          this = hatch (this, R{k}, PATTERN, ANGLE, SPACING);
+        endfor
+        return;
       endif
       if (isnumeric (R))
         error (strcat ("draw.Drawing.hatch: R must be a geom.Region; make", ...

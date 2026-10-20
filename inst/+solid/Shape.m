@@ -466,9 +466,10 @@ classdef Shape
     function M = tessellate (this, TOL = 0.01)
 
       ## Input validation
-      errmsg = solid.__checkpos__ (TOL, 'TOL');
-      if (! isempty (errmsg))
-        error ("solid.Shape.tessellate: %s", errmsg);
+      if (! (isfloat (TOL) && isreal (TOL) && isscalar (TOL) &&
+             isfinite (TOL) && TOL > 0))
+        error (strcat ("solid.Shape.tessellate: TOL must be a positive", ...
+                       " and finite real scalar."));
       endif
 
       if (isempty (this.Data))
@@ -632,9 +633,11 @@ classdef Shape
       if (isempty (opt.Tolerance))
         opt.Tolerance = 0.01;
       endif
-      errmsg = solid.__checkpos__ (opt.Tolerance, 'Tolerance');
-      if (! isempty (errmsg))
-        error ("solid.Shape.write: %s", errmsg);
+      if (! (isfloat (opt.Tolerance) && isreal (opt.Tolerance) &&
+             isscalar (opt.Tolerance) && isfinite (opt.Tolerance) &&
+             opt.Tolerance > 0))
+        error (strcat ("solid.Shape.write: Tolerance must be a positive", ...
+                       " and finite real scalar."));
       endif
       if (! isempty (folder) && ! isfolder (folder))
         error ("solid.Shape.write: folder '%s' does not exist.", folder);
@@ -839,10 +842,12 @@ classdef Shape
       if (nargin < 2 || nargin > 3)
         error ("solid.Shape.scale: invalid number of input arguments.");
       endif
-      errmsg = solid.__checkpos__ (F, 'F');
-      if (isempty (errmsg))
-        errmsg = checkvec (P, 'P');
+      if (! (isfloat (F) && isreal (F) && isscalar (F) && isfinite (F) &&
+             F > 0))
+        error (strcat ("solid.Shape.scale: F must be a positive", ...
+                       " and finite real scalar."));
       endif
+      errmsg = checkvec (P, 'P');
       if (! isempty (errmsg))
         error ("solid.Shape.scale: %s", errmsg);
       endif
@@ -1508,11 +1513,13 @@ classdef Shape
         error ("solid.Shape.fillet: invalid number of input arguments.");
       endif
       errmsg = checkindex (E, numedges (this), 'E', 'edge', false);
-      if (isempty (errmsg))
-        errmsg = solid.__checkpos__ (R, 'R');
-      endif
       if (! isempty (errmsg))
         error ("solid.Shape.fillet: %s", errmsg);
+      endif
+      if (! (isfloat (R) && isreal (R) && isscalar (R) && isfinite (R) &&
+             R > 0))
+        error (strcat ("solid.Shape.fillet: R must be a positive", ...
+                       " and finite real scalar."));
       endif
 
       r = occt ('solid.Shape.fillet', 'fillet', this.Data, ...
@@ -1594,9 +1601,10 @@ classdef Shape
         endif
       endif
       if (! full)
-        errmsg = solid.__checkpos__ (R, 'R');
-        if (! isempty (errmsg))
-          error ("solid.Shape.facefillet: %s", errmsg);
+        if (! (isfloat (R) && isreal (R) && isscalar (R) && isfinite (R) &&
+               R > 0))
+          error (strcat ("solid.Shape.facefillet: R must be a positive", ...
+                         " and finite real scalar."));
         endif
       endif
       F = double (F);
@@ -1813,7 +1821,8 @@ classdef Shape
           error (strcat ("solid.Shape.shell: Thickness must give each set", ...
                          " of faces as a vector of face indices."));
         endif
-        if (! isempty (solid.__checkpos__ (C{k+1}, 'T')))
+        if (! (isfloat (C{k+1}) && isreal (C{k+1}) && isscalar (C{k+1}) &&
+               isfinite (C{k+1}) && C{k+1} > 0))
           error (strcat ("solid.Shape.shell: Thickness must give each", ...
                          " thickness as a positive and finite real scalar."));
         endif
@@ -1828,10 +1837,15 @@ classdef Shape
                        " and given a thickness."));
       endif
       errmsg = checkindex (F, numfaces (this), 'F', 'face', true);
-      if (isempty (errmsg))
-        errmsg = solid.__checkpos__ (T, 'T');
+      if (! isempty (errmsg))
+        error ("solid.Shape.shell: %s", errmsg);
       endif
-      if (isempty (errmsg) && ! isempty (TF))
+      if (! (isfloat (T) && isreal (T) && isscalar (T) && isfinite (T) &&
+             T > 0))
+        error (strcat ("solid.Shape.shell: T must be a positive", ...
+                       " and finite real scalar."));
+      endif
+      if (! isempty (TF))
         errmsg = checkindex (TF, numfaces (this), 'Thickness', 'face', false);
       endif
       if (isempty (errmsg) && isempty (this.Data))
@@ -2086,7 +2100,8 @@ classdef Shape
       if (islogical (cs) && isscalar (cs) && ! cs)
         cs = [];
       endif
-      if (! isempty (solid.__checkpos__ (D, 'D')))
+      if (! (isfloat (D) && isreal (D) && isscalar (D) && isfinite (D) &&
+             D > 0))
         error (strcat ("solid.Shape.hole: D must be a positive and finite", ...
                        " real scalar or the name of an ISO metric thread", ...
                        " such as 'M6' or 'M10x1.25'."));
@@ -2495,6 +2510,10 @@ classdef Shape
     ## a boss is one region with the boss as its hole, and @code{fillet} on
     ## the region rounds the pocket's corners as a milling cutter leaves them.
     ##
+    ## @var{R} may also be a cell array of regions, such as @code{geom.text}
+    ## and @code{geom.Region.union} return: every one is cut, each from its own
+    ## plane, so a name is engraved in one call.  The cell must not be empty.
+    ##
     ## The cutter comes from outside, as for @code{solid.Shape.hole}:
     ## everything inside the outline beyond the region's plane, on the side its
     ## normal points to, is cleared too, so a pocket drawn on a sloping or
@@ -2526,6 +2545,15 @@ classdef Shape
       ## Input validation
       if (nargin < 3)
         error ("solid.Shape.pocket: invalid number of input arguments.");
+      endif
+      if (iscell (R))
+        if (isempty (R))
+          error ("solid.Shape.pocket: R must not be an empty cell array.");
+        endif
+        for k = 1:numel (R)
+          this = pocket (this, R{k}, DEPTH, varargin{:});
+        endfor
+        return;
       endif
       if (! isa (R, 'geom.Region') || ! isscalar (R))
         error ("solid.Shape.pocket: R must be a geom.Region object.");
@@ -2709,9 +2737,10 @@ classdef Shape
       if (mod (numel (varargin), 2) == 1)
         DEPTH = varargin{1};
         varargin(1) = [];
-        errmsg = solid.__checkpos__ (DEPTH, 'DEPTH');
-        if (! isempty (errmsg))
-          error ("solid.Shape.knurl: %s", errmsg);
+        if (! (isfloat (DEPTH) && isreal (DEPTH) && isscalar (DEPTH) &&
+               isfinite (DEPTH) && DEPTH > 0))
+          error (strcat ("solid.Shape.knurl: DEPTH must be a positive", ...
+                         " and finite real scalar."));
         endif
       endif
       [errmsg, opt] = options (varargin, struct ('Pattern', 'crossed', ...
@@ -2720,15 +2749,16 @@ classdef Shape
                                                  'Profile', 90, ...
                                                  'Fillet', [], ...
                                                  'Chamfer', []));
-      if (isempty (errmsg))
-        errmsg = solid.__checkpos__ (PITCH, 'PITCH');
-      endif
-      if (isempty (errmsg) && ! any (strcmp (opt.Pattern, {'single', ...
-                                                            'crossed'})))
-        errmsg = "Pattern must be 'single' or 'crossed'.";
-      endif
       if (! isempty (errmsg))
         error ("solid.Shape.knurl: %s", errmsg);
+      endif
+      if (! (isfloat (PITCH) && isreal (PITCH) && isscalar (PITCH) &&
+             isfinite (PITCH) && PITCH > 0))
+        error (strcat ("solid.Shape.knurl: PITCH must be a positive", ...
+                       " and finite real scalar."));
+      endif
+      if (! any (strcmp (opt.Pattern, {'single', 'crossed'})))
+        error ("solid.Shape.knurl: Pattern must be 'single' or 'crossed'.");
       endif
       crossed = strcmp (opt.Pattern, 'crossed');
       A = opt.Angle;
@@ -3010,9 +3040,10 @@ classdef Shape
         switch (lower (name))
           case 'tolerance'
             TOL = val;
-            errmsg = solid.__checkpos__ (TOL, 'Tolerance');
-            if (! isempty (errmsg))
-              error ("solid.Shape.hull: %s", errmsg);
+            if (! (isfloat (TOL) && isreal (TOL) && isscalar (TOL) &&
+                   isfinite (TOL) && TOL > 0))
+              error (strcat ("solid.Shape.hull: Tolerance must be a", ...
+                             " positive and finite real scalar."));
             endif
           otherwise
             error ("solid.Shape.hull: unknown option '%s'.", name);
@@ -3764,13 +3795,15 @@ function [errmsg, E] = endedges (VAL, NAME, X, WHAT, N)
     for i = 1:rows (VAL)
       ok = ok && isscalar (VAL{i,1}) ...
            && isempty (checkindex (VAL{i,1}, N, 'E', 'edge', false)) ...
-           && isempty (solid.__checkpos__ (VAL{i,2}, X));
+           && isfloat (VAL{i,2}) && isreal (VAL{i,2}) && isscalar (VAL{i,2}) ...
+           && isfinite (VAL{i,2}) && VAL{i,2} > 0;
     endfor
     if (ok)
       E = double ([VAL{:,1}; VAL{:,2}]');
     endif
   else
-    ok = isempty (solid.__checkpos__ (VAL, X));
+    ok = (isfloat (VAL) && isreal (VAL) && isscalar (VAL) && isfinite (VAL)
+          && VAL > 0);
     if (ok)
       E = [0, double(VAL)];
     endif

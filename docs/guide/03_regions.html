@@ -187,10 +187,7 @@ plot (D);</code></pre>
 <pre class="code-in"><code>T = geom.text ('Octave', 'Height', 12);
 numel (T)
 
-D = draw.Drawing ();
-for k = 1:numel (T)
-  D = D.hatch (T{k});
-endfor
+D = draw.Drawing ().hatch (T);
 plot (D);</code></pre>
 <pre class="code-out"><code>ans = 6</code></pre>
 <figure class="shot"><img src="img/03_regions-6.png" alt="Working with regions, picture 6"></figure>
@@ -198,9 +195,7 @@ plot (D);</code></pre>
 <pre class="code-in"><code>T = geom.text ('Hgjy', 'Box', [40, 12], 'VAlign', 'bottom');
 frame = geom.Polyline ([0, 0; 40, 0; 40, 12; 0, 12], 'Closed', true);
 D = draw.Drawing ().polyline (frame);
-for k = 1:numel (T)
-  D = D.hatch (T{k});
-endfor
+D = D.hatch (T);
 plot (D);</code></pre>
 <figure class="shot"><img src="img/03_regions-7.png" alt="Working with regions, picture 7"></figure>
 <h2>A part from them</h2>
@@ -208,9 +203,7 @@ plot (D);</code></pre>
 <pre class="code-in"><code>S = solid.extrude (Lever_region{1}, 6);
 name = geom.text ('L1', 'Height', 5, 'HAlign', 'center', ...
                   'VAlign', 'center', 'UCS', geom.UCS ([0, 0, 1], [20, 0, 6]));
-for k = 1:numel (name)
-  S = union (S, solid.extrude (name{k}, 1));
-endfor
+S = union (S, solid.extrude (name, 1));
 show (S);</code></pre>
 <figure class="shot"><img src="img/03_regions-8.png" alt="Working with regions, picture 8"></figure>
 <nav class="d-flex justify-content-between my-5">

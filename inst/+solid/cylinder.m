@@ -46,14 +46,14 @@ function S = cylinder (R, H, varargin)
   if (nargin < 2 || nargin > 5)
     error ("solid.cylinder: invalid number of input arguments.");
   endif
-  errmsg = solid.__checkpos__ (R, 'R');
-  if (isempty (errmsg))
-    errmsg = solid.__checkpos__ (H, 'H');
+  if (! (isfloat (R) && isreal (R) && isscalar (R) && isfinite (R) && R > 0))
+    error ("solid.cylinder: R must be a positive and finite real scalar.");
   endif
-  if (isempty (errmsg))
-    [frame, errmsg] = solid.__place__ (varargin, {'base', 'centroid'}, ...
-                                       [0, 0, 0; 0, 0, double(H) / 2]);
+  if (! (isfloat (H) && isreal (H) && isscalar (H) && isfinite (H) && H > 0))
+    error ("solid.cylinder: H must be a positive and finite real scalar.");
   endif
+  [frame, errmsg] = solid.__place__ (varargin, {'base', 'centroid'}, ...
+                                     [0, 0, 0; 0, 0, double(H) / 2]);
   if (! isempty (errmsg))
     error ("solid.cylinder: %s", errmsg);
   endif

@@ -48,16 +48,17 @@ function S = cone (R1, R2, H, varargin)
   if (isempty (errmsg))
     errmsg = checkradius (R2, 'R2');
   endif
-  if (isempty (errmsg))
-    errmsg = solid.__checkpos__ (H, 'H');
+  if (! isempty (errmsg))
+    error ("solid.cone: %s", errmsg);
   endif
-  if (isempty (errmsg) && R1 == R2)
-    errmsg = strcat ("R1 and R2 must differ; a cone with equal radii", ...
-                     " is a cylinder.");
+  if (! (isfloat (H) && isreal (H) && isscalar (H) && isfinite (H) && H > 0))
+    error ("solid.cone: H must be a positive and finite real scalar.");
   endif
-  if (isempty (errmsg))
-    [frame, errmsg] = solid.__place__ (varargin, {'base'}, [0, 0, 0]);
+  if (R1 == R2)
+    error (strcat ("solid.cone: R1 and R2 must differ; a cone with equal", ...
+                   " radii is a cylinder."));
   endif
+  [frame, errmsg] = solid.__place__ (varargin, {'base'}, [0, 0, 0]);
   if (! isempty (errmsg))
     error ("solid.cone: %s", errmsg);
   endif

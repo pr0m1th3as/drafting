@@ -15,7 +15,6 @@
 ## You should have received a copy of the GNU General Public License along with
 ## this program; if not, see <http://www.gnu.org/licenses/>.
 
-
 ## -*- texinfo -*-
 ## @deftypefn  {drafting} {@var{S} =} solid.revolve (@var{R})
 ## @deftypefnx {drafting} {@var{S} =} solid.revolve (@var{R}, @var{ANGLE})
@@ -29,6 +28,11 @@
 ## position along the axis, as a turned part is drawn.  This is how a shaft, a
 ## bush, a pulley or a knob is modelled.  A hole in the region becomes a
 ## closed ring-shaped cavity.
+##
+## @var{R} may also be a cell array of regions, such as
+## @code{geom.Region.union} returns: each is turned about the axis of its own
+## plane and the solids are fused into one shape.  The cell must not be
+## empty.
 ##
 ## A region in the default @math{xy} plane turns about the model's @math{y}
 ## axis.  For a part along @math{z}, draw the region in the @math{xz} plane,
@@ -63,6 +67,14 @@ function S = revolve (R, ANGLE = 360)
   ## Input validation
   if (nargin < 1 || nargin > 2)
     error ("solid.revolve: invalid number of input arguments.");
+  endif
+  if (iscell (R))
+    if (isempty (R))
+      error ("solid.revolve: R must not be an empty cell array.");
+    endif
+    S = cellfun (@(r) solid.revolve (r, ANGLE), R, 'UniformOutput', false);
+    S = union (S{:});
+    return;
   endif
   [errmsg, D] = solid.__region__ (R, 'R');
   if (isempty (errmsg))
@@ -136,8 +148,20 @@ endfunction
 %! assert_equal (isvalid (S), true);
 
 %!error<solid.revolve: invalid number of input arguments.> solid.revolve ()
+%!test  # a cell of two regions, two rings fused into one shape
+%! R = {geom.Region([5, 0; 10, 0; 10, 2; 5, 2]), ...
+%!      geom.Region([5, 5; 10, 5; 10, 7; 5, 7])};
+%! S = solid.revolve (R);
+%! assert_equal (numsolids (S), 2);
+%! assert_equal (volume (S), 300 * pi, 1e-9);
+
 %!error<solid.revolve: R must be a geom.Region object.> ...
 %! solid.revolve ([0, 0; 1, 0; 1, 1])
+%!error<solid.revolve: R must not be an empty cell array.> ...
+%! solid.revolve (cell (1, 0))
+%!error<solid.revolve: R must lie on one side of its axis: no point of it may have a negative x.> ...
+%! solid.revolve ({geom.Region([1, 0; 2, 0; 2, 1]), ...
+%!                 geom.Region([-1, 0; 1, 0; 1, 1; -1, 1])})
 %!error<solid.revolve: R must lie on one side of its axis: no point of it may have a negative x.> ...
 %! solid.revolve (geom.Region ([-1, 0; 1, 0; 1, 1; -1, 1]))
 %!error<solid.revolve: R must lie on one side of its axis: no point of it may have a negative x.> ...

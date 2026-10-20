@@ -917,6 +917,24 @@
 %! assert_equal (volume (S), 38400 - 4 * __area__ (R.Outline), -1e-9);
 %! assert_equal (isvalid (S), true);
 
+%!test  # a cell of regions, every one cut
+%! A = geom.Region ([10, 15; 30, 15; 30, 25; 10, 25]);
+%! A.UCS = geom.UCS ([0, 0, 1], [0, 0, 12]);
+%! B = geom.Region ([50, 15; 70, 15; 70, 25; 50, 25]);
+%! B.UCS = A.UCS;
+%! S = pocket (solid.box (80, 40, 12), {A, B}, 4);
+%! assert_equal (volume (S), 38400 - 2 * 20 * 10 * 4, 1e-9);
+%! assert_equal (isvalid (S), true);
+
+%!test  # a cell of regions on two faces, each cut from its own plane
+%! A = geom.Region ([10, 15; 30, 15; 30, 25; 10, 25]);
+%! A.UCS = geom.UCS ([0, 0, 1], [0, 0, 12]);
+%! B = geom.Region ([-70, 15; -50, 15; -50, 25; -70, 25]);
+%! B.UCS = geom.UCS ([0, 0, -1], [0, 0, 0]);   # x runs along -x
+%! S = pocket (solid.box (80, 40, 12), {A, B}, 4);
+%! assert_equal (volume (S), 38400 - 2 * 20 * 10 * 4, 1e-9);
+%! assert_equal (bbox (S), [0, 0, 0, 80, 40, 12], 1e-9);
+
 
 %!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## show: each variable has a viewer of its own, titled with its name, and
@@ -1962,6 +1980,8 @@
 %! pocket (solid.Shape (), geom.Region ([0, 0; 1, 0; 1, 1]))
 %!error<solid.Shape.pocket: R must be a geom.Region object.> ...
 %! pocket (solid.Shape (), [0, 0; 1, 0; 1, 1], 1)
+%!error<solid.Shape.pocket: R must not be an empty cell array.> ...
+%! pocket (solid.Shape (), cell (1, 0), 1)
 %!error<solid.Shape.pocket: DEPTH must be positive, or Inf for a pocket right through.> ...
 %! pocket (solid.Shape (), geom.Region ([0, 0; 1, 0; 1, 1]), 0)
 %!error<solid.Shape.pocket: DEPTH must be positive, or Inf for a pocket right through.> ...

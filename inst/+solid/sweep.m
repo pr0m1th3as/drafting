@@ -15,7 +15,6 @@
 ## You should have received a copy of the GNU General Public License along with
 ## this program; if not, see <http://www.gnu.org/licenses/>.
 
-
 ## -*- texinfo -*-
 ## @deftypefn {drafting} {@var{S} =} solid.sweep (@var{R}, @var{P})
 ##
@@ -26,6 +25,10 @@
 ## along the @code{geom.Path} @var{P}.  This is how a bent bar, a frame of
 ## welded sections or a pipe run is modelled; a hole in the region makes a
 ## tube.
+##
+## @var{R} may also be a cell array of regions, such as
+## @code{geom.Region.union} returns: each is swept along @var{P} and the
+## solids are fused into one shape.  The cell must not be empty.
 ##
 ## Along an arc or a spline of the path the solid bends smoothly.  Where two
 ## segments meet at an angle the solid keeps a sharp corner, mitred as two
@@ -64,6 +67,14 @@ function S = sweep (R, P)
   if (nargin != 2)
     error ("solid.sweep: invalid number of input arguments.");
   endif
+  if (iscell (R))
+    if (isempty (R))
+      error ("solid.sweep: R must not be an empty cell array.");
+    endif
+    S = cellfun (@(r) solid.sweep (r, P), R, 'UniformOutput', false);
+    S = union (S{:});
+    return;
+  endif
   [errmsg, D] = solid.__region__ (R, 'R');
   if (! isempty (errmsg))
     error ("solid.sweep: %s", errmsg);
@@ -82,7 +93,7 @@ function S = sweep (R, P)
   endif
 
 
-  S = solid.Shape (__occt__ ('sweep', 'solid.sweep', D, solid.__path__ (P)));
+  S = solid.Shape (__occt__ ('sweep', 'solid.sweep', D, __data__ (P)));
 
 endfunction
 
@@ -207,8 +218,17 @@ endfunction
 
 %!error<solid.sweep: invalid number of input arguments.> ...
 %! solid.sweep (geom.Region ([0, 0; 1, 0; 1, 1]))
+%!test  # a cell of two regions, swept alike
+%! R = {geom.Region([0, 0; 10, 0; 10, 10; 0, 10]), ...
+%!      geom.Region([20, 0; 30, 0; 30, 10; 20, 10])};
+%! S = solid.sweep (R, geom.Path ([0, 0, 0; 0, 0, 10]));
+%! assert_equal (numsolids (S), 2);
+%! assert_equal (volume (S), 2000, 1e-9);
+
 %!error<solid.sweep: R must be a geom.Region object.> ...
 %! solid.sweep ([0, 0; 1, 0; 1, 1], geom.Path ([0, 0, 0; 0, 0, 1]))
+%!error<solid.sweep: R must not be an empty cell array.> ...
+%! solid.sweep (cell (1, 0), geom.Path ([0, 0, 0; 0, 0, 1]))
 %!error<solid.sweep: P must be a geom.Path object.> ...
 %! solid.sweep (geom.Region ([0, 0; 1, 0; 1, 1]), [0, 0, 0; 0, 0, 1])
 %!error<solid.sweep: P must not turn back on itself.> ...

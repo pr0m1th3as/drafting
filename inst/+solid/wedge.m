@@ -15,7 +15,6 @@
 ## You should have received a copy of the GNU General Public License along with
 ## this program; if not, see <http://www.gnu.org/licenses/>.
 
-
 ## -*- texinfo -*-
 ## @deftypefn  {drafting} {@var{S} =} solid.wedge (@var{DX}, @var{DY}, @var{DZ}, @var{TX})
 ## @deftypefnx {drafting} {@var{S} =} solid.wedge (@var{DX}, @var{DY}, @var{DZ}, @var{TOP})
@@ -65,15 +64,17 @@ function S = wedge (DX, DY, DZ, TOP, varargin)
   if (nargin < 4 || nargin > 7)
     error ("solid.wedge: invalid number of input arguments.");
   endif
-  errmsg = solid.__checkpos__ (DX, 'DX');
-  if (isempty (errmsg))
-    errmsg = solid.__checkpos__ (DY, 'DY');
+  if (! (isfloat (DX) && isreal (DX) && isscalar (DX) && isfinite (DX) &&
+         DX > 0))
+    error ("solid.wedge: DX must be a positive and finite real scalar.");
   endif
-  if (isempty (errmsg))
-    errmsg = solid.__checkpos__ (DZ, 'DZ');
+  if (! (isfloat (DY) && isreal (DY) && isscalar (DY) && isfinite (DY) &&
+         DY > 0))
+    error ("solid.wedge: DY must be a positive and finite real scalar.");
   endif
-  if (! isempty (errmsg))
-    error ("solid.wedge: %s", errmsg);
+  if (! (isfloat (DZ) && isreal (DZ) && isscalar (DZ) && isfinite (DZ) &&
+         DZ > 0))
+    error ("solid.wedge: DZ must be a positive and finite real scalar.");
   endif
   if (! isfloat (TOP) || ! isreal (TOP) || ! isvector (TOP)
       || ! any (numel (TOP) == [1, 4]) || ! all (isfinite (TOP)))

@@ -51,16 +51,16 @@ function S = ellipsoid (A, B, C, varargin)
   if (nargin < 3 || nargin > 4)
     error ("solid.ellipsoid: invalid number of input arguments.");
   endif
-  errmsg = solid.__checkpos__ (A, 'A');
-  if (isempty (errmsg))
-    errmsg = solid.__checkpos__ (B, 'B');
+  if (! (isfloat (A) && isreal (A) && isscalar (A) && isfinite (A) && A > 0))
+    error ("solid.ellipsoid: A must be a positive and finite real scalar.");
   endif
-  if (isempty (errmsg))
-    errmsg = solid.__checkpos__ (C, 'C');
+  if (! (isfloat (B) && isreal (B) && isscalar (B) && isfinite (B) && B > 0))
+    error ("solid.ellipsoid: B must be a positive and finite real scalar.");
   endif
-  if (isempty (errmsg))
-    [frame, errmsg] = solid.__place__ (varargin, {'centroid'}, [0, 0, 0]);
+  if (! (isfloat (C) && isreal (C) && isscalar (C) && isfinite (C) && C > 0))
+    error ("solid.ellipsoid: C must be a positive and finite real scalar.");
   endif
+  [frame, errmsg] = solid.__place__ (varargin, {'centroid'}, [0, 0, 0]);
   if (! isempty (errmsg))
     error ("solid.ellipsoid: %s", errmsg);
   endif

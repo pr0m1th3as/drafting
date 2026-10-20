@@ -146,10 +146,7 @@ plot (D);
 T = geom.text ('Octave', 'Height', 12);
 numel (T)
 
-D = draw.Drawing ();
-for k = 1:numel (T)
-  D = D.hatch (T{k});
-endfor
+D = draw.Drawing ().hatch (T);
 plot (D);
 
 ## `'Box'` sizes text to fit instead: the ink, descenders included, grows
@@ -159,9 +156,7 @@ plot (D);
 T = geom.text ('Hgjy', 'Box', [40, 12], 'VAlign', 'bottom');
 frame = geom.Polyline ([0, 0; 40, 0; 40, 12; 0, 12], 'Closed', true);
 D = draw.Drawing ().polyline (frame);
-for k = 1:numel (T)
-  D = D.hatch (T{k});
-endfor
+D = D.hatch (T);
 plot (D);
 
 ## ## A part from them
@@ -172,7 +167,5 @@ plot (D);
 S = solid.extrude (Lever_region{1}, 6);
 name = geom.text ('L1', 'Height', 5, 'HAlign', 'center', ...
                   'VAlign', 'center', 'UCS', geom.UCS ([0, 0, 1], [20, 0, 6]));
-for k = 1:numel (name)
-  S = union (S, solid.extrude (name{k}, 1));
-endfor
+S = union (S, solid.extrude (name, 1));
 show (S);

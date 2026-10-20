@@ -81,9 +81,7 @@
 ## P = solid.box (60, 20, 4);
 ## R = geom.text ('DRAFTING', 'Height', 8, 'HAlign', 'center', ...
 ##                'VAlign', 'center', 'UCS', geom.UCS ([0, 0, 1], [30, 10, 4]));
-## for k = 1:numel (R)
-##   P = union (P, solid.extrude (R@{k@}, 1));
-## endfor
+## P = union (P, solid.extrude (R, 1));
 ## @end group
 ## @end example
 ##

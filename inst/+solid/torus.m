@@ -42,16 +42,18 @@ function S = torus (R1, R2, varargin)
   if (nargin < 2 || nargin > 3)
     error ("solid.torus: invalid number of input arguments.");
   endif
-  errmsg = solid.__checkpos__ (R1, 'R1');
-  if (isempty (errmsg))
-    errmsg = solid.__checkpos__ (R2, 'R2');
+  if (! (isfloat (R1) && isreal (R1) && isscalar (R1) && isfinite (R1) &&
+         R1 > 0))
+    error ("solid.torus: R1 must be a positive and finite real scalar.");
   endif
-  if (isempty (errmsg) && R2 >= R1)
-    errmsg = "R2 must be smaller than R1.";
+  if (! (isfloat (R2) && isreal (R2) && isscalar (R2) && isfinite (R2) &&
+         R2 > 0))
+    error ("solid.torus: R2 must be a positive and finite real scalar.");
   endif
-  if (isempty (errmsg))
-    [frame, errmsg] = solid.__place__ (varargin, {'centroid'}, [0, 0, 0]);
+  if (R2 >= R1)
+    error ("solid.torus: R2 must be smaller than R1.");
   endif
+  [frame, errmsg] = solid.__place__ (varargin, {'centroid'}, [0, 0, 0]);
   if (! isempty (errmsg))
     error ("solid.torus: %s", errmsg);
   endif

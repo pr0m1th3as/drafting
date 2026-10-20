@@ -348,7 +348,7 @@ todir (const octave_value& v)
   return gp_Dir (a(0), a(1), a(2));
 }
 
-// The B-spline of a geom.Spline as solid.__path__ hands it over: its control
+// The B-spline of a geom.Spline as geom.Path's __data__ gives it: its control
 // points, their weights, its distinct knots and their multiplicities, and
 // its degree; rational when the weights differ
 static Handle (Geom_BSplineCurve)
@@ -434,7 +434,7 @@ nearlystraight (const gp_Pnt2d& a, const gp_Pnt2d& m, const gp_Pnt2d& b)
   return L > 0 && std::abs (gp_Vec2d (a, m).Crossed (ab)) <= 1e-6 * L * L;
 }
 
-// The wire of a geom.Path as solid.__path__ hands it over, in world
+// The wire of a geom.Path as its __data__ method gives it, in world
 // coordinates: its vertices; the midpoints of its arcs, NaN for a segment
 // that is not an arc; for each spline segment the control points of its cubic
 // pieces and the parameters where they meet; and whether it is closed, its

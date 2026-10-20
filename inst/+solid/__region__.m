@@ -15,15 +15,14 @@
 ## You should have received a copy of the GNU General Public License along with
 ## this program; if not, see <http://www.gnu.org/licenses/>.
 
-
 ## Internal helper.  Hand a geom.Region to Open CASCADE.
 ##
 ## Returns an error message BODY in ERRMSG, empty when R is a scalar
 ## geom.Region; the caller emits the error under its own name, naming the
 ## argument NAME.  D is the struct __occt__ reads: the outline and a cell of
-## the holes, each as solid.__path__ hands a path over, and the frame of the
-## region's plane, rows origin, x axis, y axis and normal.  SPLINES is true
-## when the outline or a hole has a spline in it.
+## the holes, each as the hidden geom.Path method __data__ gives it, and the
+## frame of the region's plane, rows origin, x axis, y axis and normal.
+## SPLINES is true when the outline or a hole has a spline in it.
 
 function [errmsg, D, SPLINES] = __region__ (R, NAME)
 

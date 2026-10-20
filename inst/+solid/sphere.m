@@ -36,10 +36,10 @@ function S = sphere (R, varargin)
   if (nargin < 1 || nargin > 2)
     error ("solid.sphere: invalid number of input arguments.");
   endif
-  errmsg = solid.__checkpos__ (R, 'R');
-  if (isempty (errmsg))
-    [frame, errmsg] = solid.__place__ (varargin, {'centroid'}, [0, 0, 0]);
+  if (! (isfloat (R) && isreal (R) && isscalar (R) && isfinite (R) && R > 0))
+    error ("solid.sphere: R must be a positive and finite real scalar.");
   endif
+  [frame, errmsg] = solid.__place__ (varargin, {'centroid'}, [0, 0, 0]);
   if (! isempty (errmsg))
     error ("solid.sphere: %s", errmsg);
   endif

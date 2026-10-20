@@ -15,7 +15,6 @@
 ## You should have received a copy of the GNU General Public License along with
 ## this program; if not, see <http://www.gnu.org/licenses/>.
 
-
 ## -*- texinfo -*-
 ## @deftypefn  {drafting} {@var{S} =} solid.loft (@var{REGIONS})
 ## @deftypefnx {drafting} {@var{S} =} solid.loft (@var{REGIONS}, @qcode{'Ruled'}, @var{TF})

@@ -15,7 +15,6 @@
 ## You should have received a copy of the GNU General Public License along with
 ## this program; if not, see <http://www.gnu.org/licenses/>.
 
-
 ## -*- texinfo -*-
 ## @deftypefn  {drafting} {@var{S} =} solid.extrude (@var{R}, @var{H})
 ## @deftypefnx {drafting} {@var{S} =} solid.extrude (@var{R}, @var{H}, @var{Name}, @var{Value}, @dots{})
@@ -28,6 +27,11 @@
 ## outline, a bracket or a key is modelled: draw its outline, then give it a
 ## thickness.  The holes of the region go right through, and its arcs become
 ## true circular edges and cylindrical faces.
+##
+## @var{R} may also be a cell array of regions, such as @code{geom.text} and
+## @code{geom.Region.union} return: each is extruded as the options say and
+## the solids are fused into one shape, so the letters of a name become one
+## solid.  The cell must not be empty.
 ##
 ## @var{H} says how far, in millimetres, and which way:
 ##
@@ -96,6 +100,15 @@ function S = extrude (R, H, varargin)
   if (nargin < 2)
     error ("solid.extrude: invalid number of input arguments.");
   endif
+  if (iscell (R))
+    if (isempty (R))
+      error ("solid.extrude: R must not be an empty cell array.");
+    endif
+    S = cellfun (@(r) solid.extrude (r, H, varargin{:}), R, ...
+                 'UniformOutput', false);
+    S = union (S{:});
+    return;
+  endif
   [errmsg, D, splines] = solid.__region__ (R, 'R');
   if (! isempty (errmsg))
     error ("solid.extrude: %s", errmsg);
@@ -128,8 +141,8 @@ function S = extrude (R, H, varargin)
     endswitch
   endfor
   A = opt.Taper;
-  if (! isfloat (A) || ! isreal (A) || ! isvector (A) || numel (A) > 2
-      || ! all (abs (A) < 90))
+  if (! (isfloat (A) && isreal (A) && isvector (A) && numel (A) <= 2 &&
+          all (abs (A) < 90)))
     error (strcat ("solid.extrude: Taper must be one angle, or two for", ...
                    " both sides, each in the range (-90, 90) degrees."));
   endif
@@ -140,13 +153,13 @@ function S = extrude (R, H, varargin)
   if (splines && any (A != 0))
     error ("solid.extrude: Taper cannot be applied to a region with splines.");
   endif
-  if (! isfloat (opt.Twist) || ! isreal (opt.Twist)
-      || ! isscalar (opt.Twist) || ! isfinite (opt.Twist))
+  if (! (isfloat (opt.Twist) && isreal (opt.Twist) &&
+         isscalar (opt.Twist) && isfinite (opt.Twist)))
     error ("solid.extrude: Twist must be a finite real scalar.");
   endif
-  errmsg = solid.__checkpos__ (opt.Scale, 'Scale');
-  if (! isempty (errmsg))
-    error ("solid.extrude: %s", errmsg);
+  if (! (isfloat (opt.Scale) && isreal (opt.Scale) && isscalar (opt.Scale) &&
+          isfinite (opt.Scale) && opt.Scale > 0))
+    error ("solid.extrude: Scale must be a positive and finite real scalar.");
   endif
   twisted = (opt.Twist != 0 || opt.Scale != 1);
   if (twisted && numel (H) == 2)
@@ -324,12 +337,41 @@ endfunction
 %! assert_equal (bbox (S)([3, 6]), [0, 20], 1e-6);
 %! assert_equal (isvalid (S), true);
 
+%!test  # a cell of two regions apart, one shape of two solids
+%! R = {geom.Region([0, 0; 10, 0; 10, 10; 0, 10]), ...
+%!      geom.Region([20, 0; 30, 0; 30, 10; 20, 10])};
+%! S = solid.extrude (R, 2);
+%! assert_equal (numsolids (S), 2);
+%! assert_equal (volume (S), 400, 1e-9);
+
+%!test  # overlapping regions are fused
+%! R = {geom.Region([0, 0; 10, 0; 10, 10; 0, 10]), ...
+%!      geom.Region([5, 0; 15, 0; 15, 10; 5, 10])};
+%! S = solid.extrude (R, 2);
+%! assert_equal (numsolids (S), 1);
+%! assert_equal (volume (S), 300, 1e-9);
+%! assert_equal (numfaces (S), 6);
+
+%!test  # a cell of one region is that region
+%! R = geom.Region ([0, 0; 10, 0; 10, 20; 0, 20]);
+%! assert_equal (isequal (solid.extrude ({R}, 5), solid.extrude (R, 5)), true);
+
+%!test  # the options apply to every region
+%! R = {geom.Region([0, 0; 10, 0; 10, 10; 0, 10]), ...
+%!      geom.Region([20, 0; 30, 0; 30, 10; 20, 10])};
+%! S = solid.extrude (R, 5, 'Scale', 0.5);
+%! assert_equal (volume (S), 2 * 5 / 3 * (100 + 25 + 50), 1e-9);
+
 %!error<solid.extrude: invalid number of input arguments.> ...
 %! solid.extrude (geom.Region ([0, 0; 1, 0; 1, 1]))
 %!error<solid.extrude: R must be a geom.Region object.> ...
 %! solid.extrude ([0, 0; 1, 0; 1, 1], 1)
 %!error<solid.extrude: R must be a geom.Region object.> ...
 %! solid.extrude (geom.Polyline ([0, 0; 1, 0; 1, 1], 'Closed', true), 1)
+%!error<solid.extrude: R must be a geom.Region object.> ...
+%! solid.extrude ({geom.Region([0, 0; 1, 0; 1, 1]), [0, 0; 1, 0; 1, 1]}, 1)
+%!error<solid.extrude: R must not be an empty cell array.> ...
+%! solid.extrude (cell (1, 0), 1)
 %!error<solid.extrude: H must be a nonzero finite real scalar, or two positive ones for both sides.> ...
 %! solid.extrude (geom.Region ([0, 0; 1, 0; 1, 1]), 0)
 %!error<solid.extrude: H must be a nonzero finite real scalar, or two positive ones for both sides.> ...

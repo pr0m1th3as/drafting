@@ -15,7 +15,6 @@
 ## You should have received a copy of the GNU General Public License along with
 ## this program; if not, see <http://www.gnu.org/licenses/>.
 
-
 ## -*- texinfo -*-
 ## @deftypefn  {drafting} {@var{S} =} solid.helix (@var{R}, @var{PITCH}, @var{TURNS})
 ##
@@ -30,6 +29,11 @@
 ## stays in the plane through the axis all the way round, as the profile of a
 ## thread does.  This is how a coil spring, a thread or a worm is modelled.  A
 ## hole in the region makes the coil a tube.
+##
+## @var{R} may also be a cell array of regions, such as
+## @code{geom.Region.union} returns: each is coiled about the axis of its own
+## plane and the solids are fused into one shape.  The cell must not be
+## empty.
 ##
 ## A region in the default @math{xy} plane coils about the model's @math{y}
 ## axis; draw it in the @math{xz} plane for a coil along @math{z}.  The coil
@@ -65,26 +69,35 @@ function S = helix (R, PITCH, TURNS)
   if (nargin != 3)
     error ("solid.helix: invalid number of input arguments.");
   endif
-  [errmsg, D] = solid.__region__ (R, 'R');
-  if (isempty (errmsg))
-    Q = __sample__ (R.Outline);
-    if (min (Q(:,1)) <= 0)
-      errmsg = strcat ("R must lie clear of its axis: every point of it", ...
-                       " must have a positive x.");
+  if (iscell (R))
+    if (isempty (R))
+      error ("solid.helix: R must not be an empty cell array.");
     endif
+    S = cellfun (@(r) solid.helix (r, PITCH, TURNS), R, ...
+                 'UniformOutput', false);
+    S = union (S{:});
+    return;
   endif
-  if (isempty (errmsg))
-    errmsg = solid.__checkpos__ (PITCH, 'PITCH');
-  endif
-  if (isempty (errmsg) && max (Q(:,2)) - min (Q(:,2)) >= PITCH)
-    errmsg = strcat ("R must be shorter along its axis than PITCH, or one", ...
-                     " turn would run into the next.");
-  endif
-  if (isempty (errmsg))
-    errmsg = solid.__checkpos__ (TURNS, 'TURNS');
-  endif
+  [errmsg, D] = solid.__region__ (R, 'R');
   if (! isempty (errmsg))
     error ("solid.helix: %s", errmsg);
+  endif
+  Q = __sample__ (R.Outline);
+  if (min (Q(:,1)) <= 0)
+    error (strcat ("solid.helix: R must lie clear of its axis: every", ...
+                   " point of it must have a positive x."));
+  endif
+  if (! (isfloat (PITCH) && isreal (PITCH) && isscalar (PITCH) &&
+         isfinite (PITCH) && PITCH > 0))
+    error ("solid.helix: PITCH must be a positive and finite real scalar.");
+  endif
+  if (max (Q(:,2)) - min (Q(:,2)) >= PITCH)
+    error (strcat ("solid.helix: R must be shorter along its axis than", ...
+                   " PITCH, or one turn would run into the next."));
+  endif
+  if (! (isfloat (TURNS) && isreal (TURNS) && isscalar (TURNS) &&
+         isfinite (TURNS) && TURNS > 0))
+    error ("solid.helix: TURNS must be a positive and finite real scalar.");
   endif
 
   ## The spine runs through the middle of the region's radial extent
@@ -129,8 +142,18 @@ endfunction
 
 %!error<solid.helix: invalid number of input arguments.> ...
 %! solid.helix (geom.Region ([1, 0; 2, 0; 2, 1]), 2)
+%!test  # a cell of two regions, two coils in one shape
+%! R1 = geom.Region ([2, 0; 3, 0; 3, 1; 2, 1]);
+%! R2 = geom.Region ([5, 0; 6, 0; 6, 1; 5, 1]);
+%! S = solid.helix ({R1, R2}, 4, 1);
+%! assert_equal (numsolids (S), 2);
+%! V = volume (solid.helix (R1, 4, 1)) + volume (solid.helix (R2, 4, 1));
+%! assert_equal (volume (S), V, -1e-9);
+
 %!error<solid.helix: R must be a geom.Region object.> ...
 %! solid.helix ([1, 0; 2, 0; 2, 1], 2, 1)
+%!error<solid.helix: R must not be an empty cell array.> ...
+%! solid.helix (cell (1, 0), 2, 1)
 %!error<solid.helix: R must lie clear of its axis: every point of it must have a positive x.> ...
 %! solid.helix (geom.Region ([0, 0; 2, 0; 2, 1]), 2, 1)
 %!error<solid.helix: R must lie clear of its axis: every point of it must have a positive x.> ...

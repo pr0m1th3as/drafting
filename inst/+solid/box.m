@@ -65,18 +65,21 @@ function S = box (DX, DY, DZ, varargin)
   if (nargin < 3 || nargin > 6)
     error ("solid.box: invalid number of input arguments.");
   endif
-  errmsg = solid.__checkpos__ (DX, 'DX');
-  if (isempty (errmsg))
-    errmsg = solid.__checkpos__ (DY, 'DY');
+  if (! (isfloat (DX) && isreal (DX) && isscalar (DX) && isfinite (DX) &&
+         DX > 0))
+    error ("solid.box: DX must be a positive and finite real scalar.");
   endif
-  if (isempty (errmsg))
-    errmsg = solid.__checkpos__ (DZ, 'DZ');
+  if (! (isfloat (DY) && isreal (DY) && isscalar (DY) && isfinite (DY) &&
+         DY > 0))
+    error ("solid.box: DY must be a positive and finite real scalar.");
   endif
-  if (isempty (errmsg))
-    D = double ([DX, DY, DZ]) / 2;
-    [frame, errmsg] = solid.__place__ (varargin, {'corner', 'base', ...
-                                       'centroid'}, [0, 0, 0; D(1:2), 0; D]);
+  if (! (isfloat (DZ) && isreal (DZ) && isscalar (DZ) && isfinite (DZ) &&
+         DZ > 0))
+    error ("solid.box: DZ must be a positive and finite real scalar.");
   endif
+  D = double ([DX, DY, DZ]) / 2;
+  [frame, errmsg] = solid.__place__ (varargin, {'corner', 'base', ...
+                                     'centroid'}, [0, 0, 0; D(1:2), 0; D]);
   if (! isempty (errmsg))
     error ("solid.box: %s", errmsg);
   endif
