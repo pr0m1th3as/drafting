@@ -92,8 +92,9 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 //   getview        replies "view AZ EL ZOOM X Y Z", the angles the view looks
 //                  from, how many times the shape is magnified from fitting
 //                  the window, and the point at the centre of the window
-//   capture W H    draws the view W by H pixels, the window's size when both
-//                  are 0, and replies "image W H" followed by its pixels,
+//   capture W H    draws the view W by H pixels, the window's size in the
+//                  screen's pixels when both are 0, as the window draws it,
+//                  and replies "image W H" followed by its pixels,
 //                  W * H * 3 bytes of red, green and blue, a row at a time
 //                  from the top
 //   close          closes the window
@@ -511,10 +512,7 @@ public:
     // does, until the T key frees it
     SetLockOrbitZUp (true);
 
-    // The world axes in a corner, turning with the view, clear of the
-    // prompts at the lower left
-    m_view->TriedronDisplay (Aspect_TOTP_RIGHT_LOWER, Quantity_NOC_BLACK, 0.12,
-                             V3d_ZBUFFER);
+    scaled (1);
 
     // See-through solids blended in one pass, whatever order they are drawn
     // in, the nearer weighted more, so that the nearer reads as in front
@@ -533,6 +531,7 @@ public:
       m_window->Map ();
       [[dv window] makeKeyAndOrderFront: nil];
       [NSApp activateIgnoringOtherApps: YES];
+      rescale ();
 #else
       Display *d = (Display *) m_display->GetDisplayAspect ();
       Window w = static_cast<Window> (m_window->NativeHandle ());
@@ -1048,6 +1047,14 @@ public:
     m_view->Invalidate ();
   }
 
+  // Text, lines and the axes sized for the pixels of the screen the window
+  // is on, so that they are as large on a Retina screen as on any other
+  void rescale ()
+  {
+    scaled (ratio ());
+    m_view->Invalidate ();
+  }
+
 protected:
 
   // A double click outside a pick chooses the centre the view turns about
@@ -1096,6 +1103,29 @@ protected:
   }
 
 private:
+
+  // Text and lines drawn R times their size in pixels, and the world axes in
+  // a corner, turning with the view, clear of the prompts at the lower left
+  void scaled (double r)
+  {
+    m_view->ChangeRenderingParams ().Resolution = static_cast<unsigned int>
+      (std::lround (Graphic3d_RenderingParams::THE_DEFAULT_RESOLUTION * r));
+    m_view->TriedronDisplay (Aspect_TOTP_RIGHT_LOWER, Quantity_NOC_BLACK,
+                             0.12 * r, V3d_ZBUFFER);
+  }
+
+  // The screen's pixels to a point, 2 on a Retina screen and 1 elsewhere; a
+  // hidden window, which no screen shows, has 1
+  double ratio () const
+  {
+#if defined (__APPLE__)
+    if (! m_window->IsVirtual ())
+    {
+      return [[(NSView *) m_window->HView () window] backingScaleFactor];
+    }
+#endif
+    return 1;
+  }
 
   // The face of a triangle mesh: the mesh's vertices DATA, NV of them, and
   // its NF triangles.  Each triangle has corners of its own carrying its own
@@ -1491,12 +1521,23 @@ private:
   }
 
   // The view drawn W by H pixels, or at the window's size when both are 0,
-  // replied as "image W H" and its rows of red, green and blue from the top
+  // replied as "image W H" and its rows of red, green and blue from the top.
+  // The window's size is in the screen's pixels and drawn as the window is,
+  // so that on a Retina screen the picture is as sharp as the window; a size
+  // asked for is drawn at one pixel to a point, the same on every screen.
   void capture (int w, int h)
   {
-    if (w <= 0 || h <= 0)
+    const double r = ratio ();
+    const bool asked = (w > 0 && h > 0);
+    if (! asked)
     {
       m_window->Size (w, h);
+      w = static_cast<int> (std::lround (w * r));
+      h = static_cast<int> (std::lround (h * r));
+    }
+    else if (r != 1)
+    {
+      scaled (1);
     }
     Image_PixMap img;
     V3d_ImageDumpOptions opt;
@@ -1504,7 +1545,12 @@ private:
     opt.Height = h;
     opt.BufferType = Graphic3d_BT_RGB;
     opt.ToAdjustAspect = true;
-    if (! m_view->ToPixMap (img, opt) || img.Format () != Image_Format_RGB
+    const bool drawn = m_view->ToPixMap (img, opt);
+    if (asked && r != 1)
+    {
+      scaled (r);
+    }
+    if (! drawn || img.Format () != Image_Format_RGB
         || static_cast<int> (img.SizeX ()) != w
         || static_cast<int> (img.SizeY ()) != h)
     {
@@ -2027,7 +2073,10 @@ button (NSEvent *e)
 {
   [super viewDidChangeBackingProperties];
   if (owner != nullptr)
+  {
+    owner->rescale ();
     owner->ProcessConfigure (true);
+  }
 }
 
 - (void) drawRect: (NSRect) r

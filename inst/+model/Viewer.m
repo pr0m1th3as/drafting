@@ -1174,7 +1174,10 @@ classdef Viewer < handle
     ## @code{@var{IMG} = capture (@var{V})} returns what the window shows, the
     ## shape as it is turned and lit, as an @math{H}-by-@math{W}-by-3
     ## @code{uint8} image of red, green and blue, the size of the window: the
-    ## form @code{imread} gives and @code{image} and @code{imwrite} take.
+    ## form @code{imread} gives and @code{image} and @code{imwrite} take.  The
+    ## size is in the pixels of the screen, so on a Mac's Retina screen, with
+    ## two pixels to a point, the picture is twice the window's size in points
+    ## and as sharp as the window.
     ##
     ## @code{capture (@var{V}, @var{FILE})} writes it to @var{FILE} instead,
     ## in the format its extension names, as @code{imwrite} writes it; PNG
@@ -1184,7 +1187,9 @@ classdef Viewer < handle
     ## picture @var{W} pixels wide and @var{H} high instead, whatever the size
     ## of the window, so a picture for print can be finer than the screen.
     ## The view keeps its height: a picture of another shape than the window
-    ## shows more or less at the sides.
+    ## shows more or less at the sides.  Text, lines and the axes are drawn
+    ## as on a screen of one pixel to a point, so the same size gives the
+    ## same picture on every system.
     ##
     ## @example
     ## @group
