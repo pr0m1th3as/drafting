@@ -2185,7 +2185,7 @@ endfunction
 
 %!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## What a pick holds is drawn in orange, so that a click visibly took
-%! orange = @(I) I(:,:,1) > 200 & I(:,:,2) < 150 & I(:,:,3) < 60;
+%! orange = @(I) I(:,:,1) > 2 * I(:,:,2) & I(:,:,3) < 60;
 %! near = @(M, p) any (any (M(round (p(2)) + (-3:5), round (p(1)) + (-3:5))));
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect

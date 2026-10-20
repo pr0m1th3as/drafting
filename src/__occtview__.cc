@@ -185,6 +185,8 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <TopoDS_Vertex.hxx>
 #include <TopoDS_Shape.hxx>
 #include <Image_PixMap.hxx>
+#include <V3d_AmbientLight.hxx>
+#include <V3d_DirectionalLight.hxx>
 #include <V3d_View.hxx>
 #include <V3d_Viewer.hxx>
 
@@ -443,7 +445,16 @@ public:
     driver->ChangeOptions ().contextNoAccel = ! accelerated ();
 #endif
     m_viewer = new V3d_Viewer (driver);
-    m_viewer->SetDefaultLights ();
+    // A light from the camera, tilted to come from above and to the left, so
+    // that faces the view meets at the same angle, as the three of a box seen
+    // from its corner, are not lit alike; and an even light all round
+    Handle (V3d_DirectionalLight) head
+      = new V3d_DirectionalLight (gp_Dir (0.3, -0.5, -1), Quantity_NOC_WHITE,
+                                  true);
+    Handle (V3d_AmbientLight) ambient
+      = new V3d_AmbientLight (Quantity_NOC_WHITE);
+    m_viewer->AddLight (head);
+    m_viewer->AddLight (ambient);
     m_viewer->SetLightOn ();
     m_context = new AIS_InteractiveContext (m_viewer);
 #if defined (_WIN32)
