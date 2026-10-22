@@ -749,16 +749,18 @@ draw.Drawing.hatch
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 939
+# length: 1093
 draw.Drawing: D = hatch (D, R)
 draw.Drawing: D = hatch (D, R, PATTERN)
 draw.Drawing: D = hatch (D, R, PATTERN, ANGLE, SPACING)
 Append a hatched region.
 
 D = hatch (D, R) fills the geom.Region
-R with a hatch pattern, its holes left clear. The region may
-have arcs and splines; a polygon is made into one with
-geom.Region (P):
+R with a hatch pattern, its holes left clear. R may also be
+a non-empty cell array of regions, such as geom.text and
+geom.Region.union return, each filled alike and appended as an
+entity of its own. The regions may have arcs and splines; a polygon is
+made into one with geom.Region (P):
 
 R = geom.Region ([0, 0; 60, 0; 60, 40; 0, 40], ...
 {[20, 20, 1; 40, 20, 1]});
@@ -1561,14 +1563,16 @@ draw.Drawing.region
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 657
+# length: 783
 draw.Drawing: D = region (D, R)
 Append a region, drawn as its outline and holes.
 
 D = region (D, R) appends the
 geom.Region R. It is drawn as its loops, the outline and
 every hole, and kept as one region, so a plate and its bores stay one
-entity:
+entity. R may also be a non-empty cell array of regions, such as
+geom.text and geom.Region.union return, appended as one
+entity each:
 
 R = geom.Region ([0, 0; 60, 0; 60, 40; 0, 40], ...
 {[20, 20, 1; 40, 20, 1]});
@@ -6301,7 +6305,7 @@ geom.text
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 2375
+# length: 2345
 drafting: R = geom.text (STR)
 drafting: R = geom.text (STR, Name, Value, ...)
 The outlines of text, as regions.
@@ -6356,9 +6360,7 @@ default.
 P = solid.box (60, 20, 4);
 R = geom.text ('DRAFTING', 'Height', 8, 'HAlign', 'center', ...
 'VAlign', 'center', 'UCS', geom.UCS ([0, 0, 1], [30, 10, 4]));
-for k = 1:numel (R)
-P = union (P, solid.extrude (R{k}, 1));
-endfor
+P = union (P, solid.extrude (R, 1));
 
 Open CASCADE builds the outlines from the font.
 
@@ -7189,7 +7191,7 @@ model.Viewer.capture
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 915
+# length: 1222
 model.Viewer: IMG = capture (V)
 model.Viewer: capture (V, FILE)
 model.Viewer: capture (..., 'Size', [W, H])
@@ -7198,7 +7200,10 @@ The picture the viewer shows, as an image or a file.
 IMG = capture (V) returns what the window shows, the
 shape as it is turned and lit, as an H-by-W-by-3
 uint8 image of red, green and blue, the size of the window: the
-form imread gives and image and imwrite take.
+form imread gives and image and imwrite take. The
+size is in the pixels of the screen, so on a Mac's Retina screen, with
+two pixels to a point, the picture is twice the window's size in points
+and as sharp as the window.
 
 capture (V, FILE) writes it to FILE instead,
 in the format its extension names, as imwrite writes it; PNG
@@ -7208,7 +7213,9 @@ capture (..., 'Size', [W, H]) draws the
 picture W pixels wide and H high instead, whatever the size
 of the window, so a picture for print can be finer than the screen.
 The view keeps its height: a picture of another shape than the window
-shows more or less at the sides.
+shows more or less at the sides. Text, lines and the axes are drawn
+as on a screen of one pixel to a point, so the same size gives the
+same picture on every system.
 
 V = show (solid.cylinder (10, 30));
 view (V, 30, 20);
@@ -9799,7 +9806,7 @@ solid.Shape.pocket
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1549
+# length: 1743
 solid.Shape: S = pocket (S, R, DEPTH)
 solid.Shape: S = pocket (..., 'Taper', A)
 Cut a pocket into a shape.
@@ -9814,6 +9821,10 @@ picks one. An Inf DEPTH cuts right through.
 The holes of the region are left standing as islands, so a pocket round
 a boss is one region with the boss as its hole, and fillet on
 the region rounds the pocket's corners as a milling cutter leaves them.
+
+R may also be a cell array of regions, such as geom.text
+and geom.Region.union return: every one is cut, each from its own
+plane, so a name is engraved in one call. The cell must not be empty.
 
 The cutter comes from outside, as for solid.Shape.hole:
 everything inside the outline beyond the region's plane, on the side its
@@ -10982,7 +10993,7 @@ solid.extrude
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 2541
+# length: 2777
 drafting: S = solid.extrude (R, H)
 drafting: S = solid.extrude (R, H, Name, Value, ...)
 A solid extruded from a region.
@@ -10993,6 +11004,11 @@ extruded from the region's plane square to it. This is how a plate of any
 outline, a bracket or a key is modelled: draw its outline, then give it a
 thickness. The holes of the region go right through, and its arcs become
 true circular edges and cylindrical faces.
+
+R may also be a cell array of regions, such as geom.text and
+geom.Region.union return: each is extruded as the options say and
+the solids are fused into one shape, so the letters of a name become one
+solid. The cell must not be empty.
 
 H says how far, in millimetres, and which way:
 
@@ -11067,7 +11083,7 @@ solid.helix
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1666
+# length: 1857
 drafting: S = solid.helix (R, PITCH, TURNS)
 A coil, swept by a region turning about its own axis as it rises.
 
@@ -11080,6 +11096,11 @@ and its y coordinate the position along the axis, and the region
 stays in the plane through the axis all the way round, as the profile of a
 thread does. This is how a coil spring, a thread or a worm is modelled. A
 hole in the region makes the coil a tube.
+
+R may also be a cell array of regions, such as
+geom.Region.union returns: each is coiled about the axis of its own
+plane and the solids are fused into one shape. The cell must not be
+empty.
 
 A region in the default xy plane coils about the model's y
 axis; draw it in the xz plane for a coil along z. The coil
@@ -11407,7 +11428,7 @@ solid.revolve
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1473
+# length: 1664
 drafting: S = solid.revolve (R)
 drafting: S = solid.revolve (R, ANGLE)
 A solid of revolution, turned from a region about its own axis.
@@ -11419,6 +11440,11 @@ the part, its x coordinate the radius and its y coordinate the
 position along the axis, as a turned part is drawn. This is how a shaft, a
 bush, a pulley or a knob is modelled. A hole in the region becomes a
 closed ring-shaped cavity.
+
+R may also be a cell array of regions, such as
+geom.Region.union returns: each is turned about the axis of its own
+plane and the solids are fused into one shape. The cell must not be
+empty.
 
 A region in the default xy plane turns about the model's y
 axis. For a part along z, draw the region in the xz plane,
@@ -11569,7 +11595,7 @@ solid.sweep
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1648
+# length: 1814
 drafting: S = solid.sweep (R, P)
 A solid swept by a region along a path.
 
@@ -11578,6 +11604,10 @@ solid.Shape traced by the geom.Region R as it travels
 along the geom.Path P. This is how a bent bar, a frame of
 welded sections or a pipe run is modelled; a hole in the region makes a
 tube.
+
+R may also be a cell array of regions, such as
+geom.Region.union returns: each is swept along P and the
+solids are fused into one shape. The cell must not be empty.
 
 Along an arc or a spline of the path the solid bends smoothly. Where two
 segments meet at an angle the solid keeps a sharp corner, mitred as two
