@@ -451,9 +451,7 @@
  P = solid.box (60, 20, 4);
  R = geom.text ('DRAFTING', 'Height', 8, 'HAlign', 'center', ...
                 'VAlign', 'center', 'UCS', geom.UCS ([0, 0, 1], [30, 10, 4]));
- for k = 1:numel (R)
-   P = union (P, solid.extrude (R{k}, 1));
- endfor
+ P = union (P, solid.extrude (R, 1));
 </pre></td></tr></table>
 
 <p> Open CASCADE builds the outlines from the font.
@@ -464,7 +462,7 @@
   <a href="geom.Region.html#geom_Region_offset">geom.Region.offset</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/29043ef/inst/+geom/text.m">geom.text</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/fc40439/inst/+geom/text.m">geom.text</a>
 </p>
 </div>
 

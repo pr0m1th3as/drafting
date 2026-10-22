@@ -462,7 +462,7 @@
   <a href="model.Viewer.html#model_Viewer_opacity">model.Viewer.opacity</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/29043ef/inst/+model/Viewer.m">model.Viewer</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/fc40439/inst/+model/Viewer.m">model.Viewer</a>
 </p>
 </div>
         <p class="lead my-3">The <code>model.Viewer</code> class contains the following properties:</p>
@@ -924,7 +924,10 @@ The picture the viewer shows, as an image or a file.
 <p> <code><var>IMG</var> = capture (<var>V</var>)</code> returns what the window shows, the
  shape as it is turned and lit, as an <em class="math">H</em>-by-<em class="math">W</em>-by-3
  <code>uint8</code> image of red, green and blue, the size of the window: the
- form <code>imread</code> gives and <code>image</code> and <code>imwrite</code> take.
+ form <code>imread</code> gives and <code>image</code> and <code>imwrite</code> take.  The
+ size is in the pixels of the screen, so on a Mac&rsquo;s Retina screen, with
+ two pixels to a point, the picture is twice the window&rsquo;s size in points
+ and as sharp as the window.
 </p>
 <p> <code>capture (<var>V</var>, <var>FILE</var>)</code> writes it to <var>FILE</var> instead,
  in the format its extension names, as <code>imwrite</code> writes it; PNG
@@ -934,7 +937,9 @@ The picture the viewer shows, as an image or a file.
  picture <var>W</var> pixels wide and <var>H</var> high instead, whatever the size
  of the window, so a picture for print can be finer than the screen.
  The view keeps its height: a picture of another shape than the window
- shows more or less at the sides.
+ shows more or less at the sides.  Text, lines and the axes are drawn
+ as on a screen of one pixel to a point, so the same size gives the
+ same picture on every system.
 </p>
 <table><tr><td>&nbsp;</td><td><pre class="example"> V = show (solid.cylinder (10, 30));
  view (V, 30, 20);

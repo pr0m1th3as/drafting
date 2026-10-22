@@ -321,7 +321,9 @@
 <p> <code><var>D</var> = region (<var>D</var>, <var>R</var>)</code> appends the
  <code>geom.Region</code> <var>R</var>.  It is drawn as its loops, the outline and
  every hole, and kept as one region, so a plate and its bores stay one
- entity:
+ entity.  <var>R</var> may also be a non-empty cell array of regions, such as
+ <code>geom.text</code> and <code>geom.Region.union</code> return, appended as one
+ entity each:
 </p>
 <table><tr><td>&nbsp;</td><td><pre class="example"> R = geom.Region ([0, 0; 60, 0; 60, 40; 0, 40], ...
                   {[20, 20, 1; 40, 20, 1]});
@@ -341,7 +343,7 @@
   <a href="draw.Drawing.polyline.html">draw.Drawing.polyline</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/29043ef/inst/+draw/Drawing.m#L1068">draw.Drawing</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/fc40439/inst/+draw/Drawing.m#L1070">draw.Drawing</a>
 </p>
 </div>
 

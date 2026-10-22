@@ -321,9 +321,11 @@
 </p>
 <div class="ms-5">
 <p> <code><var>D</var> = hatch (<var>D</var>, <var>R</var>)</code> fills the <code>geom.Region</code>
- <var>R</var> with a hatch pattern, its holes left clear.  The region may
- have arcs and splines; a polygon is made into one with
- <code>geom.Region (<var>P</var>)</code>:
+ <var>R</var> with a hatch pattern, its holes left clear.  <var>R</var> may also be
+ a non-empty cell array of regions, such as <code>geom.text</code> and
+ <code>geom.Region.union</code> return, each filled alike and appended as an
+ entity of its own.  The regions may have arcs and splines; a polygon is
+ made into one with <code>geom.Region (<var>P</var>)</code>:
 </p>
 <table><tr><td>&nbsp;</td><td><pre class="example"> R = geom.Region ([0, 0; 60, 0; 60, 40; 0, 40], ...
                   {[20, 20, 1; 40, 20, 1]});
@@ -347,7 +349,7 @@
   <a href="geom.hatchlines.html">geom.hatchlines</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/29043ef/inst/+draw/Drawing.m#L1300">draw.Drawing</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/fc40439/inst/+draw/Drawing.m#L1313">draw.Drawing</a>
 </p>
 </div>
 

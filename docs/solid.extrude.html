@@ -406,6 +406,11 @@
  thickness.  The holes of the region go right through, and its arcs become
  true circular edges and cylindrical faces.
 </p>
+<p> <var>R</var> may also be a cell array of regions, such as <code>geom.text</code> and
+ <code>geom.Region.union</code> return: each is extruded as the options say and
+ the solids are fused into one shape, so the letters of a name become one
+ solid.  The cell must not be empty.
+</p>
 <p> <var>H</var> says how far, in millimetres, and which way:
 </p>
 <dl compact="compact">
@@ -466,7 +471,7 @@
   <a href="solid.sweep.html">solid.sweep</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/29043ef/inst/+solid/extrude.m">solid.extrude</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/fc40439/inst/+solid/extrude.m">solid.extrude</a>
 </p>
 </div>
 

@@ -379,6 +379,10 @@
  a boss is one region with the boss as its hole, and <code>fillet</code> on
  the region rounds the pocket&rsquo;s corners as a milling cutter leaves them.
 </p>
+<p> <var>R</var> may also be a cell array of regions, such as <code>geom.text</code>
+ and <code>geom.Region.union</code> return: every one is cut, each from its own
+ plane, so a name is engraved in one call.  The cell must not be empty.
+</p>
 <p> The cutter comes from outside, as for <code>solid.Shape.hole</code>:
  everything inside the outline beyond the region&rsquo;s plane, on the side its
  normal points to, is cleared too, so a pocket drawn on a sloping or
@@ -406,7 +410,7 @@
   <a href="geom.Region.html#geom_Region_fillet">geom.Region.fillet</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/29043ef/inst/+solid/Shape.m#L2375">solid.Shape</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/fc40439/inst/+solid/Shape.m#L2394">solid.Shape</a>
 </p>
 </div>
 

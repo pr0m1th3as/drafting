@@ -407,6 +407,11 @@
  bush, a pulley or a knob is modelled.  A hole in the region becomes a
  closed ring-shaped cavity.
 </p>
+<p> <var>R</var> may also be a cell array of regions, such as
+ <code>geom.Region.union</code> returns: each is turned about the axis of its own
+ plane and the solids are fused into one shape.  The cell must not be
+ empty.
+</p>
 <p> A region in the default <em class="math">xy</em> plane turns about the model&rsquo;s <em class="math">y</em>
  axis.  For a part along <em class="math">z</em>, draw the region in the <em class="math">xz</em> plane,
  whose <em class="math">y</em> axis is the model&rsquo;s <em class="math">z</em> axis:
@@ -435,7 +440,7 @@
   <a href="solid.helix.html">solid.helix</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/29043ef/inst/+solid/revolve.m">solid.revolve</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/fc40439/inst/+solid/revolve.m">solid.revolve</a>
 </p>
 </div>
 

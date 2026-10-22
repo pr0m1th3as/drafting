@@ -404,6 +404,10 @@
  welded sections or a pipe run is modelled; a hole in the region makes a
  tube.
 </p>
+<p> <var>R</var> may also be a cell array of regions, such as
+ <code>geom.Region.union</code> returns: each is swept along <var>P</var> and the
+ solids are fused into one shape.  The cell must not be empty.
+</p>
 <p> Along an arc or a spline of the path the solid bends smoothly.  Where two
  segments meet at an angle the solid keeps a sharp corner, mitred as two
  sawn lengths are joined; round such a corner with <code>geom.Path.fillet</code>
@@ -437,7 +441,7 @@
   <a href="solid.helix.html">solid.helix</a>
 </p>
 <p><strong>Source Code: </strong>
-  <a href="https://github.com/pr0m1th3as/drafting/blob/29043ef/inst/+solid/sweep.m">solid.sweep</a>
+  <a href="https://github.com/pr0m1th3as/drafting/blob/fc40439/inst/+solid/sweep.m">solid.sweep</a>
 </p>
 </div>
 
