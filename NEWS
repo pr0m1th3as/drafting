@@ -1,40 +1,18 @@
-Summary of important user-visible changes for drafting 0.2.3:
+Summary of important user-visible changes for drafting 0.2.4:
 -------------------------------------------------------------------
 
- ** drafting installs and runs on Windows, the viewer included: on GNU
-    Octave 11.1.0 and 11.3.0, `pkg install` fetches Open CASCADE built with
-    Octave's own compiler and installs it with the package.
+ ** `solid.extrude`, `solid.revolve`, `solid.sweep`, `solid.helix`,
+    `solid.Shape.pocket`, `draw.Drawing.hatch` and `draw.Drawing.region`
+    take a cell array of regions, as `geom.text`, `geom.Region.union` and
+    `solid.Shape.section` return it.
 
- ** drafting builds and runs on macOS, the viewer included, with Octave and
-    Open CASCADE from Homebrew.
-
- ** New method `solid.Shape.facefillet (S, F)`: a full round on each row of
-    faces `[side, middle, side]`, as on the end of a wall; with a radius R,
-    rows of two faces are rounded along the edges they share.
-
- ** STEP files ending in `.stp` are read and written as well as `.step`.
+ ** `model.Viewer` lights the view from above and to the left, so the
+    faces of a box seen from its corner are no longer one flat grey.
 
  ** Bug fixes:
-    - `solid.Shape.volume`, `area` and `centroid` measure solids extruded
-      or revolved from splines exactly, and text to about 3e-6; areas were
-      off by up to 8e-3, and volumes of text by up to 6e-4.
-    - `solid.holespec` made the fine countersink of type A and the
-      countersink of type B too narrow for their heads, 8 across for M4
-      where an ISO 7046 head is up to 8.4; they are cones as wide as IS 3406
-      draws them.
-    - `solid.Shape.knurl`, `thread` and `hole` refuse cuts into a bore,
-      through a wall round a bore that is not a cylinder, or into pieces;
-      they failed, ran for over 20 minutes, or returned hundreds of loose
-      solids.
-    - `solid.Shape.section` failed on a plane near the root of a thread or
-      a knurl, and returned cuts with pieces missing where Open CASCADE
-      loses them, which is now an error.
-    - `solid.Shape.knurl` said "F must end in a circle at each end" of a
-      face with a hole or pocket in it.
-    - `draw.Drawing.entities` with `'Blocks', 'reference'` pointed
-      dimensions at blocks it did not return, and drew every insert in the
-      default colour and line type.
-    - `model.Viewer.pick` with `'face'` highlighted the whole solid.
-    - `model.Viewer.pick` returned edges, faces and solids in increasing
-      order, not in the order they were picked, so a `facefillet` row
-      picked side, middle, side lost its middle face.
+    - `model.Viewer` on a macOS Retina screen: picks, the double click and
+      zooming at the cursor landed at twice the cursor's coordinates, so a
+      pick took the wrong face or none.
+    - `model.Viewer` on a macOS Retina screen drew the corner axes, text
+      and edge lines at half size, and `capture` returned half the
+      screen's resolution.
