@@ -5730,12 +5730,24 @@ function directly. \n\
       if (cmd == "fillet")
       {
         BRepFilletAPI_MakeFillet op (s);
-        for (const TopoDS_Shape& e : edges)
+        // Open CASCADE throws on some edges it cannot round, while adding
+        // them or building, as where a boss meets a wall tangent to it, and
+        // reports others as not done
+        bool built = true;
+        try
         {
-          op.Add (size, TopoDS::Edge (e));
+          for (const TopoDS_Shape& e : edges)
+          {
+            op.Add (size, TopoDS::Edge (e));
+          }
+          op.Build ();
         }
-        op.Build ();
-        if (! op.IsDone () || ! BRepCheck_Analyzer (op.Shape ()).IsValid ())
+        catch (const Standard_Failure&)
+        {
+          built = false;
+        }
+        if (! built || ! op.IsDone ()
+            || ! BRepCheck_Analyzer (op.Shape ()).IsValid ())
         {
           error ("%s: Open CASCADE could not round the edges.",
                  caller.c_str ());
@@ -5747,43 +5759,53 @@ function directly. \n\
       {
         BRepFilletAPI_MakeChamfer op (s);
         const NDArray d = args(4).array_value ();
-        if (args.length () > 6 && args(6).double_value () > 0)
+        // Thrown or not done, as for a fillet
+        bool built = true;
+        try
         {
-          // D is set back along the face given, and the chamfer meets that
-          // face at the angle given
-          ShapeMap fmap;
-          TopExp::MapShapes (s, TopAbs_FACE, fmap);
-          const TopoDS_Face f = TopoDS::Face
-                                  (fmap (static_cast<int> (args(5)
-                                                           .double_value ())));
-          const double a = args(6).double_value () * M_PI / 180;
-          for (const TopoDS_Shape& e : edges)
+          if (args.length () > 6 && args(6).double_value () > 0)
           {
-            op.AddDA (d(0), a, TopoDS::Edge (e), f);
+            // D is set back along the face given, and the chamfer meets that
+            // face at the angle given
+            ShapeMap fmap;
+            TopExp::MapShapes (s, TopAbs_FACE, fmap);
+            const TopoDS_Face f
+              = TopoDS::Face (fmap (static_cast<int> (args(5)
+                                                      .double_value ())));
+            const double a = args(6).double_value () * M_PI / 180;
+            for (const TopoDS_Shape& e : edges)
+            {
+              op.AddDA (d(0), a, TopoDS::Edge (e), f);
+            }
           }
+          else if (d.numel () == 2)
+          {
+            // D1 is set back along the face given, D2 along the other
+            ShapeMap fmap;
+            TopExp::MapShapes (s, TopAbs_FACE, fmap);
+            const TopoDS_Face f
+              = TopoDS::Face (fmap (static_cast<int> (args(5)
+                                                      .double_value ())));
+            for (const TopoDS_Shape& e : edges)
+            {
+              op.Add (d(0), d(1), TopoDS::Edge (e), f);
+            }
+          }
+          else
+          {
+            for (const TopoDS_Shape& e : edges)
+            {
+              op.Add (size, TopoDS::Edge (e));
+            }
+          }
+          op.Build ();
         }
-        else if (d.numel () == 2)
+        catch (const Standard_Failure&)
         {
-          // D1 is set back along the face given, D2 along the other
-          ShapeMap fmap;
-          TopExp::MapShapes (s, TopAbs_FACE, fmap);
-          const TopoDS_Face f = TopoDS::Face
-                                  (fmap (static_cast<int> (args(5)
-                                                           .double_value ())));
-          for (const TopoDS_Shape& e : edges)
-          {
-            op.Add (d(0), d(1), TopoDS::Edge (e), f);
-          }
+          built = false;
         }
-        else
-        {
-          for (const TopoDS_Shape& e : edges)
-          {
-            op.Add (size, TopoDS::Edge (e));
-          }
-        }
-        op.Build ();
-        if (! op.IsDone () || ! BRepCheck_Analyzer (op.Shape ()).IsValid ())
+        if (! built || ! op.IsDone ()
+            || ! BRepCheck_Analyzer (op.Shape ()).IsValid ())
         {
           error ("%s: Open CASCADE could not chamfer the edges.",
                  caller.c_str ());
