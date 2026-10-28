@@ -42,6 +42,14 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #elif defined (__APPLE__)
 #  include <dlfcn.h>
 #endif
+#if ! defined (_WIN32)
+// Open CASCADE is built to turn a fault inside it into an exception on Linux
+// and macOS, at the nearest OCC_CATCH_SIGNALS; this file is built to match
+#  include <csignal>
+#  if ! defined (OCC_CONVERT_SIGNALS)
+#    define OCC_CONVERT_SIGNALS
+#  endif
+#endif
 
 #include <APIHeaderSection_MakeHeader.hxx>
 #include <BRepAdaptor_Curve.hxx>
@@ -181,6 +189,9 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <TransferBRep.hxx>
 #include <XSControl_TransferReader.hxx>
 #include <XSControl_WorkSession.hxx>
+#include <OSD.hxx>
+#include <OSD_Signal.hxx>
+#include <Standard_ErrorHandler.hxx>
 #include <Standard_Failure.hxx>
 #include <TCollection_HAsciiString.hxx>
 #include <TopExp.hxx>
@@ -261,6 +272,67 @@ quiet ()
     done = true;
   }
 }
+
+#if ! defined (_WIN32)
+// The signals a fault raises
+static const int faultsignals[] = {SIGSEGV, SIGBUS, SIGFPE, SIGILL};
+static const int nfaults = sizeof (faultsignals) / sizeof (faultsignals[0]);
+
+// While one lives, a fault inside Open CASCADE, which would end Octave, goes
+// to Open CASCADE's handler, which turns it into an exception.  Octave's
+// handlers for the faults are put back when it ends, and Octave keeps Ctrl-C
+// and every other signal throughout.
+class faults
+{
+public:
+
+  faults ()
+  {
+    // OSD::SetSignal sets handlers for many signals at once: it is called
+    // once, its handlers for the faults kept and Octave's put back for all
+    static struct sigaction occt[nfaults];
+    static bool taken = false;
+    if (! taken)
+    {
+      struct sigaction keep[NSIG];
+      bool kept[NSIG];
+      for (int s = 1; s < NSIG; s++)
+      {
+        kept[s] = (sigaction (s, nullptr, &keep[s]) == 0);
+      }
+      OSD::SetSignal (OSD_SignalMode_Set, false);
+      for (int i = 0; i < nfaults; i++)
+      {
+        sigaction (faultsignals[i], nullptr, &occt[i]);
+      }
+      for (int s = 1; s < NSIG; s++)
+      {
+        if (kept[s])
+        {
+          sigaction (s, &keep[s], nullptr);
+        }
+      }
+      taken = true;
+    }
+    for (int i = 0; i < nfaults; i++)
+    {
+      sigaction (faultsignals[i], &occt[i], &octave[i]);
+    }
+  }
+
+  ~faults ()
+  {
+    for (int i = 0; i < nfaults; i++)
+    {
+      sigaction (faultsignals[i], &octave[i], nullptr);
+    }
+  }
+
+private:
+
+  struct sigaction octave[nfaults];
+};
+#endif
 
 // The number of distinct sub-shapes of one kind.  A shared edge is counted
 // once, which a plain explorer does not do.
@@ -5499,9 +5571,13 @@ function directly. \n\
 
   quiet ();
 
+#if ! defined (_WIN32)
+  const faults caught;
+#endif
   octave_value out;
   try
   {
+    OCC_CATCH_SIGNALS
     // Primitives
     if (cmd == "box")
     {
@@ -5731,11 +5807,12 @@ function directly. \n\
       {
         BRepFilletAPI_MakeFillet op (s);
         // Open CASCADE throws on some edges it cannot round, while adding
-        // them or building, as where a boss meets a wall tangent to it, and
-        // reports others as not done
+        // them or building, as where a boss meets a wall tangent to it,
+        // faults on others and reports the rest as not done
         bool built = true;
         try
         {
+          OCC_CATCH_SIGNALS
           for (const TopoDS_Shape& e : edges)
           {
             op.Add (size, TopoDS::Edge (e));
@@ -5759,10 +5836,11 @@ function directly. \n\
       {
         BRepFilletAPI_MakeChamfer op (s);
         const NDArray d = args(4).array_value ();
-        // Thrown or not done, as for a fillet
+        // Thrown, faulted or not done, as for a fillet
         bool built = true;
         try
         {
+          OCC_CATCH_SIGNALS
           if (args.length () > 6 && args(6).double_value () > 0)
           {
             // D is set back along the face given, and the chamfer meets that
@@ -6636,6 +6714,11 @@ function directly. \n\
     {
       error ("__occt__: unknown command '%s'.", cmd.c_str ());
     }
+  }
+  catch (const OSD_Signal& e)
+  {
+    error ("%s: Open CASCADE crashed (%s).", caller.c_str (),
+           failurekind (e));
   }
   catch (const Standard_Failure& e)
   {
