@@ -2047,7 +2047,23 @@ endfunction
 %! end_unwind_protect
 
 %!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
-%! ## A view read back and set again draws the same picture
+%! ## A view read back and set again reads back the same
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Model = solid.box (80, 40, 4);
+%!   view (V, 30, 60, 4, [80, 40, 4]);
+%!   [az, el, zoom, target] = view (V);
+%!   view (V, az, el, zoom, target);
+%!   [az2, el2, zoom2, target2] = view (V);
+%!   assert_equal ([az2, el2, zoom2, target2], [az, el, zoom, target]);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
+%! ## A view read back and set again draws the same picture.  The view comes
+%! ## back to within 1e-9, which can flip a pixel on an edge; a view 0.1
+%! ## degrees or 1% of zoom off changes some 350 pixels.
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
 %!   V.Model = solid.box (80, 40, 4);
@@ -2055,7 +2071,7 @@ endfunction
 %!   I = capture (V);
 %!   [az, el, zoom, target] = view (V);
 %!   view (V, az, el, zoom, target);
-%!   assert_equal (capture (V), I);
+%!   assert_equal (nnz (any (capture (V) != I, 3)) <= 20, true);
 %! unwind_protect_cleanup
 %!   close (V);
 %! end_unwind_protect
