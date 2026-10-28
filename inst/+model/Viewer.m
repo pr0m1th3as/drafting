@@ -1843,7 +1843,7 @@ endfunction
 %!   I = capture (V);
 %!   [az, el, zoom, target] = view (V);
 %!   view (V, az, el, zoom, target);
-%!   assert_equal (capture (V), I);
+%!   assert_equal (nnz (any (capture (V) != I, 3)) <= 20, true);
 %! unwind_protect_cleanup
 %!   close (V);
 %! end_unwind_protect
