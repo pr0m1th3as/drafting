@@ -91,11 +91,16 @@ solids can be rounded:
 - `solid.Shape.facefillet` rounds flat faces whose thickness changes along
   the edge, with a cone where a cylinder no longer fits, and ends a round
   flush with end faces at any angle.
+- `solid.Shape.fillet` and `solid.Shape.chamfer` round or chamfer an edge
+  whose round or chamfer reaches the far edge of a face, which Open
+  CASCADE refuses: on a straight edge between flat faces and a circular
+  edge of a turned part, the cross-section is swept or turned along the
+  edge and subtracted, exact. Passing the far edge stays refused.
 - `solid.surface` takes grids closed in one direction or both.
 - The property `Shape` of `model.Viewer`, renamed `Model` in 0.2.2, is
   removed.
 
-## Exact curve operations
+## Exact curve operations (0.3.0)
 
 The planar curve functions, `curvature`, `curvesample`, `curveoffset`,
 `resample`, `simplify` and `arclength`, take points and return points, so a
@@ -109,7 +114,11 @@ with the sampled functions kept and unchanged:
   `geom.Region` included;
 - offsets of open polylines and paths with their arcs and splines kept exact.
 
-It needs nothing from the drawing work and can go before or alongside it.
+Offsets follow `geom.Region.offset`: lines stay lines and arcs arcs, and a
+spline's offset is a spline Open CASCADE fits to it. A path is offset only
+when it is planar; a path in 3-D is refused.
+
+It needs nothing from the drawing work and goes alongside it in 0.3.0.
 General queries, the distance to a curve, the nearest point on it, the
 smallest enclosing circle or box, wait until a package built on this one
 needs them.
