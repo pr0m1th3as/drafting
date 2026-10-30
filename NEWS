@@ -1,18 +1,10 @@
-Summary of important user-visible changes for drafting 0.2.4:
+Summary of important user-visible changes for drafting 0.2.5:
 -------------------------------------------------------------------
 
- ** `solid.extrude`, `solid.revolve`, `solid.sweep`, `solid.helix`,
-    `solid.Shape.pocket`, `draw.Drawing.hatch` and `draw.Drawing.region`
-    take a cell array of regions, as `geom.text`, `geom.Region.union` and
-    `solid.Shape.section` return it.
-
- ** `model.Viewer` lights the view from above and to the left, so the
-    faces of a box seen from its corner are no longer one flat grey.
-
  ** Bug fixes:
-    - `model.Viewer` on a macOS Retina screen: picks, the double click and
-      zooming at the cursor landed at twice the cursor's coordinates, so a
-      pick took the wrong face or none.
-    - `model.Viewer` on a macOS Retina screen drew the corner axes, text
-      and edge lines at half size, and `capture` returned half the
-      screen's resolution.
+    - A crash inside Open CASCADE no longer ends Octave on Linux and
+      macOS: it raises an error instead.
+    - `solid.Shape.fillet`, `chamfer` and `facefillet` with a radius gave
+      Open CASCADE's own message where it threw, as on an edge where a
+      boss meets a wall tangent to it.  They now say "could not round the
+      edges." or "could not chamfer the edges.".
