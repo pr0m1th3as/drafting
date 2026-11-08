@@ -100,6 +100,42 @@ classdef Assembly
 
     endfunction
 
+    function varargout = area (this, varargin)
+
+      error ("model.Assembly.area: %s", notdefined (inputname (1, false)));
+
+    endfunction
+
+    function varargout = bbox (this, varargin)
+
+      error ("model.Assembly.bbox: %s", notdefined (inputname (1, false)));
+
+    endfunction
+
+    function varargout = intersect (this, varargin)
+
+      error ("model.Assembly.intersect: %s", notdefined (inputname (1, false)));
+
+    endfunction
+
+    function varargout = isvalid (this, varargin)
+
+      error ("model.Assembly.isvalid: %s", notdefined (inputname (1, false)));
+
+    endfunction
+
+    function varargout = numsolids (this, varargin)
+
+      error ("model.Assembly.numsolids: %s", notdefined (inputname (1, false)));
+
+    endfunction
+
+    function varargout = volume (this, varargin)
+
+      error ("model.Assembly.volume: %s", notdefined (inputname (1, false)));
+
+    endfunction
+
   endmethods
 
   methods (Access = public)
@@ -727,6 +763,17 @@ function name = meshpart (A)
 
 endfunction
 
+## The message for a solid.Shape method called on the assembly written as NAME
+function errmsg = notdefined (NAME)
+
+  if (isempty (NAME))
+    NAME = 'A';
+  endif
+  errmsg = sprintf (strcat ("not defined for an assembly; use `shape (%s)`", ...
+                            " to retrieve it as a solid.Shape."), NAME);
+
+endfunction
+
 ## True when the parts X and Y are the same: shapes of the same bytes and
 ## colours, or assemblies of the same name, parts and placements
 function TF = same (X, Y)
@@ -1117,3 +1164,26 @@ endfunction
 %! write (add (model.Assembly (), 'tet', tetrapart (), geom.UCS ()), 'a.step')
 %!error<model.Assembly.tessellate: TOL must be a positive and finite real scalar.> ...
 %! tessellate (model.Assembly (), 0)
+%!error<model.Assembly.area: not defined for an assembly; use `shape \(B\)` to retrieve it as a solid.Shape.> ...
+%! B = model.Assembly ();
+%! area (B)
+%!error<model.Assembly.bbox: not defined for an assembly; use `shape \(B\)` to retrieve it as a solid.Shape.> ...
+%! B = model.Assembly ();
+%! bbox (B)
+%!error<model.Assembly.intersect: not defined for an assembly; use `shape \(B\)` to retrieve it as a solid.Shape.> ...
+%! B = model.Assembly ();
+%! intersect (B, solid.box (1, 1, 1))
+%!error<model.Assembly.isvalid: not defined for an assembly; use `shape \(B\)` to retrieve it as a solid.Shape.> ...
+%! B = model.Assembly ();
+%! isvalid (B)
+%!error<model.Assembly.numsolids: not defined for an assembly; use `shape \(B\)` to retrieve it as a solid.Shape.> ...
+%! B = model.Assembly ();
+%! numsolids (B)
+%!error<model.Assembly.volume: not defined for an assembly; use `shape \(B\)` to retrieve it as a solid.Shape.> ...
+%! B = model.Assembly ();
+%! volume (B)
+%!error<model.Assembly.volume: not defined for an assembly; use `shape \(A\)` to retrieve it as a solid.Shape.> ...
+%! B = model.Assembly ();
+%! B.volume ()
+%!error<model.Assembly.area: not defined for an assembly; use `shape \(model.Assembly \(\)\)` to retrieve it as a solid.Shape.> ...
+%! area (model.Assembly ())
