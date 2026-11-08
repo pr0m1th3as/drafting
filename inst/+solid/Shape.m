@@ -3712,9 +3712,10 @@ endfunction
 function errmsg = checkindex (I, N, name, what, emptyok)
 
   errmsg = '';
-  if (! isnumeric (I) || ! isreal (I) || ! (isvector (I) || isempty (I))
-      || (isempty (I) && ! emptyok) || any (I != fix (I)) || any (I < 1)
-      || any (I > N))
+  if (isnumeric (I) && isempty (I) && ! emptyok)
+    errmsg = sprintf ("%s is empty: no %s was selected.", name, what);
+  elseif (! isnumeric (I) || ! isreal (I) || ! (isvector (I) || isempty (I))
+          || any (I != fix (I)) || any (I < 1) || any (I > N))
     errmsg = sprintf ("%s must be a vector of %s indices of S.", name, what);
   endif
 
