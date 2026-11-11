@@ -119,9 +119,43 @@ spline's offset is a spline Open CASCADE fits to it. A path is offset only
 when it is planar; a path in 3-D is refused.
 
 It needs nothing from the drawing work and goes alongside it in 0.3.0.
+
 General queries, the distance to a curve, the nearest point on it, the
 smallest enclosing circle or box, wait until a package built on this one
 needs them.
+
+## Solid operations (0.3.0)
+
+What a part printed to fit, or a drive assembled from parts, needs from its
+solids beyond the booleans, rounds and features already there:
+
+- `solid.Shape.offset` grows or shrinks a solid by a distance, the joins
+  rounded, so a pocket with a clearance all round is the part offset and
+  subtracted. It makes good the claim that a shape is rounded by `fillet`
+  and the offsets, which holds today for regions only. Given faces, it
+  moves those faces alone, by one distance or one each, and extends or
+  trims their neighbours to meet them: the holes of a printed part opened
+  by what the printer closes them, one fit eased, or a size changed on a
+  solid read from STEP, which records nothing it was built from. Where a
+  neighbour cannot be extended, or a face would vanish or a hole close, it
+  is refused; a round beside a moved face is not solved again, so faces
+  are offset before they are rounded.
+- `solid.Shape.split` cuts a solid by a plane or by another shape and
+  returns the pieces, so a part larger than the printer's bed is printed in
+  parts.
+- `model.Assembly` reports, for each pair of parts, whether they overlap and
+  by what volume, and the smallest gap between them, so a collision or a
+  clearance below what the process holds is found before anything is made.
+- The mass properties are completed: the inertia tensor about the centroid
+  or a given point, the principal moments and axes, and the mass for a
+  density. The density is given as a number, so a material from `parts`
+  is passed by its value and the package depends on nothing above it.
+- `solid.Shape.draft` tapers chosen faces by an angle against a pull
+  direction about a neutral plane, for cast and moulded parts and for faces
+  printed without support.
+
+Each is an Open CASCADE algorithm bound in compiled code, as the booleans
+are. It needs nothing from the drawing work and goes alongside it in 0.3.0.
 
 ## Sheets and multi-view composition (0.4.0)
 
