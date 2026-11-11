@@ -170,10 +170,11 @@ __occtfont__.oct: __occtfont__.cc shapebytes.h
 
 # Never unloaded: Open CASCADE's worker threads outlive the calls that start
 # them, and would crash Octave at exit if their libraries went first; on
-# Windows and macOS the file pins itself
-__occt__.oct: __occt__.cc shapebytes.h
-	$(MKOCTFILE) -I$(OCCT_INC) __occt__.cc $(LIB_DIRS) $(RPATH) \
-	  $(OCCT_LIBS) $(NODELETE)
+# Windows and macOS the file pins itself.  The names of faces are kept in a
+# source of their own, linked into the same file.
+__occt__.oct: __occt__.cc facenames.cc facenames.h shapebytes.h
+	$(MKOCTFILE) -I$(OCCT_INC) -o __occt__.oct __occt__.cc facenames.cc \
+	  $(LIB_DIRS) $(RPATH) $(OCCT_LIBS) $(NODELETE)
 
 $(VIEWER): __occtview__.cc shapebytes.h
 	$(shell $(MKOCTFILE) -p CXX) -O2 $(VIEW_FLAGS) -I$(OCCT_INC) \
