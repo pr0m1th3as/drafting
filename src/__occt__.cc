@@ -214,6 +214,7 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <gp_Trsf.hxx>
 
 #include "shapebytes.h"
+#include "facenames.h"
 
 using namespace std;
 
@@ -348,12 +349,13 @@ count (const TopoDS_Shape& s, TopAbs_ShapeEnum type)
   return map.Extent ();
 }
 
-// A shape from the bytes held by a solid.Shape; empty bytes are the empty
-// shape.
+// A shape from the bytes held by a solid.Shape, and in NAMES the names of
+// its faces; empty bytes are the empty shape.
 static TopoDS_Shape
-toshape (const octave_value& v, const string& caller)
+toshape (const octave_value& v, const string& caller, facetable& names)
 {
   TopoDS_Shape s;
+  names = facetable ();
   if (v.isempty ())
   {
     return s;
@@ -374,20 +376,36 @@ toshape (const octave_value& v, const string& caller)
   {
     error ("%s: shape data is not an Open CASCADE shape.", caller.c_str ());
   }
-  if (! unsealshape (bytes))
+  string held;
+  if (! unsealshape (bytes, held))
   {
     error ("%s: shape data is damaged, or was not made by this version of"
            " the package.", caller.c_str ());
   }
   istringstream is (bytes);
   BinTools::Read (s, is);
+  if (! held.empty ())
+  {
+    names = readnames (held);
+  }
   return s;
 }
 
-// The bytes of a shape.  A shape with no faces, such as the result of
-// intersecting two solids that do not meet, is returned as the empty shape.
+// A shape from the bytes held by a solid.Shape, for an operation that does
+// not carry the names of faces: they are dropped, never passed on to faces
+// the operation may have changed
+static TopoDS_Shape
+toshape (const octave_value& v, const string& caller)
+{
+  facetable names;
+  return toshape (v, caller, names);
+}
+
+// The bytes of a shape, with the names of its faces when it has any.  A
+// shape with no faces, such as the result of intersecting two solids that do
+// not meet, is returned as the empty shape.
 static octave_value
-todata (const TopoDS_Shape& s)
+todata (const TopoDS_Shape& s, const facetable& names = facetable ())
 {
   if (count (s, TopAbs_FACE) == 0)
   {
@@ -397,7 +415,7 @@ todata (const TopoDS_Shape& s)
   BinTools::Write (s, os, false, false,
                    BinTools_FormatVersion_CURRENT);
   string bytes = os.str ();
-  sealshape (bytes);
+  sealshape (bytes, names.unnamed () ? string () : writenames (names));
   uint8NDArray a (dim_vector (1, bytes.size ()));
   for (size_t i = 0; i < bytes.size (); i++)
   {
@@ -1775,6 +1793,18 @@ transform (const TopoDS_Shape& s, const gp_Trsf& t)
   return BRepBuilderAPI_Transform (s, t, true).Shape ();
 }
 
+// The same, NAMES, the names of the faces of S, made those of the result
+static TopoDS_Shape
+transform (const TopoDS_Shape& s, const gp_Trsf& t, facetable& names)
+{
+  BRepBuilderAPI_Transform op (s, t, true);
+  const TopoDS_Shape r = op.Shape ();
+  names = carrynames ([&op] (const TopoDS_Shape& f)
+                      -> const TopTools_ListOfShape&
+                      { return op.Modified (f); }, {s}, {names}, r);
+  return r;
+}
+
 // The transformation into the frame F, rows origin, x axis, y axis and
 // normal, where its plane is z = 0
 static gp_Trsf
@@ -2653,11 +2683,12 @@ itself (int n)
   return L;
 }
 
-// A shape's bytes and where its solids came from, as the commands that
-// change solids return them: a row for each solid of the solids it came
-// from, in increasing order, padded with 0
+// A shape's bytes, with the names of its faces NAMES, and where its solids
+// came from, as the commands that change solids return them: a row for each
+// solid of the solids it came from, in increasing order, padded with 0
 static Cell
-traced (const TopoDS_Shape& r, const origins& L)
+traced (const TopoDS_Shape& r, const origins& L,
+        const facetable& names = facetable ())
 {
   size_t k = 0;
   for (const auto& o : L)
@@ -2674,7 +2705,7 @@ traced (const TopoDS_Shape& r, const origins& L)
     }
   }
   Cell c (1, 2);
-  c(0) = todata (r);
+  c(0) = todata (r, names);
   c(1) = M;
   return c;
 }
@@ -2960,9 +2991,10 @@ offsetwire (const TopoDS_Wire& w, double d, const gp_Vec& v,
 
 // S with every spline face that lies in a plane made a true plane on the
 // same edges, so that a flat wall counts as flat when queried, picked or
-// drawn.  A ruled loft makes even a flat wall a spline.
+// drawn.  A ruled loft makes even a flat wall a spline.  NAMES, the names of
+// the faces of S, are made those of the result.
 static TopoDS_Shape
-planarize (const TopoDS_Shape& s)
+planarize (const TopoDS_Shape& s, facetable& names)
 {
   BRepTools_ReShape rs;
   bool changed = false;
@@ -3008,7 +3040,16 @@ planarize (const TopoDS_Shape& s)
     rs.Replace (f, nf);
     changed = true;
   }
-  return changed ? rs.Apply (s) : s;
+  if (! changed)
+  {
+    return s;
+  }
+  const TopoDS_Shape r = rs.Apply (s);
+  const Handle (BRepTools_History) h = rs.History ();
+  names = carrynames ([&h] (const TopoDS_Shape& f)
+                      -> const TopTools_ListOfShape&
+                      { return h->Modified (f); }, {s}, {names}, r);
+  return r;
 }
 
 // The solid between a wire and its offset lifted, by straight lines
@@ -3042,9 +3083,11 @@ taperedside (const region& r, double h, double a, const string& caller)
   {
     holes.push_back (ruled (w, offsetwire (w, d, up, caller), caller));
   }
+  // A new solid, whose faces have no names yet
+  facetable none;
   return planarize (cutall (ruled (r.outer, offsetwire (r.outer, -d, up,
                                                        caller), caller),
-                            holes, caller));
+                            holes, caller), none);
 }
 
 // A document of Open CASCADE's framework for names and colours (XDE), in
@@ -5645,7 +5688,10 @@ function directly. \n\
                          gp_Ax3 (gp_Pnt (f(0,0), f(0,1), f(0,2)),
                                  gp_Dir (f(3,0), f(3,1), f(3,2)),
                                  gp_Dir (f(1,0), f(1,1), f(1,2))));
-      out = todata (transform (toshape (args(2), caller), t));
+      facetable names;
+      const TopoDS_Shape s = toshape (args(2), caller, names);
+      const TopoDS_Shape r = transform (s, t, names);
+      out = todata (r, names);
     }
 
     // Solids from regions, each made where the region's plane puts it.  An
@@ -5797,7 +5843,8 @@ function directly. \n\
     // Features on chosen edges and faces
     else if (cmd == "fillet" || cmd == "chamfer")
     {
-      const TopoDS_Shape s = toshape (args(2), caller);
+      facetable names;
+      const TopoDS_Shape s = toshape (args(2), caller, names);
       const ShapeList edges
         = picked (s, TopAbs_EDGE, args(3).array_value ());
       const double size = args(4).array_value ()(0);
@@ -5831,6 +5878,9 @@ function directly. \n\
         }
         r = op.Shape ();
         L = lineage (op, {s}, r);
+        names = carrynames ([&op] (const TopoDS_Shape& f)
+                            -> const TopTools_ListOfShape&
+                            { return op.Modified (f); }, {s}, {names}, r);
       }
       else
       {
@@ -5890,14 +5940,18 @@ function directly. \n\
         }
         r = op.Shape ();
         L = lineage (op, {s}, r);
+        names = carrynames ([&op] (const TopoDS_Shape& f)
+                            -> const TopTools_ListOfShape&
+                            { return op.Modified (f); }, {s}, {names}, r);
       }
-      out = traced (r, L);
+      out = traced (r, L, names);
     }
     else if (cmd == "fullround")
     {
       // Each row of faces [A, M, B] rounded across M, the pieces of every row
       // cut in one operation
-      const TopoDS_Shape s = toshape (args(2), caller);
+      facetable names;
+      const TopoDS_Shape s = toshape (args(2), caller, names);
       const Matrix F = args(3).matrix_value ();
       ShapeMap fmap;
       TopExp::MapShapes (s, TopAbs_FACE, fmap);
@@ -5923,7 +5977,10 @@ function directly. \n\
       {
         error ("%s: Open CASCADE could not round the faces.", caller.c_str ());
       }
-      out = traced (r, lineage (op, {s}, r));
+      names = carrynames ([&op] (const TopoDS_Shape& f)
+                          -> const TopTools_ListOfShape&
+                          { return op.Modified (f); }, {s}, {names}, r);
+      out = traced (r, lineage (op, {s}, r), names);
     }
     else if (cmd == "shell")
     {
@@ -6035,12 +6092,17 @@ function directly. \n\
     // a second.
     else if (cmd == "fuse")
     {
+      // Each solid with the names of its faces
       vector<TopoDS_Shape> solids;
+      vector<facetable> named;
       for (int i = 2; i < args.length (); i++)
       {
-        for (const TopoDS_Shape& p : eachsolid (toshape (args(i), caller)))
+        facetable names;
+        const TopoDS_Shape s = toshape (args(i), caller, names);
+        for (const TopoDS_Shape& p : eachsolid (s))
         {
           solids.push_back (p);
+          named.push_back (carrynames (unmodified, {s}, {names}, p));
         }
       }
       const int n = solids.size ();
@@ -6085,6 +6147,7 @@ function directly. \n\
         groups[root (i)].push_back (i);
       }
       vector<TopoDS_Shape> results;
+      vector<facetable> resultnames;
       origins L;
       for (const auto& g : groups)
       {
@@ -6092,15 +6155,18 @@ function directly. \n\
         if (G.size () == 1)
         {
           results.push_back (solids[G[0]]);
+          resultnames.push_back (named[G[0]]);
           L.push_back ({G[0] + 1});
           continue;
         }
         ShapeList objects, tools;
         vector<TopoDS_Shape> src;
+        vector<facetable> srcnames;
         for (int i : G)
         {
           (src.empty () ? objects : tools).Append (solids[i]);
           src.push_back (solids[i]);
+          srcnames.push_back (named[i]);
         }
         BRepAlgoAPI_Fuse op;
         op.SetArguments (objects);
@@ -6116,18 +6182,25 @@ function directly. \n\
           L.push_back (h);
         }
         results.push_back (r);
+        resultnames.push_back (carrynames ([&op] (const TopoDS_Shape& f)
+                                           -> const TopTools_ListOfShape&
+                                           { return op.Modified (f); },
+                                           src, srcnames, r));
       }
-      out = traced (gather (results), L);
+      const TopoDS_Shape all = gather (results);
+      out = traced (all, L, carrynames (unmodified, results, resultnames,
+                                        all));
     }
     else if (cmd == "cut")
     {
       // Each solid of the first shape cut on its own by every solid of the
       // others, since Open CASCADE cuts overlapping solids from one another
-      vector<TopoDS_Shape> sources {toshape (args(2), caller)};
+      vector<facetable> names (args.length () - 2);
+      vector<TopoDS_Shape> sources {toshape (args(2), caller, names[0])};
       ShapeList tools;
       for (int i = 3; i < args.length (); i++)
       {
-        sources.push_back (toshape (args(i), caller));
+        sources.push_back (toshape (args(i), caller, names[i-2]));
         for (const TopoDS_Shape& p : eachsolid (sources.back ()))
         {
           tools.Append (p);
@@ -6137,6 +6210,7 @@ function directly. \n\
       const int n = count (sources[0], TopAbs_SOLID);
       const int m = (n > 0 ? 1 : 0);
       vector<TopoDS_Shape> results;
+      vector<facetable> resultnames;
       origins L;
       for (size_t j = 0; j < objects.size (); j++)
       {
@@ -6158,8 +6232,18 @@ function directly. \n\
           L.push_back (g);
         }
         results.push_back (r);
+        // The solid's own names, and the tools' for the faces they cut
+        vector<facetable> srcnames (names);
+        srcnames[0] = carrynames (unmodified, {sources[0]}, {names[0]},
+                                  objects[j]);
+        resultnames.push_back (carrynames ([&op] (const TopoDS_Shape& f)
+                                           -> const TopTools_ListOfShape&
+                                           { return op.Modified (f); },
+                                           src, srcnames, r));
       }
-      out = traced (gather (results), L);
+      const TopoDS_Shape all = gather (results);
+      out = traced (all, L, carrynames (unmodified, results, resultnames,
+                                        all));
     }
     else if (cmd == "common")
     {
@@ -6167,12 +6251,14 @@ function directly. \n\
       // numbered all in turn: SEEN of them before the shape intersected
       // next.  The solids of that shape are joined first into the region
       // they cover, and each solid so far is intersected with it on its own.
-      TopoDS_Shape s = toshape (args(2), caller);
+      facetable names;
+      TopoDS_Shape s = toshape (args(2), caller, names);
       origins L = itself (count (s, TopAbs_SOLID));
       int seen = L.size ();
       for (int i = 3; i < args.length () && count (s, TopAbs_FACE) > 0; i++)
       {
-        const TopoDS_Shape t = toshape (args(i), caller);
+        facetable regionnames;
+        const TopoDS_Shape t = toshape (args(i), caller, regionnames);
         const int nt = count (t, TopAbs_SOLID);
         TopoDS_Shape region = t;
         origins R = itself (nt);
@@ -6190,10 +6276,15 @@ function directly. \n\
           join.SetTools (rest);
           region = boolean (join, caller, "intersection");
           R = lineage (join, {t}, region);
+          regionnames = carrynames ([&join] (const TopoDS_Shape& f)
+                                    -> const TopTools_ListOfShape&
+                                    { return join.Modified (f); }, {t},
+                                    {regionnames}, region);
         }
         const vector<TopoDS_Shape> objects = eachsolid (s);
         const int m = (count (s, TopAbs_SOLID) > 0 ? 1 : 0);
         vector<TopoDS_Shape> results;
+        vector<facetable> resultnames;
         origins next;
         for (size_t j = 0; j < objects.size (); j++)
         {
@@ -6224,40 +6315,60 @@ function directly. \n\
             next.push_back (g);
           }
           results.push_back (r);
+          const facetable own = carrynames (unmodified, {s}, {names},
+                                            objects[j]);
+          resultnames.push_back (carrynames ([&op] (const TopoDS_Shape& f)
+                                             -> const TopTools_ListOfShape&
+                                             { return op.Modified (f); },
+                                             {objects[j], region},
+                                             {own, regionnames}, r));
         }
         seen += nt;
         L = next;
         s = gather (results);
+        names = carrynames (unmodified, results, resultnames, s);
       }
-      out = traced (s, L);
+      out = traced (s, L, names);
     }
 
-    // Transformations
+    // Transformations, the faces keeping their names
     else if (cmd == "translate")
     {
       const gp_Pnt v = topoint (args(3));
       gp_Trsf t;
       t.SetTranslation (gp_Vec (v.X (), v.Y (), v.Z ()));
-      out = todata (transform (toshape (args(2), caller), t));
+      facetable names;
+      const TopoDS_Shape r = transform (toshape (args(2), caller, names), t,
+                                        names);
+      out = todata (r, names);
     }
     else if (cmd == "rotate")
     {
       gp_Trsf t;
       t.SetRotation (gp_Ax1 (topoint (args(5)), todir (args(4))),
                      args(3).double_value () * M_PI / 180);
-      out = todata (transform (toshape (args(2), caller), t));
+      facetable names;
+      const TopoDS_Shape r = transform (toshape (args(2), caller, names), t,
+                                        names);
+      out = todata (r, names);
     }
     else if (cmd == "mirror")
     {
       gp_Trsf t;
       t.SetMirror (gp_Ax2 (topoint (args(4)), todir (args(3))));
-      out = todata (transform (toshape (args(2), caller), t));
+      facetable names;
+      const TopoDS_Shape r = transform (toshape (args(2), caller, names), t,
+                                        names);
+      out = todata (r, names);
     }
     else if (cmd == "scale")
     {
       gp_Trsf t;
       t.SetScale (topoint (args(4)), args(3).double_value ());
-      out = todata (transform (toshape (args(2), caller), t));
+      facetable names;
+      const TopoDS_Shape r = transform (toshape (args(2), caller, names), t,
+                                        names);
+      out = todata (r, names);
     }
 
     // A scaling by its own factor along each axis, about a point: the curved
@@ -6271,14 +6382,20 @@ function directly. \n\
       g.SetVectorialPart (gp_Mat (f(0), 0, 0, 0, f(1), 0, 0, 0, f(2)));
       g.SetTranslationPart (gp_XYZ (p.X () * (1 - f(0)), p.Y () * (1 - f(1)),
                                     p.Z () * (1 - f(2))));
-      BRepBuilderAPI_GTransform gt (toshape (args(2), caller), g,
-                                    true);
+      facetable names;
+      const TopoDS_Shape s = toshape (args(2), caller, names);
+      BRepBuilderAPI_GTransform gt (s, g, true);
       if (! gt.IsDone ())
       {
         error ("%s: Open CASCADE could not scale the shape.",
                caller.c_str ());
       }
-      out = todata (planarize (gt.Shape ()));
+      names = carrynames ([&gt] (const TopoDS_Shape& f)
+                          -> const TopTools_ListOfShape&
+                          { return gt.Modified (f); }, {s}, {names},
+                          gt.Shape ());
+      const TopoDS_Shape r = planarize (gt.Shape (), names);
+      out = todata (r, names);
     }
 
     // Shapes together in one, as they are, none fused with another
@@ -6287,9 +6404,12 @@ function directly. \n\
       BRep_Builder bb;
       TopoDS_Compound c;
       bb.MakeCompound (c);
+      vector<TopoDS_Shape> parts;
+      vector<facetable> names (args.length () - 2);
       for (int i = 2; i < args.length (); i++)
       {
-        const TopoDS_Shape t = toshape (args(i), caller);
+        const TopoDS_Shape t = toshape (args(i), caller, names[i-2]);
+        parts.push_back (t);
         if (t.ShapeType () != TopAbs_COMPOUND)
         {
           bb.Add (c, t);
@@ -6300,7 +6420,8 @@ function directly. \n\
           bb.Add (c, it.Value ());
         }
       }
-      out = traced (c, itself (count (c, TopAbs_SOLID)));
+      out = traced (c, itself (count (c, TopAbs_SOLID)),
+                    carrynames (unmodified, parts, names, c));
     }
 
     // The cut through a shape by the plane of a frame, rows origin, x axis,

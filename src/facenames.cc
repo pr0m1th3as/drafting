@@ -170,6 +170,13 @@ readnames (const std::string& b)
   return t;
 }
 
+const TopTools_ListOfShape&
+unmodified (const TopoDS_Shape&)
+{
+  static const TopTools_ListOfShape none;
+  return none;
+}
+
 facetable
 carrynames (const modifiedfaces& modified,
             const std::vector<TopoDS_Shape>& sources,

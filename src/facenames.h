@@ -79,6 +79,10 @@ facetable readnames (const std::string& bytes);
 typedef std::function<const TopTools_ListOfShape& (const TopoDS_Shape&)>
   modifiedfaces;
 
+// No faces, for a step that modifies none: one that gathers shapes into one,
+// or takes a part of a shape, whose faces carry their names as they are
+const TopTools_ListOfShape& unmodified (const TopoDS_Shape& face);
+
 // The names of the faces of RESULT, carried by an operation from the faces
 // of SOURCES, whose names are NAMES, one table for each source.  A face of
 // RESULT that is a face of a source, or one the operation modified a face of
