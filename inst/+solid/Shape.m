@@ -1295,10 +1295,22 @@ classdef Shape
     ## edge is chosen when it lies wholly inside, to within 1e-6 millimetres.
     ##
     ## @item @qcode{'Face'}
-    ## Face indices, as @code{solid.Shape.faces} returns them.  An edge is
-    ## chosen when it bounds any of these faces, so all the edges round a
-    ## face can be rounded or chamfered in one step:
+    ## Face indices, as @code{solid.Shape.faces} returns them, or a name or a
+    ## cell array of names, as @code{solid.Shape.faces} takes them with
+    ## @qcode{'Label'}.  An edge is chosen when it bounds any of these faces,
+    ## so all the edges round a face can be rounded or chamfered in one step:
     ## @code{fillet (@var{S}, edges (@var{S}, 'Face', @var{F}), @var{R})}.
+    ##
+    ## @item @qcode{'Between'}
+    ## Two sides, each faces given as for @qcode{'Face'}, in a cell array, or
+    ## two face indices in a vector.  An edge is chosen when it lies between
+    ## a face of one side and another face of the other: @code{edges (@var{S},
+    ## 'Between', @{'plate.zmax', 'boss.side'@})} is the circle where a boss
+    ## meets the top of a plate.  A side may name several faces, as
+    ## @code{@{'shaft', @{'lower.zmin', 'upper.zmax'@}@}} chooses where a shaft
+    ## leaves two plates and not where it crosses the gap between them.  The
+    ## edge a fillet or chamfer has replaced lies between its two faces no
+    ## more, and is not chosen.
     ## @end table
     ##
     ## @example
@@ -1319,7 +1331,8 @@ classdef Shape
       kinds = {'line', 'circle', 'ellipse', 'bspline', 'other'};
       [errmsg, opt] = options (varargin, struct ('Type', [], ...
                                                  'Direction', [], ...
-                                                 'Within', [], 'Face', []));
+                                                 'Within', [], 'Face', [], ...
+                                                 'Between', []));
       if (isempty (errmsg))
         [errmsg, opt.Type] = checktype (opt.Type, kinds, 'curve');
       endif
@@ -1330,7 +1343,27 @@ classdef Shape
         errmsg = checkbox (opt.Within);
       endif
       if (isempty (errmsg) && ! isempty (opt.Face))
-        errmsg = checkindex (opt.Face, numfaces (this), 'Face', 'face', false);
+        [errmsg, opt.Face] = facesgiven (this, opt.Face, 'Face', ...
+                                         'solid.Shape.edges');
+      endif
+      ## Two sides, each faces given as for 'Face'
+      sides = {};
+      if (isempty (errmsg) && ! isempty (opt.Between))
+        B = opt.Between;
+        if (isnumeric (B) && numel (B) == 2)
+          sides = {B(1), B(2)};
+        elseif (iscell (B) && numel (B) == 2)
+          sides = B(:)';
+        else
+          errmsg = strcat ("Between must be two sides, each face indices,", ...
+                           " a name or a cell array of names.");
+        endif
+        for k = 1:numel (sides)
+          if (isempty (errmsg))
+            [errmsg, sides{k}] = facesgiven (this, sides{k}, 'Between', ...
+                                             'solid.Shape.edges');
+          endif
+        endfor
       endif
       if (! isempty (errmsg))
         error ("solid.Shape.edges: %s", errmsg);
@@ -1354,6 +1387,14 @@ classdef Shape
       endif
       if (! isempty (opt.Face))
         keep &= cellfun (@(f) any (ismember (f, opt.Face)), onfaces);
+      endif
+      ## An edge between a face of one side and another face of the other
+      if (! isempty (sides))
+        one = cellfun (@(f) any (ismember (f, sides{1})), onfaces);
+        two = cellfun (@(f) any (ismember (f, sides{2})), onfaces);
+        apart = cellfun (@(f) numel (unique (f(ismember (f, [sides{:}])))) ...
+                              >= 2, onfaces);
+        keep &= one & two & apart;
       endif
       E = find (keep)';
 
@@ -1405,6 +1446,15 @@ classdef Shape
     ## faces of that block.  A name that no face of @var{S} has is an error,
     ## so that a mistyped name, or one whose face is gone, is not taken for an
     ## empty choice.
+    ##
+    ## @item @qcode{'Adjacent'}
+    ## Faces given as indices, as a name as for @qcode{'Label'}, or as a cell
+    ## array whose each element is a name or a face index.  A face is chosen
+    ## when it shares an edge, not only a corner, with every face given: each
+    ## index, or each name, however many pieces it has.  After the edges
+    ## round the top of a block are rounded, @code{faces (@var{S}, 'Type',
+    ## 'cylinder', 'Adjacent', @{'plate.zmax', 'plate.ymin'@})} is the round
+    ## along its front edge.
     ## @end table
     ##
     ## A face keeps its names through what is done to the shape later.  Moved,
@@ -1438,7 +1488,7 @@ classdef Shape
                'revolution', 'extrusion', 'bspline', 'other'};
       [errmsg, opt] = options (varargin, struct ('Type', [], 'Normal', [], ...
                                                  'Axis', [], 'Within', [], ...
-                                                 'Label', []));
+                                                 'Label', [], 'Adjacent', []));
       if (isempty (errmsg))
         [errmsg, opt.Type] = checktype (opt.Type, kinds, 'surface');
       endif
@@ -1454,6 +1504,24 @@ classdef Shape
       if (isempty (errmsg) && ! isempty (opt.Label))
         [errmsg, hit] = named (this, opt.Label, 'Label', 'solid.Shape.faces');
       endif
+      ## Each index, or each name, is one face the faces chosen must border
+      next = {};
+      if (isempty (errmsg) && ! isempty (opt.Adjacent))
+        A = opt.Adjacent;
+        if (ischar (A))
+          next = {A};
+        elseif (iscell (A))
+          next = A(:)';
+        else
+          next = num2cell (A(:)');
+        endif
+        for k = 1:numel (next)
+          if (isempty (errmsg))
+            [errmsg, next{k}] = facesgiven (this, next{k}, 'Adjacent', ...
+                                            'solid.Shape.faces');
+          endif
+        endfor
+      endif
       if (! isempty (errmsg))
         error ("solid.Shape.faces: %s", errmsg);
       endif
@@ -1467,6 +1535,17 @@ classdef Shape
       keep = true (numel (type), 1);
       if (! isempty (opt.Label))
         keep &= hit;
+      endif
+      ## A face borders another when an edge, not a seam, lies between them
+      if (! isempty (next))
+        info = occt ('solid.Shape.faces', 'edges', this.Data);
+        [seam, onfaces] = info{4:5};
+        onfaces(seam) = {[]};
+        for k = 1:numel (next)
+          touch = cellfun (@(f) any (ismember (f, next{k})), onfaces);
+          near = setdiff ([zeros(1, 0), onfaces{touch}], next{k});
+          keep &= ismember ((1:numel (type))', near(:));
+        endfor
       endif
       if (! isempty (opt.Type))
         keep &= ismember (type, opt.Type);
@@ -3693,6 +3772,23 @@ function [errmsg, hit] = named (S, NAMES, OPTION, caller)
     endif
     hit |= m;
   endfor
+
+endfunction
+
+## The faces of S that FACES gives, as a row of indices: FACES is face
+## indices, or a name or a cell array of names as named takes them, given as
+## the option OPTION.  Returns an error message body, empty when FACES is
+## valid.
+function [errmsg, F] = facesgiven (S, FACES, OPTION, caller)
+
+  F = zeros (1, 0);
+  if (ischar (FACES) || iscell (FACES))
+    [errmsg, hit] = named (S, FACES, OPTION, caller);
+    F = find (hit)';
+  else
+    errmsg = checkindex (FACES, numfaces (S), OPTION, 'face', false);
+    F = double (FACES(:)');
+  endif
 
 endfunction
 
