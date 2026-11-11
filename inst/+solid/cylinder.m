@@ -19,6 +19,7 @@
 ## @deftypefn  {drafting} {@var{S} =} solid.cylinder (@var{R}, @var{H})
 ## @deftypefnx {drafting} {@var{S} =} solid.cylinder (@var{R}, @var{H}, @var{U})
 ## @deftypefnx {drafting} {@var{S} =} solid.cylinder (@dots{}, 'Anchor', @var{A})
+## @deftypefnx {drafting} {@var{S} =} solid.cylinder (@dots{}, 'Label', @var{L})
 ##
 ## A right circular cylinder.
 ##
@@ -37,13 +38,20 @@
 ## @qcode{'base'}, the centre of its base, the default, or
 ## @qcode{'centroid'}, the point on its axis half way up, its centre of mass.
 ##
+## The option @qcode{'Label'} names the faces of the cylinder, so that a
+## later step finds a face by its name with @code{solid.Shape.faces}.
+## @var{L} is an identifier, a letter followed by letters, digits or
+## underscores, and the faces are named @var{L}@code{.start}, the end the
+## cylinder stands on, @var{L}@code{.end}, the far end, and
+## @var{L}@code{.side}, its curved side.
+##
 ## @seealso{solid.Shape, solid.cone, solid.box, geom.UCS}
 ## @end deftypefn
 
 function S = cylinder (R, H, varargin)
 
   ## Input validation
-  if (nargin < 2 || nargin > 5)
+  if (nargin < 2 || nargin > 7)
     error ("solid.cylinder: invalid number of input arguments.");
   endif
   if (! (isfloat (R) && isreal (R) && isscalar (R) && isfinite (R) && R > 0))
@@ -52,13 +60,14 @@ function S = cylinder (R, H, varargin)
   if (! (isfloat (H) && isreal (H) && isscalar (H) && isfinite (H) && H > 0))
     error ("solid.cylinder: H must be a positive and finite real scalar.");
   endif
-  [frame, errmsg] = solid.__place__ (varargin, {'base', 'centroid'}, ...
-                                     [0, 0, 0; 0, 0, double(H) / 2]);
+  [frame, errmsg, label] = solid.__place__ (varargin, {'base', 'centroid'}, ...
+                                            [0, 0, 0; 0, 0, double(H) / 2], ...
+                                            true);
   if (! isempty (errmsg))
     error ("solid.cylinder: %s", errmsg);
   endif
 
-  S = __occt__ ('cylinder', 'solid.cylinder', double (R), double (H));
+  S = __occt__ ('cylinder', 'solid.cylinder', double (R), double (H), label);
   S = solid.Shape (__occt__ ('place', 'solid.cylinder', S, frame));
 
 endfunction
@@ -82,9 +91,22 @@ endfunction
 %! S = solid.cylinder (2, 10, U);
 %! assert_equal (bbox (S), [-1, 0, -7, 3, 4, 3], 1e-9);
 
+%!test  # faces named start, end and side
+%! U = geom.UCS ([0, 0, -1], [1, 2, 3]);
+%! S = solid.cylinder (2, 10, U, 'Label', 'pin');
+%! assert_equal (faces (S, 'Label', 'pin.start'), ...
+%!               faces (S, 'Normal', [0, 0, 1]));
+%! assert_equal (faces (S, 'Label', 'pin.end'), ...
+%!               faces (S, 'Normal', [0, 0, -1]));
+%! assert_equal (faces (S, 'Label', 'pin.side'), faces (S, 'Type', 'cylinder'));
+%!test  # a label with an anchor
+%! S = solid.cylinder (2, 10, 'Anchor', 'centroid', 'Label', 'pin');
+%! assert_equal (faces (S, 'Label', 'pin.start'), ...
+%!               faces (S, 'Normal', [0, 0, -1]));
+
 %!error<solid.cylinder: invalid number of input arguments.> solid.cylinder (1)
 %!error<solid.cylinder: invalid number of input arguments.> ...
-%! solid.cylinder (1, 2, geom.UCS (), 'Anchor', 'base', 3)
+%! solid.cylinder (1, 2, geom.UCS (), 'Anchor', 'base', 'Label', 'a', 3)
 %!error<solid.cylinder: R must be a positive and finite real scalar.> ...
 %! solid.cylinder (0, 2)
 %!error<solid.cylinder: H must be a positive and finite real scalar.> ...
@@ -101,3 +123,5 @@ endfunction
 %! assert_equal (B([3, 6]), [-1, 1], 1e-6);
 %!error<solid.cylinder: Anchor must be 'base' or 'centroid'.> ...
 %! solid.cylinder (1, 2, 'Anchor', 'corner')
+%!error<solid.cylinder: Label must be an identifier: a letter followed by letters, digits or underscores.> ...
+%! solid.cylinder (1, 2, 'Label', 'pin side')

@@ -1044,6 +1044,105 @@ edgeinfo (const TopoDS_Shape& s)
   return Cell (ovl (type, dir, box, seam, onfaces));
 }
 
+// The outward normal of the flat face F.  The plane's normal is its x axis
+// crossed with its y axis, which is its main axis only when its frame is
+// right-handed: a mirror leaves it left-handed.
+static gp_Dir
+outward (const TopoDS_Face& f)
+{
+  const gp_Ax3 frame = BRepAdaptor_Surface (f).Plane ().Position ();
+  gp_Dir d = frame.Direction ();
+  if (! frame.Direct ())
+  {
+    d.Reverse ();
+  }
+  if (f.Orientation () == TopAbs_REVERSED)
+  {
+    d.Reverse ();
+  }
+  return d;
+}
+
+// The names of the faces of the new solid S, made by an operation given the
+// label LABEL: each face is named by the label and the role ROLE gives it,
+// as "plate.zmax", or by the label alone where ROLE gives none.  An empty
+// LABEL names no face.
+static facetable
+labelled (const TopoDS_Shape& s, const string& label,
+          const function<string (const TopoDS_Face&)>& role)
+{
+  facetable t;
+  if (label.empty ())
+  {
+    return t;
+  }
+  ShapeMap map;
+  TopExp::MapShapes (s, TopAbs_FACE, map);
+  t.faces.resize (map.Extent ());
+  for (int i = 1; i <= map.Extent (); i++)
+  {
+    const string r = role (TopoDS::Face (map (i)));
+    t.faces[i-1].insert ({r.empty () ? label : label + "." + r, {}});
+  }
+  return t;
+}
+
+// The role of a face of a block made along the axes: the axis its outward
+// normal runs along and its end of it, from "xmin" to "zmax"
+static string
+boxrole (const TopoDS_Face& f)
+{
+  const gp_Dir d = outward (f);
+  const double c[3] = {d.X (), d.Y (), d.Z ()};
+  int k = 0;
+  for (int j = 1; j < 3; j++)
+  {
+    if (std::abs (c[j]) > std::abs (c[k]))
+    {
+      k = j;
+    }
+  }
+  return string (1, "xyz"[k]) + (c[k] < 0 ? "min" : "max");
+}
+
+// The role of a face of a cylinder made up the z axis: "side" for its
+// curved face, "start" for the end it stands on and "end" for the other
+static string
+cylinderrole (const TopoDS_Face& f)
+{
+  if (BRepAdaptor_Surface (f).GetType () != GeomAbs_Plane)
+  {
+    return "side";
+  }
+  return outward (f).Z () < 0 ? "start" : "end";
+}
+
+// The names of the faces of a shape, a row of names for each face, and
+// whether they are stale, written by another version of Open CASCADE
+static Cell
+nameinfo (const TopoDS_Shape& s, const facetable& names)
+{
+  const octave_idx_type n = count (s, TopAbs_FACE);
+  const bool fits = names.faces.empty ()
+                    || names.faces.size () == static_cast<size_t> (n);
+  Cell labels (n, 1);
+  for (octave_idx_type i = 0; i < n; i++)
+  {
+    Cell row (1, 0);
+    if (fits && ! names.faces.empty ())
+    {
+      row = Cell (1, names.faces[i].size ());
+      octave_idx_type j = 0;
+      for (const facename& f : names.faces[i])
+      {
+        row(j++) = f.label;
+      }
+    }
+    labels(i) = row;
+  }
+  return Cell (ovl (labels, names.stale || ! fits));
+}
+
 // The faces of a shape: the kind of surface each lies on, the outward normal
 // of a plane, the axis of a surface of revolution, and its bounding box
 static Cell
@@ -5621,18 +5720,25 @@ function directly. \n\
   try
   {
     OCC_CATCH_SIGNALS
-    // Primitives
+    // Primitives, a label after the sizes naming the faces when given
     if (cmd == "box")
     {
-      out = todata (BRepPrimAPI_MakeBox (args(2).double_value (),
-                                         args(3).double_value (),
-                                         args(4).double_value ()).Shape ());
+      const TopoDS_Shape s = BRepPrimAPI_MakeBox (args(2).double_value (),
+                                                  args(3).double_value (),
+                                                  args(4).double_value ())
+                             .Shape ();
+      const string label = (args.length () > 5 ? args(5).string_value ()
+                                               : string ());
+      out = todata (s, labelled (s, label, boxrole));
     }
     else if (cmd == "cylinder")
     {
-      out = todata (BRepPrimAPI_MakeCylinder (args(2).double_value (),
-                                              args(3).double_value ())
-                    .Shape ());
+      const TopoDS_Shape s
+        = BRepPrimAPI_MakeCylinder (args(2).double_value (),
+                                    args(3).double_value ()).Shape ();
+      const string label = (args.length () > 4 ? args(4).string_value ()
+                                               : string ());
+      out = todata (s, labelled (s, label, cylinderrole));
     }
     // A wedge: a block DX by DY at the base, DZ high, its top face spanning
     // XMIN to XMAX and YMIN to YMAX.  Open CASCADE builds a wedge with its
@@ -6756,6 +6862,12 @@ function directly. \n\
     else if (cmd == "faces")
     {
       out = faceinfo (toshape (args(2), caller));
+    }
+    else if (cmd == "names")
+    {
+      facetable names;
+      const TopoDS_Shape s = toshape (args(2), caller, names);
+      out = nameinfo (s, names);
     }
     // Closed loops in a plane checked as a region's loops are: see loopcheck
     else if (cmd == "loopcheck")

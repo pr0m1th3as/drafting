@@ -1395,7 +1395,27 @@ classdef Shape
     ## A box @code{[@var{xmin}, @var{ymin}, @var{zmin}, @var{xmax},
     ## @var{ymax}, @var{zmax}]}, as @code{solid.Shape.bbox} returns one.  A
     ## face is chosen when it lies wholly inside, to within 1e-6 millimetres.
+    ##
+    ## @item @qcode{'Label'}
+    ## A name, or a cell array of names chosen together, given to faces by
+    ## the option @qcode{'Label'} of the function that made them, as
+    ## @code{plate.zmax} for the top of @code{solid.box (60, 40, 10,
+    ## 'Label', 'plate')}.  A face is chosen when it has the name, or a name
+    ## that begins with it followed by a dot: @code{plate} chooses all six
+    ## faces of that block.  A name that no face of @var{S} has is an error,
+    ## so that a mistyped name, or one whose face is gone, is not taken for an
+    ## empty choice.
     ## @end table
+    ##
+    ## A face keeps its names through what is done to the shape later.  Moved,
+    ## turned, trimmed or cut into, it is the same face; split into pieces,
+    ## every piece has its names; merged with a face it lies flush with, it
+    ## has the names of both; and when it is cut away, its names go with it.
+    ## A face that an operation makes, as the round of @code{fillet}, has no
+    ## name until that operation takes a label.  Names last while the shape
+    ## is used and when it is saved and loaded with the same version of Open
+    ## CASCADE; under another version they are refused, and the script that
+    ## made the shape is run again.
     ##
     ## The empty shape has no faces.
     ##
@@ -1417,7 +1437,8 @@ classdef Shape
       kinds = {'plane', 'cylinder', 'cone', 'sphere', 'torus', ...
                'revolution', 'extrusion', 'bspline', 'other'};
       [errmsg, opt] = options (varargin, struct ('Type', [], 'Normal', [], ...
-                                                 'Axis', [], 'Within', []));
+                                                 'Axis', [], 'Within', [], ...
+                                                 'Label', []));
       if (isempty (errmsg))
         [errmsg, opt.Type] = checktype (opt.Type, kinds, 'surface');
       endif
@@ -1430,6 +1451,9 @@ classdef Shape
       if (isempty (errmsg))
         errmsg = checkbox (opt.Within);
       endif
+      if (isempty (errmsg) && ! isempty (opt.Label))
+        [errmsg, hit] = named (this, opt.Label, 'Label', 'solid.Shape.faces');
+      endif
       if (! isempty (errmsg))
         error ("solid.Shape.faces: %s", errmsg);
       endif
@@ -1441,6 +1465,9 @@ classdef Shape
       info = occt ('solid.Shape.faces', 'faces', this.Data);
       [type, normal, axis, box] = info{:};
       keep = true (numel (type), 1);
+      if (! isempty (opt.Label))
+        keep &= hit;
+      endif
       if (! isempty (opt.Type))
         keep &= ismember (type, opt.Type);
       endif
@@ -3619,6 +3646,53 @@ function errmsg = checkvec (V, name, nonzero = false)
   elseif (nonzero && all (V == 0))
     errmsg = sprintf ("%s must not be the zero vector.", name);
   endif
+
+endfunction
+
+## The faces of S that NAMES names, as a logical column with a row for each
+## face.  NAMES is a name or a cell array of names, each identifiers joined
+## by dots, given as the option OPTION, and a face is chosen when one of its
+## names is a name given or begins with one followed by a dot, so that
+## 'plate' chooses every face named 'plate.zmax', 'plate.xmin' and so on.
+## Returns an error message body, empty when every name is well formed and
+## names some face of S.
+function [errmsg, hit] = named (S, NAMES, OPTION, caller)
+
+  errmsg = '';
+  hit = [];
+  if (ischar (NAMES) && isrow (NAMES))
+    NAMES = {NAMES};
+  endif
+  pattern = '^[A-Za-z]\w*(\.[A-Za-z]\w*)*$';
+  if (! (iscellstr (NAMES) && ! isempty (NAMES)
+         && all (cellfun (@(n) isrow (n) && ! isempty (regexp (n, pattern, ...
+                                                               'once')), ...
+                          NAMES(:)))))
+    errmsg = sprintf (strcat ("%s must be a name or a cell array of names,", ...
+                              " each identifiers joined by dots."), OPTION);
+    return;
+  endif
+  labels = cell (0, 1);
+  if (! isempty (S.Data))
+    info = occt (caller, 'names', S.Data);
+    labels = info{1};
+    if (info{2})
+      errmsg = strcat ("the names of the faces were written by another", ...
+                       " version of Open CASCADE; run the script again.");
+      return;
+    endif
+  endif
+  hit = false (numel (labels), 1);
+  for k = 1:numel (NAMES)
+    n = NAMES{k};
+    m = cellfun (@(c) any (strcmp (c, n) | strncmp (c, [n, '.'], ...
+                                                    numel (n) + 1)), labels);
+    if (! any (m))
+      errmsg = sprintf ("no face is named '%s'.", n);
+      return;
+    endif
+    hit |= m;
+  endfor
 
 endfunction
 

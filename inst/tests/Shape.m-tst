@@ -398,6 +398,73 @@
 %!                                  5, 50; 0, 50]));
 %! assert_equal (numel (faces (S, 'Type', {'cylinder', 'cone'})), 3);
 
+%!test  # faces by name
+%! P = solid.box (60, 40, 10, 'Label', 'plate');
+%! assert_equal (faces (P, 'Label', 'plate.zmax'), ...
+%!               faces (P, 'Normal', [0, 0, 1]));
+%! assert_equal (faces (P, 'Label', 'plate'), 1:6);
+%!test  # a list of names chooses the faces of any of them
+%! P = solid.box (60, 40, 10, 'Label', 'plate');
+%! F = faces (P, 'Label', {'plate.xmin', 'plate.xmax'});
+%! assert_equal (F, sort ([faces(P, 'Normal', [-1, 0, 0]), ...
+%!                         faces(P, 'Normal', [1, 0, 0])]));
+%!test  # a name combines with the other options
+%! P = solid.box (60, 40, 10, 'Label', 'plate');
+%! assert_equal (faces (P, 'Label', 'plate', 'Normal', [0, 1, 0]), ...
+%!               faces (P, 'Label', 'plate.ymax'));
+%!test  # names stay with their faces when the shape is turned
+%! P = rotate (solid.box (60, 40, 10, 'Label', 'plate'), 90, [0, 0, 1]);
+%! assert_equal (faces (P, 'Label', 'plate.xmin'), ...
+%!               faces (P, 'Normal', [0, -1, 0]));
+%!test  # names stay through mirror and resize
+%! P = mirror (solid.box (60, 40, 10, 'Label', 'plate'), [1, 0, 0], [30, 0, 0]);
+%! assert_equal (faces (P, 'Label', 'plate.xmin'), ...
+%!               faces (P, 'Within', [60, 0, 0, 60, 40, 10]));
+%! P = resize (solid.box (60, 40, 10, 'Label', 'plate'), [120, 40, 5]);
+%! assert_equal (faces (P, 'Label', 'plate.zmax'), ...
+%!               faces (P, 'Normal', [0, 0, 1]));
+%!test  # a union keeps the names of both, and a flush face has both
+%! S = union (solid.box (60, 40, 10, 'Label', 'plate'), ...
+%!            solid.cylinder (5, 30, geom.UCS ([0, 0, 1], [20, 20, 0]), ...
+%!                            'Label', 'boss'));
+%! assert_equal (faces (S, 'Label', 'boss.side'), ...
+%!               faces (S, 'Type', 'cylinder'));
+%! assert_equal (faces (S, 'Label', 'boss.start'), ...
+%!               faces (S, 'Label', 'plate.zmin'));
+%!test  # a face split by a cut has its name on every piece
+%! S = subtract (solid.box (60, 40, 10, 'Label', 'plate'), ...
+%!               translate (solid.box (10, 50, 5), [25, -5, 7]));
+%! assert_equal (numel (faces (S, 'Label', 'plate.zmax')), 2);
+%!test  # the faces a tool cuts are named by the tool
+%! S = subtract (solid.box (60, 40, 10, 'Label', 'plate'), ...
+%!               solid.cylinder (5, 30, geom.UCS ([0, 0, 1], [20, 20, -5]), ...
+%!                               'Label', 'bore'));
+%! assert_equal (faces (S, 'Label', 'bore.side'), ...
+%!               faces (S, 'Type', 'cylinder'));
+%!test  # the faces a fillet trims keep their names, its rounds have none
+%! P = solid.box (60, 40, 10, 'Label', 'plate');
+%! S = fillet (P, edges (P, 'Face', faces (P, 'Label', 'plate.zmax')), 2);
+%! assert_equal (numel (faces (S, 'Label', 'plate')), 6);
+%! assert_equal (numfaces (S), 10);
+%!test  # names stay through an array of copies
+%! S = rectarray (solid.box (10, 10, 10, 'Label', 'cube'), [2, 1, 1], ...
+%!                [20, 0, 0]);
+%! assert_equal (numel (faces (S, 'Label', 'cube.zmax')), 2);
+%!test  # names stay with the bytes of a shape saved and loaded
+%! C = solid.cylinder (5, 30, 'Label', 'boss');
+%! d = C.Data;
+%! f = [tempname(), '.mat'];
+%! unwind_protect
+%!   save ('-binary', f, 'd');
+%!   clear d;
+%!   load (f);
+%!   S = solid.Shape (d);
+%!   assert_equal (faces (S, 'Label', 'boss.side'), ...
+%!                 faces (S, 'Type', 'cylinder'));
+%! unwind_protect_cleanup
+%!   delete (f);
+%! end_unwind_protect
+
 %!test  # four parallel edges rounded
 %! B = solid.box (10, 20, 30);
 %! S = fillet (B, edges (B, 'Direction', [0, 0, 1]), 2);
@@ -1747,6 +1814,27 @@
 %! faces (solid.Shape (), 'Axis', [0, 0, 0])
 %!error<solid.Shape.faces: Within must be a box \[xmin, ymin, zmin, xmax, ymax, zmax\] with each minimum no greater than its maximum.> ...
 %! faces (solid.Shape (), 'Within', 'abc')
+%!error<solid.Shape.faces: Label must be a name or a cell array of names, each identifiers joined by dots.> ...
+%! faces (solid.box (1, 1, 1, 'Label', 'cube'), 'Label', 'cube.')
+%!error<solid.Shape.faces: Label must be a name or a cell array of names, each identifiers joined by dots.> ...
+%! faces (solid.box (1, 1, 1, 'Label', 'cube'), 'Label', {'cube', 2})
+%!error<solid.Shape.faces: Label must not be empty.> ...
+%! faces (solid.box (1, 1, 1, 'Label', 'cube'), 'Label', '')
+%!error<solid.Shape.faces: no face is named 'cube.top'.> ...
+%! faces (solid.box (1, 1, 1, 'Label', 'cube'), 'Label', 'cube.top')
+%!error<solid.Shape.faces: no face is named 'cub'.> ...
+%! faces (solid.box (1, 1, 1, 'Label', 'cube'), 'Label', 'cub')
+%!error<solid.Shape.faces: no face is named 'cube'.> ...
+%! faces (solid.box (1, 1, 1), 'Label', 'cube')
+%!error<solid.Shape.faces: no face is named 'cube'.> ...
+%! faces (solid.Shape (), 'Label', 'cube')
+%!error<solid.Shape.faces: no face is named 'cube.top'.> ...
+%! faces (solid.box (1, 1, 1, 'Label', 'cube'), 'Label', ...
+%!        {'cube.zmax', 'cube.top'})
+%!error<solid.Shape.faces: no face is named 'plate.zmax'.> ...
+%! S = subtract (solid.box (60, 40, 10, 'Label', 'plate'), ...
+%!               translate (solid.box (70, 50, 5), [-5, -5, 5]));
+%! faces (S, 'Label', 'plate.zmax');
 %!error<solid.Shape.fillet: invalid number of input arguments.> ...
 %! fillet (solid.Shape (), 1)
 %!error<solid.Shape.fillet: E must be a vector of edge indices of S.> ...

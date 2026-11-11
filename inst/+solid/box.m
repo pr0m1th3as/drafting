@@ -19,6 +19,7 @@
 ## @deftypefn  {drafting} {@var{S} =} solid.box (@var{DX}, @var{DY}, @var{DZ})
 ## @deftypefnx {drafting} {@var{S} =} solid.box (@var{DX}, @var{DY}, @var{DZ}, @var{U})
 ## @deftypefnx {drafting} {@var{S} =} solid.box (@dots{}, 'Anchor', @var{A})
+## @deftypefnx {drafting} {@var{S} =} solid.box (@dots{}, 'Label', @var{L})
 ##
 ## A rectangular block.
 ##
@@ -46,6 +47,17 @@
 ## the centre of the block, its centre of mass.
 ## @end table
 ##
+## The option @qcode{'Label'} names the faces of the block, so that a later
+## step finds a face by its name with @code{solid.Shape.faces}, whatever was
+## done to the block in between.  @var{L} is an identifier, a letter followed
+## by letters, digits or underscores, and each face is named by it and the
+## side of the block it is on: @var{L}@code{.xmin}, @var{L}@code{.xmax},
+## @var{L}@code{.ymin}, @var{L}@code{.ymax}, @var{L}@code{.zmin} and
+## @var{L}@code{.zmax}, along the axes of @var{U}, or of the world when
+## @var{U} is left out.  A face keeps its name when it is moved or turned,
+## so that @code{plate.xmin} is the same face after a rotation, wherever it
+## then faces.
+##
 ## @example
 ## @group
 ## ## A block standing centred on the top of another
@@ -62,7 +74,7 @@
 function S = box (DX, DY, DZ, varargin)
 
   ## Input validation
-  if (nargin < 3 || nargin > 6)
+  if (nargin < 3 || nargin > 8)
     error ("solid.box: invalid number of input arguments.");
   endif
   if (! (isfloat (DX) && isreal (DX) && isscalar (DX) && isfinite (DX) &&
@@ -78,13 +90,15 @@ function S = box (DX, DY, DZ, varargin)
     error ("solid.box: DZ must be a positive and finite real scalar.");
   endif
   D = double ([DX, DY, DZ]) / 2;
-  [frame, errmsg] = solid.__place__ (varargin, {'corner', 'base', ...
-                                     'centroid'}, [0, 0, 0; D(1:2), 0; D]);
+  [frame, errmsg, label] = solid.__place__ (varargin, {'corner', 'base', ...
+                                            'centroid'}, ...
+                                            [0, 0, 0; D(1:2), 0; D], true);
   if (! isempty (errmsg))
     error ("solid.box: %s", errmsg);
   endif
 
-  S = __occt__ ('box', 'solid.box', double (DX), double (DY), double (DZ));
+  S = __occt__ ('box', 'solid.box', double (DX), double (DY), double (DZ), ...
+                label);
   S = solid.Shape (__occt__ ('place', 'solid.box', S, frame));
 
 endfunction
@@ -116,9 +130,29 @@ endfunction
 %! S = solid.box (6, 4, 2, 'Anchor', 'centroid');
 %! assert_equal (bbox (S), [-3, -2, -1, 3, 2, 1], 1e-9);
 
+%!test  # faces named by side
+%! S = solid.box (10, 20, 30, 'Label', 'block');
+%! assert_equal (faces (S, 'Label', 'block.xmin'), ...
+%!               faces (S, 'Normal', [-1, 0, 0]));
+%! assert_equal (faces (S, 'Label', 'block.ymax'), ...
+%!               faces (S, 'Normal', [0, 1, 0]));
+%! assert_equal (faces (S, 'Label', 'block.zmin'), ...
+%!               faces (S, 'Normal', [0, 0, -1]));
+%!test  # sides along the axes of the UCS
+%! U = geom.UCS ([1, 0, 0], [5, 0, 0], [5, 1, 0]);
+%! S = solid.box (10, 20, 30, U, 'Label', 'block');
+%! assert_equal (faces (S, 'Label', 'block.zmax'), ...
+%!               faces (S, 'Normal', [1, 0, 0]));
+%! assert_equal (faces (S, 'Label', 'block.xmax'), ...
+%!               faces (S, 'Normal', [0, 1, 0]));
+%!test  # a label with an anchor, option names ignoring case
+%! S = solid.box (6, 4, 2, 'label', 'block', 'Anchor', 'centroid');
+%! assert_equal (bbox (S), [-3, -2, -1, 3, 2, 1], 1e-9);
+%! assert_equal (numel (faces (S, 'Label', 'block')), 6);
+
 %!error<solid.box: invalid number of input arguments.> solid.box (1, 2)
 %!error<solid.box: invalid number of input arguments.> ...
-%! solid.box (1, 2, 3, geom.UCS (), 'Anchor', 'base', 4)
+%! solid.box (1, 2, 3, geom.UCS (), 'Anchor', 'base', 'Label', 'a', 4)
 %!error<solid.box: DX must be a positive and finite real scalar.> ...
 %! solid.box (0, 2, 3)
 %!error<solid.box: DX must be a positive and finite real scalar.> ...
@@ -140,3 +174,11 @@ endfunction
 %! assert_equal (B, [-1, -2, -3, 1, 2, 3], 1e-6);
 %!error<solid.box: Anchor must be 'corner', 'base' or 'centroid'.> ...
 %! solid.box (1, 2, 3, geom.UCS (), 'Anchor', 'top')
+%!error<solid.box: Label must be an identifier: a letter followed by letters, digits or underscores.> ...
+%! solid.box (1, 2, 3, 'Label', 'plate.top')
+%!error<solid.box: Label must be an identifier: a letter followed by letters, digits or underscores.> ...
+%! solid.box (1, 2, 3, 'Label', '2plate')
+%!error<solid.box: Label must be an identifier: a letter followed by letters, digits or underscores.> ...
+%! solid.box (1, 2, 3, 'Label', '')
+%!error<solid.box: Label must be an identifier: a letter followed by letters, digits or underscores.> ...
+%! solid.box (1, 2, 3, 'Label', 5)

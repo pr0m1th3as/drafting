@@ -24,14 +24,19 @@
 ## default first, and OFFSETS has one row for each, the point in the
 ## primitive's own coordinates that lands on the UCS origin.
 ##
+## LABELLED is true for a primitive that names its faces, which then takes
+## the option 'Label', returned in LABEL, empty when it is not given.
+##
 ## FRAME has the rows origin, x axis, y axis and normal of the frame that the
 ## primitive's own axes are laid on.  Returns an error message BODY in ERRMSG,
 ## empty when ARGS is valid; the caller emits the error under its own name.
 
-function [FRAME, errmsg] = __place__ (ARGS, ANCHORS, OFFSETS)
+function [FRAME, errmsg, LABEL] = __place__ (ARGS, ANCHORS, OFFSETS,
+                                             LABELLED = false)
 
   FRAME = [];
   errmsg = '';
+  LABEL = '';
 
   U = geom.UCS ();
   if (! isempty (ARGS) && (numel (ANCHORS) == 1 || ! ischar (ARGS{1})))
@@ -69,6 +74,18 @@ function [FRAME, errmsg] = __place__ (ARGS, ANCHORS, OFFSETS)
                             names(p+1:end));
           return;
         endif
+      case 'label'
+        if (! LABELLED)
+          errmsg = sprintf ("unknown option '%s'.", name);
+          return;
+        endif
+        if (! (ischar (val) && isrow (val)
+               && ! isempty (regexp (val, '^[A-Za-z]\w*$', 'once'))))
+          errmsg = strcat ("Label must be an identifier: a letter", ...
+                           " followed by letters, digits or underscores.");
+          return;
+        endif
+        LABEL = val;
       otherwise
         errmsg = sprintf ("unknown option '%s'.", name);
         return;
@@ -93,3 +110,15 @@ endfunction
 %! [~, errmsg] = solid.__place__ ({'Anchor', 'top'}, ...
 %!                                {'corner', 'base', 'centroid'}, zeros (3));
 %! assert_equal (errmsg, "Anchor must be 'corner', 'base' or 'centroid'.");
+
+%!test
+%! [~, errmsg, label] = solid.__place__ ({'Label', 'plate'}, ...
+%!                                       {'corner', 'base'}, zeros (2, 3), ...
+%!                                       true);
+%! assert_equal (errmsg, '');
+%! assert_equal (label, 'plate');
+
+%!test
+%! [~, errmsg] = solid.__place__ ({'Label', 'plate'}, {'corner', 'base'}, ...
+%!                                zeros (2, 3));
+%! assert_equal (errmsg, "unknown option 'Label'.");
