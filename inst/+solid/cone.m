@@ -58,7 +58,7 @@ function S = cone (R1, R2, H, varargin)
     error (strcat ("solid.cone: R1 and R2 must differ; a cone with equal", ...
                    " radii is a cylinder."));
   endif
-  [frame, errmsg] = solid.__place__ (varargin, {'base'}, [0, 0, 0]);
+  [frame, errmsg] = solid.__primoptargs__ (varargin, {'base'}, [0, 0, 0]);
   if (! isempty (errmsg))
     error ("solid.cone: %s", errmsg);
   endif

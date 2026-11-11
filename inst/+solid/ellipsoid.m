@@ -60,7 +60,7 @@ function S = ellipsoid (A, B, C, varargin)
   if (! (isfloat (C) && isreal (C) && isscalar (C) && isfinite (C) && C > 0))
     error ("solid.ellipsoid: C must be a positive and finite real scalar.");
   endif
-  [frame, errmsg] = solid.__place__ (varargin, {'centroid'}, [0, 0, 0]);
+  [frame, errmsg] = solid.__primoptargs__ (varargin, {'centroid'}, [0, 0, 0]);
   if (! isempty (errmsg))
     error ("solid.ellipsoid: %s", errmsg);
   endif

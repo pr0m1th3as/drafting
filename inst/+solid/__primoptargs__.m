@@ -15,8 +15,9 @@
 ## You should have received a copy of the GNU General Public License along with
 ## this program; if not, see <http://www.gnu.org/licenses/>.
 
-## Internal helper.  Read the optional UCS and 'Anchor' option that place a
-## primitive, and return the frame that places it.
+## Internal helper.  Read the optional arguments of a primitive, those after
+## its sizes: the UCS and the option 'Anchor' that place it, from which the
+## frame that places it is returned, and the option 'Label'.
 ##
 ## ARGS holds the arguments after the primitive's sizes: none, a geom.UCS, and
 ## for a primitive with more than one anchor, 'Anchor' and its name, with or
@@ -31,8 +32,8 @@
 ## primitive's own axes are laid on.  Returns an error message BODY in ERRMSG,
 ## empty when ARGS is valid; the caller emits the error under its own name.
 
-function [FRAME, errmsg, LABEL] = __place__ (ARGS, ANCHORS, OFFSETS,
-                                             LABELLED = false)
+function [FRAME, errmsg, LABEL] = __primoptargs__ (ARGS, ANCHORS, OFFSETS,
+                                                   LABELLED = false)
 
   FRAME = [];
   errmsg = '';
@@ -97,28 +98,29 @@ function [FRAME, errmsg, LABEL] = __place__ (ARGS, ANCHORS, OFFSETS,
 endfunction
 
 %!test
-%! assert_equal (solid.__place__ ({}, {'centroid'}, [0, 0, 0]), ...
+%! assert_equal (solid.__primoptargs__ ({}, {'centroid'}, [0, 0, 0]), ...
 %!               [0, 0, 0; 1, 0, 0; 0, 1, 0; 0, 0, 1]);
 
 %!test
 %! U = geom.UCS ([0, 0, 1], [1, 2, 3]);
-%! F = solid.__place__ ({U, 'Anchor', 'base'}, {'corner', 'base'}, ...
-%!                     [0, 0, 0; 5, 10, 0]);
+%! F = solid.__primoptargs__ ({U, 'Anchor', 'base'}, {'corner', 'base'}, ...
+%!                            [0, 0, 0; 5, 10, 0]);
 %! assert_equal (F(1,:), [-4, -8, 3]);
 
 %!test
-%! [~, errmsg] = solid.__place__ ({'Anchor', 'top'}, ...
-%!                                {'corner', 'base', 'centroid'}, zeros (3));
+%! [~, errmsg] = solid.__primoptargs__ ({'Anchor', 'top'}, ...
+%!                                      {'corner', 'base', 'centroid'}, ...
+%!                                      zeros (3));
 %! assert_equal (errmsg, "Anchor must be 'corner', 'base' or 'centroid'.");
 
 %!test
-%! [~, errmsg, label] = solid.__place__ ({'Label', 'plate'}, ...
-%!                                       {'corner', 'base'}, zeros (2, 3), ...
-%!                                       true);
+%! [~, errmsg, label] = solid.__primoptargs__ ({'Label', 'plate'}, ...
+%!                                             {'corner', 'base'}, ...
+%!                                             zeros (2, 3), true);
 %! assert_equal (errmsg, '');
 %! assert_equal (label, 'plate');
 
 %!test
-%! [~, errmsg] = solid.__place__ ({'Label', 'plate'}, {'corner', 'base'}, ...
-%!                                zeros (2, 3));
+%! [~, errmsg] = solid.__primoptargs__ ({'Label', 'plate'}, ...
+%!                                      {'corner', 'base'}, zeros (2, 3));
 %! assert_equal (errmsg, "unknown option 'Label'.");

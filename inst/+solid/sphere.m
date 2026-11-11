@@ -39,7 +39,7 @@ function S = sphere (R, varargin)
   if (! (isfloat (R) && isreal (R) && isscalar (R) && isfinite (R) && R > 0))
     error ("solid.sphere: R must be a positive and finite real scalar.");
   endif
-  [frame, errmsg] = solid.__place__ (varargin, {'centroid'}, [0, 0, 0]);
+  [frame, errmsg] = solid.__primoptargs__ (varargin, {'centroid'}, [0, 0, 0]);
   if (! isempty (errmsg))
     error ("solid.sphere: %s", errmsg);
   endif

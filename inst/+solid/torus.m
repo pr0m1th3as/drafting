@@ -53,7 +53,7 @@ function S = torus (R1, R2, varargin)
   if (R2 >= R1)
     error ("solid.torus: R2 must be smaller than R1.");
   endif
-  [frame, errmsg] = solid.__place__ (varargin, {'centroid'}, [0, 0, 0]);
+  [frame, errmsg] = solid.__primoptargs__ (varargin, {'centroid'}, [0, 0, 0]);
   if (! isempty (errmsg))
     error ("solid.torus: %s", errmsg);
   endif

@@ -90,8 +90,9 @@ function S = wedge (DX, DY, DZ, TOP, varargin)
   elseif (TOP(1) > TOP(3) || TOP(2) > TOP(4))
     error ("solid.wedge: TOP must have XMIN <= XMAX and YMIN <= YMAX.");
   endif
-  [frame, errmsg] = solid.__place__ (varargin, {'corner', 'base'}, ...
-                                     [0, 0, 0; double([DX, DY]) / 2, 0]);
+  [frame, errmsg] = solid.__primoptargs__ (varargin, {'corner', 'base'}, ...
+                                           [0, 0, 0; double([DX, DY]) / 2, ...
+                                            0]);
   if (! isempty (errmsg))
     error ("solid.wedge: %s", errmsg);
   endif
