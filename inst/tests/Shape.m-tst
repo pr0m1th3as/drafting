@@ -384,6 +384,12 @@
 %! assert_equal (numel (faces (B)), 6);
 %! assert_equal (numel (faces (B, 'Type', 'plane')), 6);
 %! assert_equal (numel (faces (B, 'Normal', [1, 1, 0])), 0);
+%!test  # outward normals of a mirrored shape, whose planes are left-handed
+%! B = mirror (solid.box (60, 40, 10), [1, 0, 0], [30, 0, 0]);
+%! assert_equal (faces (B, 'Normal', [1, 0, 0]), ...
+%!               faces (B, 'Within', [60, 0, 0, 60, 40, 10]));
+%! assert_equal (faces (B, 'Normal', [0, 0, 1]), ...
+%!               faces (B, 'Within', [0, 0, 10, 60, 40, 10]));
 %!test  # option names ignore case
 %! B = solid.box (10, 20, 30);
 %! assert_equal (faces (B, 'normal', [0, 0, 1]), ...
@@ -495,6 +501,14 @@
 %! assert_equal (volume (S), 5000 - (200 - 50 * pi) * 5, 1e-9);
 %! assert_equal (numfaces (S), 6);
 %! assert_equal (isvalid (S), true);
+%!test  # a full round on a mirrored wall, whose planes are left-handed
+%! W = mirror (solid.box (50, 5, 20), [1, 0, 0], [25, 0, 0]);
+%! F = [faces(W, 'Within', [0, 0, 0, 50, 0, 20]), ...
+%!      faces(W, 'Within', [50, 0, 0, 50, 5, 20]), ...
+%!      faces(W, 'Within', [0, 5, 0, 50, 5, 20])];
+%! S = facefillet (W, F);
+%! assert_equal (volume (S), 5000 - 2 * (6.25 - 6.25 * pi / 4) * 20, 1e-9);
+%! assert_equal (bbox (S), [0, 0, 0, 50, 5, 20], 1e-9);
 
 %!test  # full rounds at both ends of a wall
 %! W = solid.box (50, 5, 20);

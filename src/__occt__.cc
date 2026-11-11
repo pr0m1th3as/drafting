@@ -1165,12 +1165,7 @@ faceinfo (const TopoDS_Shape& s)
       case GeomAbs_Plane:
       {
         type(i) = "plane";
-        gp_Dir d = a.Plane ().Axis ().Direction ();
-        if (f.Orientation () == TopAbs_REVERSED)
-        {
-          d.Reverse ();
-        }
-        dirrow (d, normal, i);
+        dirrow (outward (f), normal, i);
         break;
       }
       case GeomAbs_Cylinder:
@@ -2926,13 +2921,8 @@ roundtools (const TopoDS_Face& A, const TopoDS_Face& M, const TopoDS_Face& B,
   gp_Pnt o[3];
   for (int i = 0; i < 3; i++)
   {
-    const gp_Pln p = BRepAdaptor_Surface (face[i]).Plane ();
-    n[i] = p.Axis ().Direction ();
-    if (face[i].Orientation () == TopAbs_REVERSED)
-    {
-      n[i].Reverse ();
-    }
-    o[i] = p.Location ();
+    n[i] = outward (face[i]);
+    o[i] = BRepAdaptor_Surface (face[i]).Plane ().Location ();
   }
   // D with its first nonzero component positive, so that rounds on one axis
   // are built on one circle, and two meeting all round merge into one face

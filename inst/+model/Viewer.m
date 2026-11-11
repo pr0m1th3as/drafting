@@ -2256,6 +2256,12 @@ endfunction
 %!                                               [0, 0, 1]), 'B');
 %! assert_equal (Q, ["faces (B, 'Type', 'plane', 'Normal',", ...
 %!                   " [0, 0, 1], 'Within', [0, 0, 30, 10, 20, 30])"]);
+%!test  # a face of a mirrored block, by its true outward normal
+%! B = mirror (solid.box (10, 20, 30), [1, 0, 0], [5, 0, 0]);
+%! Q = model.Viewer.__query__ (B, 'face', faces (B, 'Within', ...
+%!                                               [10, 0, 0, 10, 20, 30]), 'B');
+%! assert_equal (Q, ["faces (B, 'Type', 'plane', 'Normal',", ...
+%!                   " [1, 0, 0], 'Within', [10, 0, 0, 10, 20, 30])"]);
 %!test  # every face of a cylinder, by the box round them alone
 %! C = solid.cylinder (4, 12);
 %! Q = model.Viewer.__query__ (C, 'face', 1:3, 'C');
