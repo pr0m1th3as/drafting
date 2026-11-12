@@ -60,6 +60,15 @@
 ## holes.  The solids of a cell array of regions are copies 1, 2 and so on of
 ## the label, chosen with @qcode{'Copy'}.
 ##
+## Where the segments of the region are labelled, as @code{geom.Region}
+## describes, each wall also takes the label of the segment it is swept from,
+## one level below its role: @var{L}@code{.side.web} for a wall of the outline's
+## segment labelled @code{web}, @var{L}@code{.hole.key_floor} for a wall of a
+## hole's segment labelled @code{key_floor}.  @var{L}@code{.side} still names
+## every wall of the outline, and a wall of a segment left unnamed is plain
+## @var{L}@code{.side} or @var{L}@code{.hole}.  Without @qcode{'Label'} no face
+## is named, whatever labels the region carries.
+##
 ## @example
 ## @group
 ## ## A compression spring along z: wire of diameter 2 on a mean diameter of
@@ -192,6 +201,16 @@ endfunction
 %! R = {geom.Region([1, 0; 2, 0; 2, 1]), geom.Region([4, 0; 5, 0; 5, 1])};
 %! S = solid.helix (R, 2, 1, 'Label', 'coil');
 %! assert_equal (isempty (faces (S, 'Label', 'coil', 'Copy', 2)), false);
+
+%!test  # each wall named by the segment it is swept from
+%! R = geom.Region ([9, 0; 11, 0.6; 11, 1.4; 9, 2], ...
+%!                  'Label', {'lower_flank', 'crest', 'upper_flank', 'root'});
+%! R.UCS = geom.UCS ([0, -1, 0], [0, 0, 0]);
+%! S = solid.helix (R, 4, 2, 'Label', 'thread');
+%! assert_equal (faces (S, 'Label', 'thread.side.root'), ...
+%!               faces (S, 'Within', [-9.5, -9.5, -1, 9.5, 9.5, 11]));
+%! assert_equal (numel (faces (S, 'Label', 'thread.side.crest')), 1);
+%! assert_equal (numel (faces (S, 'Label', 'thread.side')), 4);
 
 %!error<solid.helix: invalid number of input arguments.> ...
 %! solid.helix (geom.Region ([1, 0; 2, 0; 2, 1]), 2)

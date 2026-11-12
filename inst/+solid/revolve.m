@@ -70,6 +70,15 @@
 ## makes no face, and no name.  The solids of a cell array of regions are copies
 ## 1, 2 and so on of the label, chosen with @qcode{'Copy'}.
 ##
+## Where the segments of the region are labelled, as @code{geom.Region}
+## describes, each wall also takes the label of the segment it is turned from,
+## one level below its role: @var{L}@code{.side.web} for a wall of the outline's
+## segment labelled @code{web}, @var{L}@code{.hole.key_floor} for a wall of a
+## hole's segment labelled @code{key_floor}.  @var{L}@code{.side} still names
+## every wall of the outline, and a wall of a segment left unnamed is plain
+## @var{L}@code{.side} or @var{L}@code{.hole}.  Without @qcode{'Label'} no face
+## is named, whatever labels the region carries.
+##
 ## @seealso{geom.Region, solid.extrude, solid.helix}
 ## @end deftypefn
 
@@ -191,6 +200,21 @@ endfunction
 %! S = solid.revolve (geom.Region (O), 360);
 %! assert_equal (volume (S), 2 * pi * cx * abs (sum (c)) / 2, -1e-8);
 %! assert_equal (isvalid (S), true);
+
+%!test  # each face named by the segment it is turned from
+%! key = geom.Polyline ([18, 1; 22, 1; 22, 3; 18, 3], 'Closed', true, ...
+%!                      'Label', {'key_floor', '', 'key_top', ''});
+%! R = geom.Region ([0, 0; 40, 0; 40, 5; 5, 5; 5, 30; 0, 30], {key}, ...
+%!                  'Label', {'base', '', '', 'inside', '', ''});
+%! S = solid.revolve (R, 90, 'Label', 'ring');
+%! assert_equal (faces (S, 'Label', 'ring.side.base'), ...
+%!               faces (S, 'Within', [-40, 0, -40, 40, 0, 40]));
+%! assert_equal (faces (S, 'Label', 'ring.side.inside'), ...
+%!               faces (S, 'Type', 'cylinder', ...
+%!                      'Within', [-5, 5, -5, 5, 30, 5]));
+%! assert_equal (faces (S, 'Label', 'ring.hole.key_floor'), ...
+%!               faces (S, 'Within', [-22, 1, -22, 22, 1, 22]));
+%! assert_equal (numel (faces (S, 'Label', 'ring.side')), 5);
 
 %!error<solid.revolve: invalid number of input arguments.> solid.revolve ()
 %!test  # a cell of two regions, two rings fused into one shape

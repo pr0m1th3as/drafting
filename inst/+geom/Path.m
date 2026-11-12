@@ -168,7 +168,7 @@ classdef Path
     ## arc, a cell with, for each spline segment, its control points, their
     ## weights, its distinct knots and their multiplicities and its degree,
     ## its end control points set on the vertices so that the wire closes
-    ## exactly, and whether the path is closed
+    ## exactly, whether the path is closed, and the labels of its segments
     function D = __data__ (this)
 
       V = toworld (this.UCS, this.Vertices);
@@ -186,7 +186,7 @@ classdef Path
                        'mults', accumarray (j(:), 1), 'degree', SP.Degree);
       endfor
       D = struct ('vertices', V, 'midpoints', M, 'splines', {C}, ...
-                  'closed', this.Closed);
+                  'closed', this.Closed, 'labels', {this.Labels});
 
     endfunction
 

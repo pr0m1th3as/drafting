@@ -68,6 +68,15 @@
 ## swept along a closed path has no ends.  The solids of a cell array of regions
 ## are copies 1, 2 and so on of the label, chosen with @qcode{'Copy'}.
 ##
+## Where the segments of the region are labelled, as @code{geom.Region}
+## describes, each wall also takes the label of the segment it is swept from,
+## one level below its role: @var{L}@code{.side.web} for a wall of the outline's
+## segment labelled @code{web}, @var{L}@code{.hole.key_floor} for a wall of a
+## hole's segment labelled @code{key_floor}.  @var{L}@code{.side} still names
+## every wall of the outline, and a wall of a segment left unnamed is plain
+## @var{L}@code{.side} or @var{L}@code{.hole}.  Without @qcode{'Label'} no face
+## is named, whatever labels the region carries.
+##
 ## @seealso{geom.Path, geom.Spline, geom.Region, solid.extrude, solid.helix}
 ## @end deftypefn
 
@@ -285,6 +294,23 @@ endfunction
 %! S = solid.sweep (R, geom.Path ([0, 0, 0; 0, 0, 5]), 'Label', 'tile');
 %! assert_equal (faces (S, 'Label', 'tile.end', 'Copy', 2), ...
 %!               faces (S, 'Within', [20, 0, 5, 30, 10, 5]));
+
+%!test  # each wall named by the segment it is swept from
+%! R = geom.Region ([-2, -2; 2, -2; 2, 2; -2, 2], ...
+%!                  'Label', {'', 'right', 'top', ''});
+%! P = fillet (geom.Path ([0, 0, 0; 0, 0, 20; 20, 0, 20]), 6);
+%! S = solid.sweep (R, P, 'Label', 'bar');
+%! assert_equal (numel (faces (S, 'Label', 'bar.side.top')), 3);
+%! assert_equal (faces (S, 'Label', 'bar.side.top', ...
+%!                      'Within', [-2, 2, 0, 2, 2, 14]), ...
+%!               faces (S, 'Within', [-2, 2, 0, 2, 2, 14]));
+%!test  # a wall of a hole named by its segment
+%! H = geom.Polyline ([-1, -1; -1, 1; 1, 1; 1, -1], 'Closed', true, ...
+%!                    'Label', {'', 'roof', '', ''});
+%! R = geom.Region ([-2, -2; 2, -2; 2, 2; -2, 2], {H});
+%! S = solid.sweep (R, geom.Path ([0, 0, 0; 0, 0, 20]), 'Label', 'tube');
+%! assert_equal (faces (S, 'Label', 'tube.hole.roof'), ...
+%!               faces (S, 'Within', [-1, 1, 0, 1, 1, 20]));
 
 %!error<solid.sweep: invalid number of input arguments.> ...
 %! solid.sweep (geom.Region ([0, 0; 1, 0; 1, 1]))

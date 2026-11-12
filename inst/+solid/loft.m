@@ -52,6 +52,25 @@
 ## face of the walls swept by the outlines, and @var{L}@code{.hole}, every face
 ## of the walls swept by the holes.
 ##
+## Where the segments of the sections are labelled, as @code{geom.Region}
+## describes, each wall also takes the labels of the segments it is lofted from,
+## one level below its role: @var{L}@code{.side.web} for a wall of the outlines'
+## segments labelled @code{web}, @var{L}@code{.hole.key_floor} for a wall of the
+## holes' segments labelled @code{key_floor}.  @var{L}@code{.side} still names
+## every wall of the outlines, and a wall lofted only from segments left unnamed
+## is plain @var{L}@code{.side} or @var{L}@code{.hole}.  Without @qcode{'Label'}
+## no face is named, whatever labels the sections carry.
+##
+## The sections need not have the same number of segments, so a wall may come
+## from a segment of one section and from part of a segment of another.  It then
+## takes the label of each, one name for each: a wall lofted from a segment
+## labelled @code{front} on one section and from one labelled @code{right} on
+## the next is named both @var{L}@code{.side.front} and
+## @var{L}@code{.side.right}, and @code{faces} finds it by either.  Which
+## segments meet on a wall is decided by Open CASCADE as it pairs the edges of
+## the sections, splitting some; a segment it splits names every wall it
+## reaches.
+##
 ## @example
 ## @group
 ## ## A square of 20 at the base becoming a circle of diameter 12 at 30
@@ -196,6 +215,33 @@ endfunction
 %! assert_equal (numel (faces (S, 'Label', 'duct')), numfaces (S));
 %! assert_equal (isempty (faces (S, 'Label', 'duct.hole')), false);
 %! assert_equal (isempty (faces (S, 'Label', 'duct.side')), false);
+
+%!test  # a wall named by the segments it is lofted from
+%! base = geom.Region ([-10, -10; 10, -10; 10, 10; -10, 10], ...
+%!                     'Label', {'front', '', '', ''});
+%! top = geom.Region ([-5, -5; 5, -5; 5, 5; -5, 5], ...
+%!                    'Label', {'front', '', '', ''});
+%! top.UCS = geom.UCS ([0, 0, 1], [0, 0, 30]);
+%! S = solid.loft ({base, top}, 'Label', 'hood');
+%! assert_equal (faces (S, 'Label', 'hood.side.front'), ...
+%!               faces (S, 'Within', [-10, -10, 0, 10, -5, 30]));
+%!test  # a label on one section names the wall
+%! base = geom.Region ([-10, -10; 10, -10; 10, 10; -10, 10], ...
+%!                     'Label', {'front', '', '', ''});
+%! top = geom.Region ([-5, -5; 5, -5; 5, 5; -5, 5]);
+%! top.UCS = geom.UCS ([0, 0, 1], [0, 0, 30]);
+%! S = solid.loft ({base, top}, 'Ruled', true, 'Label', 'hood');
+%! assert_equal (faces (S, 'Label', 'hood.side.front'), ...
+%!               faces (S, 'Within', [-10, -10, 0, 10, -5, 30]));
+%!test  # a wall from segments of two labels takes both
+%! base = geom.Region ([-10, -10; 10, -10; 10, 10; -10, 10], ...
+%!                     'Label', {'front', 'right', '', ''});
+%! top = geom.Region ([-6, -6; 6, -6; 0, 6], ...
+%!                    'Label', {'front', 'slope', ''});
+%! top.UCS = geom.UCS ([0, 0, 1], [0, 0, 30]);
+%! S = solid.loft ({base, top}, 'Label', 'hood');
+%! assert_equal (numel (intersect (faces (S, 'Label', 'hood.side.front'), ...
+%!                                 faces (S, 'Label', 'hood.side.right'))), 1);
 
 %!error<solid.loft: invalid number of input arguments.> solid.loft ()
 %!error<solid.loft: REGIONS must be a cell array of at least two geom.Region objects.> ...
