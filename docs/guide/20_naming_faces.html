@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Naming faces - drafting guide</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" integrity="sha512-1ycn6IcaQQ40/MKBW2W4Rhis/DbILU74C1vSrLJxCq57o941Ym01SwNsOMqvEBFlcgUa6xLiPY/NS5R+E6ztJQ==" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/css/bootstrap.min.css" integrity="sha384-KyZXEAg3QhqLMpG8r+8fhAXLRk2vvoC2f3B09zVXn8CA5QIVfZOJ3BCsw2P0p/We" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-U1DAWAznBHeqEIlVSCgzq+c9gqGAJn5c/t99JyeKa9xxaYpSvHU5awsuZVVFIhvj" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="guide.css">
+  </head>
+  <body>
+    <div class="bg-dark">
+      <div class="container-xl">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+          <div class="container-fluid">
+            <a class="navbar-brand" href="index.html">
+              <img src="../assets/drafting.png" alt="drafting" class="d-inline-block align-top" width="25" height="25">
+              drafting guide
+            </a>
+            <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+              <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+              <ul class="navbar-nav">
+                <li class="nav-item">
+                  <a class="nav-link" href="https://pr0m1th3as.github.io/drafting-models/">
+                    <i class="fas fa-cubes"></i>
+                    Models
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="../index.html">
+                    <i class="fas fa-book"></i>
+                    Function reference
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="https://github.com/pr0m1th3as/drafting">
+                    <i class="fab fa-github"></i>
+                    Source
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </nav>
+      </div>
+    </div>
+    <div class="container-xl my-4">
+      <div class="row">
+        <div class="col-md-3 col-lg-2 mb-4">
+          <nav class="guide-nav">
+<!-- guide-nav -->
+            <h6>Guide</h6>
+            <ul>
+              <li><a href="index.html">Overview</a></li>
+              <li><a href="layout.html">Package layout</a></li>
+              <li><a href="dxf.html">DXF and the classes</a></li>
+            </ul>
+            <h6>Octave</h6>
+            <ul>
+              <li><a href="primer.html">A brief Octave primer</a></li>
+            </ul>
+            <h6>Standards</h6>
+            <ul>
+              <li><a href="standards_threads.html">Threads and tapped holes</a></li>
+              <li><a href="standards_holes.html">Clearance holes, counterbores and countersinks</a></li>
+              <li><a href="standards_knurling.html">Knurls</a></li>
+            </ul>
+            <h6>Tutorials</h6>
+            <ul>
+              <li><a href="01_first_part.html">A first part</a></li>
+              <li><a href="02_outlines.html">Outlines: polylines, splines, paths and regions</a></li>
+              <li><a href="03_regions.html">Working with regions</a></li>
+              <li><a href="04_coordinate_systems.html">Coordinate systems</a></li>
+              <li><a href="05_solids_from_regions.html">Solids from regions</a></li>
+              <li><a href="06_primitives_and_booleans.html">Primitives, booleans and transforms</a></li>
+              <li><a href="07_features.html">Features: holes, pockets, fillets, chamfers and shells</a></li>
+              <li><a href="08_sections_and_projections.html">Sections and projections</a></li>
+              <li><a href="09_drawings.html">Technical drawings</a></li>
+              <li><a href="10_meshes.html">Meshes</a></li>
+              <li><a href="11_assemblies.html">Assemblies</a></li>
+              <li><a href="12_from_openscad.html">For OpenSCAD users</a></li>
+              <li><a href="13_surfaces.html">Surfaces through a grid</a></li>
+              <li><a href="14_parts_as_functions.html">Parts as functions</a></li>
+              <li><a href="15_testing_parts.html">Testing parts</a></li>
+              <li><a href="16_holes_and_threads.html">Holes and threads</a></li>
+              <li><a href="17_clearance_holes.html">Clearance holes, counterbores and countersinks</a></li>
+              <li><a href="18_looking_inside.html">Looking inside a model</a></li>
+              <li><a href="19_knurling.html">Knurling</a></li>
+              <li><a href="20_naming_faces.html" class="active">Naming faces</a></li>
+            </ul>
+<!-- /guide-nav -->
+          </nav>
+        </div>
+        <main class="col-md-9 col-lg-10">
+<h1>Naming faces</h1>
+<p>A script that rounds an edge or drills into a face has to say which one. Choosing it by its index, or by the box it lies in, works for the part as it stands, and breaks when an earlier dimension changes. A name given to a face where it is made stays with that face through every later step, so the script keeps finding it however the part changes.</p>
+<h2>Where positions break</h2>
+<p>A plate 60 long carries a boss in the middle of its top. The edge where the boss meets the plate is chosen by its kind and the box it lies in, and rounded.</p>
+<pre class="code-in"><code>L = 60;
+part = union (solid.box (L, 40, 10), ...
+              translate (solid.cylinder (6, 15), [L / 2, 20, 10]));
+E = edges (part, 'Type', 'circle', 'Within', [23, 13, 10, 37, 27, 10])</code></pre>
+<pre class="code-out"><code>E = 10</code></pre>
+<p>Make the plate 80 long and the boss moves to <i>x</i> = 40. The same box now finds nothing, and the script stops at the fillet.</p>
+<pre class="code-in"><code>L = 80;
+part = union (solid.box (L, 40, 10), ...
+              translate (solid.cylinder (6, 15), [L / 2, 20, 10]));
+E = edges (part, 'Type', 'circle', 'Within', [23, 13, 10, 37, 27, 10])</code></pre>
+<pre class="code-out"><code>E = [](1x0)</code></pre>
+<h2>Giving names</h2>
+<p>The functions that make solids, from <a href="../solid.box.html"><code>solid.box</code></a> to <a href="../solid.extrude.html"><code>solid.extrude</code></a>, take <code>'Label'</code>, a name for the faces they make. A box names its six sides after the way they face: <code>plate.xmin</code> and <code>plate.xmax</code>, <code>plate.ymin</code> and <code>plate.ymax</code>, and <code>plate.zmin</code> at the bottom and <code>plate.zmax</code> at the top. A cylinder names its ends <code>boss.start</code> and <code>boss.end</code> and its round face <code>boss.side</code>. The reference page of each function lists the names it gives.</p>
+<p>The edge where the boss meets the plate lies between the top of the plate and the side of the boss, and <code>edges</code> finds it so.</p>
+<pre class="code-in"><code>L = 60;
+plate = solid.box (L, 40, 10, 'Label', 'plate');
+boss = solid.cylinder (6, 15, geom.UCS ([0, 0, 1], [L / 2, 20, 10]), ...
+                       'Label', 'boss');
+part = union (plate, boss);
+E = edges (part, 'Between', {'plate.zmax', 'boss.side'})
+part = fillet (part, E, 2, 'Label', 'foot');
+show (part);</code></pre>
+<pre class="code-out"><code>E = 10</code></pre>
+<figure class="shot"><img src="img/20_naming_faces-1.png" alt="Naming faces, picture 1"></figure>
+<p>The plate made 80 long, the same lines find the same edge where the boss now stands.</p>
+<pre class="code-in"><code>L = 80;
+plate = solid.box (L, 40, 10, 'Label', 'plate');
+boss = solid.cylinder (6, 15, geom.UCS ([0, 0, 1], [L / 2, 20, 10]), ...
+                       'Label', 'boss');
+part = union (plate, boss);
+E = edges (part, 'Between', {'plate.zmax', 'boss.side'})
+part = fillet (part, E, 2, 'Label', 'foot');</code></pre>
+<pre class="code-out"><code>E = 10</code></pre>
+<p>The fillet was given a name too: <code>foot</code> is the round it made. A face that a step makes without <code>'Label'</code> has no name.</p>
+<h2>Choosing by name</h2>
+<p><code>faces</code> takes a name with <code>'Label'</code>. A name also chooses every face whose name begins with it and a dot, so <code>plate</code> is all the faces of the plate, and a cell array chooses the faces of each name in it.</p>
+<pre class="code-in"><code>faces (part, 'Label', 'plate.zmax')
+faces (part, 'Label', 'plate')
+faces (part, 'Label', {'boss.end', 'foot'})</code></pre>
+<pre class="code-out"><code>ans = 1
+ans =
+
+   1   3   4   5   6   8
+
+ans =
+
+   2   9</code></pre>
+<p>A name no face has is an error, so that a name mistyped, or one whose face was cut away, is not taken for an empty choice.</p>
+<pre class="code-in"><code>faces (part, 'Label', 'plate.top');</code></pre>
+<pre class="code-out"><code>solid.Shape.faces: no face is named 'plate.top'.</code></pre>
+<p><code>'Adjacent'</code> chooses the faces that share an edge with each face given. The faces next to the round are the top of the plate and the side of the boss.</p>
+<pre class="code-in"><code>faces (part, 'Adjacent', 'foot')</code></pre>
+<pre class="code-out"><code>ans =
+
+   1   7</code></pre>
+<p>For edges, <code>'Face'</code> chooses every edge round the faces given, and <code>'Between'</code> the edges between two of them, as above. These are the four edges round the top of the plate.</p>
+<pre class="code-in"><code>edges (part, 'Face', 'plate.zmax', 'Type', 'line')</code></pre>
+<pre class="code-out"><code>ans =
+
+   2   3   4   5</code></pre>
+<h2>Names through later steps</h2>
+<p>A face keeps its names when the shape is moved, turned or cut. A face cut in two is two faces, each with the name. A slot across the plate splits its top.</p>
+<pre class="code-in"><code>slotted = subtract (part, translate (solid.box (6, 50, 4), [10, -5, 6]));
+faces (slotted, 'Label', 'plate.zmax')</code></pre>
+<pre class="code-out"><code>ans =
+
+   1   7</code></pre>
+<p>Two faces made flush by a union become one face, which has the names of both. A block set against the end of the plate continues its top.</p>
+<pre class="code-in"><code>block = solid.box (20, 40, 10, geom.UCS ([0, 0, 1], [L, 0, 0]), ...
+                   'Label', 'block');
+longer = union (part, block);
+isequal (faces (longer, 'Label', 'plate.zmax'), ...
+         faces (longer, 'Label', 'block.zmax'))</code></pre>
+<pre class="code-out"><code>ans = 1</code></pre>
+<h2>Points and frames from names</h2>
+<p><code>normal</code> gives the outward normal of a flat face, <code>corner</code> the point a set of faces share, <code>centre</code> the centre of a circular edge and <code>midpoint</code> the middle of an edge. From them a coordinate system can be laid on a face so that it moves with the part. Here it lies on the top of the plate, its origin at the corner with the front and the left side, its <i>x</i> axis along the front.</p>
+<pre class="code-in"><code>top = faces (part, 'Label', 'plate.zmax');
+O = corner (part, faces (part, 'Label', {'plate.zmax', 'plate.xmin', ...
+                                         'plate.ymin'}))
+X = corner (part, faces (part, 'Label', {'plate.zmax', 'plate.xmax', ...
+                                         'plate.ymin'}));
+U = geom.UCS (normal (part, top), O, X)</code></pre>
+<pre class="code-out"><code>O =
+
+    0    0   10
+
+U =
+
+  geom.UCS: origin [0, 0, 10], x axis [1, 0, 0], normal [0, 0, 1]</code></pre>
+<p>The centre of the top of the boss is where a hole down its axis goes.</p>
+<pre class="code-in"><code>C = centre (part, edges (part, 'Between', {'boss.end', 'boss.side'}))
+part = hole (part, C, 5, 20, 'Label', 'bore');
+faces (part, 'Label', 'bore')</code></pre>
+<pre class="code-out"><code>C =
+
+   40   20   25
+
+ans =
+
+   10   11</code></pre>
+<h2>Naming the walls of a profile</h2>
+<p>A solid made from a region names its two ends <code>start</code> and <code>end</code> and its walls <code>side</code>, those of its holes <code>hole</code>. The segments of the region can be named too, one name for each segment in the order its vertices are written, <code>''</code> for a segment left unnamed, and each wall then takes its segment's name below its role. An angle section has its inside face named, and a keyway through it its floor and top.</p>
+<pre class="code-in"><code>key = geom.Polyline ([18, 1; 22, 1; 22, 3; 18, 3], 'Closed', true, ...
+                     'Label', {'key_floor', '', 'key_top', ''});
+outline = geom.Polyline ([0, 0; 40, 0; 40, 5; 5, 5; 5, 30; 0, 30], ...
+                         'Closed', true, ...
+                         'Label', {'base', '', '', 'inside', '', ''});</code></pre>
+<p>The inside corner, the fourth vertex, is rounded before the region is made. The arc takes the name given to the fillet, and the segments it shortens keep theirs.</p>
+<pre class="code-in"><code>outline = fillet (outline, 3, 4, 'Label', 'corner_round');
+section = geom.Region (outline, {key});
+angle = solid.extrude (section, 30, 'Label', 'angle');
+faces (angle, 'Label', 'angle.side.inside')
+faces (angle, 'Label', 'angle.side.corner_round')
+faces (angle, 'Label', 'angle.hole.key_floor')
+show (angle);</code></pre>
+<pre class="code-out"><code>ans = 5
+ans = 4
+ans = 11</code></pre>
+<figure class="shot"><img src="img/20_naming_faces-2.png" alt="Naming faces, picture 2"></figure>
+<p><code>angle.side</code> still names every wall of the outline, and <code>angle.hole</code> every wall of the keyway.</p>
+<pre class="code-in"><code>numel (faces (angle, 'Label', 'angle.side'))</code></pre>
+<pre class="code-out"><code>ans = 7</code></pre>
+<h2>Along a path</h2>
+<p>A path can be labelled the same way, and a sweep then records along which segment of it each wall runs. <code>'Along'</code> chooses by that. A bar 10 by 6 is swept up 40 and across 30, the bend rounded to 8 and named.</p>
+<pre class="code-in"><code>bar = geom.Region ([-5, -3; 5, -3; 5, 3; -5, 3], 'Label', {'', '', 'top', ''});
+route = geom.Path ([0, 0, 0; 0, 0, 40; 30, 0, 40], ...
+                   'Label', {'upright', 'arm'});
+route = fillet (route, 8, 'Label', 'bend');
+bracket = solid.sweep (bar, route, 'Label', 'bracket');
+faces (bracket, 'Label', 'bracket.side', 'Along', 'arm')
+faces (bracket, 'Label', 'bracket.side.top', 'Along', 'arm')
+faces (bracket, 'Along', 'bend')
+show (bracket);</code></pre>
+<pre class="code-out"><code>ans =
+
+    9   10   11   12
+
+ans = 11
+ans =
+
+   5   6   7   8</code></pre>
+<figure class="shot"><img src="img/20_naming_faces-3.png" alt="Naming faces, picture 3"></figure>
+<h2>Copies</h2>
+<p><code>copy</code>, <code>rectarray</code> and <code>polararray</code> number their copies, and <code>'Copy'</code> chooses the faces of some of them. A block rounded along its top edges is set round a circle six times, and the round along the front of the third is found by its name, its copy and the face it borders.</p>
+<pre class="code-in"><code>blank = translate (solid.box (20, 10, 5, 'Label', 'plate'), [30, -5, 0]);
+blank = fillet (blank, edges (blank, 'Face', 'plate.zmax'), 2, ...
+                'Label', 'edge_round');
+ring = polararray (blank, 6, 360);
+faces (ring, 'Label', 'edge_round', 'Copy', 3, 'Adjacent', 'plate.ymin')</code></pre>
+<pre class="code-out"><code>ans = 27</code></pre>
+<h2>Picks written as names</h2>
+<p>On a part with names, <code>pick</code> writes its code by them, and <code>pickucs</code> builds its coordinate system from them, so that what is picked once keeps being found. Here the edge at the top of the boss is picked, and the top of the plate for a coordinate system, its origin at the front left corner and its <i>x</i> axis towards the front right one. This guide is built with nobody at the mouse, so the build clicks at those points.</p>
+<pre class="code-in"><code>V = show (part);
+[E, CODE] = pick (V, 'edge')
+[U, CODE] = pickucs (V)</code></pre>
+<pre class="code-out"><code>E = 17
+CODE = edges (part, 'Between', {'boss.end', 'boss.side'})
+U =
+
+  geom.UCS: origin [0, 0, 10], x axis [1, 0, 0], normal [0, 0, 1]
+
+CODE = geom.UCS (normal (part, faces (part, 'Label', 'plate.zmax')), ...
+          corner (part, faces (part, 'Label', {'plate.xmin', 'plate.ymin', ...
+                                               'plate.zmax'})), ...
+          corner (part, faces (part, 'Label', {'plate.xmax', 'plate.ymin', ...
+                                               'plate.zmax'})))</code></pre>
+<figure class="shot"><img src="img/20_naming_faces-4.png" alt="Naming faces, picture 4"></figure>
+<h2>Names and saved shapes</h2>
+<p>The names are kept in the shape itself, so they stay with it when it is passed to a function, saved and loaded. They depend on how Open CASCADE numbers the faces, so a shape saved under one version of Open CASCADE and loaded under another has its names refused, and choosing a face by name says to run the script that made it again.</p>
+<nav class="d-flex justify-content-between my-5">
+<a href="19_knurling.html">&larr; Knurling</a>
+</nav>
+
+        </main>
+      </div>
+    </div>
+  </body>
+</html>
