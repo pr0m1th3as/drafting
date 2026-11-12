@@ -1964,6 +1964,17 @@
 %! assert_equal (volume (S), 4638.466155, 1e-5);
 %! assert_equal (isvalid (S), true);
 
+%!test  # the knurl named by its label and by F's names, the ends kept
+%! K = solid.cylinder (14, 10, 'Label', 'knob');
+%! E = edges (K, 'Type', 'circle', 'Within', [-15, -15, 10, 15, 15, 10]);
+%! S = knurl (K, faces (K, 'Label', 'knob.side'), 0.8, ...
+%!            'Chamfer', {E, 0.5}, 'Label', 'grip');
+%! assert_equal (faces (S, 'Label', 'grip'), faces (S, 'Label', 'knob.side'));
+%! assert_equal (numel (faces (S, 'Label', 'grip')), numfaces (S) - 2);
+%! assert_equal (normal (S, faces (S, 'Label', 'knob.end')), [0, 0, 1], 1e-12);
+%! assert_equal (normal (S, faces (S, 'Label', 'knob.start')), [0, 0, -1], ...
+%!               1e-12);
+
 %!test  # a tube knurled over a wall just thicker than the teeth are deep
 %! S = subtract (solid.cylinder (5, 6), solid.cylinder (4.45, 6));
 %! S = knurl (S, 1, 1, 0.5);
@@ -2577,6 +2588,8 @@
 %!error<solid.Shape.knurl: the chamfer of 1 at an end of F would cut into a bore of S.> ...
 %! knurl (subtract (solid.cylinder (5, 6), solid.cylinder (4.2, 6)), 1, 1, ...
 %!        0.5, 'Chamfer', 1)
+%!error<solid.Shape.knurl: Label must be an identifier: a letter followed by letters, digits or underscores.> ...
+%! knurl (solid.cylinder (5, 6), 1, 1, 'Label', 'a.b')
 
 %!test  # a box cut through the middle
 %! U = geom.UCS ([0, 0, 1], [0, 0, 15]);

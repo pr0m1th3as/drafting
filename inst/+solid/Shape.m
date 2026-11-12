@@ -3139,6 +3139,15 @@ classdef Shape
     ## As @qcode{'Fillet'}, for a chamfer of 45 degrees set back @var{D}
     ## millimetres both ways: a distance @var{D} for every free end, or
     ## @code{@{@var{E}, @var{D}@}} with a row for each end.
+    ##
+    ## @item @qcode{'Label'}
+    ## An identifier @var{L}, a letter followed by letters, digits or
+    ## underscores, that names every face of the knurl @var{L}, so that a
+    ## later step finds them by name with @code{solid.Shape.faces}: its
+    ## teeth, the lands between them and the fillets or chamfers it runs over.
+    ## They take the names of @var{F} too, since they stand where it was, so a
+    ## name that chose @var{F} chooses the knurl.  The faces at the ends of
+    ## @var{F}, reshaped to the knurl's outline, keep their names.
     ## @end table
     ##
     ## An end of @var{F} takes one fillet or chamfer at most, and an end at a
@@ -3204,7 +3213,14 @@ classdef Shape
                                                  'Points', [], ...
                                                  'Profile', 90, ...
                                                  'Fillet', [], ...
-                                                 'Chamfer', []));
+                                                 'Chamfer', [], ...
+                                                 'Label', ''));
+      if (isempty (errmsg) && ! isempty (opt.Label)
+          && ! (ischar (opt.Label) && isrow (opt.Label)
+                && ! isempty (regexp (opt.Label, '^[A-Za-z]\w*$', 'once'))))
+        errmsg = strcat ("Label must be an identifier: a letter followed", ...
+                         " by letters, digits or underscores.");
+      endif
       if (! isempty (errmsg))
         error ("solid.Shape.knurl: %s", errmsg);
       endif
@@ -3285,7 +3301,7 @@ classdef Shape
 
       r = occt ('solid.Shape.knurl', 'knurl', this.Data, double (F), ...
                 double (PITCH), double (DEPTH), double (A), indented, ...
-                double (P), T);
+                double (P), T, opt.Label);
       S = this;
       this.Data = r{1};
       [this.Colour, this.Name] = inherit (r{2}, S);

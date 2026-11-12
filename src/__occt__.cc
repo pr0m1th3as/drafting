@@ -5639,14 +5639,24 @@ wholering (const TopoDS_Shape& s, const gp_Ax3& ax, double r0, double r1,
          >= v * (1 - 1e-6);
 }
 
+// What knurlsolid made, for the names of the faces: the face at each end
+// of F as it was and the face made in its place, and the knurled skin
+struct knurled
+{
+  TopoDS_Shape ends[2];
+  TopoDS_Shape made[2];
+  TopoDS_Shape skin;
+};
+
 // The solid SO with its face F knurled: F replaced by the knurled skin, the
 // flat face at each end of F given the knurl's outline in place of its
-// circle, and every other face kept.  TREAT has a row for each treatment,
-// the index in S of the edge it treats, or 0 for every free end left, its
-// type and its size.
+// circle, and every other face kept, what was made recorded in DONE.  TREAT
+// has a row for each treatment, the index in S of the edge it treats, or 0
+// for every free end left, its type and its size.
 static TopoDS_Shape
 knurlsolid (const TopoDS_Shape& so, const TopoDS_Face& F, const ShapeMap& emap,
-            knurlspec spec, const Matrix& treat, const string& caller)
+            knurlspec spec, const Matrix& treat, const string& caller,
+            knurled& done)
 {
   const char *who = caller.c_str ();
   BRepAdaptor_Surface ad (F);
@@ -5982,14 +5992,20 @@ knurlsolid (const TopoDS_Shape& so, const TopoDS_Face& F, const ShapeMap& emap,
   {
     error ("%s: Open CASCADE could not knurl F.", who);
   }
+  for (int k = 0; k < 2; k++)
+  {
+    done.ends[k] = P[k];
+    done.made[k] = N[k];
+  }
+  done.skin = side;
   return out;
 }
 
 // The shape S with its face of index FI knurled, its other solids as they
-// were and in the same order
+// were and in the same order, what was made recorded in DONE
 static TopoDS_Shape
 knurl (const TopoDS_Shape& s, int fi, const knurlspec& spec,
-       const Matrix& treat, const string& caller)
+       const Matrix& treat, const string& caller, knurled& done)
 {
   ShapeMap fmap;
   ShapeMap emap;
@@ -6003,7 +6019,7 @@ knurl (const TopoDS_Shape& s, int fi, const knurlspec& spec,
     TopExp::MapShapes (so, TopAbs_FACE, own);
     if (own.Contains (F))
     {
-      so = knurlsolid (so, F, emap, spec, treat, caller);
+      so = knurlsolid (so, F, emap, spec, treat, caller, done);
       break;
     }
   }
@@ -6709,7 +6725,8 @@ function directly. \n\
     // fillet (TYPE 1) or chamfer (TYPE 2), EDGE 0 for every free end left
     else if (cmd == "knurl")
     {
-      const TopoDS_Shape s = toshape (args(2), caller);
+      facetable names;
+      const TopoDS_Shape s = toshape (args(2), caller, names);
       knurling::knurlspec spec;
       spec.pitch = args(4).double_value ();
       spec.depth = args(5).double_value ();
@@ -6717,9 +6734,59 @@ function directly. \n\
       spec.angles.assign (a.data (), a.data () + a.numel ());
       spec.indented = args(7).bool_value ();
       spec.profile = args(8).double_value ();
-      const TopoDS_Shape r = knurling::knurl (s, args(3).int_value (), spec,
-                                              args(9).matrix_value (), caller);
-      out = traced (r, itself (count (s, TopAbs_SOLID)));
+      knurling::knurled done;
+      const int fi = args(3).int_value ();
+      const TopoDS_Shape r = knurling::knurl (s, fi, spec,
+                                              args(9).matrix_value (), caller,
+                                              done);
+      // The faces kept keep their names and each new end face those of the
+      // face it replaces; every face of the knurled skin takes the names of
+      // F and the label, when one is given
+      TopTools_ListOfShape made[2];
+      for (int k = 0; k < 2; k++)
+      {
+        made[k].Append (done.made[k]);
+      }
+      facetable rnames
+        = carrynames ([&] (const TopoDS_Shape& f)
+                      -> const TopTools_ListOfShape&
+                      {
+                        for (int k = 0; k < 2; k++)
+                        {
+                          if (f.IsSame (done.ends[k]))
+                          {
+                            return made[k];
+                          }
+                        }
+                        return unmodified (f);
+                      }, {s}, {names}, r);
+      const string label = (args.length () > 10 ? args(10).string_value ()
+                                                : string ());
+      ShapeMap before, after;
+      TopExp::MapShapes (s, TopAbs_FACE, before);
+      TopExp::MapShapes (r, TopAbs_FACE, after);
+      std::set<facename> own;
+      if (names.faces.size () == static_cast<size_t> (before.Extent ()))
+      {
+        own = names.faces[fi-1];
+      }
+      if (! label.empty ())
+      {
+        own.insert ({label, {}});
+      }
+      if (! rnames.stale && ! own.empty ())
+      {
+        rnames.faces.resize (after.Extent ());
+        for (TopExp_Explorer x (done.skin, TopAbs_FACE); x.More (); x.Next ())
+        {
+          const int j = after.FindIndex (x.Current ());
+          if (j > 0)
+          {
+            rnames.faces[j-1].insert (own.begin (), own.end ());
+          }
+        }
+      }
+      out = traced (r, itself (count (s, TopAbs_SOLID)), rnames);
     }
 
     // Booleans.  A union and a difference take every solid after the first
