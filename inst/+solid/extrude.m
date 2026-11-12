@@ -72,17 +72,16 @@
 ## of the extrusion, changing evenly along the height.  It is 1 by default.
 ##
 ## @item @qcode{'Label'}
-## An identifier @var{L}, a letter followed by letters, digits or
-## underscores, that names the faces of the solid, so that a later step
-## finds a face by its name with @code{solid.Shape.faces}:
-## @var{L}@code{.start}, the end face on the side the region's normal points
-## away from, @var{L}@code{.end}, the end face on the side it points to,
-## @var{L}@code{.side}, every face of the walls rising from the outline, and
-## @var{L}@code{.hole}, every face of the walls of the holes.  The ends are
-## named the same way whatever the sign of @var{H}, so the start of an
-## extrusion along the normal lies in the region's plane, and of one against
-## it at the far end.  The solids of a cell array of regions are copies 1, 2
-## and so on of the label, chosen with @qcode{'Copy'}.
+## A valid Octave identifier or keyword @var{L}, that names the faces of the
+## solid, so that a later step finds a face by its name with
+## @code{solid.Shape.faces}: @var{L}@code{.start}, the end face on the side the
+## region's normal points away from, @var{L}@code{.end}, the end face on the
+## side it points to, @var{L}@code{.side}, every face of the walls rising from
+## the outline, and @var{L}@code{.hole}, every face of the walls of the holes.
+## The ends are named the same way whatever the sign of @var{H}, so the start of
+## an extrusion along the normal lies in the region's plane, and of one against
+## it at the far end.  The solids of a cell array of regions are copies 1, 2 and
+## so on of the label, chosen with @qcode{'Copy'}.
 ## @end table
 ##
 ## Twist and scale apply to an extrusion to one side and cannot be combined
@@ -157,10 +156,9 @@ function S = extrude (R, H, varargin)
       case 'label'
         opt.Label = val;
         if (! (ischar (val) && isrow (val)
-               && ! isempty (regexp (val, '^[A-Za-z]\w*$', 'once'))))
-          error (strcat ("solid.extrude: Label must be an identifier: a", ...
-                         " letter followed by letters, digits or", ...
-                         " underscores."));
+               && (isvarname (val) || iskeyword (val))))
+          error (strcat ("solid.extrude: Label must be a valid Octave", ...
+                         " identifier or keyword."));
         endif
       otherwise
         error ("solid.extrude: unknown option '%s'.", name);
@@ -492,5 +490,5 @@ endfunction
 %!                                         'Closed', true)), 1, 'Taper', 2)
 %!error<solid.extrude: Taper cannot be combined with Twist or Scale.> ...
 %! solid.extrude (geom.Region ([0, 0; 1, 0; 1, 1]), 1, 'Taper', 3, 'Scale', 2)
-%!error<solid.extrude: Label must be an identifier: a letter followed by letters, digits or underscores.> ...
+%!error<solid.extrude: Label must be a valid Octave identifier or keyword.> ...
 %! solid.extrude (geom.Region ([0, 0; 1, 0; 1, 1]), 1, 'Label', 'a.b')

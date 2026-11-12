@@ -60,17 +60,15 @@
 ## fit at a radius set by the spacing of the grid, and limits the thickness
 ## the same way.  The edges of the solid run square to the surface.
 ##
-## The option @qcode{'Label'} names the faces of the solid, so that a later
-## step finds a face by its name with @code{solid.Shape.faces}.  @var{L} is
-## an identifier, a letter followed by letters, digits or underscores.  The
-## two large faces are @var{L}@code{.start}, on the side against the
-## normal, and @var{L}@code{.end}, on the side along it, whichever way
-## @var{H} goes.  The narrow walls round the rim are named by the edge of
-## the grid they stand on, as the grid is indexed @code{@var{X}(@var{i},
-## @var{j})}: @var{L}@code{.imin} along its first row, @var{L}@code{.imax}
-## along its last, @var{L}@code{.jmin} along its first column and
-## @var{L}@code{.jmax} along its last, however fine the grid and however it
-## is turned.
+## The option @qcode{'Label'} names the faces of the solid, so that a later step
+## finds a face by its name with @code{solid.Shape.faces}.  @var{L} is a valid
+## Octave identifier or keyword.  The two large faces are @var{L}@code{.start},
+## on the side against the normal, and @var{L}@code{.end}, on the side along it,
+## whichever way @var{H} goes.  The narrow walls round the rim are named by the
+## edge of the grid they stand on, as the grid is indexed @code{@var{X}(@var{i},
+## @var{j})}: @var{L}@code{.imin} along its first row, @var{L}@code{.imax} along
+## its last, @var{L}@code{.jmin} along its first column and @var{L}@code{.jmax}
+## along its last, however fine the grid and however it is turned.
 ##
 ## @example
 ## @group
@@ -130,10 +128,9 @@ function S = surface (X, Y, Z, H, varargin)
       case 'label'
         label = val;
         if (! (ischar (val) && isrow (val)
-               && ! isempty (regexp (val, '^[A-Za-z]\w*$', 'once'))))
-          error (strcat ("solid.surface: Label must be an identifier: a", ...
-                         " letter followed by letters, digits or", ...
-                         " underscores."));
+               && (isvarname (val) || iskeyword (val))))
+          error (strcat ("solid.surface: Label must be a valid Octave", ...
+                         " identifier or keyword."));
         endif
       otherwise
         error ("solid.surface: unknown option '%s'.", name);
@@ -247,7 +244,7 @@ endfunction
 %! solid.surface ([0, 1; 0, 1], [0, 0; 1, 1], zeros (2), 1, 'Label')
 %!error<solid.surface: unknown option 'Closed'.> ...
 %! solid.surface ([0, 1; 0, 1], [0, 0; 1, 1], zeros (2), 1, 'Closed', true)
-%!error<solid.surface: Label must be an identifier: a letter followed by letters, digits or underscores.> ...
+%!error<solid.surface: Label must be a valid Octave identifier or keyword.> ...
 %! solid.surface ([0, 1; 0, 1], [0, 0; 1, 1], zeros (2), 1, 'Label', 'a.b')
 %!error<solid.surface: X, Y and Z must be real finite matrices of one size, at least 2 by 2.> ...
 %! solid.surface ('ab', [0, 0; 1, 1], zeros (2), 1)

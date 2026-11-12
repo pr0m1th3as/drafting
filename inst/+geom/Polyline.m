@@ -157,12 +157,11 @@ classdef Polyline
     ##
     ## @item @qcode{'Label'}
     ## A cell array with a label for each segment, in the order the vertices are
-    ## written: the segment from the first to the second, and so on, and for
-    ## a closed one, last the segment back to the first.  Each label is an
-    ## identifier, a letter followed by letters, digits or underscores, or
-    ## @code{''} for a segment left unnamed.  A solid made from it names the
-    ## face each segment makes by its label, as @code{rib.side.web}; see
-    ## @code{solid.extrude}.
+    ## written: the segment from the first to the second, and so on, and for a
+    ## closed one, last the segment back to the first.  Each label is a valid
+    ## Octave identifier or keyword, or @code{''} for a segment left unnamed.  A
+    ## solid made from it names the face each segment makes by its label, as
+    ## @code{rib.side.web}; see @code{solid.extrude}.
     ## @end table
     ##
     ## @example
@@ -279,10 +278,10 @@ classdef Polyline
     ## @end group
     ## @end example
     ##
-    ## The option @qcode{'Label'} names the arc each corner becomes, an
-    ## identifier, a letter followed by letters, digits or underscores; without
-    ## it the arc is unnamed.  The segments of @var{PL} keep their labels, a
-    ## segment used up and dropped taking its label with it.
+    ## The option @qcode{'Label'} names the arc each corner becomes, a valid
+    ## Octave identifier or keyword; without it the arc is unnamed.  The
+    ## segments of @var{PL} keep their labels, a segment used up and dropped
+    ## taking its label with it.
     ##
     ## @seealso{geom.Region.fillet}
     ## @end deftypefn
@@ -313,10 +312,10 @@ classdef Polyline
         switch (lower (name))
           case 'label'
             label = val;
-            if (! isvarname (label))
-              error (strcat ("geom.Polyline.fillet: Label must be an", ...
-                             " identifier: a letter followed by letters,", ...
-                             " digits or underscores."));
+            if (! (ischar (label) && isrow (label)
+                   && (isvarname (label) || iskeyword (label))))
+              error (strcat ("geom.Polyline.fillet: Label must be a valid", ...
+                             " Octave identifier or keyword."));
             endif
           otherwise
             error ("geom.Polyline.fillet: unknown option '%s'.", name);
@@ -388,10 +387,10 @@ classdef Polyline
     ## @end group
     ## @end example
     ##
-    ## The option @qcode{'Label'} names the straight cut each corner becomes,
-    ## an identifier, a letter followed by letters, digits or underscores;
-    ## without it the cut is unnamed.  The segments of @var{PL} keep their
-    ## labels, a segment used up and dropped taking its label with it.
+    ## The option @qcode{'Label'} names the straight cut each corner becomes, a
+    ## valid Octave identifier or keyword; without it the cut is unnamed.  The
+    ## segments of @var{PL} keep their labels, a segment used up and dropped
+    ## taking its label with it.
     ##
     ## @seealso{geom.Polyline.fillet, geom.Region.chamfer}
     ## @end deftypefn
@@ -423,10 +422,10 @@ classdef Polyline
         switch (lower (name))
           case 'label'
             label = val;
-            if (! isvarname (label))
-              error (strcat ("geom.Polyline.chamfer: Label must be an", ...
-                             " identifier: a letter followed by letters,", ...
-                             " digits or underscores."));
+            if (! (ischar (label) && isrow (label)
+                   && (isvarname (label) || iskeyword (label))))
+              error (strcat ("geom.Polyline.chamfer: Label must be a valid", ...
+                             " Octave identifier or keyword."));
             endif
           case 'angle'
             A = val;
@@ -870,5 +869,5 @@ endfunction
 %! assert_equal (C.Labels, {'base', 'toe', '', 'bevel', 'inside', '', 'back'});
 %!error<geom.Polyline: Label must have one entry for each of the 2 segments.> ...
 %! geom.Polyline ([0, 0; 1, 0; 1, 1], 'Label', {'a', 'b', 'c'})
-%!error<geom.Polyline.chamfer: Label must be an identifier: a letter followed by letters, digits or underscores.> ...
+%!error<geom.Polyline.chamfer: Label must be a valid Octave identifier or keyword.> ...
 %! chamfer (geom.Polyline ([0, 0; 1, 0; 1, 1]), 0.1, 'Label', '1')

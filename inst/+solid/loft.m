@@ -45,13 +45,12 @@
 ## section.  It is @code{false} by default, which passes one smooth surface
 ## through every section.  With two sections both give the same solid.
 ##
-## The option @qcode{'Label'} names the faces of the loft, so that a later
-## step finds a face by its name with @code{solid.Shape.faces}.  @var{L} is
-## an identifier, a letter followed by letters, digits or underscores, and
-## the faces are named @var{L}@code{.start}, the first section,
-## @var{L}@code{.end}, the last, @var{L}@code{.side}, every face of the
-## walls swept by the outlines, and @var{L}@code{.hole}, every face of the
-## walls swept by the holes.
+## The option @qcode{'Label'} names the faces of the loft, so that a later step
+## finds a face by its name with @code{solid.Shape.faces}.  @var{L} is a valid
+## Octave identifier or keyword, and the faces are named @var{L}@code{.start},
+## the first section, @var{L}@code{.end}, the last, @var{L}@code{.side}, every
+## face of the walls swept by the outlines, and @var{L}@code{.hole}, every face
+## of the walls swept by the holes.
 ##
 ## @example
 ## @group
@@ -97,10 +96,9 @@ function S = loft (REGIONS, varargin)
       case 'label'
         opt.Label = val;
         if (! (ischar (val) && isrow (val)
-               && ! isempty (regexp (val, '^[A-Za-z]\w*$', 'once'))))
-          error (strcat ("solid.loft: Label must be an identifier: a", ...
-                         " letter followed by letters, digits or", ...
-                         " underscores."));
+               && (isvarname (val) || iskeyword (val))))
+          error (strcat ("solid.loft: Label must be a valid Octave", ...
+                         " identifier or keyword."));
         endif
       otherwise
         error ("solid.loft: unknown option '%s'.", name);
@@ -230,6 +228,6 @@ endfunction
 %!error<solid.loft: Ruled must be true or false.> ...
 %! solid.loft ({geom.Region([0, 0; 1, 0; 1, 1]), ...
 %!              geom.Region([0, 0; 1, 0; 1, 1])}, 'Ruled', 1)
-%!error<solid.loft: Label must be an identifier: a letter followed by letters, digits or underscores.> ...
+%!error<solid.loft: Label must be a valid Octave identifier or keyword.> ...
 %! solid.loft ({geom.Region([0, 0; 1, 0; 1, 1]), ...
 %!              geom.Region([0, 0; 1, 0; 1, 1])}, 'Label', '1a')

@@ -17,7 +17,8 @@
 
 ## Internal helper.  Check the labels L given for the N segments of a path,
 ## polyline or region outline: a cell array of N names, each a valid Octave
-## identifier as isvarname judges it, or '' for a segment left unnamed.
+## identifier as isvarname judges it or a keyword, or '' for a segment left
+## unnamed.
 ## Returns L as a row, empty when every entry is '', and an error message
 ## body in ERRMSG, empty when L is valid; the caller emits the error under
 ## its own name.
@@ -39,7 +40,12 @@ function [errmsg, L] = __checklabels__ (L, N)
     L = cell (1, 0);
     return;
   endif
-  if (! all (cellfun ('isvarname', L(! is_empty))))
+  given = L(! is_empty);
+  valid = cellfun ('isvarname', given);
+  ## A keyword fails isvarname only because it cannot name a variable,
+  ## which a label never does; iskeyword is asked of those alone
+  valid(! valid) = cellfun ('iskeyword', given(! valid));
+  if (! all (valid))
     errmsg = strcat ("Label must contain valid identifiers, one for", ...
                      " each segment, or '' for a segment left unnamed.");
     return;
@@ -66,8 +72,9 @@ endfunction
 %!               "Label must have one entry for each of the 2 segments.");
 
 %!test
-%! [errmsg] = geom.__checklabels__ ({'end'}, 1);
-%! assert_equal (isempty (errmsg), false);
+%! [errmsg, L] = geom.__checklabels__ ({'end', 'web'}, 2);
+%! assert_equal (errmsg, '');
+%! assert_equal (L, {'end', 'web'});
 
 %!test
 %! [errmsg] = geom.__checklabels__ ({'a.b'}, 1);

@@ -34,10 +34,9 @@
 ## the origin of the @code{geom.UCS} @var{U}, its tube circling the normal of
 ## @var{U} in the plane of @var{U}.
 ##
-## The option @qcode{'Label'} names the one face of the torus @var{L},
-## so that a later step finds it by its name with @code{solid.Shape.faces}.
-## @var{L} is an identifier, a letter followed by letters, digits or
-## underscores.
+## The option @qcode{'Label'} names the one face of the torus @var{L}, so that a
+## later step finds it by its name with @code{solid.Shape.faces}.  @var{L} is a
+## valid Octave identifier or keyword.
 ##
 ## @seealso{solid.Shape, solid.sphere, geom.UCS}
 ## @end deftypefn

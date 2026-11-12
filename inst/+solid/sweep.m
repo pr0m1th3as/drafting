@@ -59,15 +59,14 @@
 ## solid that intersects itself; check such a result with
 ## @code{solid.Shape.isvalid}.
 ##
-## The option @qcode{'Label'} names the faces of the solid, so that a later
-## step finds a face by its name with @code{solid.Shape.faces}.  @var{L} is
-## an identifier, a letter followed by letters, digits or underscores, and
-## the faces are named @var{L}@code{.start}, the end at the first point of
-## @var{P}, @var{L}@code{.end}, the end at its last, @var{L}@code{.side},
-## every face of the walls swept by the outline, and @var{L}@code{.hole},
-## every face of the walls swept by the holes.  A ring swept along a closed
-## path has no ends.  The solids of a cell array of regions are copies 1, 2
-## and so on of the label, chosen with @qcode{'Copy'}.
+## The option @qcode{'Label'} names the faces of the solid, so that a later step
+## finds a face by its name with @code{solid.Shape.faces}.  @var{L} is a valid
+## Octave identifier or keyword, and the faces are named @var{L}@code{.start},
+## the end at the first point of @var{P}, @var{L}@code{.end}, the end at its
+## last, @var{L}@code{.side}, every face of the walls swept by the outline, and
+## @var{L}@code{.hole}, every face of the walls swept by the holes.  A ring
+## swept along a closed path has no ends.  The solids of a cell array of regions
+## are copies 1, 2 and so on of the label, chosen with @qcode{'Copy'}.
 ##
 ## @seealso{geom.Path, geom.Spline, geom.Region, solid.extrude, solid.helix}
 ## @end deftypefn
@@ -122,10 +121,9 @@ function S = sweep (R, P, varargin)
       case 'label'
         label = val;
         if (! (ischar (val) && isrow (val)
-               && ! isempty (regexp (val, '^[A-Za-z]\w*$', 'once'))))
-          error (strcat ("solid.sweep: Label must be an identifier: a", ...
-                         " letter followed by letters, digits or", ...
-                         " underscores."));
+               && (isvarname (val) || iskeyword (val))))
+          error (strcat ("solid.sweep: Label must be a valid Octave", ...
+                         " identifier or keyword."));
         endif
       otherwise
         error ("solid.sweep: unknown option '%s'.", name);
@@ -299,7 +297,7 @@ endfunction
 %!error<solid.sweep: option names must be character vectors.> ...
 %! solid.sweep (geom.Region ([0, 0; 1, 0; 1, 1]), ...
 %!              geom.Path ([0, 0, 0; 0, 0, 1]), 1, 2)
-%!error<solid.sweep: Label must be an identifier: a letter followed by letters, digits or underscores.> ...
+%!error<solid.sweep: Label must be a valid Octave identifier or keyword.> ...
 %! solid.sweep (geom.Region ([0, 0; 1, 0; 1, 1]), ...
 %!              geom.Path ([0, 0, 0; 0, 0, 1]), 'Label', 'a-b')
 %!test  # a cell of two regions, swept alike

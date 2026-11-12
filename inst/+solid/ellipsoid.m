@@ -35,10 +35,9 @@
 ## @math{x} axis, @var{B} along its @math{y} axis and @var{C} along its
 ## normal.
 ##
-## The option @qcode{'Label'} names the one face of the ellipsoid @var{L},
-## so that a later step finds it by its name with @code{solid.Shape.faces}.
-## @var{L} is an identifier, a letter followed by letters, digits or
-## underscores.
+## The option @qcode{'Label'} names the one face of the ellipsoid @var{L}, so
+## that a later step finds it by its name with @code{solid.Shape.faces}.
+## @var{L} is a valid Octave identifier or keyword.
 ##
 ## @example
 ## @group

@@ -36,13 +36,13 @@
 ## the cone in the @code{geom.UCS} @var{U}, its axis along the normal of
 ## @var{U} and the centre of its base on the origin of @var{U}.
 ##
-## The option @qcode{'Label'} names the faces of the cone, so that a later
-## step finds a face by its name with @code{solid.Shape.faces}.  @var{L} is
-## an identifier, a letter followed by letters, digits or underscores, and
-## the faces are named @var{L}@code{.start}, the end of radius @var{R1},
-## @var{L}@code{.end}, the end of radius @var{R2}, and @var{L}@code{.side},
-## its slanting side.  An end of radius zero is a point, not a face, and has
-## no name: the tip of a cone is @code{solid.Shape.corner} of its side.
+## The option @qcode{'Label'} names the faces of the cone, so that a later step
+## finds a face by its name with @code{solid.Shape.faces}.  @var{L} is a valid
+## Octave identifier or keyword, and the faces are named @var{L}@code{.start},
+## the end of radius @var{R1}, @var{L}@code{.end}, the end of radius @var{R2},
+## and @var{L}@code{.side}, its slanting side.  An end of radius zero is a
+## point, not a face, and has no name: the tip of a cone is
+## @code{solid.Shape.corner} of its side.
 ##
 ## @seealso{solid.Shape, solid.cylinder, geom.UCS}
 ## @end deftypefn
@@ -138,7 +138,7 @@ endfunction
 %! solid.cone (1, 2, 3, 'base')
 %!error<solid.cone: unknown option 'Anchor'.> ...
 %! solid.cone (1, 2, 3, 'Anchor', 'base')
-%!error<solid.cone: Label must be an identifier: a letter followed by letters, digits or underscores.> ...
+%!error<solid.cone: Label must be a valid Octave identifier or keyword.> ...
 %! solid.cone (1, 2, 3, 'Label', 'tip.end')
 %!error<solid.cone: R1 must be a non-negative and finite real scalar.> ...
 %! solid.cone (-1, 2, 3)

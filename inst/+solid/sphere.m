@@ -28,10 +28,9 @@
 ## @code{@var{S} = solid.sphere (@var{R}, @var{U})} centres it on the origin
 ## of the @code{geom.UCS} @var{U}, with its poles on the normal of @var{U}.
 ##
-## The option @qcode{'Label'} names the one face of the sphere @var{L},
-## so that a later step finds it by its name with @code{solid.Shape.faces}.
-## @var{L} is an identifier, a letter followed by letters, digits or
-## underscores.
+## The option @qcode{'Label'} names the one face of the sphere @var{L}, so that
+## a later step finds it by its name with @code{solid.Shape.faces}.  @var{L} is
+## a valid Octave identifier or keyword.
 ##
 ## @seealso{solid.Shape, solid.torus, geom.UCS}
 ## @end deftypefn
@@ -79,8 +78,8 @@ endfunction
 %! solid.sphere (1, geom.UCS (), 'Label', 'ball', 2)
 %!error<solid.sphere: unknown option 'Anchor'.> ...
 %! solid.sphere (1, 'Anchor', 'centroid')
-%!error<solid.sphere: Label must be an identifier: a letter followed by letters, digits or underscores.> ...
-%! solid.sphere (1, 'Label', '_ball')
+%!error<solid.sphere: Label must be a valid Octave identifier or keyword.> ...
+%! solid.sphere (1, 'Label', 'ball.top')
 %!error<solid.sphere: U must be a geom.UCS object.> solid.sphere (1, [0, 0, 1])
 %!error<solid.sphere: R must be a positive and finite real scalar.> ...
 %! solid.sphere (-5)

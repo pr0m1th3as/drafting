@@ -87,9 +87,9 @@ function [FRAME, errmsg, LABEL] = __primoptargs__ (ARGS, ANCHORS, OFFSETS,
           return;
         endif
         if (! (ischar (val) && isrow (val)
-               && ! isempty (regexp (val, '^[A-Za-z]\w*$', 'once'))))
-          errmsg = strcat ("Label must be an identifier: a letter", ...
-                           " followed by letters, digits or underscores.");
+               && (isvarname (val) || iskeyword (val))))
+          errmsg = strcat ("Label must be a valid Octave", ...
+                           " identifier or keyword.");
           return;
         endif
         LABEL = val;

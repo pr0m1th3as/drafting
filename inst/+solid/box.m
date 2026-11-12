@@ -47,16 +47,15 @@
 ## the centre of the block, its centre of mass.
 ## @end table
 ##
-## The option @qcode{'Label'} names the faces of the block, so that a later
-## step finds a face by its name with @code{solid.Shape.faces}, whatever was
-## done to the block in between.  @var{L} is an identifier, a letter followed
-## by letters, digits or underscores, and each face is named by it and the
-## side of the block it is on: @var{L}@code{.xmin}, @var{L}@code{.xmax},
-## @var{L}@code{.ymin}, @var{L}@code{.ymax}, @var{L}@code{.zmin} and
-## @var{L}@code{.zmax}, along the axes of @var{U}, or of the world when
-## @var{U} is left out.  A face keeps its name when it is moved or turned,
-## so that @code{plate.xmin} is the same face after a rotation, wherever it
-## then faces.
+## The option @qcode{'Label'} names the faces of the block, so that a later step
+## finds a face by its name with @code{solid.Shape.faces}, whatever was done to
+## the block in between.  @var{L} is a valid Octave identifier or keyword, and
+## each face is named by it and the side of the block it is on:
+## @var{L}@code{.xmin}, @var{L}@code{.xmax}, @var{L}@code{.ymin},
+## @var{L}@code{.ymax}, @var{L}@code{.zmin} and @var{L}@code{.zmax}, along the
+## axes of @var{U}, or of the world when @var{U} is left out.  A face keeps its
+## name when it is moved or turned, so that @code{plate.xmin} is the same face
+## after a rotation, wherever it then faces.
 ##
 ## @example
 ## @group
@@ -146,6 +145,11 @@ endfunction
 %!               faces (S, 'Normal', [1, 0, 0]));
 %! assert_equal (faces (S, 'Label', 'block.xmax'), ...
 %!               faces (S, 'Normal', [0, 1, 0]));
+%!test  # a keyword, or a name with a leading underscore, as a label
+%! S = solid.box (10, 20, 30, 'Label', 'for');
+%! assert_equal (faces (S, 'Label', 'for.zmax'), faces (S, 'Normal', [0, 0, 1]));
+%! S = solid.box (10, 20, 30, 'Label', '_block');
+%! assert_equal (numel (faces (S, 'Label', '_block')), 6);
 %!test  # a label with an anchor, option names ignoring case
 %! S = solid.box (6, 4, 2, 'label', 'block', 'Anchor', 'centroid');
 %! assert_equal (bbox (S), [-3, -2, -1, 3, 2, 1], 1e-9);
@@ -175,11 +179,11 @@ endfunction
 %! assert_equal (B, [-1, -2, -3, 1, 2, 3], 1e-6);
 %!error<solid.box: Anchor must be 'corner', 'base' or 'centroid'.> ...
 %! solid.box (1, 2, 3, geom.UCS (), 'Anchor', 'top')
-%!error<solid.box: Label must be an identifier: a letter followed by letters, digits or underscores.> ...
+%!error<solid.box: Label must be a valid Octave identifier or keyword.> ...
 %! solid.box (1, 2, 3, 'Label', 'plate.top')
-%!error<solid.box: Label must be an identifier: a letter followed by letters, digits or underscores.> ...
+%!error<solid.box: Label must be a valid Octave identifier or keyword.> ...
 %! solid.box (1, 2, 3, 'Label', '2plate')
-%!error<solid.box: Label must be an identifier: a letter followed by letters, digits or underscores.> ...
+%!error<solid.box: Label must be a valid Octave identifier or keyword.> ...
 %! solid.box (1, 2, 3, 'Label', '')
-%!error<solid.box: Label must be an identifier: a letter followed by letters, digits or underscores.> ...
+%!error<solid.box: Label must be a valid Octave identifier or keyword.> ...
 %! solid.box (1, 2, 3, 'Label', 5)

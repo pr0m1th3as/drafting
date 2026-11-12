@@ -43,12 +43,11 @@
 ## face, so a box meshed with twelve triangles has six faces.  With
 ## @qcode{'Merge'} set to @code{false} every triangle stays a face.
 ##
-## The option @qcode{'Label'} names every face of the solid @var{L}, so that
-## a later step finds them by their name with @code{solid.Shape.faces}.
-## @var{L} is an identifier, a letter followed by letters, digits or
-## underscores.  The faces of a mesh have no roles of their own, so one of
-## them is chosen from the rest by @qcode{'Normal'}, @qcode{'Within'} or
-## @qcode{'Adjacent'}.
+## The option @qcode{'Label'} names every face of the solid @var{L}, so that a
+## later step finds them by their name with @code{solid.Shape.faces}.  @var{L}
+## is a valid Octave identifier or keyword.  The faces of a mesh have no roles
+## of their own, so one of them is chosen from the rest by @qcode{'Normal'},
+## @qcode{'Within'} or @qcode{'Adjacent'}.
 ##
 ## @example
 ## @group
@@ -91,10 +90,9 @@ function S = polyhedron (M, varargin)
       case 'label'
         label = val;
         if (! (ischar (label) && isrow (label)
-               && ! isempty (regexp (label, '^[A-Za-z]\w*$', 'once'))))
-          error (strcat ("solid.polyhedron: Label must be an identifier:", ...
-                         " a letter followed by letters, digits or", ...
-                         " underscores."));
+               && (isvarname (label) || iskeyword (label))))
+          error (strcat ("solid.polyhedron: Label must be a valid Octave", ...
+                         " identifier or keyword."));
         endif
       otherwise
         error ("solid.polyhedron: unknown option '%s'.", name);
@@ -228,9 +226,9 @@ endfunction
 %! solid.polyhedron (polymesh.Mesh (eye (3), [1, 2, 3]), 'Merge', 2)
 %!error<solid.polyhedron: Merge must be true or false.> ...
 %! solid.polyhedron (polymesh.Mesh (eye (3), [1, 2, 3]), 'Merge', 1)
-%!error<solid.polyhedron: Label must be an identifier: a letter followed by letters, digits or underscores.> ...
+%!error<solid.polyhedron: Label must be a valid Octave identifier or keyword.> ...
 %! solid.polyhedron (polymesh.Mesh (eye (3), [1, 2, 3]), 'Label', 'a.b')
-%!error<solid.polyhedron: Label must be an identifier: a letter followed by letters, digits or underscores.> ...
+%!error<solid.polyhedron: Label must be a valid Octave identifier or keyword.> ...
 %! solid.polyhedron (polymesh.Mesh (eye (3), [1, 2, 3]), 'Label', '')
 %!error<solid.polyhedron: the mesh has no triangles.> ...
 %! solid.polyhedron (polymesh.Mesh ())

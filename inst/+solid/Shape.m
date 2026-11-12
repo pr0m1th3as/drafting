@@ -1840,16 +1840,15 @@ classdef Shape
     ## @end group
     ## @end example
     ##
-    ## The option @qcode{'Label'} names every face the fillet makes @var{L}, an
-    ## identifier, a letter followed by letters, digits or underscores, so
-    ## that a later step finds them by name with @code{solid.Shape.faces}:
-    ## each round along an edge, and each patch where several meet at a
-    ## corner.  One of them is chosen from the rest with @qcode{'Adjacent'}:
-    ## a round borders the two faces of the edge it replaced, which keep their
-    ## names, and a corner patch borders only the rounds that meet there, so
-    ## it is chosen with @qcode{'Adjacent'} on them.  The edge itself is gone,
-    ## so @code{edges} with @qcode{'Between'} on its two faces then chooses
-    ## nothing.
+    ## The option @qcode{'Label'} names every face the fillet makes @var{L}, a
+    ## valid Octave identifier or keyword, so that a later step finds them by
+    ## name with @code{solid.Shape.faces}: each round along an edge, and each
+    ## patch where several meet at a corner.  One of them is chosen from the
+    ## rest with @qcode{'Adjacent'}: a round borders the two faces of the edge
+    ## it replaced, which keep their names, and a corner patch borders only the
+    ## rounds that meet there, so it is chosen with @qcode{'Adjacent'} on them.
+    ## The edge itself is gone, so @code{edges} with @qcode{'Between'} on its
+    ## two faces then chooses nothing.
     ##
     ## @seealso{solid.Shape.edges, solid.Shape.facefillet, solid.Shape.chamfer}
     ## @end deftypefn
@@ -1862,9 +1861,9 @@ classdef Shape
       [errmsg, opt] = options (varargin, struct ('Label', ''));
       if (isempty (errmsg) && ! isempty (opt.Label)
           && ! (ischar (opt.Label) && isrow (opt.Label)
-                && ! isempty (regexp (opt.Label, '^[A-Za-z]\w*$', 'once'))))
-        errmsg = strcat ("Label must be an identifier: a letter followed", ...
-                         " by letters, digits or underscores.");
+                && (isvarname (opt.Label) || iskeyword (opt.Label))))
+        errmsg = strcat ("Label must be a valid Octave", ...
+                         " identifier or keyword.");
       endif
       if (! isempty (errmsg))
         error ("solid.Shape.fillet: %s", errmsg);
@@ -1938,13 +1937,12 @@ classdef Shape
     ## @end group
     ## @end example
     ##
-    ## The option @qcode{'Label'} names every round the call makes @var{L}, an
-    ## identifier, a letter followed by letters, digits or underscores, so
-    ## that a later step finds them by name with @code{solid.Shape.faces}.  A
-    ## full round stands where its middle face @var{M} was, so it takes the
-    ## names of @var{M} as well: the end of a wall labelled @code{wall} stays
-    ## @code{wall.xmax} when rounded.  The faces beside the rounds keep their
-    ## names.
+    ## The option @qcode{'Label'} names every round the call makes @var{L}, a
+    ## valid Octave identifier or keyword, so that a later step finds them by
+    ## name with @code{solid.Shape.faces}.  A full round stands where its middle
+    ## face @var{M} was, so it takes the names of @var{M} as well: the end of a
+    ## wall labelled @code{wall} stays @code{wall.xmax} when rounded.  The faces
+    ## beside the rounds keep their names.
     ##
     ## @seealso{solid.Shape.faces, solid.Shape.fillet}
     ## @end deftypefn
@@ -1963,9 +1961,9 @@ classdef Shape
       [errmsg, opt] = options (varargin, struct ('Label', ''));
       if (isempty (errmsg) && ! isempty (opt.Label)
           && ! (ischar (opt.Label) && isrow (opt.Label)
-                && ! isempty (regexp (opt.Label, '^[A-Za-z]\w*$', 'once'))))
-        errmsg = strcat ("Label must be an identifier: a letter followed", ...
-                         " by letters, digits or underscores.");
+                && (isvarname (opt.Label) || iskeyword (opt.Label))))
+        errmsg = strcat ("Label must be a valid Octave", ...
+                         " identifier or keyword.");
       endif
       if (! isempty (errmsg))
         error ("solid.Shape.facefillet: %s", errmsg);
@@ -2050,16 +2048,15 @@ classdef Shape
     ## @end group
     ## @end example
     ##
-    ## The option @qcode{'Label'} names every face the chamfer makes @var{L}, an
-    ## identifier, a letter followed by letters, digits or underscores, so
-    ## that a later step finds them by name with @code{solid.Shape.faces}:
-    ## each bevel along an edge, and each patch where several meet at a
-    ## corner.  One of them is chosen from the rest with @qcode{'Adjacent'}:
-    ## a bevel borders the two faces of the edge it replaced, which keep their
-    ## names, and a corner patch borders only the bevels that meet there, so
-    ## it is chosen with @qcode{'Adjacent'} on them.  The edge itself is gone,
-    ## so @code{edges} with @qcode{'Between'} on its two faces then chooses
-    ## nothing.
+    ## The option @qcode{'Label'} names every face the chamfer makes @var{L}, a
+    ## valid Octave identifier or keyword, so that a later step finds them by
+    ## name with @code{solid.Shape.faces}: each bevel along an edge, and each
+    ## patch where several meet at a corner.  One of them is chosen from the
+    ## rest with @qcode{'Adjacent'}: a bevel borders the two faces of the edge
+    ## it replaced, which keep their names, and a corner patch borders only the
+    ## bevels that meet there, so it is chosen with @qcode{'Adjacent'} on them.
+    ## The edge itself is gone, so @code{edges} with @qcode{'Between'} on its
+    ## two faces then chooses nothing.
     ##
     ## @seealso{solid.Shape.edges, solid.Shape.fillet}
     ## @end deftypefn
@@ -2079,9 +2076,9 @@ classdef Shape
       [errmsg, opt] = options (varargin, struct ('Angle', [], 'Label', ''));
       if (isempty (errmsg) && ! isempty (opt.Label)
           && ! (ischar (opt.Label) && isrow (opt.Label)
-                && ! isempty (regexp (opt.Label, '^[A-Za-z]\w*$', 'once'))))
-        errmsg = strcat ("Label must be an identifier: a letter followed", ...
-                         " by letters, digits or underscores.");
+                && (isvarname (opt.Label) || iskeyword (opt.Label))))
+        errmsg = strcat ("Label must be a valid Octave", ...
+                         " identifier or keyword.");
       endif
       if (! isempty (errmsg))
         error ("solid.Shape.chamfer: %s", errmsg);
@@ -2183,16 +2180,16 @@ classdef Shape
     ##
     ## @code{@var{S} = shell (@dots{}, @qcode{'Label'}, @var{L})} names the
     ## faces the shell makes, so that a later step finds them by name with
-    ## @code{solid.Shape.faces}.  @var{L} is an identifier, a letter followed
-    ## by letters, digits or underscores.  Each new face is named after the
-    ## face of @var{S} it lies against, its full name following @var{L} and
-    ## @code{inner}, or @code{outer} for walls grown outwards: the inside of
-    ## the front wall of a block labelled @code{plate} is
-    ## @code{cup.inner.plate.ymin}, and @code{cup.inner} is every inner face.
-    ## The ring an opened face leaves is @var{L}@code{.rim} followed by that
-    ## face's name, and keeps its own name too, being what is left of it.  A
-    ## face of @var{S} without a name gives its new face @var{L} and the role
-    ## alone.  The faces of @var{S} that stay keep their names.
+    ## @code{solid.Shape.faces}.  @var{L} is a valid Octave identifier or
+    ## keyword.  Each new face is named after the face of @var{S} it lies
+    ## against, its full name following @var{L} and @code{inner}, or
+    ## @code{outer} for walls grown outwards: the inside of the front wall of a
+    ## block labelled @code{plate} is @code{cup.inner.plate.ymin}, and
+    ## @code{cup.inner} is every inner face.  The ring an opened face leaves is
+    ## @var{L}@code{.rim} followed by that face's name, and keeps its own name
+    ## too, being what is left of it.  A face of @var{S} without a name gives
+    ## its new face @var{L} and the role alone.  The faces of @var{S} that stay
+    ## keep their names.
     ##
     ## @example
     ## @group
@@ -2221,9 +2218,9 @@ classdef Shape
       endif
       if (isempty (errmsg) && ! isempty (opt.Label)
           && ! (ischar (opt.Label) && isrow (opt.Label)
-                && ! isempty (regexp (opt.Label, '^[A-Za-z]\w*$', 'once'))))
-        errmsg = strcat ("Label must be an identifier: a letter followed", ...
-                         " by letters, digits or underscores.");
+                && (isvarname (opt.Label) || iskeyword (opt.Label))))
+        errmsg = strcat ("Label must be a valid Octave", ...
+                         " identifier or keyword.");
       endif
       if (! isempty (errmsg))
         error ("solid.Shape.shell: %s", errmsg);
@@ -2435,14 +2432,14 @@ classdef Shape
     ## other blind hole is flat-bottomed by default, as an end mill leaves it.
     ##
     ## @item @qcode{'Label'}
-    ## An identifier @var{L}, a letter followed by letters, digits or
-    ## underscores, that names the faces the holes make, so that a later step
-    ## finds them by name with @code{solid.Shape.faces}: @var{L}@code{.wall},
-    ## the bore, @var{L}@code{.bottom}, the drill point or flat floor of a
-    ## blind hole, @var{L}@code{.counterbore}, the wall of a counterbore, and
-    ## @var{L}@code{.step}, its floor, and @var{L}@code{.countersink}, the
-    ## cone of a countersink.  A through hole has no bottom.  The hole at row
-    ## @var{k} of @var{P}, or of @qcode{'At'}, is copy @var{k}, chosen with
+    ## A valid Octave identifier or keyword @var{L}, that names the faces the
+    ## holes make, so that a later step finds them by name with
+    ## @code{solid.Shape.faces}: @var{L}@code{.wall}, the bore,
+    ## @var{L}@code{.bottom}, the drill point or flat floor of a blind hole,
+    ## @var{L}@code{.counterbore}, the wall of a counterbore, and
+    ## @var{L}@code{.step}, its floor, and @var{L}@code{.countersink}, the cone
+    ## of a countersink.  A through hole has no bottom.  The hole at row @var{k}
+    ## of @var{P}, or of @qcode{'At'}, is copy @var{k}, chosen with
     ## @qcode{'Copy'}.
     ## @end table
     ##
@@ -2497,9 +2494,9 @@ classdef Shape
       endif
       if (isempty (errmsg) && ! isempty (opt.Label)
           && ! (ischar (opt.Label) && isrow (opt.Label)
-                && ! isempty (regexp (opt.Label, '^[A-Za-z]\w*$', 'once'))))
-        errmsg = strcat ("Label must be an identifier: a letter followed", ...
-                         " by letters, digits or underscores.");
+                && (isvarname (opt.Label) || iskeyword (opt.Label))))
+        errmsg = strcat ("Label must be a valid Octave", ...
+                         " identifier or keyword.");
       endif
       if (! isempty (errmsg))
         error ("solid.Shape.hole: %s", errmsg);
@@ -2810,14 +2807,13 @@ classdef Shape
     ## @code{solid.Shape.hole}, false by default.
     ##
     ## @item @qcode{'Label'}
-    ## An identifier @var{L}, a letter followed by letters, digits or
-    ## underscores, that names every face the threads make @var{L}, so that a
-    ## later step finds them by name with @code{solid.Shape.faces}: the flanks
-    ## and root of the groove, where it runs out, and for an external thread
-    ## the cylinder turned down for it.  The crests of an internal thread are
-    ## what is left of the bore, so they keep the bore's name and take
-    ## @var{L} too.  The thread at row @var{k} of @var{P}, or of
-    ## @qcode{'At'}, is copy @var{k}, chosen with @qcode{'Copy'}.
+    ## A valid Octave identifier or keyword @var{L}, that names every face the
+    ## threads make @var{L}, so that a later step finds them by name with
+    ## @code{solid.Shape.faces}: the flanks and root of the groove, where it
+    ## runs out, and for an external thread the cylinder turned down for it.
+    ## The crests of an internal thread are what is left of the bore, so they
+    ## keep the bore's name and take @var{L} too.  The thread at row @var{k} of
+    ## @var{P}, or of @qcode{'At'}, is copy @var{k}, chosen with @qcode{'Copy'}.
     ## @end table
     ##
     ## Threading the empty shape leaves it empty.
@@ -2854,9 +2850,9 @@ classdef Shape
       endif
       if (isempty (errmsg) && ! isempty (opt.Label)
           && ! (ischar (opt.Label) && isrow (opt.Label)
-                && ! isempty (regexp (opt.Label, '^[A-Za-z]\w*$', 'once'))))
-        errmsg = strcat ("Label must be an identifier: a letter followed", ...
-                         " by letters, digits or underscores.");
+                && (isvarname (opt.Label) || iskeyword (opt.Label))))
+        errmsg = strcat ("Label must be a valid Octave", ...
+                         " identifier or keyword.");
       endif
       if (isempty (errmsg) && ! ischar (NAME))
         errmsg = strcat ("NAME must be the name of an ISO metric thread", ...
@@ -3019,13 +3015,12 @@ classdef Shape
     ##
     ## @code{@var{S} = pocket (@dots{}, @qcode{'Label'}, @var{L})} names the
     ## faces the pocket makes, so that a later step finds them by name with
-    ## @code{solid.Shape.faces}.  @var{L} is an identifier, a letter followed
-    ## by letters, digits or underscores, and the faces are named
-    ## @var{L}@code{.floor}, the bottom of the pocket, @var{L}@code{.wall},
-    ## the walls cut by the outline of the region, and @var{L}@code{.island},
-    ## the walls of the islands its holes leave standing.  A pocket right
-    ## through has no floor.  The pocket of each region of a cell array is a
-    ## copy, chosen with @qcode{'Copy'}.
+    ## @code{solid.Shape.faces}.  @var{L} is a valid Octave identifier or
+    ## keyword, and the faces are named @var{L}@code{.floor}, the bottom of the
+    ## pocket, @var{L}@code{.wall}, the walls cut by the outline of the region,
+    ## and @var{L}@code{.island}, the walls of the islands its holes leave
+    ## standing.  A pocket right through has no floor.  The pocket of each
+    ## region of a cell array is a copy, chosen with @qcode{'Copy'}.
     ##
     ## Pocketing the empty shape leaves it empty.
     ##
@@ -3072,9 +3067,9 @@ classdef Shape
       endif
       if (isempty (errmsg) && ! isempty (opt.Label)
           && ! (ischar (opt.Label) && isrow (opt.Label)
-                && ! isempty (regexp (opt.Label, '^[A-Za-z]\w*$', 'once'))))
-        errmsg = strcat ("Label must be an identifier: a letter followed", ...
-                         " by letters, digits or underscores.");
+                && (isvarname (opt.Label) || iskeyword (opt.Label))))
+        errmsg = strcat ("Label must be a valid Octave", ...
+                         " identifier or keyword.");
       endif
       if (! isempty (errmsg))
         error ("solid.Shape.pocket: %s", errmsg);
@@ -3206,13 +3201,13 @@ classdef Shape
     ## @code{@{@var{E}, @var{D}@}} with a row for each end.
     ##
     ## @item @qcode{'Label'}
-    ## An identifier @var{L}, a letter followed by letters, digits or
-    ## underscores, that names every face of the knurl @var{L}, so that a
-    ## later step finds them by name with @code{solid.Shape.faces}: its
-    ## teeth, the lands between them and the fillets or chamfers it runs over.
-    ## They take the names of @var{F} too, since they stand where it was, so a
-    ## name that chose @var{F} chooses the knurl.  The faces at the ends of
-    ## @var{F}, reshaped to the knurl's outline, keep their names.
+    ## A valid Octave identifier or keyword @var{L}, that names every face of
+    ## the knurl @var{L}, so that a later step finds them by name with
+    ## @code{solid.Shape.faces}: its teeth, the lands between them and the
+    ## fillets or chamfers it runs over.  They take the names of @var{F} too,
+    ## since they stand where it was, so a name that chose @var{F} chooses the
+    ## knurl.  The faces at the ends of @var{F}, reshaped to the knurl's
+    ## outline, keep their names.
     ## @end table
     ##
     ## An end of @var{F} takes one fillet or chamfer at most, and an end at a
@@ -3282,9 +3277,9 @@ classdef Shape
                                                  'Label', ''));
       if (isempty (errmsg) && ! isempty (opt.Label)
           && ! (ischar (opt.Label) && isrow (opt.Label)
-                && ! isempty (regexp (opt.Label, '^[A-Za-z]\w*$', 'once'))))
-        errmsg = strcat ("Label must be an identifier: a letter followed", ...
-                         " by letters, digits or underscores.");
+                && (isvarname (opt.Label) || iskeyword (opt.Label))))
+        errmsg = strcat ("Label must be a valid Octave", ...
+                         " identifier or keyword.");
       endif
       if (! isempty (errmsg))
         error ("solid.Shape.knurl: %s", errmsg);
@@ -3542,11 +3537,11 @@ classdef Shape
     ## of curved faces.
     ##
     ## The hull is a new solid, no one operand's material, so it takes no
-    ## @code{Colour} and no @code{Name} from them, and its faces no names.
-    ## The option @qcode{'Label'} names every face of it @var{L}, an
-    ## identifier, a letter followed by letters, digits or underscores, so
-    ## that a later step finds them by name with @code{solid.Shape.faces}; one
-    ## of them is chosen from the rest by @qcode{'Normal'} or @qcode{'Within'}.
+    ## @code{Colour} and no @code{Name} from them, and its faces no names.  The
+    ## option @qcode{'Label'} names every face of it @var{L}, a valid Octave
+    ## identifier or keyword, so that a later step finds them by name with
+    ## @code{solid.Shape.faces}; one of them is chosen from the rest by
+    ## @qcode{'Normal'} or @qcode{'Within'}.
     ##
     ## @example
     ## @group
@@ -3591,10 +3586,9 @@ classdef Shape
           case 'label'
             label = val;
             if (! (ischar (val) && isrow (val)
-                   && ! isempty (regexp (val, '^[A-Za-z]\w*$', 'once'))))
-              error (strcat ("solid.Shape.hull: Label must be an", ...
-                             " identifier: a letter followed by letters,", ...
-                             " digits or underscores."));
+                   && (isvarname (val) || iskeyword (val))))
+              error (strcat ("solid.Shape.hull: Label must be a valid", ...
+                             " Octave identifier or keyword."));
             endif
           otherwise
             error ("solid.Shape.hull: unknown option '%s'.", name);
@@ -4208,11 +4202,11 @@ function [errmsg, hit] = named (S, NAMES, OPTION, caller)
   if (ischar (NAMES) && isrow (NAMES))
     NAMES = {NAMES};
   endif
-  pattern = '^[A-Za-z]\w*(\.[A-Za-z]\w*)*$';
+  ## Each level an identifier or a keyword, as a role such as 'end' is
+  level = @(c) isvarname (c) || iskeyword (c);
+  dotted = @(n) isrow (n) && all (cellfun (level, strsplit (n, '.')));
   if (! (iscellstr (NAMES) && ! isempty (NAMES)
-         && all (cellfun (@(n) isrow (n) && ! isempty (regexp (n, pattern, ...
-                                                               'once')), ...
-                          NAMES(:)))))
+         && all (cellfun (dotted, NAMES(:)))))
     errmsg = sprintf (strcat ("%s must be a name or a cell array of names,", ...
                               " each identifiers joined by dots."), OPTION);
     return;

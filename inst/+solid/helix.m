@@ -51,15 +51,14 @@
 ## adds nothing.  The surfaces are splines fitted to the exact helix, so a
 ## volume or extent agrees with that to a few parts in a million.
 ##
-## The option @qcode{'Label'} names the faces of the coil, so that a later
-## step finds a face by its name with @code{solid.Shape.faces}.  @var{L} is
-## an identifier, a letter followed by letters, digits or underscores, and
-## the faces are named @var{L}@code{.start}, the end in the region's plane
-## where the coil begins, @var{L}@code{.end}, the end after @var{TURNS},
-## @var{L}@code{.side}, every face of the walls swept by the outline, and
-## @var{L}@code{.hole}, every face of the walls swept by the holes.  The
-## solids of a cell array of regions are copies 1, 2 and so on of the
-## label, chosen with @qcode{'Copy'}.
+## The option @qcode{'Label'} names the faces of the coil, so that a later step
+## finds a face by its name with @code{solid.Shape.faces}.  @var{L} is a valid
+## Octave identifier or keyword, and the faces are named @var{L}@code{.start},
+## the end in the region's plane where the coil begins, @var{L}@code{.end}, the
+## end after @var{TURNS}, @var{L}@code{.side}, every face of the walls swept by
+## the outline, and @var{L}@code{.hole}, every face of the walls swept by the
+## holes.  The solids of a cell array of regions are copies 1, 2 and so on of
+## the label, chosen with @qcode{'Copy'}.
 ##
 ## @example
 ## @group
@@ -129,10 +128,9 @@ function S = helix (R, PITCH, TURNS, varargin)
       case 'label'
         label = val;
         if (! (ischar (val) && isrow (val)
-               && ! isempty (regexp (val, '^[A-Za-z]\w*$', 'once'))))
-          error (strcat ("solid.helix: Label must be an identifier: a", ...
-                         " letter followed by letters, digits or", ...
-                         " underscores."));
+               && (isvarname (val) || iskeyword (val))))
+          error (strcat ("solid.helix: Label must be a valid Octave", ...
+                         " identifier or keyword."));
         endif
       otherwise
         error ("solid.helix: unknown option '%s'.", name);
@@ -201,7 +199,7 @@ endfunction
 %! solid.helix (geom.Region ([1, 0; 2, 0; 2, 1]), 2, 1, 'Label')
 %!error<solid.helix: unknown option 'Turns'.> ...
 %! solid.helix (geom.Region ([1, 0; 2, 0; 2, 1]), 2, 1, 'Turns', 2)
-%!error<solid.helix: Label must be an identifier: a letter followed by letters, digits or underscores.> ...
+%!error<solid.helix: Label must be a valid Octave identifier or keyword.> ...
 %! solid.helix (geom.Region ([1, 0; 2, 0; 2, 1]), 2, 1, 'Label', '')
 %!test  # a cell of two regions, two coils in one shape
 %! R1 = geom.Region ([2, 0; 3, 0; 3, 1; 2, 1]);

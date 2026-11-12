@@ -397,12 +397,11 @@ classdef Path
     ##
     ## @item @qcode{'Label'}
     ## A cell array with a label for each segment, in the order the points are
-    ## written: the segment from the first to the second, and so on, and for
-    ## a closed one, last the segment back to the first.  Each label is an
-    ## identifier, a letter followed by letters, digits or underscores, or
-    ## @code{''} for a segment left unnamed.  A solid made from it names the
-    ## face each segment makes by its label, as @code{rib.side.web}; see
-    ## @code{solid.extrude}.
+    ## written: the segment from the first to the second, and so on, and for a
+    ## closed one, last the segment back to the first.  Each label is a valid
+    ## Octave identifier or keyword, or @code{''} for a segment left unnamed.  A
+    ## solid made from it names the face each segment makes by its label, as
+    ## @code{rib.side.web}; see @code{solid.extrude}.
     ## @end table
     ##
     ## @code{@var{P} = geom.Path (@var{PL})} makes the path of the
@@ -560,10 +559,10 @@ classdef Path
     ## segment or into the round of the next corner, is refused.  Rounds that
     ## use up a segment between them meet, and the segment is dropped.
     ##
-    ## The option @qcode{'Label'} names the arc each corner becomes, an
-    ## identifier, a letter followed by letters, digits or underscores; without
-    ## it the arc is unnamed.  The segments of @var{P} keep their labels, a
-    ## segment used up and dropped taking its label with it.
+    ## The option @qcode{'Label'} names the arc each corner becomes, a valid
+    ## Octave identifier or keyword; without it the arc is unnamed.  The
+    ## segments of @var{P} keep their labels, a segment used up and dropped
+    ## taking its label with it.
     ##
     ## @seealso{geom.Polyline.fillet}
     ## @end deftypefn
@@ -593,10 +592,10 @@ classdef Path
         switch (lower (name))
           case 'label'
             label = val;
-            if (! isvarname (label))
-              error (strcat ("geom.Path.fillet: Label must be an", ...
-                             " identifier: a letter followed by letters,", ...
-                             " digits or underscores."));
+            if (! (ischar (label) && isrow (label)
+                   && (isvarname (label) || iskeyword (label))))
+              error (strcat ("geom.Path.fillet: Label must be a valid", ...
+                             " Octave identifier or keyword."));
             endif
           otherwise
             error ("geom.Path.fillet: unknown option '%s'.", name);
@@ -663,10 +662,10 @@ classdef Path
     ## of the next corner, or an angle at which the cut misses the segment
     ## after the corner, is refused.
     ##
-    ## The option @qcode{'Label'} names the straight cut each corner becomes,
-    ## an identifier, a letter followed by letters, digits or underscores;
-    ## without it the cut is unnamed.  The segments of @var{P} keep their
-    ## labels, a segment used up and dropped taking its label with it.
+    ## The option @qcode{'Label'} names the straight cut each corner becomes, a
+    ## valid Octave identifier or keyword; without it the cut is unnamed.  The
+    ## segments of @var{P} keep their labels, a segment used up and dropped
+    ## taking its label with it.
     ##
     ## @seealso{geom.Path.fillet, geom.Polyline.chamfer}
     ## @end deftypefn
@@ -704,10 +703,10 @@ classdef Path
             endif
           case 'label'
             label = val;
-            if (! isvarname (label))
-              error (strcat ("geom.Path.chamfer: Label must be an", ...
-                             " identifier: a letter followed by letters,", ...
-                             " digits or underscores."));
+            if (! (ischar (label) && isrow (label)
+                   && (isvarname (label) || iskeyword (label))))
+              error (strcat ("geom.Path.chamfer: Label must be a valid", ...
+                             " Octave identifier or keyword."));
             endif
           otherwise
             error ("geom.Path.chamfer: unknown option '%s'.", name);
@@ -1993,10 +1992,10 @@ endfunction
 %!error<geom.Path: Label must be a cell array of character vectors.> ...
 %! geom.Path ([0, 0; 10, 0], 'Label', 'a')
 %!error<geom.Path: Label must contain valid identifiers, one for each segment, or '' for a segment left unnamed.> ...
-%! geom.Path ([0, 0; 10, 0], 'Label', {'end'})
+%! geom.Path ([0, 0; 10, 0], 'Label', {'2nd'})
 %!error<geom.Path: invalid number of input arguments.> ...
 %! geom.Path (geom.Spline ([0, 0; 5, 3; 10, 0]), 'Closed', true)
-%!error<geom.Path.fillet: Label must be an identifier: a letter followed by letters, digits or underscores.> ...
+%!error<geom.Path.fillet: Label must be a valid Octave identifier or keyword.> ...
 %! fillet (geom.Path ([0, 0; 10, 0; 10, 10]), 1, 'Label', 'a.b')
 %!error<geom.Path.fillet: unknown option 'Radius'.> ...
 %! fillet (geom.Path ([0, 0; 10, 0; 10, 10]), 1, 'Radius', 2)

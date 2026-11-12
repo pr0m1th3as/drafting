@@ -60,16 +60,15 @@
 ## axis, starting from the region's plane.  @var{ANGLE} is in the range
 ## @math{(0, 360]}, and 360 is the default.
 ##
-## The option @qcode{'Label'} names the faces of the solid, so that a later
-## step finds a face by its name with @code{solid.Shape.faces}.  @var{L} is
-## an identifier, a letter followed by letters, digits or underscores, and
-## the faces are named @var{L}@code{.side}, every face turned from the
-## outline of the region, and @var{L}@code{.hole}, every face turned from
-## its holes.  A part turn has two flat ends besides, @var{L}@code{.start} in
-## the region's plane and @var{L}@code{.end} at @var{ANGLE}; a whole turn has
-## none.  Where the region runs along the axis it makes no face, and no
-## name.  The solids of a cell array of regions are copies 1, 2 and so on of
-## the label, chosen with @qcode{'Copy'}.
+## The option @qcode{'Label'} names the faces of the solid, so that a later step
+## finds a face by its name with @code{solid.Shape.faces}.  @var{L} is a valid
+## Octave identifier or keyword, and the faces are named @var{L}@code{.side},
+## every face turned from the outline of the region, and @var{L}@code{.hole},
+## every face turned from its holes.  A part turn has two flat ends besides,
+## @var{L}@code{.start} in the region's plane and @var{L}@code{.end} at
+## @var{ANGLE}; a whole turn has none.  Where the region runs along the axis it
+## makes no face, and no name.  The solids of a cell array of regions are copies
+## 1, 2 and so on of the label, chosen with @qcode{'Copy'}.
 ##
 ## @seealso{geom.Region, solid.extrude, solid.helix}
 ## @end deftypefn
@@ -113,10 +112,9 @@ function S = revolve (R, varargin)
       case 'label'
         label = val;
         if (! (ischar (val) && isrow (val)
-               && ! isempty (regexp (val, '^[A-Za-z]\w*$', 'once'))))
-          error (strcat ("solid.revolve: Label must be an identifier: a", ...
-                         " letter followed by letters, digits or", ...
-                         " underscores."));
+               && (isvarname (val) || iskeyword (val))))
+          error (strcat ("solid.revolve: Label must be a valid Octave", ...
+                         " identifier or keyword."));
         endif
       otherwise
         error ("solid.revolve: unknown option '%s'.", name);
@@ -251,5 +249,5 @@ endfunction
 %! solid.revolve (geom.Region ([0, 0; 1, 0; 1, 1]), 'Angle', 90)
 %!error<solid.revolve: option names must be character vectors.> ...
 %! solid.revolve (geom.Region ([0, 0; 1, 0; 1, 1]), 90, 1, 2)
-%!error<solid.revolve: Label must be an identifier: a letter followed by letters, digits or underscores.> ...
+%!error<solid.revolve: Label must be a valid Octave identifier or keyword.> ...
 %! solid.revolve (geom.Region ([0, 0; 1, 0; 1, 1]), 'Label', 'a.b')
