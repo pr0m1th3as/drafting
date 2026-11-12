@@ -1182,6 +1182,28 @@
 %!test  # threading the empty shape
 %! assert_equal (isempty (thread (solid.Shape (), [0, 0, 0], 'M6', 5)), ...
 %!               true);
+%!test  # an internal thread's faces named, its crests keeping the bore's name
+%! S = hole (solid.box (20, 20, 20), [10, 10, 20], 'M6', 15, ...
+%!           'Label', 'tapping');
+%! S = thread (S, [10, 10, 20], 'M6', 12, 'Label', 'tap');
+%! assert_equal (isempty (faces (S, 'Type', 'bspline')), false);
+%! assert_equal (all (ismember (faces (S, 'Type', 'bspline'), ...
+%!                              faces (S, 'Label', 'tap'))), true);
+%! crest = faces (S, 'Label', 'tapping.wall');
+%! assert_equal (all (ismember (crest, faces (S, 'Label', 'tap'))), true);
+%! assert_equal (numel (faces (S, 'Label', 'tapping.bottom')), 1);
+%!test  # an external thread's faces named, the rest of the rod kept
+%! S = thread (solid.cylinder (5, 40, 'Label', 'rod'), [0, 0, 40], ...
+%!             'M10', 15, 'Label', 'screw');
+%! assert_equal (numel (faces (S, 'Label', 'rod')), 3);
+%! assert_equal (numel (faces (S, 'Label', {'rod', 'screw'})), numfaces (S));
+%!test  # the thread at each row of P is a copy
+%! T = hole (solid.box (40, 20, 10), [10, 10, 10; 30, 10, 10], 'M5', Inf);
+%! T = thread (T, [10, 10, 10; 30, 10, 10], 'M5', Inf, 'Label', 'tap');
+%! F = faces (T, 'Label', 'tap', 'Copy', 2);
+%! G = faces (T, 'Label', 'tap', 'Copy', 1);
+%! assert_equal (isempty (F), false);
+%! assert_equal (isempty (intersect (F, G)), true);
 
 %!test  # a rectangle 4 deep in the top of a plate
 %! R = geom.Region ([30, 15; 50, 15; 50, 25; 30, 25]);
@@ -2436,6 +2458,8 @@
 %!error<solid.Shape.thread: M10 at \(0, 0, 40\): the thread runs past the end of the cylinder.> ...
 %! thread (union (solid.cylinder (5, 40), solid.cylinder (8, 20)), ...
 %!         [0, 0, 40], 'M10', 25)
+%!error<solid.Shape.thread: Label must be an identifier: a letter followed by letters, digits or underscores.> ...
+%! thread (solid.Shape (), [0, 0, 0], 'M6', 5, 'Label', 'a.b')
 %!error<solid.Shape.pocket: invalid number of input arguments.> ...
 %! pocket (solid.Shape (), geom.Region ([0, 0; 1, 0; 1, 1]))
 %!error<solid.Shape.pocket: R must be a geom.Region object.> ...

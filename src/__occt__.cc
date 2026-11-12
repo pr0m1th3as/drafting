@@ -7408,6 +7408,15 @@ function directly. \n\
       const TopoDS_Shape s = toshape (args(2), caller, names);
       out = nameinfo (s, names);
     }
+    // The shape with every face named by the label given alone, the faces
+    // of a tool all of whose faces play one role in the feature it cuts
+    else if (cmd == "label")
+    {
+      const TopoDS_Shape s = toshape (args(2), caller);
+      out = todata (s, labelled (s, args(3).string_value (),
+                                 [] (const TopoDS_Face&)
+                                 { return string (); }));
+    }
     // The shape with every name in the cell FROM renamed to the one at the
     // same place in TO, and every other name dropped: the faces of a tool
     // given the roles of the feature it cuts

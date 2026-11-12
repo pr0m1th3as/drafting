@@ -2743,6 +2743,16 @@ classdef Shape
     ## @item @qcode{'Custom'}
     ## True to take a thread of any diameter and pitch, as for
     ## @code{solid.Shape.hole}, false by default.
+    ##
+    ## @item @qcode{'Label'}
+    ## An identifier @var{L}, a letter followed by letters, digits or
+    ## underscores, that names every face the threads make @var{L}, so that a
+    ## later step finds them by name with @code{solid.Shape.faces}: the flanks
+    ## and root of the groove, where it runs out, and for an external thread
+    ## the cylinder turned down for it.  The crests of an internal thread are
+    ## what is left of the bore, so they keep the bore's name and take
+    ## @var{L} too.  The thread at row @var{k} of @var{P}, or of
+    ## @qcode{'At'}, is copy @var{k}, chosen with @qcode{'Copy'}.
     ## @end table
     ##
     ## Threading the empty shape leaves it empty.
@@ -2773,9 +2783,15 @@ classdef Shape
         error ("solid.Shape.thread: invalid number of input arguments.");
       endif
       [errmsg, opt] = options (varargin, struct ('Direction', [], 'At', [], ...
-                                                 'Custom', []));
+                                                 'Custom', [], 'Label', ''));
       if (isempty (errmsg))
         [errmsg, P, opt.Direction] = placement (P, opt.Direction, opt.At);
+      endif
+      if (isempty (errmsg) && ! isempty (opt.Label)
+          && ! (ischar (opt.Label) && isrow (opt.Label)
+                && ! isempty (regexp (opt.Label, '^[A-Za-z]\w*$', 'once'))))
+        errmsg = strcat ("Label must be an identifier: a letter followed", ...
+                         " by letters, digits or underscores.");
       endif
       if (isempty (errmsg) && ! ischar (NAME))
         errmsg = strcat ("NAME must be the name of an ISO metric thread", ...
@@ -2874,7 +2890,8 @@ classdef Shape
           error ("solid.Shape.thread: %s at (%s): %s.", t.name, ...
                  pointstr (P(i,:)), beyond);
         endif
-        tools{i} = place (cutter (specs{i}{:}), v, P(i,:));
+        tools{i} = tagged (place (cutter (specs{i}{:}), v, P(i,:)), ...
+                           opt.Label, i);
       endfor
 
       ## Open CASCADE fails to cut some threads, returning the groove as a
@@ -2893,7 +2910,8 @@ classdef Shape
         this = S;
       else
         for i = 1:n
-          this = cutthread (this, tools{i}, specs{i}, v, P(i,:), t.name);
+          this = cutthread (this, tools{i}, specs{i}, v, P(i,:), t.name, ...
+                            opt.Label, i);
         endfor
       endif
 
@@ -4572,8 +4590,9 @@ endfunction
 ## The thread of the spec SPEC, the arguments of cutter, cut from S along V
 ## from the point P by the tool T, or, where Open CASCADE fails on it, by
 ## the tool with the shorter core, kept only when it removes what the groove
-## alone and the core or sleeve alone remove; NAME names the thread
-function S = cutthread (S, T, SPEC, V, P, NAME)
+## alone and the core or sleeve alone remove; NAME names the thread, and
+## the tool is tagged as tagged does with the label LABEL as thread K
+function S = cutthread (S, T, SPEC, V, P, NAME, LABEL, K)
 
   N = numsolids (S);
   try
@@ -4586,7 +4605,8 @@ function S = cutthread (S, T, SPEC, V, P, NAME)
   want = volume (intersect (S, place (cutter (SPEC{:}, 'groove'), V, P))) ...
          + volume (intersect (S, place (cutter (SPEC{:}, 'body'), V, P)));
   try
-    C = subtract (S, place (cutter (SPEC{:}, 'short'), V, P));
+    C = subtract (S, tagged (place (cutter (SPEC{:}, 'short'), V, P), ...
+                             LABEL, K));
     ok = (numsolids (C) <= N
           && abs (volume (S) - volume (C) - want) <= 1e-3 * want);
   catch
@@ -4611,6 +4631,17 @@ endfunction
 ## INNER and the crest at OUTER.  KIND 'short' ends the cylinder or sleeve
 ## half a pitch sooner, 'groove' gives the groove alone clear of them, and
 ## 'body' the cylinder or sleeve alone.
+## The cutter G of thread K of a call to thread, every face of it named by
+## the label LABEL alone when one is given, and numbered as copy K
+function G = tagged (G, LABEL, K)
+
+  if (! isempty (LABEL))
+    G = solid.Shape (occt ('solid.Shape.thread', 'label', G.Data, LABEL));
+  endif
+  G = solid.Shape (occt ('solid.Shape.thread', 'copyindex', G.Data, K));
+
+endfunction
+
 function G = cutter (P, INNER, OUTER, INTERNAL, L, KIND = 'tool')
 
   c = tand (30);
