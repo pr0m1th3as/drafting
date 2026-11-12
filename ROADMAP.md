@@ -72,7 +72,7 @@ it changes what the package is. In rough order of value:
 | Dimensional tolerances | symmetric (`±0.05`), limit dimensions (`25.05/24.95`), and ISO fits (`H7`, `g6`) resolved to real limits from the standard tables |
 | Feature control frames | profile and runout first, the frames on every blade, vane, printed part and shaft; then position, flatness, concentricity and perpendicularity; with datum references and material-condition modifiers |
 | Baseline and chain dimensions | datum-referenced running dimensions over a point set, building on `ordinate`, and chain-dimension helpers |
-| Surface finish and welds | Ra/Rz finish symbols, and weld symbols per ISO 2553 |
+| Surface finish | Ra/Rz finish symbols |
 | Section and detail marks | cutting planes with view direction, circled detail callouts carrying their own scale |
 | Balloons and parts list | numbered leaders and a bill of materials table |
 
@@ -235,6 +235,12 @@ expectations, and the test suite remains `pkg test`.
 same list of primitives `entities` gives `plot` and `tikz`, so it is a third
 consumer rather than a new architecture. It serves documentation, the web, and
 everyone without a CAD program.
+
+**Weld symbols.** The symbols of ISO 2553 on an arrow and reference line:
+the elementary and supplementary symbols, the weld's size and length, and
+the tail for the process. A welded frame is a drawing like any other, but
+the parts this package is used for are printed and machined, so the work
+waits until someone needs it.
 
 ## Other platforms
 
