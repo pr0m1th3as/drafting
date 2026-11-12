@@ -1890,6 +1890,7 @@ classdef Shape
     ## -*- texinfo -*-
     ## @deftypefn  {solid.Shape} {@var{S} =} facefillet (@var{S}, @var{F})
     ## @deftypefnx {solid.Shape} {@var{S} =} facefillet (@var{S}, @var{F}, @var{R})
+    ## @deftypefnx {solid.Shape} {@var{S} =} facefillet (@dots{}, @qcode{'Label'}, @var{L})
     ##
     ## Round a shape between faces chosen by index.
     ##
@@ -1937,15 +1938,38 @@ classdef Shape
     ## @end group
     ## @end example
     ##
+    ## The option @qcode{'Label'} names every round the call makes @var{L}, an
+    ## identifier, a letter followed by letters, digits or underscores, so
+    ## that a later step finds them by name with @code{solid.Shape.faces}.  A
+    ## full round stands where its middle face @var{M} was, so it takes the
+    ## names of @var{M} as well: the end of a wall labelled @code{wall} stays
+    ## @code{wall.xmax} when rounded.  The faces beside the rounds keep their
+    ## names.
+    ##
     ## @seealso{solid.Shape.faces, solid.Shape.fillet}
     ## @end deftypefn
-    function this = facefillet (this, F, R)
+    function this = facefillet (this, F, varargin)
 
       ## Input validation
-      if (nargin < 2 || nargin > 3)
+      if (nargin < 2 || nargin > 5)
         error ("solid.Shape.facefillet: invalid number of input arguments.");
       endif
-      full = nargin == 2;
+      ## The radius, if any, then Name/Value pairs
+      full = isempty (varargin) || ischar (varargin{1});
+      if (! full)
+        R = varargin{1};
+        varargin(1) = [];
+      endif
+      [errmsg, opt] = options (varargin, struct ('Label', ''));
+      if (isempty (errmsg) && ! isempty (opt.Label)
+          && ! (ischar (opt.Label) && isrow (opt.Label)
+                && ! isempty (regexp (opt.Label, '^[A-Za-z]\w*$', 'once'))))
+        errmsg = strcat ("Label must be an identifier: a letter followed", ...
+                         " by letters, digits or underscores.");
+      endif
+      if (! isempty (errmsg))
+        error ("solid.Shape.facefillet: %s", errmsg);
+      endif
       if (! isnumeric (F) || ! isreal (F) || ndims (F) != 2 || isempty (F)
           || columns (F) != 3 - ! full || any (F(:) != fix (F(:)))
           || any (F(:) < 1) || any (F(:) > numfaces (this)))
@@ -1971,10 +1995,11 @@ classdef Shape
       endif
 
       if (full)
-        r = occt ('solid.Shape.facefillet', 'fullround', this.Data, F);
+        r = occt ('solid.Shape.facefillet', 'fullround', this.Data, F, ...
+                  opt.Label);
       else
         r = occt ('solid.Shape.facefillet', 'fillet', this.Data, E, ...
-                  double (R));
+                  double (R), opt.Label);
       endif
       A = this;
       this.Data = r{1};

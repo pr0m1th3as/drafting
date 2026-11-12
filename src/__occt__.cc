@@ -6652,12 +6652,14 @@ function directly. \n\
       };
       ShapeList objects, tools;
       objects.Append (s);
+      vector<vector<TopoDS_Shape>> rowtools (F.rows ());
       for (octave_idx_type i = 0; i < F.rows (); i++)
       {
         for (const TopoDS_Shape& t : roundtools (face (i, 0), face (i, 1),
                                                  face (i, 2), i + 1, caller))
         {
           tools.Append (t);
+          rowtools[i].push_back (t);
         }
       }
       BRepAlgoAPI_Cut op;
@@ -6668,10 +6670,55 @@ function directly. \n\
       {
         error ("%s: Open CASCADE could not round the faces.", caller.c_str ());
       }
-      names = carrynames ([&op] (const TopoDS_Shape& f)
-                          -> const TopTools_ListOfShape&
-                          { return op.Modified (f); }, {s}, {names}, r);
-      out = traced (r, lineage (op, {s}, r), names);
+      const modifiedfaces m = [&op] (const TopoDS_Shape& f)
+                              -> const TopTools_ListOfShape&
+                              { return op.Modified (f); };
+      facetable rnames = carrynames (m, {s}, {names}, r);
+      // Each round, a face the cut made from the tools of row I, takes the
+      // names of the middle face of the row and the label, when given
+      const string label = (args.length () > 4 ? args(4).string_value ()
+                                               : string ());
+      facetable made;
+      madefaces (made, s, r, m, "made");
+      ShapeMap after;
+      TopExp::MapShapes (r, TopAbs_FACE, after);
+      if (! rnames.stale && ! made.faces.empty ())
+      {
+        rnames.faces.resize (after.Extent ());
+        for (octave_idx_type i = 0; i < F.rows (); i++)
+        {
+          std::set<facename> own;
+          const int mi = static_cast<int> (F(i,1));
+          if (names.faces.size () == static_cast<size_t> (fmap.Extent ()))
+          {
+            own = names.faces[mi-1];
+          }
+          if (! label.empty ())
+          {
+            own.insert ({label, {}});
+          }
+          for (const TopoDS_Shape& t : rowtools[i])
+          {
+            for (TopExp_Explorer x (t, TopAbs_FACE); x.More (); x.Next ())
+            {
+              vector<TopoDS_Shape> images {x.Current ()};
+              for (const TopoDS_Shape& g : op.Modified (x.Current ()))
+              {
+                images.push_back (g);
+              }
+              for (const TopoDS_Shape& g : images)
+              {
+                const int j = after.FindIndex (g);
+                if (j > 0 && ! made.faces[j-1].empty ())
+                {
+                  rnames.faces[j-1].insert (own.begin (), own.end ());
+                }
+              }
+            }
+          }
+        }
+      }
+      out = traced (r, lineage (op, {s}, r), rnames);
     }
     else if (cmd == "shell")
     {

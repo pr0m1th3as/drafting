@@ -695,6 +695,22 @@
 %! assert_equal (volume (S), 5000 - (200 - 50 * pi) * 5, 1e-9);
 %! assert_equal (numfaces (S), 6);
 %! assert_equal (isvalid (S), true);
+%!test  # a full round named by the label and by its middle face's names
+%! W = solid.box (50, 5, 20, 'Label', 'wall');
+%! t = faces (W, 'Label', 'wall.zmax');
+%! b = faces (W, 'Label', 'wall.zmin');
+%! S = facefillet (W, [t, faces(W, 'Label', 'wall.xmin'), b; ...
+%!                     t, faces(W, 'Label', 'wall.xmax'), b], 'Label', 'nose');
+%! assert_equal (faces (S, 'Label', 'nose'), faces (S, 'Type', 'cylinder'));
+%! assert_equal (faces (S, 'Label', 'wall.xmax'), ...
+%!               faces (S, 'Type', 'cylinder', ...
+%!                      'Within', [40, 0, 0, 50, 5, 20]));
+%! assert_equal (numel (faces (S, 'Label', {'wall.zmax', 'wall.zmin'})), 2);
+%!test  # the round between two faces named by the label
+%! W = solid.box (50, 5, 20, 'Label', 'wall');
+%! S = facefillet (W, [faces(W, 'Label', 'wall.zmax'), ...
+%!                     faces(W, 'Label', 'wall.xmax')], 2, 'Label', 'soft');
+%! assert_equal (faces (S, 'Label', 'soft'), faces (S, 'Type', 'cylinder'));
 %!test  # a full round on a mirrored wall, whose planes are left-handed
 %! W = mirror (solid.box (50, 5, 20), [1, 0, 0], [25, 0, 0]);
 %! F = [faces(W, 'Within', [0, 0, 0, 50, 0, 20]), ...
@@ -2269,6 +2285,10 @@
 %!                   'Within', [0, 5, 20, 50, 5, 20]), 2.5)
 %!error<solid.Shape.facefillet: invalid number of input arguments.> ...
 %! facefillet (solid.Shape ())
+%!error<solid.Shape.facefillet: Label must be an identifier: a letter followed by letters, digits or underscores.> ...
+%! facefillet (solid.box (50, 5, 20), [6, 1, 5], 'Label', 'a.b')
+%!error<solid.Shape.facefillet: unknown option 'Radius'.> ...
+%! facefillet (solid.box (50, 5, 20), [6, 1], 'Radius', 2)
 %!error<solid.Shape.facefillet: F must be an N-by-3 matrix of face indices of S.> ...
 %! facefillet (solid.Shape (), [1, 2, 3])
 %!error<solid.Shape.facefillet: F must be an N-by-3 matrix of face indices of S.> ...
