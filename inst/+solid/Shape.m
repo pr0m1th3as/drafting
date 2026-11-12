@@ -575,7 +575,7 @@ classdef Shape
     ## @var{FILE} when there are several.
     ## @end table
     ##
-    ## @code{write (@dots{}, 'Tolerance', @var{TOL})} sets, for a
+    ## @code{write (@dots{}, @qcode{'Tolerance'}, @var{TOL})} sets, for a
     ## mesh, the largest distance in millimetres between a facet and the true
     ## surface.  It is 0.01 by default, well below what a printer resolves; a
     ## larger value gives a smaller file.  No facet spans more than 20 degrees
@@ -1306,25 +1306,26 @@ classdef Shape
     ## cell array of names, as @code{solid.Shape.faces} takes them with
     ## @qcode{'Label'}.  An edge is chosen when it bounds any of these faces,
     ## so all the edges round a face can be rounded or chamfered in one step:
-    ## @code{fillet (@var{S}, edges (@var{S}, 'Face', @var{F}), @var{R})}.
+    ## @code{fillet (@var{S}, edges (@var{S}, @qcode{'Face'}, @var{F}),
+    ## @var{R})}.
     ##
     ## @item @qcode{'Between'}
     ## Two sides, each faces given as for @qcode{'Face'}, in a cell array, or
-    ## two face indices in a vector.  An edge is chosen when it lies between
-    ## a face of one side and another face of the other: @code{edges (@var{S},
-    ## 'Between', @{'plate.zmax', 'boss.side'@})} is the circle where a boss
-    ## meets the top of a plate.  A side may name several faces, as
-    ## @code{@{'shaft', @{'lower.zmin', 'upper.zmax'@}@}} chooses where a shaft
-    ## leaves two plates and not where it crosses the gap between them.  The
-    ## edge a fillet or chamfer has replaced lies between its two faces no
-    ## more, and is not chosen.
+    ## two face indices in a vector.  An edge is chosen when it lies between a
+    ## face of one side and another face of the other: @code{edges (@var{S},
+    ## @qcode{'Between'}, @{@qcode{'plate.zmax'}, @qcode{'boss.side'}@})} is
+    ## the circle where a boss meets the top of a plate.  A side may name
+    ## several faces, as @code{@{@qcode{'shaft'}, @{@qcode{'lower.zmin'},
+    ## @qcode{'upper.zmax'}@}@}} chooses where a shaft leaves two plates and
+    ## not where it crosses the gap between them.  The edge a fillet or chamfer
+    ## has replaced lies between its two faces no more, and is not chosen.
     ##
     ## @item @qcode{'Copy'}
     ## Copies of an array, as @code{solid.Shape.faces} takes them.  An edge is
-    ## chosen when a face it bounds is in one of them, whatever its other
-    ## face: with a row of bosses standing on a plate, @code{edges (@var{S},
-    ## 'Between', @{'plate.zmax', 'boss.side'@}, 'Copy', 2)} is the circle at
-    ## the foot of the second boss.
+    ## chosen when a face it bounds is in one of them, whatever its other face:
+    ## with a row of bosses standing on a plate, @code{edges (@var{S},
+    ## @qcode{'Between'}, @{@qcode{'plate.zmax'}, @qcode{'boss.side'}@},
+    ## @qcode{'Copy'}, 2)} is the circle at the foot of the second boss.
     ##
     ## @item @qcode{'Along'}
     ## Labels of the segments of a sweep's path, as @code{solid.Shape.faces}
@@ -1472,48 +1473,50 @@ classdef Shape
     ## face is chosen when it lies wholly inside, to within 1e-6 millimetres.
     ##
     ## @item @qcode{'Label'}
-    ## A name, or a cell array of names chosen together, given to faces by
-    ## the option @qcode{'Label'} of the function that made them, as
-    ## @code{plate.zmax} for the top of @code{solid.box (60, 40, 10,
-    ## 'Label', 'plate')}.  A face is chosen when it has the name, or a name
-    ## that begins with it followed by a dot: @code{plate} chooses all six
-    ## faces of that block.  A name that no face of @var{S} has is an error,
-    ## so that a mistyped name, or one whose face is gone, is not taken for an
-    ## empty choice.
+    ## A name, or a cell array of names chosen together, given to faces by the
+    ## option @qcode{'Label'} of the function that made them, as
+    ## @code{plate.zmax} for the top of
+    ## @code{solid.box (60, 40, 10, @qcode{'Label'}, @qcode{'plate'})}.  A face
+    ## is chosen when it has the name, or a name that begins with it followed
+    ## by a dot: @code{plate} chooses all six faces of that block.  A name that
+    ## no face of @var{S} has is an error, so that a mistyped name, or one
+    ## whose face is gone, is not taken for an empty choice.
     ##
     ## @item @qcode{'Adjacent'}
     ## Faces given as indices, as a name as for @qcode{'Label'}, or as a cell
     ## array whose each element is a name or a face index.  A face is chosen
     ## when it shares an edge, not only a corner, with every face given: each
-    ## index, or each name, however many pieces it has.  After the edges
-    ## round the top of a block are rounded, @code{faces (@var{S}, 'Type',
-    ## 'cylinder', 'Adjacent', @{'plate.zmax', 'plate.ymin'@})} is the round
-    ## along its front edge.
+    ## index, or each name, however many pieces it has.  After the edges round
+    ## the top of a block are rounded, @code{faces (@var{S}, @qcode{'Type'},
+    ## @qcode{'cylinder'}, @qcode{'Adjacent'}, @{@qcode{'plate.zmax'},
+    ## @qcode{'plate.ymin'}@})} is the round along its front edge.
     ##
     ## @item @qcode{'Copy'}
-    ## The copies of @code{solid.Shape.copy}, @code{solid.Shape.rectarray}
-    ## or @code{solid.Shape.polararray} the faces come from, as each numbers
-    ## them: copy numbers, or @qcode{':'} for every copy.  A face is chosen
-    ## when it is in one of them, labelled or not: @code{faces (@var{S},
-    ## 'Copy', 2)} is the second pin of a row.  For arrays of arrays, a cell
-    ## array gives the copies of each in turn, the first array applied first,
-    ## and chooses every combination of them: @code{@{1:3, [2, 4]@}} is the
-    ## first three pins of a row in its second and fourth copies.  A face is
-    ## chosen only when it went through as many arrays as the cell has
-    ## elements.  Copies that no face is in are an error.
+    ## The copies of @code{solid.Shape.copy}, @code{solid.Shape.rectarray} or
+    ## @code{solid.Shape.polararray} the faces come from, as each numbers them:
+    ## copy numbers, or @qcode{':'} for every copy.  A face is chosen when it
+    ## is in one of them, labelled or not:
+    ## @code{faces (@var{S}, @qcode{'Copy'}, 2)} is the second pin of a row.
+    ## For arrays of arrays, a cell array gives the copies of each in turn, the
+    ## first array applied first, and chooses every combination of them:
+    ## @code{@{1:3, [2, 4]@}} is the first three pins of a row in its second
+    ## and fourth copies.  A face is chosen only when it went through as many
+    ## arrays as the cell has elements.  Copies that no face is in are an
+    ## error.
     ##
     ## @item @qcode{'Along'}
     ## The label of a segment of the path a solid was swept along by
-    ## @code{solid.sweep}, given by @qcode{'Label'} where the
-    ## @code{geom.Path} was made, or a cell array of such labels chosen
-    ## together.  A face is chosen when it was swept along a segment with the
-    ## label.  With a bar swept by @code{solid.sweep (@var{R}, @var{P},
-    ## 'Label', 'bracket')} along @code{@var{P} = geom.Path ([0, 0, 0; 0, 0,
-    ## 40; 30, 0, 40], 'Label', @{'upright', 'arm'@})}, @code{faces (@var{S},
-    ## 'Label', 'bracket.side', 'Along', 'arm')} is the four long faces of the
-    ## arm.  The walls of the section's holes run along the path as its sides
-    ## do; the two ends of the sweep run along no segment.  A label that no
-    ## face runs along is an error.
+    ## @code{solid.sweep}, given by @qcode{'Label'} where the @code{geom.Path}
+    ## was made, or a cell array of such labels chosen together.  A face is
+    ## chosen when it was swept along a segment with the label.  With a bar
+    ## swept by @code{solid.sweep (@var{R}, @var{P}, @qcode{'Label'},
+    ## @qcode{'bracket'})} along @code{@var{P} = geom.Path ([0, 0, 0; 0, 0, 40;
+    ## 30, 0, 40], @qcode{'Label'}, @{@qcode{'upright'}, @qcode{'arm'}@})},
+    ## @code{faces (@var{S}, @qcode{'Label'}, @qcode{'bracket.side'},
+    ## @qcode{'Along'}, @qcode{'arm'})} is the four long faces of the arm.  The
+    ## walls of the section's holes run along the path as its sides do; the two
+    ## ends of the sweep run along no segment.  A label that no face runs along
+    ## is an error.
     ## @end table
     ##
     ## A face keeps its names through what is done to the shape later.  Moved,
@@ -2066,10 +2069,10 @@ classdef Shape
     ## @var{F})} cuts each edge back by @var{D1} along the face @var{F}, a face
     ## index as @code{solid.Shape.faces} returns one, and by @var{D2} along the
     ## other face of the edge.  Every edge must bound @var{F}, as the edges
-    ## round a face do: @code{edges (@var{S}, 'Face', @var{F})}.
+    ## round a face do: @code{edges (@var{S}, @qcode{'Face'}, @var{F})}.
     ##
     ## @code{@var{S} = chamfer (@var{S}, @var{E}, @var{D}, @var{F},
-    ## 'Angle', @var{A})} cuts each edge back by @var{D} along the face
+    ## @qcode{'Angle'}, @var{A})} cuts each edge back by @var{D} along the face
     ## @var{F}, with the chamfer face meeting @var{F} at @var{A} degrees, in
     ## the range @math{(0, 90)}: the chamfer a drawing calls @code{@var{D} x
     ## @var{A}}.  Along the other face it reaches @code{@var{D} * tand
@@ -2194,12 +2197,12 @@ classdef Shape
     ## @var{F} empty no face is removed and the result is a closed shell
     ## around a sealed cavity.
     ##
-    ## @code{@var{S} = shell (@dots{}, 'Outward', true)} grows the
+    ## @code{@var{S} = shell (@dots{}, @qcode{'Outward'}, true)} grows the
     ## walls outwards instead, so the inside keeps the size and shape of
     ## @var{S} and the outside grows by @var{T}: the way to make a box that a
     ## part of the shape of @var{S} fits into.  It is @code{false} by default.
     ##
-    ## @code{@var{S} = shell (@dots{}, 'Thickness', @{@var{FACES},
+    ## @code{@var{S} = shell (@dots{}, @qcode{'Thickness'}, @{@var{FACES},
     ## @var{T2}, @dots{}@})} gives the faces indexed by @var{FACES} walls
     ## @var{T2} thick instead of @var{T}, and so on for every pair in the cell
     ## array: a thicker floor, a thinner lid.  The faces come from
@@ -2218,7 +2221,7 @@ classdef Shape
     ## Walls too thick for the shape, which would meet in the middle, cannot
     ## be built and raise an error.
     ##
-    ## @code{@var{S} = shell (@dots{}, 'Label', @var{L})} names the
+    ## @code{@var{S} = shell (@dots{}, @qcode{'Label'}, @var{L})} names the
     ## faces the shell makes, so that a later step finds them by name with
     ## @code{solid.Shape.faces}.  @var{L} is a valid Octave identifier or
     ## keyword.  Each new face is named after the face of @var{S} it lies
@@ -3047,13 +3050,13 @@ classdef Shape
     ## uneven face is clean all round.  A pocket drawn under material that its
     ## outline passes through first cuts that material as well.
     ##
-    ## @code{@var{S} = pocket (@dots{}, 'Taper', @var{A})} leans the
+    ## @code{@var{S} = pocket (@dots{}, @qcode{'Taper'}, @var{A})} leans the
     ## pocket's walls in by @var{A} degrees as they go deeper, the draft of a
     ## moulded recess, as @code{solid.extrude} tapers a wall; the islands
     ## widen to match.  @var{A} is in the range @math{(-90, 90)}.  A region
     ## with splines takes no taper, as for @code{solid.extrude}.
     ##
-    ## @code{@var{S} = pocket (@dots{}, 'Label', @var{L})} names the
+    ## @code{@var{S} = pocket (@dots{}, @qcode{'Label'}, @var{L})} names the
     ## faces the pocket makes, so that a later step finds them by name with
     ## @code{solid.Shape.faces}.  @var{L} is a valid Octave identifier or
     ## keyword, and the faces are named @var{L}@code{.floor}, the bottom of the

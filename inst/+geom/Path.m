@@ -99,7 +99,7 @@ classdef Path
     ## Labels of the segments
     ##
     ## A row cell array with the label of each segment, the segment leaving
-    ## vertex @math{i} at element @math{i}, @code{''} for a segment left
+    ## vertex @math{i} at element @math{i}, @qcode{''} for a segment left
     ## unnamed; empty when the path has no labels.  The labels are given with
     ## @qcode{'Label'} when the path is made, and name the faces a solid made
     ## from the path takes from each segment.
@@ -399,8 +399,8 @@ classdef Path
     ## A cell array with a label for each segment, in the order the points are
     ## written: the segment from the first to the second, and so on, and for a
     ## closed one, last the segment back to the first.  Each label is a valid
-    ## Octave identifier or keyword, or @code{''} for a segment left unnamed.  A
-    ## solid made from it names the face each segment makes by its label, as
+    ## Octave identifier or keyword, or @qcode{''} for a segment left unnamed.
+    ## A solid made from it names the face each segment makes by its label, as
     ## @code{rib.side.web}; see @code{solid.extrude}.
     ## @end table
     ##
@@ -411,7 +411,7 @@ classdef Path
     ## @code{@var{P} = geom.Path (@var{SP})} makes the path of one segment
     ## along the @code{geom.Spline} @var{SP}, in its UCS.  A closed spline
     ## makes a closed path of one vertex, its first point, the spline running
-    ## from it round and back.  @code{geom.Path (@var{SP}, 'Label',
+    ## from it round and back.  @code{geom.Path (@var{SP}, @qcode{'Label'},
     ## @{@var{L}@})} labels that one segment @var{L}.
     ##
     ## @example
@@ -650,7 +650,7 @@ classdef Path
     ## @var{D1} along the segment before each corner and @var{D2} along the
     ## segment after it, before and after in the order of the vertices.
     ##
-    ## @code{@var{P} = chamfer (@var{P}, @var{D}, 'Angle', @var{A})}
+    ## @code{@var{P} = chamfer (@var{P}, @var{D}, @qcode{'Angle'}, @var{A})}
     ## cuts back @var{D} along the segment before each corner, with the cut at
     ## @var{A} degrees to that segment.
     ##

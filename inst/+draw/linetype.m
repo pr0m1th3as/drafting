@@ -25,11 +25,11 @@
 ## @code{@var{NAMES} = draw.linetype ()} returns the names of every line type
 ## the package defines, as a cell array of character vectors.
 ##
-## @code{@var{PATTERN} = draw.linetype (@var{NAME})} returns the dash pattern of
-## one of them, as a row vector in millimetres.  A positive element is a drawn
-## dash, a negative element a gap, and a zero a dot.  @code{'CONTINUOUS'} has an
-## empty pattern.  The patterns are the metric ones CAD programs define, so a
-## hidden line is dashes of 6.35 with gaps of 3.175.
+## @code{@var{PATTERN} = draw.linetype (@var{NAME})} returns the dash pattern
+## of one of them, as a row vector in millimetres.  A positive element is a
+## drawn dash, a negative element a gap, and a zero a dot.
+## @qcode{'CONTINUOUS'} has an empty pattern.  The patterns are the metric ones
+## CAD programs define, so a hidden line is dashes of 6.35 with gaps of 3.175.
 ##
 ## @code{[@var{PATTERN}, @var{DESCR}] = draw.linetype (@var{NAME})} also returns
 ## a human-readable description, which is what a DXF line-type table carries.

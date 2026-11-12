@@ -974,13 +974,13 @@ classdef Region
     ## names the face each segment makes, as @code{rib.side.web}; see
     ## @code{solid.extrude}.  The labels of a loop are given where its
     ## vertices are written, one label for each segment in the order the
-    ## vertices are written, @code{''} for a segment left unnamed:
+    ## vertices are written, @qcode{''} for a segment left unnamed:
     ##
     ## @itemize
     ## @item
     ## an outline given as a matrix of vertices, or as a polyline, path or
-    ## spline without labels, is labelled by @code{'Label', @var{L}}: the
-    ## segment from row 1 to row 2 first, and last the one back to row 1; a
+    ## spline without labels, is labelled by @code{@qcode{'Label'}, @var{L}}:
+    ## the segment from row 1 to row 2 first, and last the one back to row 1; a
     ## spline is one segment;
     ##
     ## @item

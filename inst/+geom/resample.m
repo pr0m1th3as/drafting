@@ -27,8 +27,8 @@
 ## spaced equally along the polyline @var{P}, the first at its start and the
 ## last at its end.
 ##
-## @code{@var{Q} = geom.resample (@var{P}, 'Spacing', @var{D})} spaces them
-## @var{D} apart instead, taking as many as fit.  The last point lands at
+## @code{@var{Q} = geom.resample (@var{P}, @qcode{'Spacing'}, @var{D})} spaces
+## them @var{D} apart instead, taking as many as fit.  The last point lands at
 ## the end of the curve whatever the remainder, so the final gap may be shorter
 ## than @var{D}; a curve is not lengthened to make the arithmetic tidy.
 ##

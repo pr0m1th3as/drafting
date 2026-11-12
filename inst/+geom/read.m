@@ -50,11 +50,11 @@
 ## treat it, and any other in DXF's own frame for its plane.  Paths and
 ## splines are read in world coordinates.
 ##
-## @code{@var{C} = geom.read (@var{FILE}, 'Layer', @var{LAYER})}
+## @code{@var{C} = geom.read (@var{FILE}, @qcode{'Layer'}, @var{LAYER})}
 ## returns only what lies on the layer @var{LAYER}, its name compared without
 ## regard to case, as CAD programs compare them.
 ##
-## @code{@var{G} = geom.read (@var{FILE}, 'Type', @var{TYPE})}
+## @code{@var{G} = geom.read (@var{FILE}, @qcode{'Type'}, @var{TYPE})}
 ## builds the class @var{TYPE} names and returns one object of it:
 ##
 ## @table @asis

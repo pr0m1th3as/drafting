@@ -51,8 +51,8 @@
 ## its columns.  A diameter with no coarse pitch is named with its pitch, as
 ## @qcode{'M15x1.5'}.
 ##
-## @code{@var{T} = solid.threadspec (@var{NAME}, 'Custom', @var{TF})} with
-## @var{TF} true takes a thread of any diameter and pitch, named with its
+## @code{@var{T} = solid.threadspec (@var{NAME}, @qcode{'Custom'}, @var{TF})}
+## with @var{TF} true takes a thread of any diameter and pitch, named with its
 ## pitch, as @qcode{'M16x0.8'} cut on a lathe or @qcode{'M6.35x1.27'} for
 ## 1/4-20 UNC; its pitch and minor diameter must be positive.  Without it a
 ## name outside ISO 261 is refused, so that a mistyped name is caught.

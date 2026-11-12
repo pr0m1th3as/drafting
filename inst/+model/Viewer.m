@@ -639,7 +639,7 @@ classdef Viewer < handle
     ## @end group
     ## @end example
     ##
-    ## @code{@var{V} = model.Viewer ('Hidden', true)} never shows its
+    ## @code{@var{V} = model.Viewer (@qcode{'Hidden'}, true)} never shows its
     ## window.  It draws and picks all the same, which is how the viewer is
     ## tested.
     ##
@@ -897,7 +897,7 @@ classdef Viewer < handle
     ## @end group
     ## @end example
     ##
-    ## @code{[@var{I}, @var{CODE}] = pick (@var{V}, 'solid')} picks
+    ## @code{[@var{I}, @var{CODE}] = pick (@var{V}, @qcode{'solid'})} picks
     ## whole solids: a click on any face of a solid selects it, and @var{I}
     ## returns the indices of the solids picked, in the order you picked them,
     ## numbered as @code{solid.Shape.solids} and @code{model.Assembly.solids}
@@ -906,7 +906,7 @@ classdef Viewer < handle
     ## @code{opacity}, as code: the name they share, else the path they
     ## share, where either selects them alone, else their indices.
     ##
-    ## @code{[@var{P}, @var{CODE}] = pick (@var{V}, 'point')} picks
+    ## @code{[@var{P}, @var{CODE}] = pick (@var{V}, @qcode{'point'})} picks
     ## points: each click snaps as for @code{model.Viewer.pickucs}, a corner
     ## to its vertex, a circular edge to its centre, another edge to its
     ## midpoint halfway along its length, a face to the point clicked, and is
@@ -1215,15 +1215,14 @@ classdef Viewer < handle
     ## close up from a script.
     ##
     ## @code{[@var{AZ}, @var{EL}, @var{ZOOM}, @var{TARGET}] = view (@var{V})}
-    ## returns the view as it is now, however it got there: the angles it
-    ## looks from, @var{AZ} from -180 to 180, its magnification against the
-    ## shape fitted, and the point at the centre of the window, wherever the
-    ## view was panned to.  Given back to @code{view}, as
-    ## @code{view (@var{V}, @var{AZ}, @var{EL}, 'Zoom', @var{ZOOM}, 'Target',
-    ## @var{TARGET})}, they restore it, so a view found with the mouse can be
-    ## kept in a script.  After @kbd{T},
-    ## the mouse can also turn the view about the line of sight, which they
-    ## do not hold, so such a view is restored upright.
+    ## returns the view as it is now, however it got there: the angles it looks
+    ## from, @var{AZ} from -180 to 180, its magnification against the shape
+    ## fitted, and the point at the centre of the window, wherever the view was
+    ## panned to.  Given back to @code{view}, as @code{view (@var{V}, @var{AZ},
+    ## @var{EL}, @qcode{'Zoom'}, @var{ZOOM}, @qcode{'Target'}, @var{TARGET})},
+    ## they restore it, so a view found with the mouse can be kept in a script.
+    ## After @kbd{T}, the mouse can also turn the view about the line of sight,
+    ## which they do not hold, so such a view is restored upright.
     ##
     ## The keys of the window give four of these views: @kbd{0} is
     ## @code{view (@var{V}, 45, 35.26)}, near enough, the isometric view the
@@ -1342,7 +1341,7 @@ classdef Viewer < handle
     ## in the format its extension names, as @code{imwrite} writes it; PNG
     ## keeps every pixel.
     ##
-    ## @code{capture (@dots{}, 'Size', [@var{W}, @var{H}])} draws the
+    ## @code{capture (@dots{}, @qcode{'Size'}, [@var{W}, @var{H}])} draws the
     ## picture @var{W} pixels wide and @var{H} high instead, whatever the size
     ## of the window, so a picture for print can be finer than the screen.
     ## The view keeps its height: a picture of another shape than the window

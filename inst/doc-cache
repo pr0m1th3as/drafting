@@ -1216,14 +1216,14 @@ thing
 and is equivalent. A figure handle draws into that figure's current
 axes, made if it has none.
 
-H = draw.Drawing.plot (...) returns a column of graphics
-handles, one per object created. Every line of one layer, colour, line
-style and width is one line object, its pieces split by NaN;
-points are markers of one line object per layer and colour; each text
-is an object of its own, drawn on top. The 'Tag' of every
-object is its layer's name, so
-findobj (HAX, 'Tag', NAME) finds what the layer
-NAME drew, to restyle, hide or delete it.
+H = draw.Drawing.plot (...) returns a column of
+graphics handles, one per object created. Every line of one layer,
+colour, line style and width is one line object, its pieces split by
+NaN; points are markers of one line object per layer and colour;
+each text is an object of its own, drawn on top. The 'Tag' of
+every object is its layer's name, so
+findobj (HAX, 'Tag', NAME) finds what the
+layer NAME drew, to restyle, hide or delete it.
 
 Name/Value pairs
 
@@ -2088,11 +2088,11 @@ Dash patterns of the standard line types.
 NAMES = draw.linetype () returns the names of every line type
 the package defines, as a cell array of character vectors.
 
-PATTERN = draw.linetype (NAME) returns the dash pattern of
-one of them, as a row vector in millimetres. A positive element is a drawn
-dash, a negative element a gap, and a zero a dot. 'CONTINUOUS' has an
-empty pattern. The patterns are the metric ones CAD programs define, so a
-hidden line is dashes of 6.35 with gaps of 3.175.
+PATTERN = draw.linetype (NAME) returns the dash pattern
+of one of them, as a row vector in millimetres. A positive element is a
+drawn dash, a negative element a gap, and a zero a dot.
+'CONTINUOUS' has an empty pattern. The patterns are the metric ones
+CAD programs define, so a hidden line is dashes of 6.35 with gaps of 3.175.
 
 [PATTERN, DESCR] = draw.linetype (NAME) also returns
 a human-readable description, which is what a DXF line-type table carries.
@@ -2534,8 +2534,8 @@ system by default.
 A cell array with a label for each segment, in the order the points are
 written: the segment from the first to the second, and so on, and for a
 closed one, last the segment back to the first. Each label is a valid
-Octave identifier or keyword, or '' for a segment left unnamed. A
-solid made from it names the face each segment makes by its label, as
+Octave identifier or keyword, or '' for a segment left unnamed.
+A solid made from it names the face each segment makes by its label, as
 rib.side.web; see solid.extrude.
 
 P = geom.Path (PL) makes the path of the
@@ -3111,12 +3111,12 @@ segment leaving its last vertex, so the bulge there must be zero.
 The geom.UCS the vertices are coordinates in, the world
 xy plane by default.
 'Label'
-A cell array with a label for each segment, in the order the vertices are
-written: the segment from the first to the second, and so on, and for a
-closed one, last the segment back to the first. Each label is a valid
-Octave identifier or keyword, or '' for a segment left unnamed. A
-solid made from it names the face each segment makes by its label, as
-rib.side.web; see solid.extrude.
+A cell array with a label for each segment, in the order the vertices
+are written: the segment from the first to the second, and so on, and
+for a closed one, last the segment back to the first. Each label is a
+valid Octave identifier or keyword, or '' for a segment left
+unnamed. A solid made from it names the face each segment makes by its
+label, as rib.side.web; see solid.extrude.
 
 ## A slot 40 between centres and 12 wide, as one closed polyline
 PL = geom.Polyline ([0, -6, 0; 40, -6, 1; 40, 6, 0; 0, 6, 1], ...
@@ -3517,8 +3517,8 @@ vertices are written, one label for each segment in the order the
 vertices are written, '' for a segment left unnamed:
 
 an outline given as a matrix of vertices, or as a polyline, path or
-spline without labels, is labelled by 'Label', L: the
-segment from row 1 to row 2 first, and last the one back to row 1; a
+spline without labels, is labelled by 'Label', L:
+the segment from row 1 to row 2 first, and last the one back to row 1; a
 spline is one segment;
 
 an outline given as a geom.Polyline or geom.Path made
@@ -6170,8 +6170,8 @@ Q = geom.resample (P, N) returns N points
 spaced equally along the polyline P, the first at its start and the
 last at its end.
 
-Q = geom.resample (P, 'Spacing', D) spaces them
-D apart instead, taking as many as fit. The last point lands at
+Q = geom.resample (P, 'Spacing', D) spaces
+them D apart instead, taking as many as fit. The last point lands at
 the end of the curve whatever the remainder, so the final gap may be shorter
 than D; a curve is not lengthened to make the arithmetic tidy.
 
@@ -7784,15 +7784,14 @@ about it afterwards, as after a double click. So a detail is seen
 close up from a script.
 
 [AZ, EL, ZOOM, TARGET] = view (V)
-returns the view as it is now, however it got there: the angles it
-looks from, AZ from -180 to 180, its magnification against the
-shape fitted, and the point at the centre of the window, wherever the
-view was panned to. Given back to view, as
-view (V, AZ, EL, 'Zoom', ZOOM, 'Target',
-TARGET), they restore it, so a view found with the mouse can be
-kept in a script. After T,
-the mouse can also turn the view about the line of sight, which they
-do not hold, so such a view is restored upright.
+returns the view as it is now, however it got there: the angles it looks
+from, AZ from -180 to 180, its magnification against the shape
+fitted, and the point at the centre of the window, wherever the view was
+panned to. Given back to view, as view (V, AZ,
+EL, 'Zoom', ZOOM, 'Target', TARGET),
+they restore it, so a view found with the mouse can be kept in a script.
+After T, the mouse can also turn the view about the line of sight,
+which they do not hold, so such a view is restored upright.
 
 The keys of the window give four of these views: 0 is
 view (V, 45, 35.26), near enough, the isometric view the
@@ -8395,11 +8394,11 @@ apart by how they nest. geom.Region.fit turns the polygon back
 into lines, arcs and splines within a tolerance, so that a faceted
 bore is a circle again.
 
-R = section (M, U, 'Tolerance', T) heals
-a mesh with gaps: where the cut through it breaks off, ends closer than
-T are joined, nearest first, and points of the cut closer than
-T are taken as one. The default T is a millionth of the
-size of the mesh, which joins nothing but rounding.
+R = section (M, U, 'Tolerance',
+T) heals a mesh with gaps: where the cut through it breaks off,
+ends closer than T are joined, nearest first, and points of the
+cut closer than T are taken as one. The default T is a
+millionth of the size of the mesh, which joins nothing but rounding.
 
 [R, OPEN] = section (...) returns in OPEN
 what could not be made into regions, as a cell array of N-by-2
@@ -9292,23 +9291,24 @@ Face indices, as solid.Shape.faces returns them, or a name or a
 cell array of names, as solid.Shape.faces takes them with
 'Label'. An edge is chosen when it bounds any of these faces,
 so all the edges round a face can be rounded or chamfered in one step:
-fillet (S, edges (S, 'Face', F), R).
+fillet (S, edges (S, 'Face', F),
+R).
 'Between'
 Two sides, each faces given as for 'Face', in a cell array, or
-two face indices in a vector. An edge is chosen when it lies between
-a face of one side and another face of the other: edges (S,
-'Between', {'plate.zmax', 'boss.side'}) is the circle where a boss
-meets the top of a plate. A side may name several faces, as
-{'shaft', {'lower.zmin', 'upper.zmax'}} chooses where a shaft
-leaves two plates and not where it crosses the gap between them. The
-edge a fillet or chamfer has replaced lies between its two faces no
-more, and is not chosen.
+two face indices in a vector. An edge is chosen when it lies between a
+face of one side and another face of the other: edges (S,
+'Between', {'plate.zmax', 'boss.side'}) is
+the circle where a boss meets the top of a plate. A side may name
+several faces, as {'shaft', {'lower.zmin',
+'upper.zmax'}} chooses where a shaft leaves two plates and
+not where it crosses the gap between them. The edge a fillet or chamfer
+has replaced lies between its two faces no more, and is not chosen.
 'Copy'
 Copies of an array, as solid.Shape.faces takes them. An edge is
-chosen when a face it bounds is in one of them, whatever its other
-face: with a row of bosses standing on a plate, edges (S,
-'Between', {'plate.zmax', 'boss.side'}, 'Copy', 2) is the circle at
-the foot of the second boss.
+chosen when a face it bounds is in one of them, whatever its other face:
+with a row of bosses standing on a plate, edges (S,
+'Between', {'plate.zmax', 'boss.side'},
+'Copy', 2) is the circle at the foot of the second boss.
 'Along'
 Labels of the segments of a sweep's path, as solid.Shape.faces
 takes them. An edge is chosen when a face it bounds was swept along
@@ -9452,45 +9452,47 @@ A box [xmin, ymin, zmin, xmax,
 ymax, zmax], as solid.Shape.bbox returns one. A
 face is chosen when it lies wholly inside, to within 1e-6 millimetres.
 'Label'
-A name, or a cell array of names chosen together, given to faces by
-the option 'Label' of the function that made them, as
-plate.zmax for the top of solid.box (60, 40, 10,
-'Label', 'plate'). A face is chosen when it has the name, or a name
-that begins with it followed by a dot: plate chooses all six
-faces of that block. A name that no face of S has is an error,
-so that a mistyped name, or one whose face is gone, is not taken for an
-empty choice.
+A name, or a cell array of names chosen together, given to faces by the
+option 'Label' of the function that made them, as
+plate.zmax for the top of
+solid.box (60, 40, 10, 'Label', 'plate'). A face
+is chosen when it has the name, or a name that begins with it followed
+by a dot: plate chooses all six faces of that block. A name that
+no face of S has is an error, so that a mistyped name, or one
+whose face is gone, is not taken for an empty choice.
 'Adjacent'
 Faces given as indices, as a name as for 'Label', or as a cell
 array whose each element is a name or a face index. A face is chosen
 when it shares an edge, not only a corner, with every face given: each
-index, or each name, however many pieces it has. After the edges
-round the top of a block are rounded, faces (S, 'Type',
-'cylinder', 'Adjacent', {'plate.zmax', 'plate.ymin'}) is the round
-along its front edge.
+index, or each name, however many pieces it has. After the edges round
+the top of a block are rounded, faces (S, 'Type',
+'cylinder', 'Adjacent', {'plate.zmax',
+'plate.ymin'}) is the round along its front edge.
 'Copy'
-The copies of solid.Shape.copy, solid.Shape.rectarray
-or solid.Shape.polararray the faces come from, as each numbers
-them: copy numbers, or ':' for every copy. A face is chosen
-when it is in one of them, labelled or not: faces (S,
-'Copy', 2) is the second pin of a row. For arrays of arrays, a cell
-array gives the copies of each in turn, the first array applied first,
-and chooses every combination of them: {1:3, [2, 4]} is the
-first three pins of a row in its second and fourth copies. A face is
-chosen only when it went through as many arrays as the cell has
-elements. Copies that no face is in are an error.
+The copies of solid.Shape.copy, solid.Shape.rectarray or
+solid.Shape.polararray the faces come from, as each numbers them:
+copy numbers, or ':' for every copy. A face is chosen when it
+is in one of them, labelled or not:
+faces (S, 'Copy', 2) is the second pin of a row.
+For arrays of arrays, a cell array gives the copies of each in turn, the
+first array applied first, and chooses every combination of them:
+{1:3, [2, 4]} is the first three pins of a row in its second
+and fourth copies. A face is chosen only when it went through as many
+arrays as the cell has elements. Copies that no face is in are an
+error.
 'Along'
 The label of a segment of the path a solid was swept along by
-solid.sweep, given by 'Label' where the
-geom.Path was made, or a cell array of such labels chosen
-together. A face is chosen when it was swept along a segment with the
-label. With a bar swept by solid.sweep (R, P,
-'Label', 'bracket') along P = geom.Path ([0, 0, 0; 0, 0,
-40; 30, 0, 40], 'Label', {'upright', 'arm'}), faces (S,
-'Label', 'bracket.side', 'Along', 'arm') is the four long faces of the
-arm. The walls of the section's holes run along the path as its sides
-do; the two ends of the sweep run along no segment. A label that no
-face runs along is an error.
+solid.sweep, given by 'Label' where the geom.Path
+was made, or a cell array of such labels chosen together. A face is
+chosen when it was swept along a segment with the label. With a bar
+swept by solid.sweep (R, P, 'Label',
+'bracket') along P = geom.Path ([0, 0, 0; 0, 0, 40;
+30, 0, 40], 'Label', {'upright', 'arm'}),
+faces (S, 'Label', 'bracket.side',
+'Along', 'arm') is the four long faces of the arm. The
+walls of the section's holes run along the path as its sides do; the two
+ends of the sweep run along no segment. A label that no face runs along
+is an error.
 
 A face keeps its names through what is done to the shape later. Moved,
 turned, trimmed or cut into, it is the same face; split into pieces,
@@ -12443,8 +12445,8 @@ The names are those of ISO 261, table 2, from M1 to M64, all three of
 its columns. A diameter with no coarse pitch is named with its pitch, as
 'M15x1.5'.
 
-T = solid.threadspec (NAME, 'Custom', TF) with
-TF true takes a thread of any diameter and pitch, named with its
+T = solid.threadspec (NAME, 'Custom', TF)
+with TF true takes a thread of any diameter and pitch, named with its
 pitch, as 'M16x0.8' cut on a lathe or 'M6.35x1.27' for
 1/4-20 UNC; its pitch and minor diameter must be positive. Without it a
 name outside ISO 261 is refused, so that a mistyped name is caught.

@@ -356,12 +356,12 @@ classdef Drawing
     ##
     ## A dimension is a @code{DIMENSION} record that names in @code{block} the
     ## anonymous block, @qcode{'*D1'}, @qcode{'*D2'} and so on, holding the
-    ## lines and text that draw it, as a CAD file keeps it; @var{BLOCKS}
-    ## holds those blocks.  A centre mark and a leader become their lines and
-    ## text.  The ornament is in millimetres of model space scaled by
+    ## lines and text that draw it, as a CAD file keeps it; @var{BLOCKS} holds
+    ## those blocks.  A centre mark and a leader become their lines and text.
+    ## The ornament is in millimetres of model space scaled by
     ## @qcode{'DimScale'}: a drawing to be plotted at @math{1:50} wants
-    ## @code{'DimScale', 50}.  Ticks are 45-degree obliques and the text is
-    ## horizontal whatever the dimension measures.
+    ## @code{@qcode{'DimScale'}, 50}.  Ticks are 45-degree obliques and the
+    ## text is horizontal whatever the dimension measures.
     ##
     ## Nothing on a layer that is not visible is returned.  Every record takes
     ## its colour, line type and line weight from its layer where it is drawn
@@ -2402,14 +2402,14 @@ classdef Drawing
     ## and is equivalent.  A figure handle draws into that figure's current
     ## axes, made if it has none.
     ##
-    ## @code{@var{H} = draw.Drawing.plot (@dots{})} returns a column of graphics
-    ## handles, one per object created.  Every line of one layer, colour, line
-    ## style and width is one line object, its pieces split by @code{NaN};
-    ## points are markers of one line object per layer and colour; each text
-    ## is an object of its own, drawn on top.  The @qcode{'Tag'} of every
-    ## object is its layer's name, so
-    ## @code{findobj (@var{HAX}, 'Tag', @var{NAME})} finds what the layer
-    ## @var{NAME} drew, to restyle, hide or delete it.
+    ## @code{@var{H} = draw.Drawing.plot (@dots{})} returns a column of
+    ## graphics handles, one per object created.  Every line of one layer,
+    ## colour, line style and width is one line object, its pieces split by
+    ## @code{NaN}; points are markers of one line object per layer and colour;
+    ## each text is an object of its own, drawn on top.  The @qcode{'Tag'} of
+    ## every object is its layer's name, so
+    ## @code{findobj (@var{HAX}, @qcode{'Tag'}, @var{NAME})} finds what the
+    ## layer @var{NAME} drew, to restyle, hide or delete it.
     ##
     ## @subheading Name/Value pairs
     ##
@@ -2891,7 +2891,7 @@ classdef Drawing
     ## @qcode{fltk}, which @code{octave-cli} uses on a desktop, cannot print
     ## a figure that is not shown, so there @code{print} is an error; run
     ## Octave as @code{octave --no-gui}, or call
-    ## @code{graphics_toolkit ('gnuplot')} first.
+    ## @code{graphics_toolkit (@qcode{'gnuplot'})} first.
     ##
     ## @subheading The scale is chosen from the preferred series
     ##

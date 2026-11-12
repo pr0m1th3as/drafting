@@ -77,7 +77,7 @@ classdef Polyline
     ## Labels of the segments
     ##
     ## A row cell array with the label of each segment, the segment leaving
-    ## vertex @math{i} at element @math{i}, @code{''} for a segment left
+    ## vertex @math{i} at element @math{i}, @qcode{''} for a segment left
     ## unnamed; empty when the polyline has no labels.  The labels are given
     ## with @qcode{'Label'} when the polyline is made, and name the faces a
     ## solid made from it takes from each segment.
@@ -156,12 +156,12 @@ classdef Polyline
     ## @math{xy} plane by default.
     ##
     ## @item @qcode{'Label'}
-    ## A cell array with a label for each segment, in the order the vertices are
-    ## written: the segment from the first to the second, and so on, and for a
-    ## closed one, last the segment back to the first.  Each label is a valid
-    ## Octave identifier or keyword, or @code{''} for a segment left unnamed.  A
-    ## solid made from it names the face each segment makes by its label, as
-    ## @code{rib.side.web}; see @code{solid.extrude}.
+    ## A cell array with a label for each segment, in the order the vertices
+    ## are written: the segment from the first to the second, and so on, and
+    ## for a closed one, last the segment back to the first.  Each label is a
+    ## valid Octave identifier or keyword, or @qcode{''} for a segment left
+    ## unnamed.  A solid made from it names the face each segment makes by its
+    ## label, as @code{rib.side.web}; see @code{solid.extrude}.
     ## @end table
     ##
     ## @example
@@ -365,7 +365,7 @@ classdef Polyline
     ## @var{D1} along the segment before each corner and @var{D2} along the
     ## segment after it, before and after in the order of the vertices.
     ##
-    ## @code{@var{PL} = chamfer (@var{PL}, @var{D}, 'Angle', @var{A})}
+    ## @code{@var{PL} = chamfer (@var{PL}, @var{D}, @qcode{'Angle'}, @var{A})}
     ## cuts back @var{D} along the segment before each corner, with the cut at
     ## @var{A} degrees to that segment, so a square corner is cut @code{@var{D}
     ## x @var{A}}, reaching @code{@var{D} * tand (@var{A})} along the segment
