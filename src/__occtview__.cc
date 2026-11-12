@@ -53,9 +53,11 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 //                  its corners
 //   pickone KIND   KIND is face or point: the next click replies at once with
 //                  "face K X Y Z", the face and the point on it, or with
-//                  "point X Y Z SNAP", the point snapped to a vertex, the
-//                  centre of a circular edge, the midpoint of another edge or
-//                  a point on a face, SNAP naming which, and marks it; Enter
+//                  "point X Y Z SNAP K...", the point snapped to a vertex, the
+//                  centre of a circular edge, the midpoint of another edge,
+//                  halfway along its length, or a point on a face, SNAP
+//                  naming which, and K the faces that meet at the vertex, the
+//                  edge or the face, and marks it; Enter
 //                  replies "skip" and Escape "cancel".  On a mesh a face is
 //                  "facet NX NY NZ X Y Z", the normal of the triangle clicked
 //                  and the point on it, and a point snaps to a corner of the
@@ -144,6 +146,7 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <AIS_TextLabel.hxx>
 #include <AIS_ViewController.hxx>
 #include <BRepAdaptor_Curve.hxx>
+#include <GCPnts_AbscissaPoint.hxx>
 #include <BRepBndLib.hxx>
 #include <BRepMesh_IncrementalMesh.hxx>
 #include <BRep_Builder.hxx>
@@ -1423,10 +1426,23 @@ private:
     else
     {
       string snap = "face";
+      string from;
       if (s.ShapeType () == TopAbs_VERTEX)
       {
         p = BRep_Tool::Pnt (TopoDS::Vertex (s));
         snap = "vertex";
+        for (int i = 1; i <= m_faces.Extent (); i++)
+        {
+          for (TopExp_Explorer x (m_faces (i), TopAbs_VERTEX); x.More ();
+               x.Next ())
+          {
+            if (x.Current ().IsSame (s))
+            {
+              from += " " + to_string (i);
+              break;
+            }
+          }
+        }
       }
       else if (s.ShapeType () == TopAbs_EDGE)
       {
@@ -1438,13 +1454,20 @@ private:
         }
         else
         {
-          p = c.Value ((c.FirstParameter () + c.LastParameter ()) / 2);
+          const double len = GCPnts_AbscissaPoint::Length (c);
+          const GCPnts_AbscissaPoint half (c, len / 2, c.FirstParameter ());
+          p = c.Value (half.Parameter ());
           snap = "midpoint";
         }
+        from = " " + to_string (m_edges.FindIndex (s));
+      }
+      else
+      {
+        from = " " + to_string (m_faces.FindIndex (s));
       }
       r = "point";
       mark (p);
-      r += num (p) + " " + snap;
+      r += num (p) + " " + snap + from;
       m_context->ClearDetected (false);
       reply (r);
       endone ("");

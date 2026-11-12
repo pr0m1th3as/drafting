@@ -261,17 +261,18 @@ classdef Viewer < handle
 
       ## Input validation
       if (! ischar (KIND)
-          || ! any (strcmp (KIND, {'edge', 'face', 'solid', 'any'})))
+          || ! any (strcmp (KIND, {'edge', 'face', 'point', 'solid', 'any'})))
         error (strcat ("model.Viewer.pick: KIND must be 'edge', 'face',", ...
-                       " 'solid' or 'any'."));
+                       " 'point', 'solid' or 'any'."));
       endif
       ismesh = isa (state (this).mesh, 'polymesh.Mesh');
-      if (ismesh && ! strcmp (KIND, 'any'))
+      if (ismesh && ! any (strcmp (KIND, {'any', 'point'})))
         error ("model.Viewer.pick: a mesh has only points to pick.");
       endif
       ## The parts of an assembly are not edited, so a pick on one only
-      ## tells its solids
-      if (! ismesh && ! isempty (state (this).model))
+      ## tells its solids, or points
+      if (! ismesh && ! isempty (state (this).model)
+          && ! strcmp (KIND, 'point'))
         if (any (strcmp (KIND, {'edge', 'face'})))
           error (strcat ("model.Viewer.pick: the parts of an assembly are", ...
                          " not edited; pick 'solid' to identify one."));
@@ -280,6 +281,10 @@ classdef Viewer < handle
       endif
       if (! isopen (this) || isempty (this.Model))
         error ("model.Viewer.pick: the viewer is showing no shape.");
+      endif
+      if (strcmp (KIND, 'point'))
+        [varargout{1:2}] = pickpoints (this, CLICKS);
+        return;
       endif
 
       ## Lines left from an earlier exchange are stale
@@ -803,6 +808,7 @@ classdef Viewer < handle
     ## @deftypefnx {model.Viewer} {[@var{E}, @var{CODE}] =} pick (@var{V}, @qcode{'edge'})
     ## @deftypefnx {model.Viewer} {[@var{F}, @var{CODE}] =} pick (@var{V}, @qcode{'face'})
     ## @deftypefnx {model.Viewer} {[@var{I}, @var{CODE}] =} pick (@var{V}, @qcode{'solid'})
+    ## @deftypefnx {model.Viewer} {[@var{P}, @var{CODE}] =} pick (@var{V}, @qcode{'point'})
     ## @deftypefnx {model.Viewer} {[@var{P}, @var{F}] =} pick (@var{V})
     ##
     ## Pick edges and faces of a solid, or points on a mesh, with the mouse.
@@ -884,10 +890,35 @@ classdef Viewer < handle
     ## @code{opacity}, as code: the name they share, else the path they
     ## share, where either selects them alone, else their indices.
     ##
+    ## @code{[@var{P}, @var{CODE}] = pick (@var{V}, @qcode{'point'})} picks
+    ## points: each click snaps as for @code{model.Viewer.pickucs}, a corner
+    ## to its vertex, a circular edge to its centre, another edge to its
+    ## midpoint halfway along its length, a face to the point clicked, and is
+    ## marked, until @kbd{Enter}; @kbd{Escape} cancels, returning nothing.
+    ## @var{P} is an @math{N}-by-3 matrix of the points in the order picked.
+    ## @var{CODE} rebuilds them from the names of the faces: a corner as
+    ## @code{solid.Shape.corner} of the fewest named faces that meet there
+    ## and share no other corner, a centre or midpoint as
+    ## @code{solid.Shape.centre} or @code{solid.Shape.midpoint} of the edge,
+    ## found as for an edge picked; a point on a face, and one the names
+    ## cannot rebuild, by its coordinates.  Several points are the rows of one
+    ## matrix.  On a mesh, on an assembly and on a shape without names
+    ## @var{CODE} is the coordinates.
+    ##
+    ## @example
+    ## @group
+    ## ## The top front right corner of a block made with 'Label', 'plate'
+    ## [P, CODE] = pick (V, 'point');
+    ## P = corner (part, faces (part, 'Label', ...
+    ##                          @{'plate.xmax', 'plate.ymin', 'plate.zmax'@}));
+    ## @end group
+    ## @end example
+    ##
     ## When the viewer shows a @code{model.Assembly}, picking only tells its
     ## solids apart, since the parts of an assembly are edited as parts, not
-    ## in the assembly.  @code{pick (@var{V})} then picks solids, and
-    ## @qcode{'edge'} and @qcode{'face'} are refused.
+    ## in the assembly.  @code{pick (@var{V})} then picks solids,
+    ## @qcode{'point'} picks points, and @qcode{'edge'} and @qcode{'face'} are
+    ## refused.
     ##
     ## When the viewer shows a @code{polymesh.Mesh}, @code{[@var{P}, @var{F}]
     ## = pick (@var{V})} waits while you click points on it, each marked
@@ -898,7 +929,8 @@ classdef Viewer < handle
     ## turned as its corners run.  A click that misses the mesh adds nothing.
     ## @kbd{Enter} finishes and @kbd{Escape} cancels, returning nothing.  A
     ## mesh has no edges, faces or solids in the sense of a solid, so
-    ## @qcode{'edge'}, @qcode{'face'} and @qcode{'solid'} are refused.
+    ## @qcode{'edge'}, @qcode{'face'} and @qcode{'solid'} are refused;
+    ## @qcode{'point'} picks points as on a solid.
     ##
     ## @seealso{solid.Shape.edges, solid.Shape.faces, solid.Shape.show,
     ## model.Viewer.opacity}
@@ -1390,6 +1422,89 @@ classdef Viewer < handle
 
     endfunction
 
+    ## The points of pick (V, 'point'): each click snapped as pickucs snaps
+    ## it, until Enter; Escape returns none.  CLICKS as __pick__ takes them.
+    ## CODE rebuilds the points of a solid from the names of its faces, as
+    ## pointcode writes it, a point it cannot rebuild by its coordinates, as
+    ## the rows of one matrix for several points; on a mesh or an assembly
+    ## it is their coordinates.
+    function [P, CODE] = pickpoints (V, CLICKS)
+
+      st = state (V);
+      while (ischar (fgetl (st.out)))
+      endwhile
+      fclear (st.out);
+      P = zeros (0, 3);
+      R = {};
+      scripted = ! isempty (CLICKS);
+      send (V, "prompt Pick points: Enter finishes, Escape cancels");
+      finished = false;
+      unwind_protect
+        while (! finished)
+          send (V, "pickone point");
+          if (scripted)
+            if (isempty (CLICKS) || any (isnan (CLICKS(1,:))))
+              send (V, "enter");
+            elseif (any (isinf (CLICKS(1,:))))
+              send (V, "cancel");
+            else
+              send (V, sprintf ("click %d %d", round (CLICKS(1,:))));
+            endif
+            CLICKS(1:min (1, rows (CLICKS)),:) = [];
+            r = strsplit (receive (V, 10));
+          else
+            r = strsplit (receive (V, Inf));
+          endif
+          switch (r{1})
+            case 'point'
+              P(end+1,:) = str2double (r(2:4));
+              R{end+1} = r;
+            case 'skip'
+              finished = true;
+            case 'cancel'
+              P = zeros (0, 3);
+              R = {};
+              finished = true;
+            case 'closed'
+              error (strcat ("model.Viewer.pick: the window was closed", ...
+                             " during the pick."));
+          endswitch
+        endwhile
+      unwind_protect_cleanup
+        if (isopen (V))
+          if (! finished)
+            send (V, "cancel");
+          endif
+          send (V, "clearmarks");
+          send (V, "prompt");
+        endif
+      end_unwind_protect
+
+      CODE = '';
+      if (isempty (P))
+        return;
+      endif
+      S = shown (V);
+      named = isa (S, 'solid.Shape') && isempty (st.model);
+      SP = ' ';
+      if (rows (P) > 1)
+        SP = '';
+      endif
+      codes = cell (rows (P), 1);
+      for k = 1:rows (P)
+        codes{k} = valuetext (P(k,:));
+        if (named)
+          codes{k} = pointcode (S, R{k}, P(k,:), SP);
+        endif
+      endfor
+      CODE = strjoin (codes, "; ");
+      if (rows (P) > 1)
+        CODE = sprintf ("[%s]", CODE);
+      endif
+      CODE = strrep (CODE, '__shape__', st.name);
+
+    endfunction
+
     ## One point, prompted with ASK until a point is picked
     function [p, r, CLICKS, SHOWN] = point (V, ASK, CLICKS, SHOWN)
 
@@ -1772,7 +1887,7 @@ function Q = namedfaces (S, T, INFO, NAMES, SP)
   endfor
   near = setdiff (near, T);
   cand.Adjacent = {};
-  for i = near
+  for i = near(:)'
     cand.Adjacent = [cand.Adjacent, own(i)];
   endfor
   cand.Adjacent = unique (cand.Adjacent);
@@ -1980,7 +2095,7 @@ function Q = namededges (S, T, INFO, NAMES, SP)
     shared = intersect (shared, onfaces{e});
   endfor
   bases = {};
-  for s = shared
+  for s = shared(:)'
     others = setdiff (F, s);
     if (isempty (others) || any (cellfun (@(i) isempty (own (i)), ...
                                           num2cell (others))))
@@ -2014,6 +2129,70 @@ function Q = namededges (S, T, INFO, NAMES, SP)
     endfor
   endfor
   Q = shortest (query, T, bases, cand, steps, 'edge', SP);
+
+endfunction
+
+## The code that rebuilds the point P of the solid S that the viewer's reply
+## R snapped to, the shape named __shape__ and SP the space before each
+## call's parenthesis: for a vertex, corner of the fewest named faces that
+## meet there and share it alone, the shortest code among as many; for the
+## centre of a circle or the midpoint of another edge, centre or midpoint of
+## the edge as namededges finds it.  A point on a face, and one the names
+## cannot rebuild, is its coordinates.
+function Q = pointcode (S, R, P, SP)
+
+  Q = valuetext (P);
+  names = __occt__ ('names', 'model.Viewer.pick', S.Data);
+  if (names{2} || numel (R) < 6)
+    return;
+  endif
+  K = str2double (R(6:end));
+  if (strcmp (R{5}, 'vertex'))
+    info = __occt__ ('faces', 'model.Viewer.pick', S.Data);
+    K = K(arrayfun (@(i) any (! cellfun ('isempty', names{1}{i})), K));
+    for n = 1:numel (K)
+      best = '';
+      sets = nchoosek (K, n);
+      for j = 1:rows (sets)
+        F = namedfaces (S, sets(j,:), info, names, SP);
+        if (isempty (F))
+          continue;
+        endif
+        c = sprintf ("corner%s(__shape__, %s)", SP, F);
+        if (! rebuilds (S, c, P))
+          continue;
+        endif
+        [~, order] = sort ({c, best});
+        if (isempty (best) || numel (c) < numel (best)
+            || (numel (c) == numel (best) && order(1) == 1))
+          best = c;
+        endif
+      endfor
+      if (! isempty (best))
+        Q = best;
+        return;
+      endif
+    endfor
+  elseif (any (strcmp (R{5}, {'centre', 'midpoint'})))
+    info = __occt__ ('edges', 'model.Viewer.pick', S.Data);
+    E = namededges (S, K, info, names, SP);
+    c = sprintf ("%s%s(__shape__, %s)", R{5}, SP, E);
+    if (! isempty (E) && rebuilds (S, c, P))
+      Q = c;
+    endif
+  endif
+
+endfunction
+
+## Whether the code Q, run on the shape __shape__, gives the point P, to a
+## millionth of its size; code that errs gives none
+function TF = rebuilds (__shape__, Q, P)
+
+  try
+    TF = norm (eval (Q) - P) <= 1e-6 * max (1, norm (P));
+  catch
+    TF = false;
+  end_try_catch
 
 endfunction
 
@@ -3239,6 +3418,114 @@ endfunction
 %! end_unwind_protect
 
 %!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
+%! ## A picked corner is the corner of the named faces that meet there
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   S = solid.box (60, 40, 10, 'Label', 'plate');
+%!   V.Model = S;
+%!   [P, CODE] = V.__pick__ ('point', [V.__project__([60, 0, 10]); NaN, NaN]);
+%!   assert_equal (P, [60, 0, 10], 1e-9);
+%!   assert_equal (CODE, ["corner (S, faces (S, 'Label', {'plate.xmax',", ...
+%!                        " 'plate.ymin', 'plate.zmax'}))"]);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
+%! ## A picked midpoint is the midpoint of the edge between named faces
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   S = solid.box (60, 40, 10, 'Label', 'plate');
+%!   V.Model = S;
+%!   [P, CODE] = V.__pick__ ('point', [V.__project__([30, 0, 10]); NaN, NaN]);
+%!   assert_equal (P, [30, 0, 10], 1e-9);
+%!   assert_equal (CODE, ["midpoint (S, edges (S, 'Between',", ...
+%!                        " {'plate.ymin', 'plate.zmax'}))"]);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
+%! ## A picked centre is the centre of the circle between named faces
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   S = union (solid.box (60, 40, 10, 'Label', 'plate'), ...
+%!              solid.cylinder (5, 20, geom.UCS ([0, 0, 1], [20, 20, 10]), ...
+%!                              'Label', 'boss'));
+%!   V.Model = S;
+%!   [P, CODE] = V.__pick__ ('point', [V.__project__([25, 20, 30]); NaN, NaN]);
+%!   assert_equal (P, [20, 20, 30], 1e-9);
+%!   assert_equal (CODE, ["centre (S, edges (S, 'Between',", ...
+%!                        " {'boss.end', 'boss.side'}))"]);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
+%! ## A point picked inside a face is its coordinates
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   S = solid.box (60, 40, 10, 'Label', 'plate');
+%!   V.Model = S;
+%!   [P, CODE] = V.__pick__ ('point', [V.__project__([30, 20, 10]); NaN, NaN]);
+%!   assert_equal (P(3), 10, 1e-9);
+%!   assert_equal (CODE(1), '[');
+%!   assert_equal (eval (CODE), P, 1e-6);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
+%! ## Several points are the rows of one matrix
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   S = solid.box (60, 40, 10, 'Label', 'plate');
+%!   V.Model = S;
+%!   [P, CODE] = V.__pick__ ('point', [V.__project__([60, 0, 10]); ...
+%!                                     V.__project__([30, 0, 10]); NaN, NaN]);
+%!   assert_equal (P, [60, 0, 10; 30, 0, 10], 1e-9);
+%!   assert_equal (strncmp (CODE, "[corner(S, faces(S, 'Label', ", 29), true);
+%!   assert_equal (eval (CODE), P, 1e-9);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
+%! ## Points of a shape without names are their coordinates
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Model = solid.box (60, 40, 10);
+%!   [P, CODE] = V.__pick__ ('point', [V.__project__([60, 0, 10]); NaN, NaN]);
+%!   assert_equal (CODE, "[60, 0, 10]");
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
+%! ## Escape returns no point
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Model = solid.box (60, 40, 10, 'Label', 'plate');
+%!   [P, CODE] = V.__pick__ ('point', [V.__project__([60, 0, 10]); Inf, Inf]);
+%!   assert_equal (size (P), [0, 3]);
+%!   assert_equal (CODE, '');
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
+%! ## Points of a mesh are their coordinates
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Model = boxmesh (80, 40, 12);
+%!   [P, CODE] = V.__pick__ ('point', [V.__project__([80, 0, 12]); NaN, NaN]);
+%!   assert_equal (P, [80, 0, 12]);
+%!   assert_equal (CODE, "[80, 0, 12]");
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## Edges one query names all come back in the order picked, their code
 %! ## in increasing order
 %! V = model.Viewer ('Hidden', true);
@@ -3292,7 +3579,7 @@ endfunction
 %!   close (V);
 %! end_unwind_protect
 
-%!error<model.Viewer.pick: KIND must be 'edge', 'face', 'solid' or 'any'.>
+%!error<model.Viewer.pick: KIND must be 'edge', 'face', 'point', 'solid' or 'any'.>
 %! pick (model.Viewer (), 'vertex')
 %!error<model.Viewer.pick: the viewer is showing no shape.>
 %! pick (model.Viewer ())

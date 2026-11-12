@@ -89,8 +89,8 @@ OCCT_LIBS = -lTKernel -lTKMath -lTKG2d -lTKG3d -lTKGeomBase -lTKGeomAlgo \
             -lTKBRep -lTKTopAlgo -lTKPrim -lTKBO -lTKFillet -lTKOffset \
             -lTKMesh -lTKDESTEP -lTKXSBase -lTKDE -lTKXCAF -lTKLCAF -lTKCAF \
             -lTKCDF -lTKHLR -lTKShHealing
-VIEW_LIBS = -lTKernel -lTKMath -lTKG3d -lTKBRep -lTKTopAlgo -lTKMesh \
-            -lTKService -lTKV3d -lTKOpenGl $(WINDOW_LIBS)
+VIEW_LIBS = -lTKernel -lTKMath -lTKG3d -lTKGeomBase -lTKBRep -lTKTopAlgo \
+            -lTKMesh -lTKService -lTKV3d -lTKOpenGl $(WINDOW_LIBS)
 FONT_LIBS = -lTKernel -lTKMath -lTKG2d -lTKG3d -lTKGeomBase -lTKGeomAlgo -lTKBRep \
             -lTKTopAlgo -lTKService -lTKV3d
 
