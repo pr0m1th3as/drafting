@@ -17,7 +17,7 @@
 
 ## -*- texinfo -*-
 ## @deftypefn  {drafting} {@var{K} =} geom.curvature (@var{P})
-## @deftypefnx {drafting} {@var{K} =} geom.curvature (@var{P}, @var{CLOSED})
+## @deftypefnx {drafting} {@var{K} =} geom.curvature (@var{P}, @qcode{'Closed'}, @var{CLOSED})
 ## @deftypefnx {drafting} {[@var{K}, @var{R}] =} geom.curvature (@dots{})
 ##
 ## Signed curvature of a sampled planar curve.
@@ -28,10 +28,9 @@
 ## so with the package convention of millimetres it is in reciprocal
 ## millimetres.
 ##
-## @code{@var{K} = geom.curvature (@var{P}, @var{CLOSED})} treats the curve as
-## closed when @var{CLOSED} is true, joining the last point to the first.  An
-## explicitly repeated closing point is accepted and ignored.  @var{CLOSED}
-## defaults to false.
+## The option @qcode{'Closed'} treats the curve as closed when @var{CLOSED} is
+## true, joining the last point to the first.  An explicitly repeated closing
+## point is accepted and ignored.  @var{CLOSED} defaults to false.
 ##
 ## @code{[@var{K}, @var{R}] = geom.curvature (@dots{})} additionally returns the
 ## signed radius of curvature @var{R}, which is @code{1 ./ @var{K}}.  A straight
@@ -55,14 +54,30 @@
 ## @seealso{geom.curveoffset, geom.curvesample, geom.selfintersects}
 ## @end deftypefn
 
-function [K, R] = curvature (P, CLOSED = false)
+function [K, R] = curvature (P, varargin)
 
   ## Input validation
-  if (nargin < 1 || nargin > 2)
+  if (nargin < 1)
     error ("geom.curvature: invalid number of input arguments.");
   endif
+  if (mod (numel (varargin), 2) != 0)
+    error ("geom.curvature: Name/Value arguments must come in pairs.");
+  endif
+  CLOSED = false;
+  for ii = 1:2:numel (varargin)
+    name = varargin{ii};
+    if (! ischar (name) || ! isrow (name))
+      error ("geom.curvature: option names must be character vectors.");
+    endif
+    switch (lower (name))
+      case 'closed'
+        CLOSED = varargin{ii+1};
+      otherwise
+        error ("geom.curvature: unknown option '%s'.", name);
+    endswitch
+  endfor
   if (! islogical (CLOSED) || ! isscalar (CLOSED))
-    error ("geom.curvature: CLOSED must be true or false.");
+    error ("geom.curvature: Closed must be true or false.");
   endif
   CLOSED = logical (CLOSED);
   [errmsg, P] = geom.__checkcurve__ (P, CLOSED);
@@ -115,7 +130,7 @@ endfunction
 %!
 %! t = linspace (0, 2*pi, 361)(1:360)';
 %! P = (30 + 5 * cos (6 * t)) .* [cos(t), sin(t)];
-%! [K, R] = geom.curvature (P, true);
+%! [K, R] = geom.curvature (P, 'Closed', true);
 %! printf ('tightest radius %.2f mm at a crest, %.2f mm in a root\n', ...
 %!         min (abs (R(K > 0))), min (abs (R(K < 0))));
 %!
@@ -128,31 +143,31 @@ endfunction
 
 %!test  # a counter-clockwise unit circle has curvature 1 everywhere
 %! t = linspace (0, 2*pi, 361)(1:360)';
-%! K = geom.curvature ([cos(t), sin(t)], true);
+%! K = geom.curvature ([cos(t), sin(t)], 'Closed', true);
 %! assert_equal (K, ones (360, 1), 1e-9);
 
 %!test  # a clockwise circle carries the opposite sign
 %! t = linspace (0, 2*pi, 361)(1:360)';
-%! K = geom.curvature ([cos(-t), sin(-t)], true);
+%! K = geom.curvature ([cos(-t), sin(-t)], 'Closed', true);
 %! assert_equal (K, -ones (360, 1), 1e-9);
 
 %!test  # curvature is the reciprocal of the radius
 %! t = linspace (0, 2*pi, 181)(1:180)';
-%! K = geom.curvature (25 * [cos(t), sin(t)], true);
+%! K = geom.curvature (25 * [cos(t), sin(t)], 'Closed', true);
 %! assert_equal (K, ones (180, 1) / 25, 1e-9);
 
 %!test  # exact at coarse and uneven sampling, being a circumradius
 %! t = [0; 0.3; 1.1; 2.0; 3.5; 4.0; 5.2]';
-%! K = geom.curvature ([cos(t'), sin(t')], true);
+%! K = geom.curvature ([cos(t'), sin(t')], 'Closed', true);
 %! assert_equal (K, ones (7, 1), 1e-9);
 
 %!test  # the radius of curvature is the second output
 %! t = linspace (0, 2*pi, 181)(1:180)';
-%! [K, R] = geom.curvature (7 * [cos(t), sin(t)], true);
+%! [K, R] = geom.curvature (7 * [cos(t), sin(t)], 'Closed', true);
 %! assert_equal (R, 7 * ones (180, 1), 1e-9);
 
 %!test  # a straight run is flat, not an error
-%! K = geom.curvature ([0, 0; 1, 0; 2, 0; 3, 0], true);
+%! K = geom.curvature ([0, 0; 1, 0; 2, 0; 3, 0], 'Closed', true);
 %! assert_equal (K, zeros (4, 1), 1e-12);
 
 %!test  # an open curve has no curvature at its ends
@@ -166,18 +181,24 @@ endfunction
 %!test  # an explicitly closed ring gives one value per distinct point
 %! t = linspace (0, 2*pi, 61)(1:60)';
 %! P = [cos(t), sin(t)];
-%! K = geom.curvature ([P; P(1,:)], true);
+%! K = geom.curvature ([P; P(1,:)], 'Closed', true);
 %! assert_equal (rows (K), 60);
 
 %!test  # coincident points do not divide by zero
-%! K = geom.curvature ([0, 0; 1, 0; 1, 0; 2, 0], true);
+%! K = geom.curvature ([0, 0; 1, 0; 1, 0; 2, 0], 'Closed', true);
 %! assert_equal (any (isnan (K)), false);
 
 %!error<geom.curvature: invalid number of input arguments.> geom.curvature ()
-%!error<geom.curvature: CLOSED must be true or false.> ...
-%! geom.curvature ([0, 0; 1, 0; 1, 1], [true, false])
-%!error<geom.curvature: CLOSED must be true or false.> ...
-%! geom.curvature ([0, 0; 1, 0; 1, 1], 1)
+%!error<geom.curvature: Name/Value arguments must come in pairs.> ...
+%! geom.curvature ([0, 0; 1, 0; 1, 1], true)
+%!error<geom.curvature: option names must be character vectors.> ...
+%! geom.curvature ([0, 0; 1, 0; 1, 1], 1, true)
+%!error<geom.curvature: unknown option 'Close'.> ...
+%! geom.curvature ([0, 0; 1, 0; 1, 1], 'Close', true)
+%!error<geom.curvature: Closed must be true or false.> ...
+%! geom.curvature ([0, 0; 1, 0; 1, 1], 'Closed', [true, false])
+%!error<geom.curvature: Closed must be true or false.> ...
+%! geom.curvature ([0, 0; 1, 0; 1, 1], 'Closed', 1)
 %!error<geom.curvature: P must be a real floating-point matrix.> geom.curvature ('a')
 %!error<geom.curvature: P must be an N-by-2 matrix of point coordinates.> ...
 %! geom.curvature ([1, 2, 3])

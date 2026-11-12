@@ -17,7 +17,7 @@
 
 ## -*- texinfo -*-
 ## @deftypefn  {drafting} {@var{R} =} geom.largestrect (@var{P})
-## @deftypefnx {drafting} {@var{R} =} geom.largestrect (@var{P}, @var{MARGINS})
+## @deftypefnx {drafting} {@var{R} =} geom.largestrect (@var{P}, @qcode{'Margins'}, @var{MARGINS})
 ## @deftypefnx {drafting} {[@var{R}, @var{B}] =} geom.largestrect (@dots{})
 ##
 ## Largest axis-aligned rectangle inscribed in a rectilinear polygon.
@@ -27,9 +27,9 @@
 ## matrix of vertices wound counter-clockwise starting from the lower-left
 ## corner.
 ##
-## @code{@var{R} = geom.largestrect (@var{P}, @var{MARGINS})} additionally
-## keeps the rectangle clear of @emph{every} wall of @var{P} by the given
-## margins, the face of a notch included and not merely the bounding box.
+## The option @qcode{'Margins'} keeps the rectangle clear of @emph{every} wall
+## of @var{P} by the margins @var{MARGINS}, the face of a notch included and
+## not merely the bounding box.
 ## @var{MARGINS} is a scalar applied to all four sides, or the 1-by-4 vector
 ## @code{[@var{left}, @var{bottom}, @var{right}, @var{top}]} naming them
 ## individually, in the units of @var{P}.  All values must be non-negative and
@@ -63,7 +63,7 @@
 ## @seealso{geom.bbox, geom.offset, geom.isrectilinear}
 ## @end deftypefn
 
-function [R, B] = largestrect (P, MARGINS = 0)
+function [R, B] = largestrect (P, varargin)
 
   ## Input validation
   if (nargin < 1)
@@ -73,10 +73,26 @@ function [R, B] = largestrect (P, MARGINS = 0)
   if (! isempty (errmsg))
     error ("geom.largestrect: %s", errmsg);
   endif
+  if (mod (numel (varargin), 2) != 0)
+    error ("geom.largestrect: Name/Value arguments must come in pairs.");
+  endif
+  MARGINS = 0;
+  for ii = 1:2:numel (varargin)
+    name = varargin{ii};
+    if (! ischar (name) || ! isrow (name))
+      error ("geom.largestrect: option names must be character vectors.");
+    endif
+    switch (lower (name))
+      case 'margins'
+        MARGINS = varargin{ii+1};
+      otherwise
+        error ("geom.largestrect: unknown option '%s'.", name);
+    endswitch
+  endfor
   if (! isfloat (MARGINS) || ! isreal (MARGINS)
       || ! all (isfinite (MARGINS(:))) || any (MARGINS(:) < 0)
       || ! (isscalar (MARGINS) || isequal (size (MARGINS), [1, 4])))
-    error (strcat ("geom.largestrect: MARGINS must be a non-negative real", ...
+    error (strcat ("geom.largestrect: Margins must be a non-negative real", ...
                    " finite scalar or 1-by-4 vector."));
   endif
   if (! geom.isrectilinear (P))
@@ -95,7 +111,7 @@ function [R, B] = largestrect (P, MARGINS = 0)
   win = box;
   if (MARGINS(1) + MARGINS(3) >= box(3) - box(1)
       || MARGINS(2) + MARGINS(4) >= box(4) - box(2))
-    error (strcat ("geom.largestrect: MARGINS leave no room inside the", ...
+    error (strcat ("geom.largestrect: Margins leave no room inside the", ...
                    " bounding box of P."));
   endif
 
@@ -152,7 +168,7 @@ function [R, B] = largestrect (P, MARGINS = 0)
 
   if (isempty (B))
     error (strcat ("geom.largestrect: no rectangle fits inside P within", ...
-                   " MARGINS."));
+                   " Margins."));
   endif
 
   ## Counter-clockwise from the lower-left corner
@@ -166,7 +182,7 @@ endfunction
 %! ## is what that budget leaves room for.
 %!
 %! P = [0, 0; 60, 0; 60, 20; 30, 20; 30, 45; 0, 45];
-%! [R, B] = geom.largestrect (P, [4, 6, 4, 3])
+%! [R, B] = geom.largestrect (P, 'Margins', [4, 6, 4, 3])
 %!
 %! D = draw.Drawing ().polyline (geom.Polyline (P, 'Closed', true));
 %! D.Colour = 'red';
@@ -191,28 +207,28 @@ endfunction
 
 %!test  # a scalar margin insets all four sides
 %! P = [0, 0; 10, 0; 10, 6; 0, 6];
-%! [~, B] = geom.largestrect (P, 1);
+%! [~, B] = geom.largestrect (P, 'Margins', 1);
 %! assert_equal (B, [1, 1, 9, 5]);
 
 %!test  # per-side margins: [left, bottom, right, top]
 %! P = [0, 0; 1600, 0; 1600, 1800; 0, 1800];
-%! [~, B] = geom.largestrect (P, [100, 50, 200, 25]);
+%! [~, B] = geom.largestrect (P, 'Margins', [100, 50, 200, 25]);
 %! assert_equal (B, [100, 50, 1400, 1775]);
 
 %!test  # an outline reduced by a per-side clearance budget
 %! outline = [0, 0; 1600, 0; 1600, 1800; 0, 1800];
-%! [~, B] = geom.largestrect (outline, [50, 200, 50, 100]);
+%! [~, B] = geom.largestrect (outline, 'Margins', [50, 200, 50, 100]);
 %! assert_equal (B(3) - B(1), 1500);     # width
 %! assert_equal (B(4) - B(2), 1500);     # depth
 
 %!test  # a margin is held against a re-entrant wall, not just the bounding box
 %! P = [0, 0; 60, 0; 60, 20; 30, 20; 30, 45; 0, 45];
-%! [~, B] = geom.largestrect (P, [4, 6, 4, 3]);
+%! [~, B] = geom.largestrect (P, 'Margins', [4, 6, 4, 3]);
 %! assert_equal (B, [4, 6, 26, 42], 1e-9);
 
 %!test  # the clearance from a notch face equals the margin for that side
 %! P = [0, 0; 60, 0; 60, 5; 30, 5; 30, 45; 0, 45];
-%! [~, B] = geom.largestrect (P, [0, 0, 7, 0]);
+%! [~, B] = geom.largestrect (P, 'Margins', [0, 0, 7, 0]);
 %! assert_equal (30 - B(3), 7, 1e-9);
 
 %!test  # the notch of an L shape is excluded: 40, not the 64 of the outline
@@ -242,27 +258,37 @@ endfunction
 
 %!test  # growing a margin can only shrink the result
 %! P = [0, 0; 10, 0; 10, 6; 0, 6];
-%! a = arrayfun (@(m) geom.signedarea (geom.largestrect (P, m)), [0, 1, 2]);
+%! a = arrayfun (@(m) geom.signedarea (geom.largestrect (P, 'Margins', m)), ...
+%!              [0, 1, 2]);
 %! assert_equal (all (diff (a) < 0), true);
 
 %!test  # margins agree with offsetting the outline first, on a rectangle
 %! P = [0, 0; 1600, 0; 1600, 1800; 0, 1800];
-%! assert_equal (geom.largestrect (P, 60), geom.offset (P, 60), 1e-9);
+%! assert_equal (geom.largestrect (P, 'Margins', 60), geom.offset (P, 60), ...
+%!               1e-9);
 
 %!error<geom.largestrect: invalid number of input arguments.> ...
 %! geom.largestrect ()
 %!error<geom.largestrect: P must be a polygon with at least 3 vertices.> ...
 %! geom.largestrect ([0, 0; 1, 1])
-%!error<geom.largestrect: MARGINS must be a non-negative real finite scalar or 1-by-4 vector.> ...
-%! geom.largestrect ([0, 0; 10, 0; 10, 6; 0, 6], -1)
-%!error<geom.largestrect: MARGINS must be a non-negative real finite scalar or 1-by-4 vector.> ...
-%! geom.largestrect ([0, 0; 10, 0; 10, 6; 0, 6], [1, 2, 3])
-%!error<geom.largestrect: MARGINS must be a non-negative real finite scalar or 1-by-4 vector.> ...
-%! geom.largestrect ([0, 0; 10, 0; 10, 6; 0, 6], Inf)
+%!error<geom.largestrect: Name/Value arguments must come in pairs.> ...
+%! geom.largestrect ([0, 0; 10, 0; 10, 6; 0, 6], 1)
+%!error<geom.largestrect: option names must be character vectors.> ...
+%! geom.largestrect ([0, 0; 10, 0; 10, 6; 0, 6], 1, 1)
+%!error<geom.largestrect: unknown option 'Margin'.> ...
+%! geom.largestrect ([0, 0; 10, 0; 10, 6; 0, 6], 'Margin', 1)
+%!error<geom.largestrect: Margins must be a non-negative real finite scalar or 1-by-4 vector.> ...
+%! geom.largestrect ([0, 0; 10, 0; 10, 6; 0, 6], 'Margins', -1)
+%!error<geom.largestrect: Margins must be a non-negative real finite scalar or 1-by-4 vector.> ...
+%! geom.largestrect ([0, 0; 10, 0; 10, 6; 0, 6], 'Margins', [1, 2, 3])
+%!error<geom.largestrect: Margins must be a non-negative real finite scalar or 1-by-4 vector.> ...
+%! geom.largestrect ([0, 0; 10, 0; 10, 6; 0, 6], 'Margins', Inf)
+%!error<geom.largestrect: Margins must be a non-negative real finite scalar or 1-by-4 vector.> ...
+%! geom.largestrect ([0, 0; 10, 0; 10, 6; 0, 6], 'Margins', [])
 %!error<geom.largestrect: P must be a rectilinear polygon; inscribing in a general polygon is not implemented.> ...
 %! geom.largestrect ([0, 0; 10, 0; 0, 10])
-%!error<geom.largestrect: MARGINS leave no room inside the bounding box of P.> ...
-%! geom.largestrect ([0, 0; 10, 0; 10, 6; 0, 6], 5)
+%!error<geom.largestrect: Margins leave no room inside the bounding box of P.> ...
+%! geom.largestrect ([0, 0; 10, 0; 10, 6; 0, 6], 'Margins', 5)
 %!error<geom.largestrect: P must be a real floating-point matrix.> ...
 %! geom.largestrect ({1, 2})
 %!error<geom.largestrect: P must be an N-by-2 matrix of point coordinates.> ...

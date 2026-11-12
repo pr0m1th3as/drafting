@@ -17,8 +17,8 @@
 
 ## -*- texinfo -*-
 ## @deftypefn  {drafting} {@var{Q} =} geom.resample (@var{P}, @var{N})
-## @deftypefnx {drafting} {@var{Q} =} geom.resample (@var{P}, @qcode{'spacing'}, @var{D})
-## @deftypefnx {drafting} {@var{Q} =} geom.resample (@dots{}, @var{CLOSED})
+## @deftypefnx {drafting} {@var{Q} =} geom.resample (@var{P}, @qcode{'Spacing'}, @var{D})
+## @deftypefnx {drafting} {@var{Q} =} geom.resample (@dots{}, @qcode{'Closed'}, @var{CLOSED})
 ## @deftypefnx {drafting} {[@var{Q}, @var{S}] =} geom.resample (@dots{})
 ##
 ## Respace the points of a curve evenly along its length.
@@ -27,13 +27,14 @@
 ## spaced equally along the polyline @var{P}, the first at its start and the
 ## last at its end.
 ##
-## @code{@var{Q} = geom.resample (@var{P}, @qcode{'spacing'}, @var{D})} spaces
-## them @var{D} apart instead, taking as many as fit.  The last point lands at
+## @code{@var{Q} = geom.resample (@var{P}, 'Spacing', @var{D})} spaces them
+## @var{D} apart instead, taking as many as fit.  The last point lands at
 ## the end of the curve whatever the remainder, so the final gap may be shorter
 ## than @var{D}; a curve is not lengthened to make the arithmetic tidy.
 ##
-## Adding @var{CLOSED} as a final true argument treats the curve as closed, in
-## which case the returned points do not repeat the first.
+## The option @qcode{'Closed'} treats the curve as closed when @var{CLOSED} is
+## true, in which case the returned points do not repeat the first.
+## @var{CLOSED} defaults to false.
 ##
 ## @code{[@var{Q}, @var{S}] = geom.resample (@dots{})} also returns the distance
 ## along the curve at which each point was taken.
@@ -72,36 +73,48 @@
 function [Q, S] = resample (P, varargin)
 
   ## Input validation
-  if (nargin < 2 || nargin > 4)
+  if (nargin < 2)
     error ("geom.resample: invalid number of input arguments.");
   endif
 
-  ## resample (P, N), resample (P, N, CLOSED),
-  ## resample (P, 'spacing', D), resample (P, 'spacing', D, CLOSED)
-  args = varargin;
-  bySpacing = ischar (args{1});
-  if (bySpacing)
-    if (! strcmpi (args{1}, 'spacing'))
-      error ("geom.resample: the only named option is 'spacing'.");
-    endif
-    if (numel (args) < 2 || numel (args) > 3)
-      error ("geom.resample: invalid number of input arguments.");
-    endif
-    val = args{2};
-    args = args(3:end);
-  else
-    val = args{1};
-    args = args(2:end);
+  ## resample (P, N, ...) or resample (P, 'Spacing', D, ...)
+  byCount = ! ischar (varargin{1});
+  bySpacing = false;
+  val = [];
+  opts = varargin;
+  if (byCount)
+    val = varargin{1};
+    opts = varargin(2:end);
   endif
-
+  if (mod (numel (opts), 2) != 0)
+    error ("geom.resample: Name/Value arguments must come in pairs.");
+  endif
   CLOSED = false;
-  if (! isempty (args))
-    CLOSED = args{1};
-    if (! islogical (CLOSED) || ! isscalar (CLOSED))
-      error ("geom.resample: CLOSED must be true or false.");
+  for ii = 1:2:numel (opts)
+    name = opts{ii};
+    if (! ischar (name) || ! isrow (name))
+      error ("geom.resample: option names must be character vectors.");
     endif
-    CLOSED = logical (CLOSED);
+    switch (lower (name))
+      case 'spacing'
+        if (byCount)
+          error ("geom.resample: N and Spacing must not both be given.");
+        endif
+        val = opts{ii+1};
+        bySpacing = true;
+      case 'closed'
+        CLOSED = opts{ii+1};
+      otherwise
+        error ("geom.resample: unknown option '%s'.", name);
+    endswitch
+  endfor
+  if (! (byCount || bySpacing))
+    error ("geom.resample: N or Spacing must be given.");
   endif
+  if (! islogical (CLOSED) || ! isscalar (CLOSED))
+    error ("geom.resample: Closed must be true or false.");
+  endif
+  CLOSED = logical (CLOSED);
 
   [errmsg, P] = geom.__checkpts__ (P);
   if (! isempty (errmsg))
@@ -113,7 +126,7 @@ function [Q, S] = resample (P, varargin)
   if (! (isfloat (val) || (! bySpacing && isnumeric (val)))
       || ! isreal (val) || ! isscalar (val) || ! isfinite (val) || val <= 0)
     if (bySpacing)
-      error ("geom.resample: D must be a positive real finite scalar.");
+      error ("geom.resample: Spacing must be a positive real finite scalar.");
     else
       error ("geom.resample: N must be a positive integer.");
     endif
@@ -122,7 +135,7 @@ function [Q, S] = resample (P, varargin)
     error ("geom.resample: N must be an integer of at least 2.");
   endif
 
-  [L, cum] = geom.arclength (P, CLOSED);
+  [L, cum] = geom.arclength (P, 'Closed', CLOSED);
   if (L <= 0)
     error ("geom.resample: P has no length to space points along.");
   endif
@@ -170,7 +183,7 @@ endfunction
 %!
 %! t = linspace (0, 2*pi, 361)(1:360)';
 %! P = (30 + 5 * cos (6 * t)) .* [cos(t), sin(t)];
-%! Q = geom.resample (P, 24, true);
+%! Q = geom.resample (P, 24, 'Closed', true);
 %!
 %! D = draw.Drawing ().polyline (geom.Polyline (P, 'Closed', true));
 %! D.Colour = 'red';
@@ -213,11 +226,11 @@ endfunction
 %! assert_equal (min (d) < max (d) - 1e-9, true);
 
 %!test  # spacing mode takes as many as fit and still lands on the end
-%! Q = geom.resample ([0, 0; 10, 0], 'spacing', 2.5);
+%! Q = geom.resample ([0, 0; 10, 0], 'Spacing', 2.5);
 %! assert_equal (Q, [0, 0; 2.5, 0; 5, 0; 7.5, 0; 10, 0], 1e-12);
 
 %!test  # a remainder gives a shorter final gap, not a longer curve
-%! Q = geom.resample ([0, 0; 10, 0], 'spacing', 3);
+%! Q = geom.resample ([0, 0; 10, 0], 'Spacing', 3);
 %! assert_equal (Q(end,:), [10, 0], 1e-12);
 %! assert_equal (rows (Q), 5);
 
@@ -241,16 +254,16 @@ endfunction
 
 %!test  # a closed curve does not repeat its first point
 %! P = [0, 0; 10, 0; 10, 10; 0, 10];
-%! Q = geom.resample (P, 8, true);
+%! Q = geom.resample (P, 8, 'Closed', true);
 %! assert_equal (rows (Q), 8);
 %! assert_equal (norm (Q(1,:) - Q(end,:)) > 1, true);
 
 %!test  # and its points are evenly spaced right around the ring, closing gap
 %!       # included
 %! P = [0, 0; 10, 0; 10, 10; 0, 10];
-%! [Q, S] = geom.resample (P, 8, true);
+%! [Q, S] = geom.resample (P, 8, 'Closed', true);
 %! assert_equal (rows (Q), 8);
-%! L = geom.arclength (P, true);
+%! L = geom.arclength (P, 'Closed', true);
 %! g = diff ([S; L]);
 %! assert_equal (max (g) - min (g) < 1e-9, true);
 
@@ -260,17 +273,31 @@ endfunction
 
 %!test  # a circle resampled stays on the circle
 %! t = linspace (0, 2*pi, 721)(1:720)';
-%! Q = geom.resample (10 * [cos(t), sin(t)], 36, true);
+%! Q = geom.resample (10 * [cos(t), sin(t)], 36, 'Closed', true);
 %! assert_equal (sqrt (sum (Q .^ 2, 2)), 10 * ones (36, 1), 1e-3);
 
 %!error<geom.resample: invalid number of input arguments.> ...
 %! geom.resample ([0, 0; 1, 0])
 %!error<geom.resample: N must be an integer of at least 2.> ...
 %! geom.resample ([0, 0; 1, 0], 1)
-%!error<geom.resample: D must be a positive real finite scalar.> ...
-%! geom.resample ([0, 0; 1, 0], 'spacing', 0)
-%!error<geom.resample: the only named option is 'spacing'.> ...
+%!error<geom.resample: Spacing must be a positive real finite scalar.> ...
+%! geom.resample ([0, 0; 1, 0], 'Spacing', 0)
+%!error<geom.resample: Spacing must be a positive real finite scalar.> ...
+%! geom.resample ([0, 0; 1, 0], 'Spacing', [])
+%!error<geom.resample: Name/Value arguments must come in pairs.> ...
+%! geom.resample ([0, 0; 1, 0], 5, true)
+%!error<geom.resample: Name/Value arguments must come in pairs.> ...
+%! geom.resample ([0, 0; 1, 0], 'Spacing')
+%!error<geom.resample: option names must be character vectors.> ...
+%! geom.resample ([0, 0; 1, 0], 5, 1, true)
+%!error<geom.resample: unknown option 'every'.> ...
 %! geom.resample ([0, 0; 1, 0], 'every', 2)
+%!error<geom.resample: N and Spacing must not both be given.> ...
+%! geom.resample ([0, 0; 1, 0], 5, 'Spacing', 0.5)
+%!error<geom.resample: N or Spacing must be given.> ...
+%! geom.resample ([0, 0; 1, 0], 'Closed', true)
+%!error<geom.resample: Closed must be true or false.> ...
+%! geom.resample ([0, 0; 1, 0], 5, 'Closed', 1)
 %!error<geom.resample: P must contain at least two points.> ...
 %! geom.resample ([3, 4], 5)
 %!error<geom.resample: P must be a real floating-point matrix.> ...

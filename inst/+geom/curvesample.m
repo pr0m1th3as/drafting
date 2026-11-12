@@ -16,25 +16,25 @@
 ## this program; if not, see <http://www.gnu.org/licenses/>.
 
 ## -*- texinfo -*-
-## @deftypefn  {drafting} {@var{P} =} geom.curvesample (@var{FCN}, @var{TRANGE}, @var{TOL})
-## @deftypefnx {drafting} {@var{P} =} geom.curvesample (@var{FCN}, @var{TRANGE}, @var{TOL}, @var{MAXPTS})
+## @deftypefn  {drafting} {@var{P} =} geom.curvesample (@var{FCN}, @var{TSPAN}, @var{TOL})
+## @deftypefnx {drafting} {@var{P} =} geom.curvesample (@var{FCN}, @var{TSPAN}, @var{TOL}, @qcode{'MaxPoints'}, @var{MAXPTS})
 ## @deftypefnx {drafting} {[@var{P}, @var{T}] =} geom.curvesample (@dots{})
 ##
 ## Sample a parametric curve to a stated chordal tolerance.
 ##
-## @code{@var{P} = geom.curvesample (@var{FCN}, @var{TRANGE}, @var{TOL})}
+## @code{@var{P} = geom.curvesample (@var{FCN}, @var{TSPAN}, @var{TOL})}
 ## returns points on the curve @var{FCN} over the parameter interval
-## @var{TRANGE}, placed so that the straight chord between consecutive points
+## @var{TSPAN}, placed so that the straight chord between consecutive points
 ## never departs from the true curve by more than @var{TOL}.
 ##
 ## @var{FCN} is a function handle taking a column vector of parameter values and
 ## returning an @math{N}-by-2 matrix, one row of coordinates per value.
-## @var{TRANGE} is a two-element increasing vector @code{[@var{T0}, @var{T1}]}.
+## @var{TSPAN} is a two-element increasing vector @code{[@var{T0}, @var{T1}]}.
 ## @var{TOL} is a positive scalar in the units of the curve, so millimetres by
 ## package convention.
 ##
-## @code{@var{P} = geom.curvesample (@dots{}, @var{MAXPTS})} caps the number of
-## points; exceeding it raises an error rather than refining without end.
+## The option @qcode{'MaxPoints'} caps the number of points at @var{MAXPTS};
+## exceeding it raises an error rather than refining without end.
 ## @var{MAXPTS} defaults to 100000.
 ##
 ## @code{[@var{P}, @var{T}] = geom.curvesample (@dots{})} additionally returns
@@ -53,29 +53,45 @@
 ## symmetric curve from terminating early on a midpoint that happens to fall on
 ## its own chord.
 ##
-## The curve is sampled, not closed.  A closed curve is obtained by giving a
-## @var{TRANGE} spanning one full period; the first and last points then
-## coincide, and callers that want an implicitly closed ring drop the last.
+## The curve is sampled, not closed.  A closed curve is obtained by setting
+## @var{TSPAN} to one full period; the first and last points then coincide,
+## and callers that want an implicitly closed ring drop the last.
 ##
 ## @seealso{geom.curvature, geom.curveoffset, geom.selfintersects}
 ## @end deftypefn
 
-function [P, T] = curvesample (FCN, TRANGE, TOL, MAXPTS = 100000)
+function [P, T] = curvesample (FCN, TSPAN, TOL, varargin)
 
   ## Input validation
-  if (nargin < 3 || nargin > 4)
+  if (nargin < 3)
     error ("geom.curvesample: invalid number of input arguments.");
   endif
+  if (mod (numel (varargin), 2) != 0)
+    error ("geom.curvesample: Name/Value arguments must come in pairs.");
+  endif
+  MAXPTS = 100000;
+  for ii = 1:2:numel (varargin)
+    name = varargin{ii};
+    if (! ischar (name) || ! isrow (name))
+      error ("geom.curvesample: option names must be character vectors.");
+    endif
+    switch (lower (name))
+      case 'maxpoints'
+        MAXPTS = varargin{ii+1};
+      otherwise
+        error ("geom.curvesample: unknown option '%s'.", name);
+    endswitch
+  endfor
   if (! is_function_handle (FCN))
     error ("geom.curvesample: FCN must be a function handle.");
   endif
-  if (! isfloat (TRANGE) || ! isreal (TRANGE) || ! isvector (TRANGE)
-      || numel (TRANGE) != 2 || ! all (isfinite (TRANGE)))
-    error (strcat ("geom.curvesample: TRANGE must be a two-element real", ...
+  if (! isfloat (TSPAN) || ! isreal (TSPAN) || ! isvector (TSPAN)
+      || numel (TSPAN) != 2 || ! all (isfinite (TSPAN)))
+    error (strcat ("geom.curvesample: TSPAN must be a two-element real", ...
                    " finite vector."));
   endif
-  if (TRANGE(2) <= TRANGE(1))
-    error ("geom.curvesample: TRANGE must be increasing.");
+  if (TSPAN(2) <= TSPAN(1))
+    error ("geom.curvesample: TSPAN must be increasing.");
   endif
   if (! isfloat (TOL) || ! isreal (TOL) || ! isscalar (TOL)
       || ! isfinite (TOL) || TOL <= 0)
@@ -83,12 +99,12 @@ function [P, T] = curvesample (FCN, TRANGE, TOL, MAXPTS = 100000)
   endif
   if (! isnumeric (MAXPTS) || ! isreal (MAXPTS) || ! isscalar (MAXPTS)
       || MAXPTS < 3 || MAXPTS != fix (MAXPTS))
-    error ("geom.curvesample: MAXPTS must be an integer of at least 3.");
+    error ("geom.curvesample: MaxPoints must be an integer of at least 3.");
   endif
 
   ## A uniform seed, so that a symmetric curve is not mistaken for a flat one
   SEED = 16;
-  T = linspace (TRANGE(1), TRANGE(2), SEED + 1)';
+  T = linspace (TSPAN(1), TSPAN(2), SEED + 1)';
   P = evaluate (FCN, T);
 
   do
@@ -218,14 +234,22 @@ endfunction
 %! geom.curvesample (@(t) [t, t], [0, 1])
 %!error<geom.curvesample: FCN must be a function handle.> ...
 %! geom.curvesample (42, [0, 1], 1e-3)
-%!error<geom.curvesample: TRANGE must be a two-element real finite vector.> ...
+%!error<geom.curvesample: TSPAN must be a two-element real finite vector.> ...
 %! geom.curvesample (@(t) [t, t], [0, 1, 2], 1e-3)
-%!error<geom.curvesample: TRANGE must be increasing.> ...
+%!error<geom.curvesample: TSPAN must be increasing.> ...
 %! geom.curvesample (@(t) [t, t], [1, 0], 1e-3)
 %!error<geom.curvesample: TOL must be a positive finite scalar.> ...
 %! geom.curvesample (@(t) [t, t], [0, 1], 0)
-%!error<geom.curvesample: MAXPTS must be an integer of at least 3.> ...
+%!error<geom.curvesample: Name/Value arguments must come in pairs.> ...
 %! geom.curvesample (@(t) [t, t], [0, 1], 1e-3, 2)
+%!error<geom.curvesample: option names must be character vectors.> ...
+%! geom.curvesample (@(t) [t, t], [0, 1], 1e-3, 2, 3)
+%!error<geom.curvesample: unknown option 'MaxPts'.> ...
+%! geom.curvesample (@(t) [t, t], [0, 1], 1e-3, 'MaxPts', 3)
+%!error<geom.curvesample: MaxPoints must be an integer of at least 3.> ...
+%! geom.curvesample (@(t) [t, t], [0, 1], 1e-3, 'MaxPoints', 2)
+%!error<geom.curvesample: MaxPoints must be an integer of at least 3.> ...
+%! geom.curvesample (@(t) [t, t], [0, 1], 1e-3, 'MaxPoints', [])
 %!error<geom.curvesample: FCN must return a real N-by-2 matrix with one row per parameter value.> ...
 %! geom.curvesample (@(t) [t, t, t], [0, 1], 1e-3)
 %!error<geom.curvesample: FCN returned a non-finite coordinate.> ...

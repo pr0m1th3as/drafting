@@ -17,8 +17,7 @@
 
 ## -*- texinfo -*-
 ## @deftypefn  {drafting} {@var{S} =} geom.hatchlines (@var{P})
-## @deftypefnx {drafting} {@var{S} =} geom.hatchlines (@var{P}, @var{PATTERN})
-## @deftypefnx {drafting} {@var{S} =} geom.hatchlines (@var{P}, @var{PATTERN}, @var{ANGLE}, @var{SPACING})
+## @deftypefnx {drafting} {@var{S} =} geom.hatchlines (@var{P}, @var{Name}, @var{Value}, @dots{})
 ## @deftypefnx {drafting} {@var{NAMES} =} geom.hatchlines ()
 ##
 ## The line segments that fill a boundary with a hatch pattern.
@@ -27,10 +26,20 @@
 ## the polygon @var{P} with the default pattern, as an @math{N}-by-4 matrix
 ## whose rows are @code{[@var{x1}, @var{y1}, @var{x2}, @var{y2}]}.
 ##
-## @code{@var{S} = geom.hatchlines (@var{P}, @var{PATTERN}, @var{ANGLE},
-## @var{SPACING})} chooses the pattern, rotates it by @var{ANGLE} degrees and
-## sets the perpendicular distance between lines to @var{SPACING} millimetres.
-## @var{ANGLE} defaults to zero and @var{SPACING} to the pattern's own.
+## Name/Value pairs:
+##
+## @table @asis
+## @item @qcode{'Pattern'}
+## The name of the pattern, from the table below, @qcode{'ANSI31'} by
+## default.
+##
+## @item @qcode{'Angle'}
+## The angle in degrees by which the pattern is rotated, zero by default.
+##
+## @item @qcode{'Spacing'}
+## The perpendicular distance between lines, in millimetres, the pattern's
+## own by default.
+## @end table
 ##
 ## @code{@var{NAMES} = geom.hatchlines ()} lists the patterns defined.
 ##
@@ -78,10 +87,6 @@
 function S = hatchlines (varargin)
 
   ## Input validation
-  if (numel (varargin) > 4)
-    error ("geom.hatchlines: invalid number of input arguments.");
-  endif
-
   T = {'ANSI31',     [45],       3.175; ...
        'ANSI32',     [45],       6.35; ...
        'ANSI37',     [45, 135],  3.175; ...
@@ -99,34 +104,51 @@ function S = hatchlines (varargin)
     error ("geom.hatchlines: %s", errmsg);
   endif
 
-  PATTERN = 'ANSI31';
-  if (numel (varargin) > 1 && ! isempty (varargin{2}))
-    PATTERN = varargin{2};
+  if (mod (numel (varargin) - 1, 2) != 0)
+    error ("geom.hatchlines: Name/Value arguments must come in pairs.");
   endif
+  PATTERN = 'ANSI31';
+  ANGLE = 0;
+  SPACING = [];
+  for ii = 2:2:numel (varargin)
+    name = varargin{ii};
+    val = varargin{ii+1};
+    if (! ischar (name) || ! isrow (name))
+      error ("geom.hatchlines: option names must be character vectors.");
+    endif
+    switch (lower (name))
+      case 'pattern'
+        PATTERN = val;
+      case 'angle'
+        ANGLE = val;
+      case 'spacing'
+        if (isempty (val))
+          error ("geom.hatchlines: Spacing must not be empty.");
+        endif
+        SPACING = val;
+      otherwise
+        error ("geom.hatchlines: unknown option '%s'.", name);
+    endswitch
+  endfor
   if (! ischar (PATTERN) || ! isrow (PATTERN))
-    error ("geom.hatchlines: PATTERN must be a character vector.");
+    error (strcat ("geom.hatchlines: Pattern must be a non-empty", ...
+                   " character vector."));
   endif
   k = find (strcmpi (PATTERN, T(:,1)), 1);
   if (isempty (k))
     error (strcat ("geom.hatchlines: '%s' is not a defined pattern; use", ...
                    " geom.hatchlines () for the list."), PATTERN);
   endif
-
-  ANGLE = 0;
-  if (numel (varargin) > 2 && ! isempty (varargin{3}))
-    ANGLE = varargin{3};
-  endif
-  SPACING = T{k,3};
-  if (numel (varargin) > 3 && ! isempty (varargin{4}))
-    SPACING = varargin{4};
+  if (isempty (SPACING))
+    SPACING = T{k,3};
   endif
   if (! isfloat (ANGLE) || ! isreal (ANGLE) || ! isscalar (ANGLE)
       || ! isfinite (ANGLE))
-    error ("geom.hatchlines: ANGLE must be a real finite scalar.");
+    error ("geom.hatchlines: Angle must be a real finite scalar.");
   endif
   if (! isfloat (SPACING) || ! isreal (SPACING) || ! isscalar (SPACING)
       || ! isfinite (SPACING) || SPACING <= 0)
-    error ("geom.hatchlines: SPACING must be a positive real finite scalar.");
+    error ("geom.hatchlines: Spacing must be a positive real finite scalar.");
   endif
 
   S = zeros (0, 4);
@@ -190,7 +212,7 @@ endfunction
 %! ## as many pieces as it takes.
 %!
 %! P = [0, 0; 60, 0; 60, 40; 35, 40; 35, 15; 25, 15; 25, 40; 0, 40];
-%! S = geom.hatchlines (P, 'ANSI31');
+%! S = geom.hatchlines (P, 'Pattern', 'ANSI31');
 %! printf ('%d segments fill the outline\n', rows (S));
 %!
 %! D = draw.Drawing ().polyline (geom.Polyline (P, 'Closed', true));
@@ -210,7 +232,7 @@ endfunction
 %! for nm = {'ANSI31', 'ANSI37', 'HORIZONTAL', 'CROSS'}
 %!   Q = P + [x, 0];
 %!   D = D.polyline (geom.Polyline (Q, 'Closed', true));
-%!   S = geom.hatchlines (Q, nm{1}, 0, 5);
+%!   S = geom.hatchlines (Q, 'Pattern', nm{1}, 'Spacing', 5);
 %!   D = D.line (S(:,1:2), S(:,3:4));
 %!   D = D.text ([x, -6], nm{1}, 3);
 %!   x += 50;
@@ -232,76 +254,87 @@ endfunction
 
 %!test  # a crosshatch produces both directions, so more segments than one
 %! P = [0, 0; 20, 0; 20, 20; 0, 20];
-%! assert_equal (rows (geom.hatchlines (P, 'ANSI37')) ...
-%!               > rows (geom.hatchlines (P, 'ANSI31')), true);
+%! assert_equal (rows (geom.hatchlines (P, 'Pattern', 'ANSI37'))
+%!               > rows (geom.hatchlines (P, 'Pattern', 'ANSI31')), true);
 
 %!test  # wider spacing means fewer lines
 %! P = [0, 0; 20, 0; 20, 20; 0, 20];
-%! n1 = rows (geom.hatchlines (P, 'ANSI31', 0, 1));
-%! n2 = rows (geom.hatchlines (P, 'ANSI31', 0, 4));
+%! n1 = rows (geom.hatchlines (P, 'Spacing', 1));
+%! n2 = rows (geom.hatchlines (P, 'Spacing', 4));
 %! assert_equal (n1 > n2, true);
 
 %!test  # horizontal hatch really is horizontal
-%! S = geom.hatchlines ([0, 0; 20, 0; 20, 20; 0, 20], 'HORIZONTAL');
+%! S = geom.hatchlines ([0, 0; 20, 0; 20, 20; 0, 20], 'Pattern', 'HORIZONTAL');
 %! assert_equal (S(:,2), S(:,4), 1e-9);
 
 %!test  # vertical hatch really is vertical
-%! S = geom.hatchlines ([0, 0; 20, 0; 20, 20; 0, 20], 'VERTICAL');
+%! S = geom.hatchlines ([0, 0; 20, 0; 20, 20; 0, 20], 'Pattern', 'VERTICAL');
 %! assert_equal (S(:,1), S(:,3), 1e-9);
 
 %!test  # the hatched length of a square matches its area over the spacing
 %! P = [0, 0; 20, 0; 20, 20; 0, 20];
-%! S = geom.hatchlines (P, 'HORIZONTAL', 0, 0.05);
+%! S = geom.hatchlines (P, 'Pattern', 'HORIZONTAL', 'Spacing', 0.05);
 %! L = sum (sqrt ((S(:,3) - S(:,1)) .^ 2 + (S(:,4) - S(:,2)) .^ 2));
 %! assert_equal (L * 0.05, 400, 1);
 
 %!test  # and for a rotated pattern too, which is the real test of the clipping
 %! P = [0, 0; 20, 0; 20, 20; 0, 20];
-%! S = geom.hatchlines (P, 'ANSI31', 0, 0.05);
+%! S = geom.hatchlines (P, 'Spacing', 0.05);
 %! L = sum (sqrt ((S(:,3) - S(:,1)) .^ 2 + (S(:,4) - S(:,2)) .^ 2));
 %! assert_equal (L * 0.05, 400, 1);
 
 %!test  # a concave boundary is filled in pieces, leaving the notch bare
 %! P = [0, 0; 20, 0; 20, 20; 12, 20; 12, 6; 8, 6; 8, 20; 0, 20];
-%! S = geom.hatchlines (P, 'HORIZONTAL', 0, 0.05);
+%! S = geom.hatchlines (P, 'Pattern', 'HORIZONTAL', 'Spacing', 0.05);
 %! L = sum (sqrt ((S(:,3) - S(:,1)) .^ 2 + (S(:,4) - S(:,2)) .^ 2));
 %! assert_equal (L * 0.05, abs (geom.signedarea (P)), 1);
 
 %!test  # a scan passing exactly through vertices does not leak outside
 %! P = [0, 0; 10, 0; 10, 10; 0, 10];
-%! S = geom.hatchlines (P, 'HORIZONTAL', 0, 1);
+%! S = geom.hatchlines (P, 'Pattern', 'HORIZONTAL', 'Spacing', 1);
 %! assert_equal (all (S(:,1) >= -1e-9 & S(:,3) <= 10 + 1e-9), true);
 
 %!test  # a triangle, whose scans cross a sloping pair of edges
 %! P = [0, 0; 10, 0; 5, 10];
-%! S = geom.hatchlines (P, 'HORIZONTAL', 0, 0.02);
+%! S = geom.hatchlines (P, 'Pattern', 'HORIZONTAL', 'Spacing', 0.02);
 %! L = sum (sqrt ((S(:,3) - S(:,1)) .^ 2 + (S(:,4) - S(:,2)) .^ 2));
 %! assert_equal (L * 0.02, 50, 0.5);
 
-%!test  # ANGLE rotates the pattern
+%!test  # Angle rotates the pattern
 %! P = [0, 0; 20, 0; 20, 20; 0, 20];
-%! S = geom.hatchlines (P, 'HORIZONTAL', 90);
+%! S = geom.hatchlines (P, 'Pattern', 'HORIZONTAL', 'Angle', 90);
 %! assert_equal (S(:,1), S(:,3), 1e-9);
 
 %!test  # a scan through a lowest vertex leaves no piece of no length
-%! S = geom.hatchlines ([0, 0; 10, 5; 0, 10; -10, 5], 'HORIZONTAL', 0, 5);
+%! S = geom.hatchlines ([0, 0; 10, 5; 0, 10; -10, 5], 'Pattern', ...
+%!                       'HORIZONTAL', 'Spacing', 5);
 %! assert_equal (S, [-10, 5, 10, 5], 1e-12);
 
-%!error<geom.hatchlines: invalid number of input arguments.> ...
-%! geom.hatchlines ([0,0;1,0;1,1], 'ANSI31', 0, 1, 2)
+%!error<geom.hatchlines: Name/Value arguments must come in pairs.> ...
+%! geom.hatchlines ([0,0;1,0;1,1], 'ANSI31')
+%!error<geom.hatchlines: option names must be character vectors.> ...
+%! geom.hatchlines ([0,0;1,0;1,1], 1, 2)
+%!error<geom.hatchlines: unknown option 'Scale'.> ...
+%! geom.hatchlines ([0,0;1,0;1,1], 'Scale', 2)
+%!error<geom.hatchlines: Pattern must be a non-empty character vector.> ...
+%! geom.hatchlines ([0,0;1,0;1,1], 'Pattern', '')
+%!error<geom.hatchlines: Spacing must not be empty.> ...
+%! geom.hatchlines ([0,0;1,0;1,1], 'Spacing', [])
 %!error<geom.hatchlines: P must be a polygon with at least 3 vertices.> ...
 %! geom.hatchlines ([0, 0; 1, 1])
 %!error<geom.hatchlines: 'TARTAN' is not a defined pattern; use geom.hatchlines \(\) for the list.> ...
-%! geom.hatchlines ([0,0;1,0;1,1], 'TARTAN')
-%!error<geom.hatchlines: SPACING must be a positive real finite scalar.> ...
-%! geom.hatchlines ([0,0;1,0;1,1], 'ANSI31', 0, 0)
-%!error<geom.hatchlines: ANGLE must be a real finite scalar.> ...
-%! geom.hatchlines ([0,0;1,0;1,1], 'ANSI31', Inf)
+%! geom.hatchlines ([0,0;1,0;1,1], 'Pattern', 'TARTAN')
+%!error<geom.hatchlines: Spacing must be a positive real finite scalar.> ...
+%! geom.hatchlines ([0,0;1,0;1,1], 'Spacing', 0)
+%!error<geom.hatchlines: Angle must be a real finite scalar.> ...
+%! geom.hatchlines ([0,0;1,0;1,1], 'Angle', Inf)
+%!error<geom.hatchlines: Angle must be a real finite scalar.> ...
+%! geom.hatchlines ([0,0;1,0;1,1], 'Angle', [])
 %!error<geom.hatchlines: P must be a real floating-point matrix.> ...
-%! geom.hatchlines ({1, 2}, 'ANSI31', 45, 2)
+%! geom.hatchlines ({1, 2}, 'Angle', 45, 'Spacing', 2)
 %!error<geom.hatchlines: P must be an N-by-2 matrix of point coordinates.> ...
-%! geom.hatchlines (ones (3, 3), 'ANSI31', 45, 2)
+%! geom.hatchlines (ones (3, 3), 'Angle', 45, 'Spacing', 2)
 %!error<geom.hatchlines: P must contain at least one point.> ...
-%! geom.hatchlines (zeros (0, 2), 'ANSI31', 45, 2)
+%! geom.hatchlines (zeros (0, 2), 'Angle', 45, 'Spacing', 2)
 %!error<geom.hatchlines: P must not contain NaN or Inf values.> ...
-%! geom.hatchlines ([0, 0; 1, 1; 2, 2; NaN, 3], 'ANSI31', 45, 2)
+%! geom.hatchlines ([0, 0; 1, 1; 2, 2; NaN, 3], 'Angle', 45, 'Spacing', 2)

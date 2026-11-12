@@ -170,7 +170,7 @@ endfunction
 %!
 %! t = linspace (0, 2*pi, 361)(1:360)';
 %! P = (30 + 4 * cos (7 * t)) .* [cos(t), sin(t)];
-%! pts = geom.resample (P, 10, true);
+%! pts = geom.resample (P, 10, 'Closed', true);
 %!
 %! D = draw.Drawing ().polyline (geom.Polyline (P, 'Closed', true));
 %! D.Colour = 'red';

@@ -2,7 +2,7 @@
 # name: cache
 # type: cell
 # rows: 3
-# columns: 246
+# columns: 248
 # name: <cell-element>
 # type: sq_string
 # elements: 1
@@ -2445,6 +2445,35 @@ Closed flag
 # name: <cell-element>
 # type: sq_string
 # elements: 1
+# length: 16
+geom.Path.Labels
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 336
+geom.Path: property Labels
+Labels of the segments
+
+A row cell array with the label of each segment, the segment leaving
+vertex i at element i, '' for a segment left
+unnamed; empty when the path has no labels. The labels are given with
+'Label' when the path is made, and name the faces a solid made
+from the path takes from each segment.
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 22
+Labels of the segments
+
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
 # length: 19
 geom.Path.Midpoints
 
@@ -2480,7 +2509,7 @@ geom.Path.Path
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1105
+# length: 1572
 geom.Path: P = geom.Path (V)
 geom.Path: P = geom.Path (V, Name, Value, ...)
 geom.Path: P = geom.Path (PL)
@@ -2501,15 +2530,23 @@ end; a repeat is accepted and dropped.
 'UCS'
 The geom.UCS the points are coordinates in, the world coordinate
 system by default.
+'Label'
+A cell array with a label for each segment, in the order the points are
+written: the segment from the first to the second, and so on, and for a
+closed one, last the segment back to the first. Each label is a valid
+Octave identifier or keyword, or '' for a segment left unnamed. A
+solid made from it names the face each segment makes by its label, as
+rib.side.web; see solid.extrude.
 
 P = geom.Path (PL) makes the path of the
 geom.Polyline PL, in its UCS, open or closed as PL
-is, with its arcs kept exact.
+is, with its arcs kept exact and its labels kept.
 
 P = geom.Path (SP) makes the path of one segment
 along the geom.Spline SP, in its UCS. A closed spline
 makes a closed path of one vertex, its first point, the spline running
-from it round and back.
+from it round and back. geom.Path (SP, 'Label',
+{L}) labels that one segment L.
 
 ## The centre line of a tube bent twice, with bends of radius 15
 P = geom.Path ([0, 0, 0; 0, 0, 100; 80, 0, 100; 80, 60, 100]);
@@ -2706,11 +2743,12 @@ geom.Path.chamfer
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1115
+# length: 1382
 geom.Path: P = chamfer (P, D)
 geom.Path: P = chamfer (P, [D1, D2])
 geom.Path: P = chamfer (..., IDX)
 geom.Path: P = chamfer (..., 'Angle', A)
+geom.Path: P = chamfer (..., 'Label', L)
 Cut the corners of a path.
 
 P = chamfer (P, D) cuts every corner where two
@@ -2735,6 +2773,11 @@ A cut that would run past the end of a segment, or into the cut or round
 of the next corner, or an angle at which the cut misses the segment
 after the corner, is refused.
 
+The option 'Label' names the straight cut each corner becomes, a
+valid Octave identifier or keyword; without it the cut is unnamed. The
+segments of P keep their labels, a segment used up and dropped
+taking its label with it.
+
 See also:
 geom.Path.fillet,
 geom.Polyline.chamfer
@@ -2758,9 +2801,10 @@ geom.Path.fillet
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 866
+# length: 1123
 geom.Path: P = fillet (P, RADIUS)
 geom.Path: P = fillet (P, RADIUS, IDX)
+geom.Path: P = fillet (..., 'Label', L)
 Round the corners of a path.
 
 P = fillet (P, RADIUS) rounds every corner
@@ -2777,6 +2821,11 @@ a corner between two straight segments.
 A radius too large for a corner, whose arc would run past the end of a
 segment or into the round of the next corner, is refused. Rounds that
 use up a segment between them meet, and the segment is dropped.
+
+The option 'Label' names the arc each corner becomes, a valid
+Octave identifier or keyword; without it the arc is unnamed. The
+segments of P keep their labels, a segment used up and dropped
+taking its label with it.
 
 See also:
 geom.Polyline.fillet
@@ -2800,7 +2849,7 @@ geom.Path.join
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1048
+# length: 1181
 geom.Path: P = join (P1, P2, ...)
 geom.Path: P = join (..., 'Tangent', TF)
 Put paths and splines end to end.
@@ -2824,6 +2873,9 @@ path may have a corner there.
 P = join (geom.Path ([0, 0, 0; 0, 0, 50]), ...
 geom.Path.arc ([0, 0, 50], [10, 0, 60], [20, 0, 50]), ...
 geom.Path ([20, 0, 50; 20, 0, 0]));
+
+The joined path keeps the labels of the segments of every piece, in
+order; the segments of a piece without labels are left unnamed.
 
 
 # name: <cell-element>
@@ -3001,6 +3053,35 @@ Closed flag
 # name: <cell-element>
 # type: sq_string
 # elements: 1
+# length: 20
+geom.Polyline.Labels
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 342
+geom.Polyline: property Labels
+Labels of the segments
+
+A row cell array with the label of each segment, the segment leaving
+vertex i at element i, '' for a segment left
+unnamed; empty when the polyline has no labels. The labels are given
+with 'Label' when the polyline is made, and name the faces a
+solid made from it takes from each segment.
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 22
+Labels of the segments
+
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
 # length: 22
 geom.Polyline.Polyline
 
@@ -3008,7 +3089,7 @@ geom.Polyline.Polyline
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 872
+# length: 1265
 geom.Polyline: PL = geom.Polyline (P)
 geom.Polyline: PL = geom.Polyline (P, Name, Value, ...)
 Make a polyline.
@@ -3029,6 +3110,13 @@ segment leaving its last vertex, so the bulge there must be zero.
 'UCS'
 The geom.UCS the vertices are coordinates in, the world
 xy plane by default.
+'Label'
+A cell array with a label for each segment, in the order the vertices are
+written: the segment from the first to the second, and so on, and for a
+closed one, last the segment back to the first. Each label is a valid
+Octave identifier or keyword, or '' for a segment left unnamed. A
+solid made from it names the face each segment makes by its label, as
+rib.side.web; see solid.extrude.
 
 ## A slot 40 between centres and 12 wide, as one closed polyline
 PL = geom.Polyline ([0, -6, 0; 40, -6, 1; 40, 6, 0; 0, 6, 1], ...
@@ -3106,11 +3194,12 @@ geom.Polyline.chamfer
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1372
+# length: 1645
 geom.Polyline: PL = chamfer (PL, D)
 geom.Polyline: PL = chamfer (PL, [D1, D2])
 geom.Polyline: PL = chamfer (..., IDX)
 geom.Polyline: PL = chamfer (..., 'Angle', A)
+geom.Polyline: PL = chamfer (..., 'Label', L)
 Cut the corners of a polyline.
 
 PL = chamfer (PL, D) cuts every corner where
@@ -3141,6 +3230,11 @@ after the corner, is refused.
 PL = geom.Polyline ([0, 0; 60, 0; 60, 40; 0, 40], 'Closed', true);
 PL = chamfer (PL, 5);
 
+The option 'Label' names the straight cut each corner becomes, a
+valid Octave identifier or keyword; without it the cut is unnamed. The
+segments of PL keep their labels, a segment used up and dropped
+taking its label with it.
+
 See also:
 geom.Polyline.fillet,
 geom.Region.chamfer
@@ -3164,9 +3258,10 @@ geom.Polyline.fillet
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 891
+# length: 1154
 geom.Polyline: PL = fillet (PL, RADIUS)
 geom.Polyline: PL = fillet (PL, RADIUS, IDX)
+geom.Polyline: PL = fillet (..., 'Label', L)
 Round the corners of a polyline.
 
 PL = fillet (PL, RADIUS) rounds every corner
@@ -3186,6 +3281,11 @@ segment or into the round of the next corner, is refused.
 ## A plate 60 by 40 with corners of radius 5
 PL = fillet (geom.Polyline ([0, 0; 60, 0; 60, 40; 0, 40], ...
 'Closed', true), 5);
+
+The option 'Label' names the arc each corner becomes, a valid
+Octave identifier or keyword; without it the arc is unnamed. The
+segments of PL keep their labels, a segment used up and dropped
+taking its label with it.
 
 See also:
 geom.Region.fillet
@@ -3373,9 +3473,10 @@ geom.Region.Region
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1230
+# length: 2633
 geom.Region: R = geom.Region (OUTLINE)
 geom.Region: R = geom.Region (OUTLINE, HOLES)
+geom.Region: R = geom.Region (..., 'Label', L)
 Make a region.
 
 R = geom.Region (OUTLINE) makes the area inside
@@ -3408,6 +3509,37 @@ R = geom.Region ([0, 0; 80, 0; 80, 50; 0, 50], {H});
 
 An invalid region is refused with an error naming the outline or hole at
 fault.
+
+The segments of a region can be labelled, so that a solid made from it
+names the face each segment makes, as rib.side.web; see
+solid.extrude. The labels of a loop are given where its
+vertices are written, one label for each segment in the order the
+vertices are written, '' for a segment left unnamed:
+
+an outline given as a matrix of vertices, or as a polyline, path or
+spline without labels, is labelled by 'Label', L: the
+segment from row 1 to row 2 first, and last the one back to row 1; a
+spline is one segment;
+
+an outline given as a geom.Polyline or geom.Path made
+with 'Label' keeps its labels, and 'Label' cannot be
+given to the region as well;
+
+a hole is labelled by giving it as a geom.Polyline or
+geom.Path made with 'Label'; 'Label' of the
+region never labels a hole.
+
+A loop the region turns round to store it keeps each label on the
+segment it was written for. The labels are read from the loops, as
+R.Outline.Labels. geom.Region.fillet and
+geom.Region.chamfer keep them; every other operation that
+reshapes a region refuses one with labels.
+
+## An angle section with a keyway, its inside corner and keyway named
+key = geom.Polyline ([18, 1; 22, 1; 22, 3; 18, 3], 'Closed', true, ...
+'Label', {'key_floor', '', 'key_top', ''});
+R = geom.Region ([0, 0; 40, 0; 40, 5; 5, 5; 5, 30; 0, 30], {key}, ...
+'Label', {'', '', '', 'inside', '', ''});
 
 
 # name: <cell-element>
@@ -3456,10 +3588,11 @@ geom.Region.chamfer
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 648
+# length: 793
 geom.Region: R = chamfer (R, D)
 geom.Region: R = chamfer (R, [D1, D2])
 geom.Region: R = chamfer (R, D, 'Angle', A)
+geom.Region: R = chamfer (..., 'Label', L)
 Cut the corners of a region.
 
 R = chamfer (R, D) cuts every corner of the
@@ -3469,7 +3602,8 @@ does. Two distances or a distance and an angle are taken as there,
 before and after each corner in the order the region stores its
 vertices: anticlockwise round the outline, clockwise round the holes.
 To cut only some corners, cut the outline or a hole as a path and make
-the region again.
+the region again. The option 'Label' names every cut, on the
+outline and in the holes alike, as geom.Path.chamfer does.
 
 See also:
 geom.Path.chamfer,
@@ -3529,8 +3663,9 @@ geom.Region.fillet
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 884
+# length: 1062
 geom.Region: R = fillet (R, RADIUS)
+geom.Region: R = fillet (..., 'Label', L)
 Round the corners of a region.
 
 R = fillet (R, RADIUS) rounds every corner of
@@ -3548,6 +3683,10 @@ outline or a hole as a path and make the region again.
 R = geom.Region ([0, 0; 60, 0; 60, 40; 0, 40], ...
 {[20, 15; 40, 15; 40, 25; 20, 25]});
 S = solid.extrude (fillet (R, 1), 6);
+
+The option 'Label' names every arc L, on the outline and
+in the holes alike, as geom.Path.fillet does; the segments keep
+their labels.
 
 See also:
 geom.Path.fillet
@@ -3571,10 +3710,9 @@ geom.Region.fit
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 2459
+# length: 2415
 geom.Region: R = fit (R)
-geom.Region: R = fit (R, MODE)
-geom.Region: R = fit (..., Name, Value, ...)
+geom.Region: R = fit (R, Name, Value, ...)
 Fit lines, arcs and splines to a faceted region.
 
 R = fit (R) replaces the straight segments of the
@@ -3586,14 +3724,14 @@ its bore a circle, its fillets arcs. Where two pieces meet without a
 corner they meet tangentially. Arcs and splines already in R are
 kept, and the straight segments between them fitted.
 
-MODE chooses what the fit may use: 'lines', lines only;
-'arcs', lines and arcs, the default; or 'curves',
-lines, arcs that turn at least 60 degrees, lines at least a fiftieth of
-the region's size, and smooth cubic splines for the stretches between
-them, the shape of a free-form part.
-
 Name/Value pairs:
 
+'Segments'
+What the fit may use: 'lines', lines only; 'arcs',
+lines and arcs, the default; or 'curves', lines, arcs that turn
+at least 60 degrees, lines at least a fiftieth of the region's size,
+and smooth cubic splines for the stretches between them, the shape of a
+free-form part.
 'AbsTol'
 The furthest, in millimetres, the fit may stray from the segments it
 replaces, and they from it.
@@ -3623,7 +3761,7 @@ returned as it was when it never passes.
 ## A slice of a scanned part, its bore a circle again
 M = polymesh.read ('part.stl');
 R = section (M, geom.UCS ([0, 0, 1], [0, 0, 5]));
-R = fit (R{1}, 'arcs', 'AbsTol', 0.01);
+R = fit (R{1}, 'AbsTol', 0.01);
 
 See also:
 polymesh.Mesh.section,
@@ -5066,9 +5204,9 @@ geom.arclength
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 933
+# length: 932
 drafting: L = geom.arclength (P)
-drafting: L = geom.arclength (P, CLOSED)
+drafting: L = geom.arclength (P, 'Closed', CLOSED)
 drafting: [L, S] = geom.arclength (...)
 Length along a sampled curve.
 
@@ -5076,9 +5214,9 @@ L = geom.arclength (P) returns the total length of the
 polyline whose points are the rows of the N-by-2 matrix P, in
 the units of P.
 
-L = geom.arclength (P, CLOSED) adds the closing
-segment from the last point back to the first when CLOSED is true.
-CLOSED defaults to false.
+The option 'Closed' adds the closing segment from the last point
+back to the first when CLOSED is true. CLOSED defaults to
+false.
 
 [L, S] = geom.arclength (...) also returns the
 cumulative length at each point, starting at zero, which is what a caller
@@ -5195,9 +5333,9 @@ geom.curvature
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1666
+# length: 1665
 drafting: K = geom.curvature (P)
-drafting: K = geom.curvature (P, CLOSED)
+drafting: K = geom.curvature (P, 'Closed', CLOSED)
 drafting: [K, R] = geom.curvature (...)
 Signed curvature of a sampled planar curve.
 
@@ -5207,10 +5345,9 @@ P. K is an N-by-1 vector in reciprocal units of P,
 so with the package convention of millimetres it is in reciprocal
 millimetres.
 
-K = geom.curvature (P, CLOSED) treats the curve as
-closed when CLOSED is true, joining the last point to the first. An
-explicitly repeated closing point is accepted and ignored. CLOSED
-defaults to false.
+The option 'Closed' treats the curve as closed when CLOSED is
+true, joining the last point to the first. An explicitly repeated closing
+point is accepted and ignored. CLOSED defaults to false.
 
 [K, R] = geom.curvature (...) additionally returns the
 signed radius of curvature R, which is 1 ./ K. A straight
@@ -5255,9 +5392,9 @@ geom.curveoffset
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 4006
+# length: 4000
 drafting: Q = geom.curveoffset (P, D)
-drafting: Q = geom.curveoffset (P, D, CLOSED)
+drafting: Q = geom.curveoffset (P, D, 'Closed', CLOSED)
 drafting: [Q, MARGIN] = geom.curveoffset (...)
 Equidistant offset of a smooth sampled curve.
 
@@ -5268,8 +5405,8 @@ point of a closed curve that repeats the first, which is dropped. P
 is an N-by-2 matrix of points and D is a real scalar in the
 units of P, so millimetres by package convention.
 
-Q = geom.curveoffset (P, D, CLOSED) treats the
-curve as closed when CLOSED is true. CLOSED defaults to false.
+The option 'Closed' treats the curve as closed when CLOSED is
+true. CLOSED defaults to false.
 
 A positive D offsets inward on a closed curve, shrinking it,
 whichever way round its points run; on an open curve, which has no inside, a
@@ -5354,25 +5491,25 @@ geom.curvesample
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1998
-drafting: P = geom.curvesample (FCN, TRANGE, TOL)
-drafting: P = geom.curvesample (FCN, TRANGE, TOL, MAXPTS)
+# length: 1996
+drafting: P = geom.curvesample (FCN, TSPAN, TOL)
+drafting: P = geom.curvesample (FCN, TSPAN, TOL, 'MaxPoints', MAXPTS)
 drafting: [P, T] = geom.curvesample (...)
 Sample a parametric curve to a stated chordal tolerance.
 
-P = geom.curvesample (FCN, TRANGE, TOL)
+P = geom.curvesample (FCN, TSPAN, TOL)
 returns points on the curve FCN over the parameter interval
-TRANGE, placed so that the straight chord between consecutive points
+TSPAN, placed so that the straight chord between consecutive points
 never departs from the true curve by more than TOL.
 
 FCN is a function handle taking a column vector of parameter values and
 returning an N-by-2 matrix, one row of coordinates per value.
-TRANGE is a two-element increasing vector [T0, T1].
+TSPAN is a two-element increasing vector [T0, T1].
 TOL is a positive scalar in the units of the curve, so millimetres by
 package convention.
 
-P = geom.curvesample (..., MAXPTS) caps the number of
-points; exceeding it raises an error rather than refining without end.
+The option 'MaxPoints' caps the number of points at MAXPTS;
+exceeding it raises an error rather than refining without end.
 MAXPTS defaults to 100000.
 
 [P, T] = geom.curvesample (...) additionally returns
@@ -5391,9 +5528,9 @@ until every interval passes. The interval is seeded uniformly, which keeps a
 symmetric curve from terminating early on a midpoint that happens to fall on
 its own chord.
 
-The curve is sampled, not closed. A closed curve is obtained by giving a
-TRANGE spanning one full period; the first and last points then
-coincide, and callers that want an implicitly closed ring drop the last.
+The curve is sampled, not closed. A closed curve is obtained by setting
+TSPAN to one full period; the first and last points then coincide,
+and callers that want an implicitly closed ring drop the last.
 
 See also:
 geom.curvature,
@@ -5487,10 +5624,9 @@ geom.hatchlines
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 2321
+# length: 2316
 drafting: S = geom.hatchlines (P)
-drafting: S = geom.hatchlines (P, PATTERN)
-drafting: S = geom.hatchlines (P, PATTERN, ANGLE, SPACING)
+drafting: S = geom.hatchlines (P, Name, Value, ...)
 drafting: NAMES = geom.hatchlines ()
 The line segments that fill a boundary with a hatch pattern.
 
@@ -5498,10 +5634,16 @@ S = geom.hatchlines (P) returns the segments that hatch
 the polygon P with the default pattern, as an N-by-4 matrix
 whose rows are [x1, y1, x2, y2].
 
-S = geom.hatchlines (P, PATTERN, ANGLE,
-SPACING) chooses the pattern, rotates it by ANGLE degrees and
-sets the perpendicular distance between lines to SPACING millimetres.
-ANGLE defaults to zero and SPACING to the pattern's own.
+Name/Value pairs:
+
+'Pattern'
+The name of the pattern, from the table below, 'ANSI31' by
+default.
+'Angle'
+The angle in degrees by which the pattern is rotated, zero by default.
+'Spacing'
+The perpendicular distance between lines, in millimetres, the pattern's
+own by default.
 
 NAMES = geom.hatchlines () lists the patterns defined.
 
@@ -5729,9 +5871,9 @@ geom.isrectilinear
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1188
+# length: 1189
 drafting: TF = geom.isrectilinear (P)
-drafting: TF = geom.isrectilinear (P, TOL)
+drafting: TF = geom.isrectilinear (P, 'Tolerance', TOL)
 True when every edge of a polygon is parallel to an axis.
 
 TF = geom.isrectilinear (P) returns true when every
@@ -5739,10 +5881,10 @@ edge of the polygon P runs parallel to either the x or the
 y axis, and false otherwise. The polygon is implicitly closed,
 so the edge joining the last vertex to the first is tested as well.
 
-TF = geom.isrectilinear (P, TOL) uses TOL as
-the absolute tolerance, in the units of P, on the off-axis component of
-each edge. TOL defaults to 1e-6, that is one micrometre at the
-package's millimetre convention. The default is deliberately looser than
+The option 'Tolerance' sets TOL, the absolute tolerance, in
+the units of P, on the off-axis component of each edge. TOL
+defaults to 1e-6, that is one micrometre at the package's millimetre
+convention. The default is deliberately looser than
 machine precision: coordinates that have been through a rotation, or that
 arrive from a CAD package, carry accumulated rounding that an exact test
 would reject.
@@ -5779,9 +5921,9 @@ geom.largestrect
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1950
+# length: 1937
 drafting: R = geom.largestrect (P)
-drafting: R = geom.largestrect (P, MARGINS)
+drafting: R = geom.largestrect (P, 'Margins', MARGINS)
 drafting: [R, B] = geom.largestrect (...)
 Largest axis-aligned rectangle inscribed in a rectilinear polygon.
 
@@ -5790,9 +5932,9 @@ axis-aligned rectangle that fits inside the polygon P, as a 4-by-2
 matrix of vertices wound counter-clockwise starting from the lower-left
 corner.
 
-R = geom.largestrect (P, MARGINS) additionally
-keeps the rectangle clear of every wall of P by the given
-margins, the face of a notch included and not merely the bounding box.
+The option 'Margins' keeps the rectangle clear of every wall
+of P by the margins MARGINS, the face of a notch included and
+not merely the bounding box.
 MARGINS is a scalar applied to all four sides, or the 1-by-4 vector
 [left, bottom, right, top] naming them
 individually, in the units of P. All values must be non-negative and
@@ -6017,10 +6159,10 @@ geom.resample
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 2296
+# length: 2333
 drafting: Q = geom.resample (P, N)
-drafting: Q = geom.resample (P, 'spacing', D)
-drafting: Q = geom.resample (..., CLOSED)
+drafting: Q = geom.resample (P, 'Spacing', D)
+drafting: Q = geom.resample (..., 'Closed', CLOSED)
 drafting: [Q, S] = geom.resample (...)
 Respace the points of a curve evenly along its length.
 
@@ -6028,13 +6170,14 @@ Q = geom.resample (P, N) returns N points
 spaced equally along the polyline P, the first at its start and the
 last at its end.
 
-Q = geom.resample (P, 'spacing', D) spaces
-them D apart instead, taking as many as fit. The last point lands at
+Q = geom.resample (P, 'Spacing', D) spaces them
+D apart instead, taking as many as fit. The last point lands at
 the end of the curve whatever the remainder, so the final gap may be shorter
 than D; a curve is not lengthened to make the arithmetic tidy.
 
-Adding CLOSED as a final true argument treats the curve as closed, in
-which case the returned points do not repeat the first.
+The option 'Closed' treats the curve as closed when CLOSED is
+true, in which case the returned points do not repeat the first.
+CLOSED defaults to false.
 
 [Q, S] = geom.resample (...) also returns the distance
 along the curve at which each point was taken.
@@ -6091,9 +6234,9 @@ geom.selfintersects
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1837
+# length: 1830
 drafting: TF = geom.selfintersects (P)
-drafting: TF = geom.selfintersects (P, CLOSED)
+drafting: TF = geom.selfintersects (P, 'Closed', CLOSED)
 drafting: [TF, IDX] = geom.selfintersects (...)
 Test whether a sampled curve crosses itself.
 
@@ -6101,9 +6244,9 @@ TF = geom.selfintersects (P) returns true when any two
 non-adjacent segments of the curve P intersect, and false otherwise.
 P is an N-by-2 matrix of points.
 
-TF = geom.selfintersects (P, CLOSED) treats the
-curve as closed when CLOSED is true, adding the segment from the last
-point back to the first. CLOSED defaults to false.
+The option 'Closed' treats the curve as closed when CLOSED is
+true, adding the segment from the last point back to the first.
+CLOSED defaults to false.
 
 [TF, IDX] = geom.selfintersects (...) additionally
 returns the offending segment pairs as an M-by-2 matrix of segment

@@ -650,7 +650,7 @@ classdef Path
     ## @var{D1} along the segment before each corner and @var{D2} along the
     ## segment after it, before and after in the order of the vertices.
     ##
-    ## @code{@var{P} = chamfer (@var{P}, @var{D}, @qcode{'Angle'}, @var{A})}
+    ## @code{@var{P} = chamfer (@var{P}, @var{D}, 'Angle', @var{A})}
     ## cuts back @var{D} along the segment before each corner, with the cut at
     ## @var{A} degrees to that segment.
     ##

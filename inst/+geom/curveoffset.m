@@ -17,7 +17,7 @@
 
 ## -*- texinfo -*-
 ## @deftypefn  {drafting} {@var{Q} =} geom.curveoffset (@var{P}, @var{D})
-## @deftypefnx {drafting} {@var{Q} =} geom.curveoffset (@var{P}, @var{D}, @var{CLOSED})
+## @deftypefnx {drafting} {@var{Q} =} geom.curveoffset (@var{P}, @var{D}, @qcode{'Closed'}, @var{CLOSED})
 ## @deftypefnx {drafting} {[@var{Q}, @var{MARGIN}] =} geom.curveoffset (@dots{})
 ##
 ## Equidistant offset of a smooth sampled curve.
@@ -29,8 +29,8 @@
 ## is an @math{N}-by-2 matrix of points and @var{D} is a real scalar in the
 ## units of @var{P}, so millimetres by package convention.
 ##
-## @code{@var{Q} = geom.curveoffset (@var{P}, @var{D}, @var{CLOSED})} treats the
-## curve as closed when @var{CLOSED} is true.  @var{CLOSED} defaults to false.
+## The option @qcode{'Closed'} treats the curve as closed when @var{CLOSED} is
+## true.  @var{CLOSED} defaults to false.
 ##
 ## A positive @var{D} offsets @strong{inward} on a closed curve, shrinking it,
 ## whichever way round its points run; on an open curve, which has no inside, a
@@ -94,17 +94,33 @@
 ## @seealso{geom.curvature, geom.selfintersects, geom.offset}
 ## @end deftypefn
 
-function [Q, MARGIN] = curveoffset (P, D, CLOSED = false)
+function [Q, MARGIN] = curveoffset (P, D, varargin)
 
   ## Input validation
-  if (nargin < 2 || nargin > 3)
+  if (nargin < 2)
     error ("geom.curveoffset: invalid number of input arguments.");
   endif
   if (! isfloat (D) || ! isreal (D) || ! isscalar (D) || ! isfinite (D))
     error ("geom.curveoffset: D must be a real finite scalar.");
   endif
+  if (mod (numel (varargin), 2) != 0)
+    error ("geom.curveoffset: Name/Value arguments must come in pairs.");
+  endif
+  CLOSED = false;
+  for ii = 1:2:numel (varargin)
+    name = varargin{ii};
+    if (! ischar (name) || ! isrow (name))
+      error ("geom.curveoffset: option names must be character vectors.");
+    endif
+    switch (lower (name))
+      case 'closed'
+        CLOSED = varargin{ii+1};
+      otherwise
+        error ("geom.curveoffset: unknown option '%s'.", name);
+    endswitch
+  endfor
   if (! islogical (CLOSED) || ! isscalar (CLOSED))
-    error ("geom.curveoffset: CLOSED must be true or false.");
+    error ("geom.curveoffset: Closed must be true or false.");
   endif
   CLOSED = logical (CLOSED);
   [errmsg, P] = geom.__checkcurve__ (P, CLOSED);
@@ -157,7 +173,7 @@ function [Q, MARGIN] = curveoffset (P, D, CLOSED = false)
 
   ## Curvature measured on the side offset towards: the side of N, or the
   ## other side for a negative D
-  K = s * sign (D + (D == 0)) * geom.curvature (P, CLOSED);
+  K = s * sign (D + (D == 0)) * geom.curvature (P, 'Closed', CLOSED);
   turning = K(isfinite (K) & K > 0);
   if (isempty (turning))
     RLIM = Inf;
@@ -195,10 +211,10 @@ endfunction
 %!
 %! D = draw.Drawing ().polyline (geom.Polyline (P, 'Closed', true));
 %! D.Colour = 'red';
-%! D = D.polyline (geom.Polyline (geom.curveoffset (P, 4, true), ...
+%! D = D.polyline (geom.Polyline (geom.curveoffset (P, 4, 'Closed', true), ...
 %!                                'Closed', true));
 %! D.Colour = 'blue';
-%! D = D.polyline (geom.Polyline (geom.curveoffset (P, -4, true), ...
+%! D = D.polyline (geom.Polyline (geom.curveoffset (P, -4, 'Closed', true), ...
 %!                                'Closed', true));
 %! plot (D);
 %! title ('a lobed profile offset 4 mm in (red) and out (blue)');
@@ -210,40 +226,40 @@ endfunction
 %!
 %! t = linspace (0, 2*pi, 241)(1:240)';
 %! P = (30 + 4 * cos (7 * t)) .* [cos(t), sin(t)];
-%! [Q, MARGIN] = geom.curveoffset (P, 4, true);
+%! [Q, MARGIN] = geom.curveoffset (P, 4, 'Closed', true);
 %! printf ('4 mm in, with %.2f mm still in hand\n', MARGIN);
 %!
 %! try
-%!   geom.curveoffset (P, 4 + MARGIN + 1, true);
+%!   geom.curveoffset (P, 4 + MARGIN + 1, 'Closed', true);
 %! catch err
 %!   disp (err.message);
 %! end_try_catch
 
 %!test  # a circle offsets to a concentric circle
 %! t = linspace (0, 2*pi, 361)(1:360)';
-%! Q = geom.curveoffset (25 * [cos(t), sin(t)], 5, true);
+%! Q = geom.curveoffset (25 * [cos(t), sin(t)], 5, 'Closed', true);
 %! assert_equal (sqrt (sum (Q .^ 2, 2)), 20 * ones (360, 1), 1e-9);
 
 %!test  # a negative offset grows the circle
 %! t = linspace (0, 2*pi, 361)(1:360)';
-%! Q = geom.curveoffset (25 * [cos(t), sin(t)], -5, true);
+%! Q = geom.curveoffset (25 * [cos(t), sin(t)], -5, 'Closed', true);
 %! assert_equal (sqrt (sum (Q .^ 2, 2)), 30 * ones (360, 1), 1e-9);
 
 %!test  # inward is inward whichever way the points run
 %! t = linspace (0, 2*pi, 361)(1:360)';
-%! Qccw = geom.curveoffset (25 * [cos(t), sin(t)], 5, true);
-%! Qcw = geom.curveoffset (25 * [cos(-t), sin(-t)], 5, true);
+%! Qccw = geom.curveoffset (25 * [cos(t), sin(t)], 5, 'Closed', true);
+%! Qcw = geom.curveoffset (25 * [cos(-t), sin(-t)], 5, 'Closed', true);
 %! assert_equal (max (sqrt (sum (Qcw .^ 2, 2))), 20, 1e-9);
 %! assert_equal (max (sqrt (sum (Qccw .^ 2, 2))), 20, 1e-9);
 
 %!test  # zero offset is the identity
 %! t = linspace (0, 2*pi, 61)(1:60)';
 %! P = 25 * [cos(t), sin(t)];
-%! assert_equal (geom.curveoffset (P, 0, true), P, 1e-12);
+%! assert_equal (geom.curveoffset (P, 0, 'Closed', true), P, 1e-12);
 
 %!test  # the margin is what remains of the radius of curvature
 %! t = linspace (0, 2*pi, 361)(1:360)';
-%! [Q, MARGIN] = geom.curveoffset (25 * [cos(t), sin(t)], 5, true);
+%! [Q, MARGIN] = geom.curveoffset (25 * [cos(t), sin(t)], 5, 'Closed', true);
 %! assert_equal (MARGIN, 20, 1e-9);
 
 %!test  # a curve that never turns towards the offset has an infinite margin
@@ -256,19 +272,19 @@ endfunction
 
 %!test  # offset exactly to the centre of curvature is still admissible
 %! t = linspace (0, 2*pi, 361)(1:360)';
-%! Q = geom.curveoffset (25 * [cos(t), sin(t)], 25, true);
+%! Q = geom.curveoffset (25 * [cos(t), sin(t)], 25, 'Closed', true);
 %! assert_equal (max (abs (Q(:))) < 1e-9, true);
 
 %!test  # unevenly spaced points offset as accurately as evenly spaced ones
 %! d = repmat ([0.05; 0.15], 40, 1);
 %! t = cumsum (d) * 2*pi / sum (d);
-%! Q = geom.curveoffset (25 * [cos(t), sin(t)], 5, true);
+%! Q = geom.curveoffset (25 * [cos(t), sin(t)], 5, 'Closed', true);
 %! assert_equal (sqrt (sum (Q .^ 2, 2)), 20 * ones (80, 1), 1e-12);
 
 %!test  # a smooth non-circular closed curve keeps its point count
 %! t = linspace (0, 2*pi, 201)(1:200)';
 %! P = [(30 + 4 * cos (5 * t)) .* cos(t), (30 + 4 * cos (5 * t)) .* sin(t)];
-%! Q = geom.curveoffset (P, 1, true);
+%! Q = geom.curveoffset (P, 1, 'Closed', true);
 %! assert_equal (size (Q), [200, 2]);
 
 %!test  # a negative offset measures its margin on the right
@@ -280,17 +296,23 @@ endfunction
 %! geom.curveoffset ([0, 0; 1, 0; 1, 1])
 %!error<geom.curveoffset: D must be a real finite scalar.> ...
 %! geom.curveoffset ([0, 0; 1, 0; 1, 1], Inf)
-%!error<geom.curveoffset: CLOSED must be true or false.> ...
-%! geom.curveoffset ([0, 0; 1, 0; 1, 1], 1, [true, false])
-%!error<geom.curveoffset: CLOSED must be true or false.> ...
-%! geom.curveoffset ([0, 0; 1, 0; 1, 1], 1, 1)
+%!error<geom.curveoffset: Name/Value arguments must come in pairs.> ...
+%! geom.curveoffset ([0, 0; 1, 0; 1, 1], 1, true)
+%!error<geom.curveoffset: option names must be character vectors.> ...
+%! geom.curveoffset ([0, 0; 1, 0; 1, 1], 1, 1, true)
+%!error<geom.curveoffset: unknown option 'Close'.> ...
+%! geom.curveoffset ([0, 0; 1, 0; 1, 1], 1, 'Close', true)
+%!error<geom.curveoffset: Closed must be true or false.> ...
+%! geom.curveoffset ([0, 0; 1, 0; 1, 1], 1, 'Closed', [true, false])
+%!error<geom.curveoffset: Closed must be true or false.> ...
+%! geom.curveoffset ([0, 0; 1, 0; 1, 1], 1, 'Closed', 1)
 %!error<geom.curveoffset: P must be a curve with at least 3 points.> ...
 %! geom.curveoffset ([0, 0; 1, 1], 1)
 %!error<geom.curveoffset: P encloses no area, so it has no inside.> ...
-%! geom.curveoffset ([0, 0; 1, 0; 2, 0], 1, true)
+%! geom.curveoffset ([0, 0; 1, 0; 2, 0], 1, 'Closed', true)
 %!error<geom.curveoffset: D exceeds the radius of curvature by 5; the offset would fold through its own centre of curvature.> ...
 %! t = linspace (0, 2*pi, 361)(1:360)';
-%! geom.curveoffset (25 * [cos(t), sin(t)], 30, true)
+%! geom.curveoffset (25 * [cos(t), sin(t)], 30, 'Closed', true)
 %!error<geom.curveoffset: P must be a real floating-point matrix.> ...
 %! geom.curveoffset ({1, 2}, 1)
 %!error<geom.curveoffset: P must be an N-by-2 matrix of point coordinates.> ...

@@ -17,7 +17,7 @@
 
 ## -*- texinfo -*-
 ## @deftypefn  {drafting} {@var{TF} =} geom.isrectilinear (@var{P})
-## @deftypefnx {drafting} {@var{TF} =} geom.isrectilinear (@var{P}, @var{TOL})
+## @deftypefnx {drafting} {@var{TF} =} geom.isrectilinear (@var{P}, @qcode{'Tolerance'}, @var{TOL})
 ##
 ## True when every edge of a polygon is parallel to an axis.
 ##
@@ -26,10 +26,10 @@
 ## @math{y} axis, and @code{false} otherwise.  The polygon is implicitly closed,
 ## so the edge joining the last vertex to the first is tested as well.
 ##
-## @code{@var{TF} = geom.isrectilinear (@var{P}, @var{TOL})} uses @var{TOL} as
-## the absolute tolerance, in the units of @var{P}, on the off-axis component of
-## each edge.  @var{TOL} defaults to @code{1e-6}, that is one micrometre at the
-## package's millimetre convention.  The default is deliberately looser than
+## The option @qcode{'Tolerance'} sets @var{TOL}, the absolute tolerance, in
+## the units of @var{P}, on the off-axis component of each edge.  @var{TOL}
+## defaults to @code{1e-6}, that is one micrometre at the package's millimetre
+## convention.  The default is deliberately looser than
 ## machine precision: coordinates that have been through a rotation, or that
 ## arrive from a CAD package, carry accumulated rounding that an exact test
 ## would reject.
@@ -45,7 +45,7 @@
 ## @seealso{geom.offset, geom.largestrect, geom.signedarea}
 ## @end deftypefn
 
-function TF = isrectilinear (P, TOL = 1e-6)
+function TF = isrectilinear (P, varargin)
 
   ## Input validation
   if (nargin < 1)
@@ -55,9 +55,25 @@ function TF = isrectilinear (P, TOL = 1e-6)
   if (! isempty (errmsg))
     error ("geom.isrectilinear: %s", errmsg);
   endif
+  if (mod (numel (varargin), 2) != 0)
+    error ("geom.isrectilinear: Name/Value arguments must come in pairs.");
+  endif
+  TOL = 1e-6;
+  for ii = 1:2:numel (varargin)
+    name = varargin{ii};
+    if (! ischar (name) || ! isrow (name))
+      error ("geom.isrectilinear: option names must be character vectors.");
+    endif
+    switch (lower (name))
+      case 'tolerance'
+        TOL = varargin{ii+1};
+      otherwise
+        error ("geom.isrectilinear: unknown option '%s'.", name);
+    endswitch
+  endfor
   if (! isfloat (TOL) || ! isreal (TOL) || ! isscalar (TOL)
       || ! isfinite (TOL) || TOL < 0)
-    error (strcat ("geom.isrectilinear: TOL must be a non-negative", ...
+    error (strcat ("geom.isrectilinear: Tolerance must be a non-negative", ...
                    " real finite scalar."));
   endif
 
@@ -82,8 +98,8 @@ endfunction
 %! ## carries rounding that an exact test would reject.
 %!
 %! P = [0, 0; 40, 1e-7; 40, 30; 0, 30];
-%! geom.isrectilinear (P)                 # default tolerance: still rectilinear
-%! geom.isrectilinear (P, 1e-12)          # exact: no longer
+%! geom.isrectilinear (P)                       # default: still rectilinear
+%! geom.isrectilinear (P, 'Tolerance', 1e-12)   # exact: no longer
 
 %!assert (geom.isrectilinear ([0, 0; 1, 0; 1, 1; 0, 1]), true)
 %!assert (geom.isrectilinear ([0, 0; 4, 0; 0, 3]), false)
@@ -106,12 +122,12 @@ endfunction
 
 %!test  # but not under an exact tolerance
 %! P = [0, 0; 1600, 1e-9; 1600, 1800; 0, 1800];
-%! assert_equal (geom.isrectilinear (P, 0), false);
+%! assert_equal (geom.isrectilinear (P, 'Tolerance', 0), false);
 
 %!test  # a generous tolerance accepts a genuinely skewed edge
 %! P = [0, 0; 1600, 5; 1600, 1800; 0, 1800];
 %! assert_equal (geom.isrectilinear (P), false);
-%! assert_equal (geom.isrectilinear (P, 10), true);
+%! assert_equal (geom.isrectilinear (P, 'Tolerance', 10), true);
 
 %!test  # a zero-length edge is not a disqualification
 %! P = [0, 0; 1, 0; 1, 0; 1, 1; 0, 1];
@@ -121,12 +137,18 @@ endfunction
 %! geom.isrectilinear ()
 %!error<geom.isrectilinear: P must be a polygon with at least 3 vertices.> ...
 %! geom.isrectilinear ([0, 0; 1, 1])
-%!error<geom.isrectilinear: TOL must be a non-negative real finite scalar.> ...
-%! geom.isrectilinear ([0, 0; 1, 0; 1, 1], -1)
-%!error<geom.isrectilinear: TOL must be a non-negative real finite scalar.> ...
-%! geom.isrectilinear ([0, 0; 1, 0; 1, 1], [1, 2])
-%!error<geom.isrectilinear: TOL must be a non-negative real finite scalar.> ...
-%! geom.isrectilinear ([0, 0; 1, 0; 1, 1], Inf)
+%!error<geom.isrectilinear: Name/Value arguments must come in pairs.> ...
+%! geom.isrectilinear ([0, 0; 1, 0; 1, 1], 1e-3)
+%!error<geom.isrectilinear: option names must be character vectors.> ...
+%! geom.isrectilinear ([0, 0; 1, 0; 1, 1], 1, 1e-3)
+%!error<geom.isrectilinear: unknown option 'Tol'.> ...
+%! geom.isrectilinear ([0, 0; 1, 0; 1, 1], 'Tol', 1e-3)
+%!error<geom.isrectilinear: Tolerance must be a non-negative real finite scalar.> ...
+%! geom.isrectilinear ([0, 0; 1, 0; 1, 1], 'Tolerance', -1)
+%!error<geom.isrectilinear: Tolerance must be a non-negative real finite scalar.> ...
+%! geom.isrectilinear ([0, 0; 1, 0; 1, 1], 'Tolerance', [1, 2])
+%!error<geom.isrectilinear: Tolerance must be a non-negative real finite scalar.> ...
+%! geom.isrectilinear ([0, 0; 1, 0; 1, 1], 'Tolerance', Inf)
 %!error<geom.isrectilinear: P must be a real floating-point matrix.> ...
 %! geom.isrectilinear ({1, 2})
 %!error<geom.isrectilinear: P must be an N-by-2 matrix of point coordinates.> ...

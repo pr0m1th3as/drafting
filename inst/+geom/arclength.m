@@ -17,7 +17,7 @@
 
 ## -*- texinfo -*-
 ## @deftypefn  {drafting} {@var{L} =} geom.arclength (@var{P})
-## @deftypefnx {drafting} {@var{L} =} geom.arclength (@var{P}, @var{CLOSED})
+## @deftypefnx {drafting} {@var{L} =} geom.arclength (@var{P}, @qcode{'Closed'}, @var{CLOSED})
 ## @deftypefnx {drafting} {[@var{L}, @var{S}] =} geom.arclength (@dots{})
 ##
 ## Length along a sampled curve.
@@ -26,9 +26,9 @@
 ## polyline whose points are the rows of the @math{N}-by-2 matrix @var{P}, in
 ## the units of @var{P}.
 ##
-## @code{@var{L} = geom.arclength (@var{P}, @var{CLOSED})} adds the closing
-## segment from the last point back to the first when @var{CLOSED} is true.
-## @var{CLOSED} defaults to false.
+## The option @qcode{'Closed'} adds the closing segment from the last point
+## back to the first when @var{CLOSED} is true.  @var{CLOSED} defaults to
+## false.
 ##
 ## @code{[@var{L}, @var{S}] = geom.arclength (@dots{})} also returns the
 ## cumulative length at each point, starting at zero, which is what a caller
@@ -42,14 +42,30 @@
 ## @seealso{geom.resample, geom.simplify, geom.curvesample}
 ## @end deftypefn
 
-function [L, S] = arclength (P, CLOSED = false)
+function [L, S] = arclength (P, varargin)
 
   ## Input validation
-  if (nargin < 1 || nargin > 2)
+  if (nargin < 1)
     error ("geom.arclength: invalid number of input arguments.");
   endif
+  if (mod (numel (varargin), 2) != 0)
+    error ("geom.arclength: Name/Value arguments must come in pairs.");
+  endif
+  CLOSED = false;
+  for ii = 1:2:numel (varargin)
+    name = varargin{ii};
+    if (! ischar (name) || ! isrow (name))
+      error ("geom.arclength: option names must be character vectors.");
+    endif
+    switch (lower (name))
+      case 'closed'
+        CLOSED = varargin{ii+1};
+      otherwise
+        error ("geom.arclength: unknown option '%s'.", name);
+    endswitch
+  endfor
   if (! islogical (CLOSED) || ! isscalar (CLOSED))
-    error ("geom.arclength: CLOSED must be true or false.");
+    error ("geom.arclength: Closed must be true or false.");
   endif
   CLOSED = logical (CLOSED);
   [errmsg, P] = geom.__checkpts__ (P);
@@ -77,7 +93,7 @@ endfunction
 %! [L, S] = geom.arclength (P)
 %!
 %! ## Closing the ring adds the segment back to the start
-%! geom.arclength (P, true)
+%! geom.arclength (P, 'Closed', true)
 
 %!demo
 %! ## The length is that of the polyline, not of the smooth curve it was
@@ -86,7 +102,8 @@ endfunction
 %! for n = [8, 60, 400]
 %!   t = linspace (0, 2*pi, n + 1)(1:n)';
 %!   printf ('%3d-sided polygon: %8.4f  (circle is %8.4f)\n', n, ...
-%!           geom.arclength (10 * [cos(t), sin(t)], true), 2 * pi * 10);
+%!           geom.arclength (10 * [cos(t), sin(t)], 'Closed', true), ...
+%!           2 * pi * 10);
 %! endfor
 
 %!test  # a straight run is its own length
@@ -96,10 +113,12 @@ endfunction
 %! assert_equal (geom.arclength ([0, 0; 3, 0; 3, 4]), 7, 1e-12);
 
 %!test  # closing adds the segment back to the start
-%! assert_equal (geom.arclength ([0, 0; 3, 0; 3, 4], true), 12, 1e-12);
+%! assert_equal (geom.arclength ([0, 0; 3, 0; 3, 4], 'Closed', true), ...
+%!               12, 1e-12);
 
 %!test  # the perimeter of a square
-%! assert_equal (geom.arclength ([0, 0; 5, 0; 5, 5; 0, 5], true), 20, 1e-12);
+%! assert_equal (geom.arclength ([0, 0; 5, 0; 5, 5; 0, 5], 'Closed', true), ...
+%!               20, 1e-12);
 
 %!test  # the cumulative length starts at zero and ends at the total
 %! [L, S] = geom.arclength ([0, 0; 3, 0; 3, 4]);
@@ -109,7 +128,7 @@ endfunction
 
 %!test  # a polygon approaches its circle's circumference from below
 %! t = linspace (0, 2*pi, 3601)(1:3600)';
-%! L = geom.arclength (10 * [cos(t), sin(t)], true);
+%! L = geom.arclength (10 * [cos(t), sin(t)], 'Closed', true);
 %! assert_equal (L < 2 * pi * 10, true);
 %! assert_equal (L, 2 * pi * 10, 1e-3);
 
@@ -122,10 +141,16 @@ endfunction
 %!error<geom.arclength: invalid number of input arguments.> geom.arclength ()
 %!error<geom.arclength: P must be an N-by-2 matrix of point coordinates.> ...
 %! geom.arclength ([1, 2, 3])
-%!error<geom.arclength: CLOSED must be true or false.> ...
-%! geom.arclength ([0, 0; 1, 1], [true, false])
-%!error<geom.arclength: CLOSED must be true or false.> ...
-%! geom.arclength ([0, 0; 1, 1], 1)
+%!error<geom.arclength: Name/Value arguments must come in pairs.> ...
+%! geom.arclength ([0, 0; 1, 1], true)
+%!error<geom.arclength: option names must be character vectors.> ...
+%! geom.arclength ([0, 0; 1, 1], 1, true)
+%!error<geom.arclength: unknown option 'Close'.> ...
+%! geom.arclength ([0, 0; 1, 1], 'Close', true)
+%!error<geom.arclength: Closed must be true or false.> ...
+%! geom.arclength ([0, 0; 1, 1], 'Closed', [true, false])
+%!error<geom.arclength: Closed must be true or false.> ...
+%! geom.arclength ([0, 0; 1, 1], 'Closed', 1)
 %!error<geom.arclength: P must not contain NaN or Inf values.> ...
 %! geom.arclength ([0, 0; Inf, 1])
 %!error<geom.arclength: P must be a real floating-point matrix.> ...

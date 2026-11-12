@@ -365,7 +365,7 @@ classdef Polyline
     ## @var{D1} along the segment before each corner and @var{D2} along the
     ## segment after it, before and after in the order of the vertices.
     ##
-    ## @code{@var{PL} = chamfer (@var{PL}, @var{D}, @qcode{'Angle'}, @var{A})}
+    ## @code{@var{PL} = chamfer (@var{PL}, @var{D}, 'Angle', @var{A})}
     ## cuts back @var{D} along the segment before each corner, with the cut at
     ## @var{A} degrees to that segment, so a square corner is cut @code{@var{D}
     ## x @var{A}}, reaching @code{@var{D} * tand (@var{A})} along the segment

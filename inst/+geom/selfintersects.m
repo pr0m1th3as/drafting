@@ -17,7 +17,7 @@
 
 ## -*- texinfo -*-
 ## @deftypefn  {drafting} {@var{TF} =} geom.selfintersects (@var{P})
-## @deftypefnx {drafting} {@var{TF} =} geom.selfintersects (@var{P}, @var{CLOSED})
+## @deftypefnx {drafting} {@var{TF} =} geom.selfintersects (@var{P}, @qcode{'Closed'}, @var{CLOSED})
 ## @deftypefnx {drafting} {[@var{TF}, @var{IDX}] =} geom.selfintersects (@dots{})
 ##
 ## Test whether a sampled curve crosses itself.
@@ -26,9 +26,9 @@
 ## non-adjacent segments of the curve @var{P} intersect, and false otherwise.
 ## @var{P} is an @math{N}-by-2 matrix of points.
 ##
-## @code{@var{TF} = geom.selfintersects (@var{P}, @var{CLOSED})} treats the
-## curve as closed when @var{CLOSED} is true, adding the segment from the last
-## point back to the first.  @var{CLOSED} defaults to false.
+## The option @qcode{'Closed'} treats the curve as closed when @var{CLOSED} is
+## true, adding the segment from the last point back to the first.
+## @var{CLOSED} defaults to false.
 ##
 ## @code{[@var{TF}, @var{IDX}] = geom.selfintersects (@dots{})} additionally
 ## returns the offending segment pairs as an @math{M}-by-2 matrix of segment
@@ -58,14 +58,30 @@
 ## @seealso{geom.curveoffset, geom.curvature, geom.signedarea}
 ## @end deftypefn
 
-function [TF, IDX] = selfintersects (P, CLOSED = false)
+function [TF, IDX] = selfintersects (P, varargin)
 
   ## Input validation
-  if (nargin < 1 || nargin > 2)
+  if (nargin < 1)
     error ("geom.selfintersects: invalid number of input arguments.");
   endif
+  if (mod (numel (varargin), 2) != 0)
+    error ("geom.selfintersects: Name/Value arguments must come in pairs.");
+  endif
+  CLOSED = false;
+  for ii = 1:2:numel (varargin)
+    name = varargin{ii};
+    if (! ischar (name) || ! isrow (name))
+      error ("geom.selfintersects: option names must be character vectors.");
+    endif
+    switch (lower (name))
+      case 'closed'
+        CLOSED = varargin{ii+1};
+      otherwise
+        error ("geom.selfintersects: unknown option '%s'.", name);
+    endswitch
+  endfor
   if (! islogical (CLOSED) || ! isscalar (CLOSED))
-    error ("geom.selfintersects: CLOSED must be true or false.");
+    error ("geom.selfintersects: Closed must be true or false.");
   endif
   CLOSED = logical (CLOSED);
   [errmsg, P] = geom.__checkcurve__ (P, CLOSED);
@@ -102,7 +118,7 @@ endfunction
 %! ## closed somewhere along its length; only a crossing test sees that.
 %!
 %! bowtie = [0, 0; 40, 40; 40, 0; 0, 40];
-%! [TF, IDX] = geom.selfintersects (bowtie, true)
+%! [TF, IDX] = geom.selfintersects (bowtie, 'Closed', true)
 %!
 %! D = draw.Drawing ().polyline (geom.Polyline (bowtie, 'Closed', true));
 %! plot (D);
@@ -113,30 +129,32 @@ endfunction
 %!
 %! t = linspace (0, 2*pi, 181)(1:180)';
 %! P = (30 + 4 * cos (5 * t)) .* [cos(t), sin(t)];
-%! geom.selfintersects (P, true)
+%! geom.selfintersects (P, 'Closed', true)
 
 %!test  # pieces of one straight edge, far apart in a fine sampling
 %! t = linspace (0, 1, 101)';
 %! P = [[2.0161 - 1.9 * t, 5 - 4.9786 * t]; 0.1, 0.02; 9, 0.02; 5.5, 10];
-%! assert_equal (geom.selfintersects (P, true), false);
+%! assert_equal (geom.selfintersects (P, 'Closed', true), false);
 
 %!test  # a convex polygon does not cross itself
-%! assert_equal (geom.selfintersects ([0, 0; 4, 0; 4, 3; 0, 3], true), false);
+%! assert_equal (geom.selfintersects ([0, 0; 4, 0; 4, 3; 0, 3], ...
+%!                                    'Closed', true), false);
 
 %!test  # a bow tie does
-%! assert_equal (geom.selfintersects ([0, 0; 4, 4; 4, 0; 0, 4], true), true);
+%! assert_equal (geom.selfintersects ([0, 0; 4, 4; 4, 0; 0, 4], ...
+%!                                    'Closed', true), true);
 
 %!test  # a circle is clean at fine sampling
 %! t = linspace (0, 2*pi, 361)(1:360)';
-%! assert_equal (geom.selfintersects ([cos(t), sin(t)], true), false);
+%! assert_equal (geom.selfintersects ([cos(t), sin(t)], 'Closed', true), false);
 
 %!test  # the crossing pair is reported
-%! [TF, IDX] = geom.selfintersects ([0, 0; 4, 4; 4, 0; 0, 4], true);
+%! [TF, IDX] = geom.selfintersects ([0, 0; 4, 4; 4, 0; 0, 4], 'Closed', true);
 %! assert_equal (TF, true);
 %! assert_equal (IDX, [1, 3]);
 
 %!test  # a clean curve reports no pairs
-%! [TF, IDX] = geom.selfintersects ([0, 0; 4, 0; 4, 3; 0, 3], true);
+%! [TF, IDX] = geom.selfintersects ([0, 0; 4, 0; 4, 3; 0, 3], 'Closed', true);
 %! assert_equal (TF, false);
 %! assert_equal (isempty (IDX), true);
 
@@ -147,10 +165,12 @@ endfunction
 %! assert_equal (geom.selfintersects ([0, 0; 4, 0; 2, 0; 2, 4]), true);
 
 %!test  # an L that only touches at shared ends is clean
-%! assert_equal (geom.selfintersects ([0, 0; 2, 0; 2, 2], false), false);
+%! assert_equal (geom.selfintersects ([0, 0; 2, 0; 2, 2], 'Closed', false), ...
+%!               false);
 
 %!test  # a closed curve whose first and last segments meet is clean
-%! assert_equal (geom.selfintersects ([0, 0; 1, 0; 1, 1; 0, 1], true), false);
+%! assert_equal (geom.selfintersects ([0, 0; 1, 0; 1, 1; 0, 1], ...
+%!                                    'Closed', true), false);
 
 %!test  # a curve returning to an earlier point is reported
 %! assert_equal (geom.selfintersects ([0, 0; 2, 0; 2, 2; 0, 2; 1, 0]), true);
@@ -160,8 +180,8 @@ endfunction
 %! assert_equal (IDX, [1, 4; 2, 4]);
 
 %!test  # a repeated point is passed over
-%! assert_equal (geom.selfintersects ([0, 0; 1, 0; 1, 0; 1, 1; 0, 1], true), ...
-%!               false);
+%! assert_equal (geom.selfintersects ([0, 0; 1, 0; 1, 0; 1, 1; 0, 1], ...
+%!                                    'Closed', true), false);
 
 %!test  # and the segments found are numbered as in P
 %! [~, IDX] = geom.selfintersects ([0, 0; 2, 2; 2, 2; 2, 0; 0, 2]);
@@ -169,10 +189,16 @@ endfunction
 
 %!error<geom.selfintersects: invalid number of input arguments.> ...
 %! geom.selfintersects ()
-%!error<geom.selfintersects: CLOSED must be true or false.> ...
-%! geom.selfintersects ([0, 0; 1, 0; 1, 1], [true, false])
-%!error<geom.selfintersects: CLOSED must be true or false.> ...
-%! geom.selfintersects ([0, 0; 1, 0; 1, 1], 1)
+%!error<geom.selfintersects: Name/Value arguments must come in pairs.> ...
+%! geom.selfintersects ([0, 0; 1, 0; 1, 1], true)
+%!error<geom.selfintersects: option names must be character vectors.> ...
+%! geom.selfintersects ([0, 0; 1, 0; 1, 1], 1, true)
+%!error<geom.selfintersects: unknown option 'Close'.> ...
+%! geom.selfintersects ([0, 0; 1, 0; 1, 1], 'Close', true)
+%!error<geom.selfintersects: Closed must be true or false.> ...
+%! geom.selfintersects ([0, 0; 1, 0; 1, 1], 'Closed', [true, false])
+%!error<geom.selfintersects: Closed must be true or false.> ...
+%! geom.selfintersects ([0, 0; 1, 0; 1, 1], 'Closed', 1)
 %!error<geom.selfintersects: P must be a curve with at least 3 points.> ...
 %! geom.selfintersects ([0, 0; 1, 1])
 %!error<geom.selfintersects: P must not contain NaN or Inf values.> ...

@@ -119,7 +119,7 @@ function Q = offset (P, D)
   ## collapses with every edge still running its own way
   DirNew = [Q(2:end,:); Q(1,:)] - Q;
   if (sign (geom.signedarea (Q)) != 1 || any (sum (DirNew .* Dir, 2) <= 0)
-      || geom.selfintersects (Q, true))
+      || geom.selfintersects (Q, 'Closed', true))
     error (strcat ("geom.offset: D is too large for P; the offset outline", ...
                    " would be degenerate."));
   endif
