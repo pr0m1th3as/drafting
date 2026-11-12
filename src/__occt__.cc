@@ -143,6 +143,7 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <NCollection_Array2.hxx>
 #include <GeomLib_IsPlanarSurface.hxx>
 #include <Geom2d_BSplineCurve.hxx>
+#include <Geom2d_Curve.hxx>
 #include <Geom2d_Line.hxx>
 #include <Geom2dAPI_InterCurveCurve.hxx>
 #include <Standard_Version.hxx>
@@ -1996,10 +1997,14 @@ polyhedron (const Matrix& V, const Matrix& F, bool merge, const string& caller)
 // point, the surface ripples near the edges of a fine grid.  With H1 or H2
 // positive it is a solid, the face thickened H1 along the normal and H2
 // against it, refused where the surface curves more tightly than the
-// thickness reaching that side.
+// thickness reaching that side.  The solid's faces are named in NAMES by the
+// label LABEL: start for the large face against the normal and end for the
+// one along it, imin and imax for the walls along the first and last row of
+// the grid, jmin and jmax along the first and last column.
 static TopoDS_Shape
 gridsurface (const Matrix& X, const Matrix& Y, const Matrix& Z, double h1,
-             double h2, const string& caller)
+             double h2, const string& caller, const string& label,
+             facetable& names)
 {
   const octave_idx_type m = X.rows ();
   const octave_idx_type n = X.columns ();
@@ -2083,6 +2088,57 @@ gridsurface (const Matrix& X, const Matrix& Y, const Matrix& Z, double h1,
   // Thickened along the normal, the solid comes out turned inwards
   TopoDS_Solid so = TopoDS::Solid (thick.Shape ());
   BRepLib::OrientClosedSolid (so);
+
+  // The face thickened is kept in the solid, against the normal when the
+  // thickness goes along it and along the normal otherwise.  Each wall
+  // shares one edge with it, and the edge lies on the first or last u, a
+  // column of the grid, or v, a row.
+  const TopoDS_Face b = TopoDS::Face (TopExp_Explorer (base, TopAbs_FACE)
+                                      .Current ());
+  double umin, umax, vmin, vmax;
+  BRepTools::UVBounds (b, umin, umax, vmin, vmax);
+  const double tol = 1e-7 * (std::abs (umax - umin) + std::abs (vmax - vmin));
+  ShapeListMap byedge;
+  TopExp::MapShapesAndAncestors (so, TopAbs_EDGE, TopAbs_FACE, byedge);
+  vector<pair<TopoDS_Shape, string>> walls;
+  for (TopExp_Explorer x (b, TopAbs_EDGE); x.More (); x.Next ())
+  {
+    double f, l;
+    const Handle (Geom2d_Curve) c
+      = BRep_Tool::CurveOnSurface (TopoDS::Edge (x.Current ()), b, f, l);
+    const gp_Pnt2d p = c->Value ((f + l) / 2);
+    const string side = std::abs (p.Y () - vmin) < tol ? "imin"
+                        : std::abs (p.Y () - vmax) < tol ? "imax"
+                        : std::abs (p.X () - umin) < tol ? "jmin" : "jmax";
+    const int k = byedge.FindIndex (x.Current ());
+    if (k > 0)
+    {
+      for (const TopoDS_Shape& g : byedge (k))
+      {
+        if (! g.IsSame (b))
+        {
+          walls.push_back ({g, side});
+        }
+      }
+    }
+  }
+  const string near = (h1 > 0 ? "start" : "end");
+  const string far = (h1 > 0 ? "end" : "start");
+  names = labelled (so, label, [&] (const TopoDS_Face& f)
+                    {
+                      if (f.IsSame (b))
+                      {
+                        return near;
+                      }
+                      for (const auto& w : walls)
+                      {
+                        if (w.first.IsSame (f))
+                        {
+                          return w.second;
+                        }
+                      }
+                      return far;
+                    });
   return so;
 }
 
@@ -6104,11 +6160,16 @@ function directly. \n\
     }
     else if (cmd == "surface")
     {
-      out = todata (gridsurface (args(2).matrix_value (),
-                                 args(3).matrix_value (),
-                                 args(4).matrix_value (),
-                                 args(5).double_value (),
-                                 args(6).double_value (), caller));
+      const string label = (args.length () > 7 ? args(7).string_value ()
+                                               : string ());
+      facetable names;
+      const TopoDS_Shape s = gridsurface (args(2).matrix_value (),
+                                          args(3).matrix_value (),
+                                          args(4).matrix_value (),
+                                          args(5).double_value (),
+                                          args(6).double_value (), caller,
+                                          label, names);
+      out = todata (s, names);
     }
     else if (cmd == "place")
     {

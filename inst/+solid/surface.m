@@ -16,7 +16,8 @@
 ## this program; if not, see <http://www.gnu.org/licenses/>.
 
 ## -*- texinfo -*-
-## @deftypefn {drafting} {@var{S} =} solid.surface (@var{X}, @var{Y}, @var{Z}, @var{H})
+## @deftypefn  {drafting} {@var{S} =} solid.surface (@var{X}, @var{Y}, @var{Z}, @var{H})
+## @deftypefnx {drafting} {@var{S} =} solid.surface (@dots{}, 'Label', @var{L})
 ##
 ## A solid made of a smooth surface through a grid of points.
 ##
@@ -59,6 +60,18 @@
 ## fit at a radius set by the spacing of the grid, and limits the thickness
 ## the same way.  The edges of the solid run square to the surface.
 ##
+## The option @qcode{'Label'} names the faces of the solid, so that a later
+## step finds a face by its name with @code{solid.Shape.faces}.  @var{L} is
+## an identifier, a letter followed by letters, digits or underscores.  The
+## two large faces are @var{L}@code{.start}, on the side against the
+## normal, and @var{L}@code{.end}, on the side along it, whichever way
+## @var{H} goes.  The narrow walls round the rim are named by the edge of
+## the grid they stand on, as the grid is indexed @code{@var{X}(@var{i},
+## @var{j})}: @var{L}@code{.imin} along its first row, @var{L}@code{.imax}
+## along its last, @var{L}@code{.jmin} along its first column and
+## @var{L}@code{.jmax} along its last, however fine the grid and however it
+## is turned.
+##
 ## @example
 ## @group
 ## ## A ripple 20 across, made a skin 1 thick centred on it
@@ -70,7 +83,7 @@
 ## @seealso{solid.polyhedron, solid.extrude, solid.Shape}
 ## @end deftypefn
 
-function S = surface (X, Y, Z, H)
+function S = surface (X, Y, Z, H, varargin)
 
   ## Input validation
   if (nargin < 4)
@@ -103,12 +116,37 @@ function S = surface (X, Y, Z, H)
                    " and last rows or columns meet."));
   endif
 
+  if (mod (numel (varargin), 2) != 0)
+    error ("solid.surface: Name/Value arguments must come in pairs.");
+  endif
+  label = '';
+  for ii = 1:2:numel (varargin)
+    name = varargin{ii};
+    val = varargin{ii+1};
+    if (! ischar (name) || ! isrow (name))
+      error ("solid.surface: option names must be character vectors.");
+    endif
+    switch (lower (name))
+      case 'label'
+        label = val;
+        if (! (ischar (val) && isrow (val)
+               && ! isempty (regexp (val, '^[A-Za-z]\w*$', 'once'))))
+          error (strcat ("solid.surface: Label must be an identifier: a", ...
+                         " letter followed by letters, digits or", ...
+                         " underscores."));
+        endif
+      otherwise
+        error ("solid.surface: unknown option '%s'.", name);
+    endswitch
+  endfor
+
   ## H1 along the normal and H2 against it
   H = double (H);
   if (isscalar (H))
     H = [max(H, 0), max(-H, 0)];
   endif
-  S = solid.Shape (__occt__ ('surface', 'solid.surface', X, Y, Z, H(1), H(2)));
+  S = solid.Shape (__occt__ ('surface', 'solid.surface', X, Y, Z, H(1), ...
+                             H(2), label));
 
 endfunction
 
@@ -160,6 +198,43 @@ endfunction
 %! S = solid.surface (X, Y, Z, [0.5, 0.5]);
 %! assert_equal (volume (S), asin (0.75) * (2.5 ^ 2 - 1.5 ^ 2) * 8, -1e-4);
 
+%!test  # the large faces start and end, whichever way H goes
+%! [X, Y, Z] = flat ();   # its faces splines, so found by place, not normal
+%! S = solid.surface (X, Y, Z, 1, 'Label', 'skin');
+%! assert_equal (faces (S, 'Label', 'skin.start'), ...
+%!               faces (S, 'Within', [0, 0, 0, 10, 8, 0]));
+%! assert_equal (faces (S, 'Label', 'skin.end'), ...
+%!               faces (S, 'Within', [0, 0, 1, 10, 8, 1]));
+%! S = solid.surface (X, Y, Z, -1, 'Label', 'skin');
+%! assert_equal (faces (S, 'Label', 'skin.start'), ...
+%!               faces (S, 'Within', [0, 0, -1, 10, 8, -1]));
+%! S = solid.surface (X, Y, Z, [0.2, 0.8], 'Label', 'skin');
+%! assert_equal (faces (S, 'Label', 'skin.end'), ...
+%!               faces (S, 'Within', [0, 0, 0.2, 10, 8, 0.2]));
+%!test  # the rim walls named by the row or column they stand on
+%! [X, Y, Z] = flat ();   # rows along y from 0 to 8, columns along x to 10
+%! S = solid.surface (X, Y, Z, 1, 'Label', 'skin');
+%! assert_equal (faces (S, 'Label', 'skin.imin'), ...
+%!               faces (S, 'Normal', [0, -1, 0]));
+%! assert_equal (faces (S, 'Label', 'skin.imax'), ...
+%!               faces (S, 'Normal', [0, 1, 0]));
+%! assert_equal (faces (S, 'Label', 'skin.jmin'), ...
+%!               faces (S, 'Normal', [-1, 0, 0]));
+%! assert_equal (faces (S, 'Label', 'skin.jmax'), ...
+%!               faces (S, 'Normal', [1, 0, 0]));
+%!test  # a transposed grid swaps rows and columns with the normal
+%! [X, Y, Z] = flat ();
+%! S = solid.surface (X', Y', Z', 1, 'Label', 'skin');
+%! assert_equal (faces (S, 'Label', 'skin.imin'), ...
+%!               faces (S, 'Normal', [-1, 0, 0]));
+%! assert_equal (faces (S, 'Label', 'skin.start'), ...
+%!               faces (S, 'Within', [0, 0, 0, 10, 8, 0]));
+%!test  # a curved skin thickened both ways
+%! [X, Y, Z] = arch ();
+%! S = solid.surface (X, Y, Z, [0.5, 0.5], 'Label', 'vault');
+%! assert_equal (numel (faces (S, 'Label', 'vault')), 6);
+%! assert_equal (numel (faces (S, 'Label', 'vault.imin')), 1);
+
 %!error<solid.surface: the surface curves more tightly than the thickness against its normal allows; its tightest radius on that side is 1.97.> ...
 %! [X, Y, Z] = arch ();
 %! solid.surface (X, Y, Z, -3)
@@ -168,6 +243,12 @@ endfunction
 %! solid.surface (X, Y, -Z, 3)
 %!error<solid.surface: invalid number of input arguments.> ...
 %! solid.surface ([0, 1; 0, 1], [0, 0; 1, 1], zeros (2))
+%!error<solid.surface: Name/Value arguments must come in pairs.> ...
+%! solid.surface ([0, 1; 0, 1], [0, 0; 1, 1], zeros (2), 1, 'Label')
+%!error<solid.surface: unknown option 'Closed'.> ...
+%! solid.surface ([0, 1; 0, 1], [0, 0; 1, 1], zeros (2), 1, 'Closed', true)
+%!error<solid.surface: Label must be an identifier: a letter followed by letters, digits or underscores.> ...
+%! solid.surface ([0, 1; 0, 1], [0, 0; 1, 1], zeros (2), 1, 'Label', 'a.b')
 %!error<solid.surface: X, Y and Z must be real finite matrices of one size, at least 2 by 2.> ...
 %! solid.surface ('ab', [0, 0; 1, 1], zeros (2), 1)
 %!error<solid.surface: X, Y and Z must be real finite matrices of one size, at least 2 by 2.> ...
