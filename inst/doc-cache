@@ -13,7 +13,7 @@ draw.Drawing
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 2279
+# length: 2289
 drafting: draw.Drawing
 A two-dimensional drawing in model space.
 
@@ -31,7 +31,7 @@ D = draw.Drawing ('plate');
 D.Layer = 'outline';
 D = D.polyline (geom.Polyline ([0, 0; 160, 0; 160, 180; 0, 180], ...
 'Closed', true));
-D = D.circle ([80, 90], 25).text ([0, -20], 'PLATE', 3.5);
+D = D.circle ([80, 90], 25).text ([0, -20], 'PLATE', 'Height', 3.5);
 
 New entities take the layer, line type, colour and line weight that are
 current when they are appended, exactly as a CAD application draws on its
@@ -336,14 +336,15 @@ draw.Drawing.angdim
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 664
+# length: 700
 draw.Drawing: D = angdim (D, V, P1, P2, RAD)
-draw.Drawing: D = angdim (..., LABEL)
+draw.Drawing: D = angdim (..., 'Text', S)
 Append an angular dimension at a vertex.
 
 V is the vertex, P1 and P2 points along the two arms,
-and RAD the radius at which the dimension arc is struck. The label
-is otherwise the measured angle and the degree symbol.
+and RAD the radius at which the dimension arc is struck. The
+option 'Text' gives the text S, which is otherwise the
+measured angle and the degree symbol.
 
 The angle measured is the one from the first arm to the second going
 counter-clockwise, so giving the arms the other way round dimensions the
@@ -569,15 +570,17 @@ draw.Drawing.diam
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 701
+# length: 768
 draw.Drawing: D = diam (D, C, R)
-draw.Drawing: D = diam (..., ANG, LABEL)
+draw.Drawing: D = diam (..., 'Angle', ANG)
+draw.Drawing: D = diam (..., 'Text', S)
 Append a diameter dimension across a circle.
 
-C is the centre and R the radius. ANG sets the
-direction the dimension line lies along, in degrees, and defaults to 45,
-which keeps it clear of the centre lines. LABEL overrides the
-text, which is otherwise the diameter symbol and the measured figure.
+C is the centre and R the radius. The option
+'Angle' sets ANG, the direction the dimension line lies
+along, in degrees, 45 by default, which keeps it clear of the centre
+lines. The option 'Text' gives the text S, which is
+otherwise the diameter symbol and the measured figure.
 
 A round feature is dimensioned by its diameter and never by its radius,
 because a diameter is what a bore gauge and a micrometer measure. A
@@ -609,10 +612,10 @@ draw.Drawing.dim
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1136
+# length: 1151
 draw.Drawing: D = dim (D, P1, P2, OFFSET)
-draw.Drawing: D = dim (D, P1, P2, OFFSET, DIRECTION)
-draw.Drawing: D = dim (D, P1, P2, OFFSET, DIRECTION, LABEL)
+draw.Drawing: D = dim (..., 'Direction', DIR)
+draw.Drawing: D = dim (..., 'Text', S)
 Append a dimension measuring between P1 and P2.
 
 OFFSET is the perpendicular distance in millimetres from the
@@ -620,8 +623,8 @@ measured points to the dimension line. Its sign selects which side the
 dimension line falls on: positive offsets lie to the left of the
 direction of travel from P1 to P2.
 
-DIRECTION selects what is being measured and defaults to
-'aligned':
+The option 'Direction' selects what is measured, DIR being
+one of these, 'aligned' by default:
 
 'aligned' --- the distance between the two points.
 'horizontal' --- the difference in x alone.
@@ -631,11 +634,12 @@ A horizontal dimension between two points at the same x, or a
 vertical one between two points at the same y, measures nothing
 and is an error.
 
-LABEL overrides the measured value with a literal string, for the
-cases every drawing eventually has --- a nominal size, a range, a note
-in place of a number. Without it the backend formats the measurement it
-computes. A dimension therefore carries no text of its own by default,
-which is precisely what keeps it truthful when the geometry changes.
+The option 'Text' overrides the measured value with the literal
+string S, for the cases every drawing eventually has --- a nominal
+size, a range, a note in place of a number. Without it the backend
+formats the measurement it computes. A dimension therefore carries no
+text of its own by default, which is precisely what keeps it truthful
+when the geometry changes.
 
 
 # name: <cell-element>
@@ -656,17 +660,17 @@ draw.Drawing.ellipse
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 658
+# length: 688
 draw.Drawing: D = ellipse (D, C, A, B)
-draw.Drawing: D = ellipse (D, C, A, B, ROT)
+draw.Drawing: D = ellipse (..., 'Rotation', ROT)
 Append ellipses centred at C with semi-axes A and B.
 
 C is an N-by-2 matrix in millimetres, one ellipse per row; zero
 rows append nothing. A, B and ROT are each one value
 for every ellipse or a vector of one per row.
 
-ROT turns the first axis away from horizontal, in degrees
-counter-clockwise, and defaults to zero.
+The option 'Rotation' turns the first axis away from horizontal
+by ROT, in degrees counter-clockwise, and defaults to zero.
 
 An ellipse is what a circle becomes when a round feature is seen
 obliquely, which is most of the time on an isometric or an auxiliary
@@ -749,10 +753,9 @@ draw.Drawing.hatch
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1093
+# length: 1158
 draw.Drawing: D = hatch (D, R)
-draw.Drawing: D = hatch (D, R, PATTERN)
-draw.Drawing: D = hatch (D, R, PATTERN, ANGLE, SPACING)
+draw.Drawing: D = hatch (D, R, Name, Value, ...)
 Append a hatched region.
 
 D = hatch (D, R) fills the geom.Region
@@ -766,11 +769,16 @@ R = geom.Region ([0, 0; 60, 0; 60, 40; 0, 40], ...
 {[20, 20, 1; 40, 20, 1]});
 D = draw.Drawing ().hatch (R);
 
-PATTERN names the fill and defaults to 'ANSI31', the
-45-degree hatch that means cut material; geom.hatchlines ()
-lists the names. ANGLE rotates the pattern, in degrees, and
-SPACING sets the line spacing in millimetres; the two are given
-together.
+Name/Value pairs:
+
+'Pattern'
+The name of the fill, 'ANSI31' by default, the 45-degree hatch
+that means cut material; geom.hatchlines () lists the names.
+'Angle'
+The angle in degrees by which the pattern is rotated, zero by default.
+'Spacing'
+The perpendicular distance between lines, in millimetres, the
+pattern's own by default, as geom.hatchlines draws it.
 
 A drawing is flat, so R must lie in its xy plane. Its
 geom.UCS may have its own origin and x axis there and may
@@ -801,15 +809,17 @@ draw.Drawing.insert
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 743
+# length: 831
 draw.Drawing: D = insert (D, NAME, POS)
-draw.Drawing: D = insert (..., ROT, SCALE)
+draw.Drawing: D = insert (..., 'Rotation', ROT)
+draw.Drawing: D = insert (..., 'Scale', SCALE)
 Place a defined block at a point.
 
 D = insert (D, NAME, POS) places the block
-NAME with its origin at POS. ROT rotates it, in
-degrees counter-clockwise, and SCALE scales it; both default to
-leaving it alone.
+NAME with its origin at POS. The option 'Rotation'
+rotates it by ROT, in degrees counter-clockwise, and
+'Scale' scales it by SCALE; both default to leaving it
+alone.
 
 An insert is a reference, not a copy. Twenty-five identical bores
 are one definition and twenty-five references, which is what a
@@ -1100,9 +1110,9 @@ draw.Drawing.ordinate
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1505
+# length: 1527
 draw.Drawing: D = ordinate (D, O, P, AXIS, L)
-draw.Drawing: D = ordinate (..., LABEL)
+draw.Drawing: D = ordinate (..., 'Text', S)
 Append an ordinate dimension, the distance of a point from a datum.
 
 O is the datum, P the feature dimensioned and AXIS
@@ -1120,8 +1130,8 @@ reads each position straight off the datum, and no error adds up along a
 chain of dimensions.
 
 The label is the distance, without sign, to a micron, measured each time
-the drawing is plotted or written, so it follows the geometry;
-LABEL gives literal text instead.
+the drawing is plotted or written, so it follows the geometry; the
+option 'Text' gives the literal text S instead.
 
 ## A plate with two holes, dimensioned from its lower left corner
 D = draw.Drawing ();
@@ -1421,7 +1431,7 @@ draw.Drawing.print
 # elements: 1
 # length: 3693
 draw.Drawing: print (D, FILE)
-draw.Drawing: print (D, FILE, NAME, VALUE, ...)
+draw.Drawing: print (D, FILE, Name, Value, ...)
 draw.Drawing: [PAPER, SCALE] = print (...)
 Plot a drawing onto paper at a stated scale.
 
@@ -1528,13 +1538,15 @@ draw.Drawing.radius
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 449
+# length: 504
 draw.Drawing: D = radius (D, C, R)
-draw.Drawing: D = radius (..., ANG, LABEL)
+draw.Drawing: D = radius (..., 'Angle', ANG)
+draw.Drawing: D = radius (..., 'Text', S)
 Append a radius dimension from a centre out to an arc.
 
-The arguments are those of diam, and ANG is the direction
-the leader runs in. The label is otherwise the letter R and the figure.
+The arguments and options are those of diam, and ANG is the
+direction the leader runs in. The text is otherwise the letter R and
+the figure.
 
 Use it for a fillet or any arc that is less than a full circle, where
 there is no diameter to measure across.
@@ -1649,10 +1661,10 @@ draw.Drawing.text
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 810
+# length: 873
 draw.Drawing: D = text (D, P, S)
-draw.Drawing: D = text (D, P, S, H)
-draw.Drawing: D = text (D, P, S, H, ROT)
+draw.Drawing: D = text (..., 'Height', H)
+draw.Drawing: D = text (..., 'Rotation', ROT)
 Append the single-line text S with its insertion point at P.
 
 P is an N-by-2 matrix in millimetres, one text per row; zero rows
@@ -1662,9 +1674,10 @@ or a vector of one per row:
 
 D = draw.Drawing ().text ([0, 0; 0, 10], {'A', 'B'});
 
-H is the cap height in millimetres and defaults to 2.5, the
-smallest of the ISO 3098 sizes and the usual height for notes on a
-drawing at 1:50. ROT rotates the text about its insertion
+The option 'Height' gives H, the cap height in millimetres,
+which defaults to 2.5, the smallest of the ISO 3098 sizes and the
+usual height for notes on a drawing at 1:50. The option
+'Rotation' rotates the text by ROT about its insertion
 point, in degrees counter-clockwise, and defaults to zero.
 
 The text is stored as given. No backend measures it, so a drawing knows
@@ -1691,7 +1704,7 @@ draw.Drawing.tikz
 # elements: 1
 # length: 2679
 draw.Drawing: S = tikz (D)
-draw.Drawing: S = tikz (D, NAME, VALUE, ...)
+draw.Drawing: S = tikz (D, Name, Value, ...)
 Render a drawing as a TikZ picture for inclusion in the LaTeX report.
 
 S = tikz (D) returns the TikZ code for the
@@ -5624,10 +5637,11 @@ geom.hatchlines
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 2316
+# length: 2675
 drafting: S = geom.hatchlines (P)
 drafting: S = geom.hatchlines (P, Name, Value, ...)
 drafting: NAMES = geom.hatchlines ()
+drafting: C = geom.hatchlines (NAME)
 The line segments that fill a boundary with a hatch pattern.
 
 S = geom.hatchlines (P) returns the segments that hatch
@@ -5646,6 +5660,12 @@ The perpendicular distance between lines, in millimetres, the pattern's
 own by default.
 
 NAMES = geom.hatchlines () lists the patterns defined.
+
+C = geom.hatchlines (NAME) returns the definition of the
+pattern NAME, matched regardless of case, as a 1-by-2 cell array
+{ANGLES, SPACING}: the angles of its line families in
+degrees and its own spacing in millimetres. An unknown name returns an
+empty 0-by-2 cell array, so the call also tests whether a pattern exists.
 
 Why this is a function and not a rendering detail
 

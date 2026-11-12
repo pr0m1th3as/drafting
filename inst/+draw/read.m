@@ -88,7 +88,7 @@ endfunction
 %!test  # a drawing comes back entity for entity
 %! D = draw.Drawing ('t');
 %! D = D.line ([0, 0], [10, 0]).circle ([5, 5], 2).arc ([0, 0], 3, 0, 90);
-%! D = D.text ([0, -5], 'NOTE', 2.5, 30).point ([1, 1]);
+%! D = D.text ([0, -5], 'NOTE', 'Height', 2.5, 'Rotation', 30).point ([1, 1]);
 %! unwind_protect
 %!   write (D, tmpf);
 %!   R = draw.read (tmpf);
@@ -131,7 +131,7 @@ endfunction
 
 %!test  # an ellipse comes back as an ellipse
 %! unwind_protect
-%!   write (draw.Drawing ().ellipse ([5, 5], 10, 4, 30), tmpf);
+%!   write (draw.Drawing ().ellipse ([5, 5], 10, 4, 'Rotation', 30), tmpf);
 %!   R = draw.read (tmpf);
 %!   assert_equal (R.Entities.type, 'ellipse');
 %!   assert_equal (R.Entities.radius, [10, 4], 1e-12);
@@ -141,7 +141,7 @@ endfunction
 %! end_unwind_protect
 
 %!test  # a dimension comes back as the dimension it was
-%! D = draw.Drawing ().dim ([0, 0], [100, 0], -15, 'horizontal');
+%! D = draw.Drawing ().dim ([0, 0], [100, 0], -15, 'Direction', 'horizontal');
 %! unwind_protect
 %!   write (D, tmpf);
 %!   R = draw.read (tmpf);
@@ -154,7 +154,8 @@ endfunction
 %! end_unwind_protect
 
 %!test  # each dimension family returns through its own method
-%! D = draw.Drawing ().diam ([40, 0], 6, 45).radius ([60, 0], 4, 30);
+%! D = draw.Drawing ().diam ([40, 0], 6, 'Angle', 45);
+%! D = D.radius ([60, 0], 4, 'Angle', 30);
 %! D = D.angdim ([0, 20], [10, 20], [8, 26], 5);
 %! D = D.ordinate ([0, 0], [20, 15], 'x', [20, -10]);
 %! unwind_protect
@@ -168,7 +169,8 @@ endfunction
 
 %!test  # a block and its inserts come back
 %! B = draw.Drawing ().circle ([0, 0], 3).line ([-4, 0], [4, 0]);
-%! D = draw.Drawing ().block ('BORE', B).insert ('BORE', [10, 0], 30, 2);
+%! D = draw.Drawing ().block ('BORE', B);
+%! D = D.insert ('BORE', [10, 0], 'Rotation', 30, 'Scale', 2);
 %! unwind_protect
 %!   write (D, tmpf);
 %!   R = draw.read (tmpf);
@@ -182,7 +184,8 @@ endfunction
 %!test  # a hatch, a region and a path come back as themselves
 %! R0 = geom.Region (geom.Polyline ([0, 0; 60, 0; 60, 40; 0, 40], ...
 %!                                  'Closed', true));
-%! D = draw.Drawing ().hatch (R0, 'ANSI37', 15, 2).region (R0);
+%! D = draw.Drawing ().hatch (R0, 'Pattern', 'ANSI37', 'Angle', 15, ...
+%!                            'Spacing', 2).region (R0);
 %! D = D.path (geom.Path ([0, 0; 10, 0; 10, 10]));
 %! unwind_protect
 %!   write (D, tmpf);

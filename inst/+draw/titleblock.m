@@ -155,7 +155,8 @@ function D = titleblock (varargin)
       error (strcat ("draw.titleblock: field '%s' must be a character", ...
                      " vector."), name);
     endif
-    D = D.text ([x0 + cells{c,1}, y0 + cells{c,2}], [cells{c,4}, v], 3.5);
+    D = D.text ([x0 + cells{c,1}, y0 + cells{c,2}], [cells{c,4}, v], ...
+                'Height', 3.5);
   endfor
 
 endfunction

@@ -37,7 +37,7 @@ classdef Drawing
   ## D.Layer = 'outline';
   ## D = D.polyline (geom.Polyline ([0, 0; 160, 0; 160, 180; 0, 180], ...
   ##                                'Closed', true));
-  ## D = D.circle ([80, 90], 25).text ([0, -20], 'PLATE', 3.5);
+  ## D = D.circle ([80, 90], 25).text ([0, -20], 'PLATE', 'Height', 3.5);
   ## @end group
   ## @end example
   ##
@@ -336,7 +336,7 @@ classdef Drawing
 
     ## -*- texinfo -*-
     ## @deftypefn  {draw.Drawing} {@var{E} =} entities (@var{D})
-    ## @deftypefnx {draw.Drawing} {@var{E} =} entities (@var{D}, @var{NAME}, @var{VALUE}, @dots{})
+    ## @deftypefnx {draw.Drawing} {@var{E} =} entities (@var{D}, @var{Name}, @var{Value}, @dots{})
     ## @deftypefnx {draw.Drawing} {[@var{E}, @var{LOST}] =} entities (@dots{})
     ## @deftypefnx {draw.Drawing} {[@var{E}, @var{LOST}, @var{BLOCKS}] =} entities (@dots{})
     ##
@@ -1286,7 +1286,7 @@ classdef Drawing
 
     ## -*- texinfo -*-
     ## @deftypefn  {draw.Drawing} {@var{D} =} ellipse (@var{D}, @var{C}, @var{A}, @var{B})
-    ## @deftypefnx {draw.Drawing} {@var{D} =} ellipse (@var{D}, @var{C}, @var{A}, @var{B}, @var{ROT})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} ellipse (@dots{}, @qcode{'Rotation'}, @var{ROT})
     ##
     ## Append ellipses centred at @var{C} with semi-axes @var{A} and @var{B}.
     ##
@@ -1294,8 +1294,8 @@ classdef Drawing
     ## rows append nothing.  @var{A}, @var{B} and @var{ROT} are each one value
     ## for every ellipse or a vector of one per row.
     ##
-    ## @var{ROT} turns the first axis away from horizontal, in degrees
-    ## counter-clockwise, and defaults to zero.
+    ## The option @qcode{'Rotation'} turns the first axis away from horizontal
+    ## by @var{ROT}, in degrees counter-clockwise, and defaults to zero.
     ##
     ## An ellipse is what a circle becomes when a round feature is seen
     ## obliquely, which is most of the time on an isometric or an auxiliary
@@ -1303,9 +1303,9 @@ classdef Drawing
     ##
     ## @seealso{draw.Drawing.circle, draw.Drawing.arc, draw.Drawing.polyline}
     ## @end deftypefn
-    function this = ellipse (this, C, A, B, ROT = 0)
+    function this = ellipse (this, C, A, B, varargin)
 
-      if (nargin < 4 || nargin > 5)
+      if (nargin < 4)
         error ("draw.Drawing.ellipse: invalid number of input arguments.");
       endif
       errmsg = checkpts (C);
@@ -1321,9 +1321,27 @@ classdef Drawing
       if (! isempty (errmsg))
         error ("draw.Drawing.ellipse: B %s", errmsg);
       endif
+      ROT = 0;
+      if (mod (numel (varargin), 2) != 0)
+        error (strcat ("draw.Drawing.ellipse: Name/Value arguments must", ...
+                       " come in pairs."));
+      endif
+      for ii = 1:2:numel (varargin)
+        name = varargin{ii};
+        if (! ischar (name) || ! isrow (name))
+          error (strcat ("draw.Drawing.ellipse: option names must be", ...
+                         " character vectors."));
+        endif
+        switch (lower (name))
+          case 'rotation'
+            ROT = varargin{ii+1};
+          otherwise
+            error ("draw.Drawing.ellipse: unknown option '%s'.", name);
+        endswitch
+      endfor
       [errmsg, ROT] = checkperrow (ROT, N, false);
       if (! isempty (errmsg))
-        error ("draw.Drawing.ellipse: ROT %s", errmsg);
+        error ("draw.Drawing.ellipse: Rotation %s", errmsg);
       endif
 
       E = makeentities ('ellipse', pen (this), N);
@@ -1336,8 +1354,8 @@ classdef Drawing
 
     ## -*- texinfo -*-
     ## @deftypefn  {draw.Drawing} {@var{D} =} text (@var{D}, @var{P}, @var{S})
-    ## @deftypefnx {draw.Drawing} {@var{D} =} text (@var{D}, @var{P}, @var{S}, @var{H})
-    ## @deftypefnx {draw.Drawing} {@var{D} =} text (@var{D}, @var{P}, @var{S}, @var{H}, @var{ROT})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} text (@dots{}, @qcode{'Height'}, @var{H})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} text (@dots{}, @qcode{'Rotation'}, @var{ROT})
     ##
     ## Append the single-line text @var{S} with its insertion point at @var{P}.
     ##
@@ -1352,18 +1370,19 @@ classdef Drawing
     ## @end group
     ## @end example
     ##
-    ## @var{H} is the cap height in millimetres and defaults to @math{2.5}, the
-    ## smallest of the ISO 3098 sizes and the usual height for notes on a
-    ## drawing at @math{1:50}.  @var{ROT} rotates the text about its insertion
+    ## The option @qcode{'Height'} gives @var{H}, the cap height in millimetres,
+    ## which defaults to @math{2.5}, the smallest of the ISO 3098 sizes and the
+    ## usual height for notes on a drawing at @math{1:50}.  The option
+    ## @qcode{'Rotation'} rotates the text by @var{ROT} about its insertion
     ## point, in degrees counter-clockwise, and defaults to zero.
     ##
     ## The text is stored as given.  No backend measures it, so a drawing knows
     ## where its text starts but not how wide it ends up.
     ##
     ## @end deftypefn
-    function this = text (this, P, S, H = 2.5, ROT = 0)
+    function this = text (this, P, S, varargin)
 
-      if (nargin < 3 || nargin > 5)
+      if (nargin < 3)
         error ("draw.Drawing.text: invalid number of input arguments.");
       endif
       errmsg = checkpts (P);
@@ -1379,13 +1398,32 @@ classdef Drawing
         error (strcat ("draw.Drawing.text: S must be a non-empty character", ...
                        " vector or a cell array of one per row."));
       endif
+      H = 2.5;
+      ROT = 0;
+      if (mod (numel (varargin), 2) != 0)
+        error ("draw.Drawing.text: Name/Value arguments must come in pairs.");
+      endif
+      for ii = 1:2:numel (varargin)
+        name = varargin{ii};
+        if (! ischar (name) || ! isrow (name))
+          error ("draw.Drawing.text: option names must be character vectors.");
+        endif
+        switch (lower (name))
+          case 'height'
+            H = varargin{ii+1};
+          case 'rotation'
+            ROT = varargin{ii+1};
+          otherwise
+            error ("draw.Drawing.text: unknown option '%s'.", name);
+        endswitch
+      endfor
       [errmsg, H] = checkperrow (H, N, true);
       if (! isempty (errmsg))
-        error ("draw.Drawing.text: H %s", errmsg);
+        error ("draw.Drawing.text: Height %s", errmsg);
       endif
       [errmsg, ROT] = checkperrow (ROT, N, false);
       if (! isempty (errmsg))
-        error ("draw.Drawing.text: ROT %s", errmsg);
+        error ("draw.Drawing.text: Rotation %s", errmsg);
       endif
 
       E = makeentities ('text', pen (this), N);
@@ -1399,8 +1437,7 @@ classdef Drawing
 
     ## -*- texinfo -*-
     ## @deftypefn  {draw.Drawing} {@var{D} =} hatch (@var{D}, @var{R})
-    ## @deftypefnx {draw.Drawing} {@var{D} =} hatch (@var{D}, @var{R}, @var{PATTERN})
-    ## @deftypefnx {draw.Drawing} {@var{D} =} hatch (@var{D}, @var{R}, @var{PATTERN}, @var{ANGLE}, @var{SPACING})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} hatch (@var{D}, @var{R}, @var{Name}, @var{Value}, @dots{})
     ##
     ## Append a hatched region.
     ##
@@ -1419,11 +1456,20 @@ classdef Drawing
     ## @end group
     ## @end example
     ##
-    ## @var{PATTERN} names the fill and defaults to @qcode{'ANSI31'}, the
-    ## 45-degree hatch that means cut material; @code{geom.hatchlines ()}
-    ## lists the names.  @var{ANGLE} rotates the pattern, in degrees, and
-    ## @var{SPACING} sets the line spacing in millimetres; the two are given
-    ## together.
+    ## Name/Value pairs:
+    ##
+    ## @table @asis
+    ## @item @qcode{'Pattern'}
+    ## The name of the fill, @qcode{'ANSI31'} by default, the 45-degree hatch
+    ## that means cut material; @code{geom.hatchlines ()} lists the names.
+    ##
+    ## @item @qcode{'Angle'}
+    ## The angle in degrees by which the pattern is rotated, zero by default.
+    ##
+    ## @item @qcode{'Spacing'}
+    ## The perpendicular distance between lines, in millimetres, the
+    ## pattern's own by default, as @code{geom.hatchlines} draws it.
+    ## @end table
     ##
     ## A drawing is flat, so @var{R} must lie in its @math{xy} plane.  Its
     ## @code{geom.UCS} may have its own origin and @math{x} axis there and may
@@ -1432,22 +1478,17 @@ classdef Drawing
     ##
     ## @seealso{draw.Drawing.region, geom.Region, geom.hatchlines}
     ## @end deftypefn
-    function this = hatch (this, R, PATTERN = 'ANSI31', ANGLE = 0, ...
-                           SPACING = 2.5)
+    function this = hatch (this, R, varargin)
 
-      if (nargin < 2 || nargin > 5)
+      if (nargin < 2)
         error ("draw.Drawing.hatch: invalid number of input arguments.");
-      endif
-      if (nargin == 4)
-        error (strcat ("draw.Drawing.hatch: ANGLE and SPACING must be", ...
-                       " given together."));
       endif
       if (iscell (R))
         if (isempty (R))
           error ("draw.Drawing.hatch: R must not be an empty cell array.");
         endif
         for k = 1:numel (R)
-          this = hatch (this, R{k}, PATTERN, ANGLE, SPACING);
+          this = hatch (this, R{k}, varargin{:});
         endfor
         return;
       endif
@@ -1458,21 +1499,50 @@ classdef Drawing
       if (! isa (R, 'geom.Region') || ! isscalar (R))
         error ("draw.Drawing.hatch: R must be a geom.Region object.");
       endif
+      PATTERN = 'ANSI31';
+      ANGLE = 0;
+      SPACING = [];
+      if (mod (numel (varargin), 2) != 0)
+        error ("draw.Drawing.hatch: Name/Value arguments must come in pairs.");
+      endif
+      for ii = 1:2:numel (varargin)
+        name = varargin{ii};
+        if (! ischar (name) || ! isrow (name))
+          error ("draw.Drawing.hatch: option names must be character vectors.");
+        endif
+        switch (lower (name))
+          case 'pattern'
+            PATTERN = varargin{ii+1};
+          case 'angle'
+            ANGLE = varargin{ii+1};
+          case 'spacing'
+            SPACING = varargin{ii+1};
+            if (isempty (SPACING))
+              error ("draw.Drawing.hatch: Spacing must not be empty.");
+            endif
+          otherwise
+            error ("draw.Drawing.hatch: unknown option '%s'.", name);
+        endswitch
+      endfor
       if (! ischar (PATTERN) || ! isrow (PATTERN) || isempty (PATTERN))
-        error (strcat ("draw.Drawing.hatch: PATTERN must be a non-empty", ...
+        error (strcat ("draw.Drawing.hatch: Pattern must be a non-empty", ...
                        " character vector."));
       endif
-      if (! any (strcmpi (PATTERN, geom.hatchlines ())))
+      C = geom.hatchlines (PATTERN);
+      if (isempty (C))
         error (strcat ("draw.Drawing.hatch: '%s' is not a defined pattern;", ...
                        " use geom.hatchlines () for the list."), PATTERN);
       endif
+      if (isempty (SPACING))
+        SPACING = C{2};
+      endif
       if (! isfloat (ANGLE) || ! isreal (ANGLE) || ! isscalar (ANGLE)
           || ! isfinite (ANGLE))
-        error ("draw.Drawing.hatch: ANGLE must be a real finite scalar.");
+        error ("draw.Drawing.hatch: Angle must be a real finite scalar.");
       endif
       if (! isfloat (SPACING) || ! isreal (SPACING)
           || ! isscalar (SPACING) || ! isfinite (SPACING) || SPACING <= 0)
-        error (strcat ("draw.Drawing.hatch: SPACING must be a real", ...
+        error (strcat ("draw.Drawing.hatch: Spacing must be a real", ...
                        " positive finite scalar."));
       endif
       [errmsg, R] = flatshape (R);
@@ -1505,8 +1575,8 @@ classdef Drawing
 
     ## -*- texinfo -*-
     ## @deftypefn  {draw.Drawing} {@var{D} =} dim (@var{D}, @var{P1}, @var{P2}, @var{OFFSET})
-    ## @deftypefnx {draw.Drawing} {@var{D} =} dim (@var{D}, @var{P1}, @var{P2}, @var{OFFSET}, @var{DIRECTION})
-    ## @deftypefnx {draw.Drawing} {@var{D} =} dim (@var{D}, @var{P1}, @var{P2}, @var{OFFSET}, @var{DIRECTION}, @var{LABEL})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} dim (@dots{}, @qcode{'Direction'}, @var{DIR})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} dim (@dots{}, @qcode{'Text'}, @var{S})
     ##
     ## Append a dimension measuring between @var{P1} and @var{P2}.
     ##
@@ -1515,8 +1585,8 @@ classdef Drawing
     ## dimension line falls on: positive offsets lie to the left of the
     ## direction of travel from @var{P1} to @var{P2}.
     ##
-    ## @var{DIRECTION} selects what is being measured and defaults to
-    ## @qcode{'aligned'}:
+    ## The option @qcode{'Direction'} selects what is measured, @var{DIR} being
+    ## one of these, @qcode{'aligned'} by default:
     ##
     ## @itemize
     ## @item @qcode{'aligned'} --- the distance between the two points.
@@ -1528,17 +1598,17 @@ classdef Drawing
     ## vertical one between two points at the same @math{y}, measures nothing
     ## and is an error.
     ##
-    ## @var{LABEL} overrides the measured value with a literal string, for the
-    ## cases every drawing eventually has --- a nominal size, a range, a note
-    ## in place of a number.  Without it the backend formats the measurement it
-    ## computes.  A dimension therefore carries no text of its own by default,
-    ## which is precisely what keeps it truthful when the geometry changes.
+    ## The option @qcode{'Text'} overrides the measured value with the literal
+    ## string @var{S}, for the cases every drawing eventually has --- a nominal
+    ## size, a range, a note in place of a number.  Without it the backend
+    ## formats the measurement it computes.  A dimension therefore carries no
+    ## text of its own by default, which is precisely what keeps it truthful
+    ## when the geometry changes.
     ##
     ## @end deftypefn
-    function this = dim (this, P1, P2, OFFSET, DIRECTION = 'aligned', ...
-                         LABEL = '')
+    function this = dim (this, P1, P2, OFFSET, varargin)
 
-      if (nargin < 4 || nargin > 6)
+      if (nargin < 4)
         error ("draw.Drawing.dim: invalid number of input arguments.");
       endif
       errmsg = checkpt (P1);
@@ -1556,13 +1626,33 @@ classdef Drawing
           || ! isfinite (OFFSET))
         error ("draw.Drawing.dim: OFFSET must be a real finite scalar.");
       endif
+      DIRECTION = 'aligned';
+      LABEL = '';
+      if (mod (numel (varargin), 2) != 0)
+        error ("draw.Drawing.dim: Name/Value arguments must come in pairs.");
+      endif
+      for ii = 1:2:numel (varargin)
+        name = varargin{ii};
+        if (! ischar (name) || ! isrow (name))
+          error ("draw.Drawing.dim: option names must be character vectors.");
+        endif
+        switch (lower (name))
+          case 'direction'
+            DIRECTION = varargin{ii+1};
+          case 'text'
+            LABEL = varargin{ii+1};
+            if (! ischar (LABEL) || ! isrow (LABEL))
+              error (strcat ("draw.Drawing.dim: Text must be a non-empty", ...
+                             " character vector."));
+            endif
+          otherwise
+            error ("draw.Drawing.dim: unknown option '%s'.", name);
+        endswitch
+      endfor
       if (! ischar (DIRECTION) || ! isrow (DIRECTION)
           || ! any (strcmpi (DIRECTION, {'aligned', 'horizontal', 'vertical'})))
-        error (strcat ("draw.Drawing.dim: DIRECTION must be 'aligned',", ...
+        error (strcat ("draw.Drawing.dim: Direction must be 'aligned',", ...
                        " 'horizontal' or 'vertical'."));
-      endif
-      if (! ischar (LABEL) || ! (isrow (LABEL) || isempty (LABEL)))
-        error ("draw.Drawing.dim: LABEL must be a character vector.");
       endif
 
       DIRECTION = lower (DIRECTION);
@@ -1586,14 +1676,16 @@ classdef Drawing
 
     ## -*- texinfo -*-
     ## @deftypefn  {draw.Drawing} {@var{D} =} diam (@var{D}, @var{C}, @var{R})
-    ## @deftypefnx {draw.Drawing} {@var{D} =} diam (@dots{}, @var{ANG}, @var{LABEL})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} diam (@dots{}, @qcode{'Angle'}, @var{ANG})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} diam (@dots{}, @qcode{'Text'}, @var{S})
     ##
     ## Append a diameter dimension across a circle.
     ##
-    ## @var{C} is the centre and @var{R} the radius.  @var{ANG} sets the
-    ## direction the dimension line lies along, in degrees, and defaults to 45,
-    ## which keeps it clear of the centre lines.  @var{LABEL} overrides the
-    ## text, which is otherwise the diameter symbol and the measured figure.
+    ## @var{C} is the centre and @var{R} the radius.  The option
+    ## @qcode{'Angle'} sets @var{ANG}, the direction the dimension line lies
+    ## along, in degrees, 45 by default, which keeps it clear of the centre
+    ## lines.  The option @qcode{'Text'} gives the text @var{S}, which is
+    ## otherwise the diameter symbol and the measured figure.
     ##
     ## A round feature is dimensioned by its diameter and never by its radius,
     ## because a diameter is what a bore gauge and a micrometer measure.  A
@@ -1603,49 +1695,52 @@ classdef Drawing
     ## @seealso{draw.Drawing.radius, draw.Drawing.angdim,
     ## draw.Drawing.centremark, draw.symbol}
     ## @end deftypefn
-    function this = diam (this, C, R, ANG = 45, LABEL = '')
+    function this = diam (this, C, R, varargin)
 
-      if (nargin < 3 || nargin > 5)
+      if (nargin < 3)
         error ("draw.Drawing.diam: invalid number of input arguments.");
       endif
-      e = dimcircle (this, 'diam', C, R, ANG, LABEL);
+      e = dimcircle (this, 'diam', C, R, varargin);
       this.Entities(end+1) = e;
 
     endfunction
 
     ## -*- texinfo -*-
     ## @deftypefn  {draw.Drawing} {@var{D} =} radius (@var{D}, @var{C}, @var{R})
-    ## @deftypefnx {draw.Drawing} {@var{D} =} radius (@dots{}, @var{ANG}, @var{LABEL})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} radius (@dots{}, @qcode{'Angle'}, @var{ANG})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} radius (@dots{}, @qcode{'Text'}, @var{S})
     ##
     ## Append a radius dimension from a centre out to an arc.
     ##
-    ## The arguments are those of @code{diam}, and @var{ANG} is the direction
-    ## the leader runs in.  The label is otherwise the letter R and the figure.
+    ## The arguments and options are those of @code{diam}, and @var{ANG} is the
+    ## direction the leader runs in.  The text is otherwise the letter R and
+    ## the figure.
     ##
     ## Use it for a fillet or any arc that is less than a full circle, where
     ## there is no diameter to measure across.
     ##
     ## @seealso{draw.Drawing.diam, draw.Drawing.angdim, draw.Drawing.centremark}
     ## @end deftypefn
-    function this = radius (this, C, R, ANG = 45, LABEL = '')
+    function this = radius (this, C, R, varargin)
 
-      if (nargin < 3 || nargin > 5)
+      if (nargin < 3)
         error ("draw.Drawing.radius: invalid number of input arguments.");
       endif
-      e = dimcircle (this, 'radius', C, R, ANG, LABEL);
+      e = dimcircle (this, 'radius', C, R, varargin);
       this.Entities(end+1) = e;
 
     endfunction
 
     ## -*- texinfo -*-
     ## @deftypefn  {draw.Drawing} {@var{D} =} angdim (@var{D}, @var{V}, @var{P1}, @var{P2}, @var{RAD})
-    ## @deftypefnx {draw.Drawing} {@var{D} =} angdim (@dots{}, @var{LABEL})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} angdim (@dots{}, @qcode{'Text'}, @var{S})
     ##
     ## Append an angular dimension at a vertex.
     ##
     ## @var{V} is the vertex, @var{P1} and @var{P2} points along the two arms,
-    ## and @var{RAD} the radius at which the dimension arc is struck.  The label
-    ## is otherwise the measured angle and the degree symbol.
+    ## and @var{RAD} the radius at which the dimension arc is struck.  The
+    ## option @qcode{'Text'} gives the text @var{S}, which is otherwise the
+    ## measured angle and the degree symbol.
     ##
     ## The angle measured is the one from the first arm to the second going
     ## counter-clockwise, so giving the arms the other way round dimensions the
@@ -1655,9 +1750,9 @@ classdef Drawing
     ## @seealso{draw.Drawing.diam, draw.Drawing.radius, draw.Drawing.ordinate,
     ## draw.symbol}
     ## @end deftypefn
-    function this = angdim (this, V, P1, P2, RAD, LABEL = '')
+    function this = angdim (this, V, P1, P2, RAD, varargin)
 
-      if (nargin < 5 || nargin > 6)
+      if (nargin < 5)
         error ("draw.Drawing.angdim: invalid number of input arguments.");
       endif
       for pr = {{V, 'V'}, {P1, 'P1'}, {P2, 'P2'}}
@@ -1670,9 +1765,27 @@ classdef Drawing
       if (! isempty (errmsg))
         error ("draw.Drawing.angdim: RAD %s", errmsg);
       endif
-      if (! ischar (LABEL) || ! (isrow (LABEL) || isempty (LABEL)))
-        error ("draw.Drawing.angdim: LABEL must be a character vector.");
+      LABEL = '';
+      if (mod (numel (varargin), 2) != 0)
+        error ("draw.Drawing.angdim: Name/Value arguments must come in pairs.");
       endif
+      for ii = 1:2:numel (varargin)
+        name = varargin{ii};
+        if (! ischar (name) || ! isrow (name))
+          error (strcat ("draw.Drawing.angdim: option names must be", ...
+                         " character vectors."));
+        endif
+        switch (lower (name))
+          case 'text'
+            LABEL = varargin{ii+1};
+            if (! ischar (LABEL) || ! isrow (LABEL))
+              error (strcat ("draw.Drawing.angdim: Text must be a", ...
+                             " non-empty character vector."));
+            endif
+          otherwise
+            error ("draw.Drawing.angdim: unknown option '%s'.", name);
+        endswitch
+      endfor
       if (isequal (P1(:)', V(:)') || isequal (P2(:)', V(:)'))
         error (strcat ("draw.Drawing.angdim: an arm point must differ from", ...
                        " the vertex."));
@@ -1694,7 +1807,7 @@ classdef Drawing
 
     ## -*- texinfo -*-
     ## @deftypefn  {draw.Drawing} {@var{D} =} ordinate (@var{D}, @var{O}, @var{P}, @var{AXIS}, @var{L})
-    ## @deftypefnx {draw.Drawing} {@var{D} =} ordinate (@dots{}, @var{LABEL})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} ordinate (@dots{}, @qcode{'Text'}, @var{S})
     ##
     ## Append an ordinate dimension, the distance of a point from a datum.
     ##
@@ -1713,8 +1826,8 @@ classdef Drawing
     ## chain of dimensions.
     ##
     ## The label is the distance, without sign, to a micron, measured each time
-    ## the drawing is plotted or written, so it follows the geometry;
-    ## @var{LABEL} gives literal text instead.
+    ## the drawing is plotted or written, so it follows the geometry; the
+    ## option @qcode{'Text'} gives the literal text @var{S} instead.
     ##
     ## @example
     ## @group
@@ -1732,9 +1845,9 @@ classdef Drawing
     ##
     ## @seealso{draw.Drawing.dim, draw.Drawing.leader}
     ## @end deftypefn
-    function this = ordinate (this, O, P, AXIS, L, LABEL = '')
+    function this = ordinate (this, O, P, AXIS, L, varargin)
 
-      if (nargin < 5 || nargin > 6)
+      if (nargin < 5)
         error ("draw.Drawing.ordinate: invalid number of input arguments.");
       endif
       errmsg = checkpt (O);
@@ -1753,9 +1866,28 @@ classdef Drawing
       if (! isempty (errmsg))
         error ("draw.Drawing.ordinate: L %s", errmsg);
       endif
-      if (! ischar (LABEL) || ! (isrow (LABEL) || isempty (LABEL)))
-        error ("draw.Drawing.ordinate: LABEL must be a character vector.");
+      LABEL = '';
+      if (mod (numel (varargin), 2) != 0)
+        error (strcat ("draw.Drawing.ordinate: Name/Value arguments must", ...
+                       " come in pairs."));
       endif
+      for ii = 1:2:numel (varargin)
+        name = varargin{ii};
+        if (! ischar (name) || ! isrow (name))
+          error (strcat ("draw.Drawing.ordinate: option names must be", ...
+                         " character vectors."));
+        endif
+        switch (lower (name))
+          case 'text'
+            LABEL = varargin{ii+1};
+            if (! ischar (LABEL) || ! isrow (LABEL))
+              error (strcat ("draw.Drawing.ordinate: Text must be a", ...
+                             " non-empty character vector."));
+            endif
+          otherwise
+            error ("draw.Drawing.ordinate: unknown option '%s'.", name);
+        endswitch
+      endfor
       AXIS = lower (AXIS);
       if (strcmp (AXIS, 'x') && L(2) == P(2))
         error (strcat ("draw.Drawing.ordinate: an x ordinate needs L to", ...
@@ -2225,14 +2357,16 @@ classdef Drawing
 
     ## -*- texinfo -*-
     ## @deftypefn  {draw.Drawing} {@var{D} =} insert (@var{D}, @var{NAME}, @var{POS})
-    ## @deftypefnx {draw.Drawing} {@var{D} =} insert (@dots{}, @var{ROT}, @var{SCALE})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} insert (@dots{}, @qcode{'Rotation'}, @var{ROT})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} insert (@dots{}, @qcode{'Scale'}, @var{SCALE})
     ##
     ## Place a defined block at a point.
     ##
     ## @code{@var{D} = insert (@var{D}, @var{NAME}, @var{POS})} places the block
-    ## @var{NAME} with its origin at @var{POS}.  @var{ROT} rotates it, in
-    ## degrees counter-clockwise, and @var{SCALE} scales it; both default to
-    ## leaving it alone.
+    ## @var{NAME} with its origin at @var{POS}.  The option @qcode{'Rotation'}
+    ## rotates it by @var{ROT}, in degrees counter-clockwise, and
+    ## @qcode{'Scale'} scales it by @var{SCALE}; both default to leaving it
+    ## alone.
     ##
     ## An insert is a @emph{reference}, not a copy.  Twenty-five identical bores
     ## are one definition and twenty-five references, which is what a
@@ -2245,9 +2379,9 @@ classdef Drawing
     ##
     ## @seealso{draw.Drawing.block, draw.Drawing.merge, draw.Drawing.transform}
     ## @end deftypefn
-    function this = insert (this, NAME, POS, ROT = 0, SCALE = 1)
+    function this = insert (this, NAME, POS, varargin)
 
-      if (nargin < 3 || nargin > 5)
+      if (nargin < 3)
         error ("draw.Drawing.insert: invalid number of input arguments.");
       endif
       if (! ischar (NAME) || ! isrow (NAME) || isempty (NAME))
@@ -2262,13 +2396,33 @@ classdef Drawing
       if (! isempty (errmsg))
         error ("draw.Drawing.insert: POS %s", errmsg);
       endif
+      ROT = 0;
+      SCALE = 1;
+      if (mod (numel (varargin), 2) != 0)
+        error ("draw.Drawing.insert: Name/Value arguments must come in pairs.");
+      endif
+      for ii = 1:2:numel (varargin)
+        name = varargin{ii};
+        if (! ischar (name) || ! isrow (name))
+          error (strcat ("draw.Drawing.insert: option names must be", ...
+                         " character vectors."));
+        endif
+        switch (lower (name))
+          case 'rotation'
+            ROT = varargin{ii+1};
+          case 'scale'
+            SCALE = varargin{ii+1};
+          otherwise
+            error ("draw.Drawing.insert: unknown option '%s'.", name);
+        endswitch
+      endfor
       if (! isfloat (ROT) || ! isreal (ROT) || ! isscalar (ROT)
           || ! isfinite (ROT))
-        error ("draw.Drawing.insert: ROT must be a real finite scalar.");
+        error ("draw.Drawing.insert: Rotation must be a real finite scalar.");
       endif
       if (! isfloat (SCALE) || ! isreal (SCALE) || ! isscalar (SCALE)
           || ! isfinite (SCALE) || SCALE <= 0)
-        error (strcat ("draw.Drawing.insert: SCALE must be a positive real", ...
+        error (strcat ("draw.Drawing.insert: Scale must be a positive real", ...
                        " finite scalar."));
       endif
 
@@ -2313,7 +2467,19 @@ classdef Drawing
     ##
     ## @seealso{draw.Drawing.block, draw.Drawing.insert, draw.Drawing.plot}
     ## @end deftypefn
-    function this = expand (this, depth = 0)
+    function this = expand (this)
+
+      this = expandblocks (this, 0);
+
+    endfunction
+
+  endmethods
+
+  methods (Access = private)
+
+    ## The work of expand, DEPTH counting the levels of blocks entered, so
+    ## that a nesting deeper than a hundred is refused.
+    function this = expandblocks (this, depth)
 
       if (depth > 100)
         error (strcat ("draw.Drawing.expand: blocks are nested more than a", ...
@@ -2345,7 +2511,7 @@ classdef Drawing
             sub.Blocks(end+1) = this.Blocks(bb);
           endif
         endfor
-        sub = expand (sub, depth + 1);
+        sub = expandblocks (sub, depth + 1);
         if (e.scale != 1)
           sub = sub.transform ('scale', e.scale);
         endif
@@ -2838,7 +3004,7 @@ classdef Drawing
 
     ## -*- texinfo -*-
     ## @deftypefn  {draw.Drawing} {} print (@var{D}, @var{FILE})
-    ## @deftypefnx {draw.Drawing} {} print (@var{D}, @var{FILE}, @var{NAME}, @var{VALUE}, @dots{})
+    ## @deftypefnx {draw.Drawing} {} print (@var{D}, @var{FILE}, @var{Name}, @var{Value}, @dots{})
     ## @deftypefnx {draw.Drawing} {[@var{PAPER}, @var{SCALE}] =} print (@dots{})
     ##
     ## Plot a drawing onto paper at a stated scale.
@@ -3123,7 +3289,7 @@ classdef Drawing
 
     ## -*- texinfo -*-
     ## @deftypefn  {draw.Drawing} {@var{S} =} tikz (@var{D})
-    ## @deftypefnx {draw.Drawing} {@var{S} =} tikz (@var{D}, @var{NAME}, @var{VALUE}, @dots{})
+    ## @deftypefnx {draw.Drawing} {@var{S} =} tikz (@var{D}, @var{Name}, @var{Value}, @dots{})
     ##
     ## Render a drawing as a TikZ picture for inclusion in the LaTeX report.
     ##
@@ -3794,7 +3960,7 @@ function E = byrow (E, field, V)
 endfunction
 
 ## Shared validation for the two circular dimensions
-function e = dimcircle (this, kind, C, R, ANG, LABEL)
+function e = dimcircle (this, kind, C, R, opts)
 
   errmsg = checkpt (C);
   if (! isempty (errmsg))
@@ -3804,12 +3970,32 @@ function e = dimcircle (this, kind, C, R, ANG, LABEL)
   if (! isempty (errmsg))
     error ("draw.Drawing.%s: R %s", kind, errmsg);
   endif
+  if (mod (numel (opts), 2) != 0)
+    error ("draw.Drawing.%s: Name/Value arguments must come in pairs.", kind);
+  endif
+  ANG = 45;
+  LABEL = '';
+  for ii = 1:2:numel (opts)
+    name = opts{ii};
+    if (! ischar (name) || ! isrow (name))
+      error ("draw.Drawing.%s: option names must be character vectors.", kind);
+    endif
+    switch (lower (name))
+      case 'angle'
+        ANG = opts{ii+1};
+      case 'text'
+        LABEL = opts{ii+1};
+        if (! ischar (LABEL) || ! isrow (LABEL))
+          error (strcat ("draw.Drawing.%s: Text must be a non-empty", ...
+                         " character vector."), kind);
+        endif
+      otherwise
+        error ("draw.Drawing.%s: unknown option '%s'.", kind, name);
+    endswitch
+  endfor
   if (! isfloat (ANG) || ! isreal (ANG) || ! isscalar (ANG)
       || ! isfinite (ANG))
-    error ("draw.Drawing.%s: ANG must be a real finite scalar.", kind);
-  endif
-  if (! ischar (LABEL) || ! (isrow (LABEL) || isempty (LABEL)))
-    error ("draw.Drawing.%s: LABEL must be a character vector.", kind);
+    error ("draw.Drawing.%s: Angle must be a real finite scalar.", kind);
   endif
 
   e = makeentity (kind, pen (this));

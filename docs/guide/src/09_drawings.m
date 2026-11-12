@@ -78,11 +78,12 @@ D = D.line ([0, 10], [100, 10]);
 ## `leader` points a note at a feature.
 
 D.Layer = 'DIMENSIONS';
-D = D.dim ([0, 0], [100, 0], -12, 'horizontal');
-D = D.dim ([100, 0], [100, 60], -12, 'vertical');
+D = D.dim ([0, 0], [100, 0], -12, 'Direction', 'horizontal');
+D = D.dim ([100, 0], [100, 60], -12, 'Direction', 'vertical');
 D = D.diam ([35, 30], 10);
-D = D.diam ([75, 45], 4, 45, ['2x ', draw.symbol('diameter'), '8']);
-D = D.radius ([94, 54], 6, 45);
+D = D.diam ([75, 45], 4, 'Angle', 45, ...
+            'Text', ['2x ', draw.symbol('diameter'), '8']);
+D = D.radius ([94, 54], 6, 'Angle', 45);
 D = D.leader ([50, 60; 60, 72; 75, 72], 'PLATE 6 THICK');
 D
 plot (D);
@@ -115,8 +116,9 @@ geom.hatchlines ()
 sq = [0, 0; 30, 0; 30, 20; 0, 20];
 H = draw.Drawing ('hatches');
 H = H.hatch (geom.Region (sq));
-H = H.hatch (geom.Region (sq + [40, 0]), 'ANSI37');
-H = H.hatch (geom.Region (sq + [80, 0]), 'CROSS', 0, 4);
+H = H.hatch (geom.Region (sq + [40, 0]), 'Pattern', 'ANSI37');
+H = H.hatch (geom.Region (sq + [80, 0]), 'Pattern', 'CROSS', ...
+             'Spacing', 4);
 H = H.text ([0, -6], 'ANSI31').text ([40, -6], 'ANSI37');
 H = H.text ([80, -6], 'CROSS');
 plot (H);
@@ -135,7 +137,7 @@ F = draw.Drawing ('flange');
 F = F.circle ([0, 0], 40).circle ([0, 0], 15);
 F = F.block ('bolt', B);
 for a = 0:60:300
-  F = F.insert ('bolt', 28 * [cosd(a), sind(a)], a);
+  F = F.insert ('bolt', 28 * [cosd(a), sind(a)], 'Rotation', a);
 endfor
 F
 plot (F);

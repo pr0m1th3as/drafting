@@ -106,10 +106,10 @@ endfunction
 %! ## all three appear on one drawing.
 %!
 %! D = draw.Drawing ().circle ([0, 0], 12.5);
-%! D = D.diam ([0, 0], 12.5, 135);
-%! D = D.text ([-20, -25], 'BORE %%c25 %%p0.02', 3.5);
-%! D = D.text ([-20, -32], 'DRAFT ANGLE 3%%d', 3.5);
-%! D = D.text ([-20, -39], 'SHRINKAGE 2%%%', 3.5);
+%! D = D.diam ([0, 0], 12.5, 'Angle', 135);
+%! D = D.text ([-20, -25], 'BORE %%c25 %%p0.02', 'Height', 3.5);
+%! D = D.text ([-20, -32], 'DRAFT ANGLE 3%%d', 'Height', 3.5);
+%! D = D.text ([-20, -39], 'SHRINKAGE 2%%%', 'Height', 3.5);
 %! plot (D);
 %! title ('the diameter, plus-minus and degree signs');
 
@@ -135,7 +135,8 @@ endfunction
 %!test  # a code reaches a DXF file unchanged, which is the point of using it
 %! fn = [tempname(), '.dxf'];
 %! unwind_protect
-%!   D = draw.Drawing ().text ([0, 0], [draw.symbol('diameter'), '25'], 3);
+%!   D = draw.Drawing ().text ([0, 0], [draw.symbol('diameter'), '25'], ...
+%!                             'Height', 3);
 %!   write (D, fn);
 %!   assert_equal (! isempty (strfind (fileread (fn), '%%c25')), true);
 %! unwind_protect_cleanup

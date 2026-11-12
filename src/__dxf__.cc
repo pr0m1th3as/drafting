@@ -4231,6 +4231,14 @@ raisedim (const octave_value& D, const Rec& r, double sc, const string& txt)
   V3 Q = r.pt (15) * sc, A = r.pt (16) * sc;
   L.z = P1.z = P2.z = Q.z = A.z = 0;
   string lbl = txt == "<>" ? "" : txt;
+  // The measured text is the default, so a label is passed only when the
+  // dimension overrides it
+  auto withlbl = [&lbl] (octave_value_list a)
+  {
+    if (! lbl.empty ())
+      a.append (ovl ("Text", lbl));
+    return a;
+  };
   int t = static_cast<int> (r.num (70));
   int type = (t & 7) + (t & 64);
   auto cr = [] (const V3& a, const V3& b) { return a.x * b.y - a.y * b.x; };
@@ -4248,7 +4256,8 @@ raisedim (const octave_value& D, const Rec& r, double sc, const string& txt)
         dir = "horizontal";
       else if (fabs (fabs (rot) - 90) < 1e-9)
         dir = "vertical";
-      return call ("dim", ovl (D, xy (P1), xy (P2), off, dir, lbl));
+      return call ("dim", withlbl (ovl (D, xy (P1), xy (P2), off,
+                                        "Direction", dir)));
     }
     case 1:
     {
@@ -4258,8 +4267,8 @@ raisedim (const octave_value& D, const Rec& r, double sc, const string& txt)
         throw Bad {"invalid"};
       U = unit (U);
       V3 N = v3 (-U.y, U.x, 0);
-      return call ("dim", ovl (D, xy (P1), xy (P2), dot (L - P1, N),
-                               "aligned", lbl));
+      return call ("dim", withlbl (ovl (D, xy (P1), xy (P2), dot (L - P1, N),
+                                        "Direction", "aligned")));
     }
     case 2:
     {
@@ -4281,8 +4290,8 @@ raisedim (const octave_value& D, const Rec& r, double sc, const string& txt)
       V3 u1 = r1 * (c1 >= 0 ? 1.0 : -1.0), u2 = r2 * (c2 >= 0 ? 1.0 : -1.0);
       if (cr (u1, u2) < 0)
         swap (u1, u2);
-      return call ("angdim", ovl (D, xy (V), xy (V + u1), xy (V + u2),
-                                  norm (A - V), lbl));
+      return call ("angdim", withlbl (ovl (D, xy (V), xy (V + u1),
+                                           xy (V + u2), norm (A - V))));
     }
     case 5:
     {
@@ -4296,23 +4305,23 @@ raisedim (const octave_value& D, const Rec& r, double sc, const string& txt)
       double aa = deg (atan2 (L.y - V.y, L.x - V.x));
       auto md = [] (double x) { return fmod (fmod (x, 360) + 360, 360); };
       if (md (aa - a1) <= md (a2 - a1))
-        return call ("angdim", ovl (D, xy (V), xy (P1), xy (P2),
-                                    norm (L - V), lbl));
-      return call ("angdim", ovl (D, xy (V), xy (P2), xy (P1),
-                                  norm (L - V), lbl));
+        return call ("angdim", withlbl (ovl (D, xy (V), xy (P1), xy (P2),
+                                             norm (L - V))));
+      return call ("angdim", withlbl (ovl (D, xy (V), xy (P2), xy (P1),
+                                           norm (L - V))));
     }
     case 3:
     {
       V3 C = (L + Q) * 0.5;
       double R = norm (L - Q) / 2;
       double a = deg (atan2 (L.y - C.y, L.x - C.x));
-      return call ("diam", ovl (D, xy (C), R, a, lbl));
+      return call ("diam", withlbl (ovl (D, xy (C), R, "Angle", a)));
     }
     case 4:
     {
       double R = norm (L - Q);
       double a = deg (atan2 (L.y - Q.y, L.x - Q.x));
-      return call ("radius", ovl (D, xy (Q), R, a, lbl));
+      return call ("radius", withlbl (ovl (D, xy (Q), R, "Angle", a)));
     }
     case 6:
     case 70:
@@ -4322,7 +4331,8 @@ raisedim (const octave_value& D, const Rec& r, double sc, const string& txt)
       bool alongy = type == 70;
       if ((alongy ? P2.y == P1.y : P2.x == P1.x))
         throw Bad {"invalid"};
-      return call ("ordinate", ovl (D, xy (L), xy (P1), ax, xy (P2), lbl));
+      return call ("ordinate", withlbl (ovl (D, xy (L), xy (P1), ax,
+                                             xy (P2))));
     }
     default:
       throw Bad {"type"};
@@ -4533,7 +4543,7 @@ private:
       {
         double A = norm (m);
         return call ("ellipse", ovl (D, xy (c), A, r.num (40, 1) * A,
-                                     deg (atan2 (m.y, m.x))));
+                                     "Rotation", deg (atan2 (m.y, m.x))));
       }
       vector<octave_value> o = natural (r, sc, false);
       return call ("spline", ovl (D, o[0]));
@@ -4584,7 +4594,8 @@ private:
       double rot = r.num (50);
       if (T == "MTEXT" && ! r.has (50) && r.has (11))
         rot = deg (atan2 (r.num (21), r.num (11)));
-      return call ("text", ovl (D, xy (r.pt (10) * sc), s, h, rot));
+      return call ("text", ovl (D, xy (r.pt (10) * sc), s, "Height", h,
+                                "Rotation", rot));
     }
     // An insert lies in its own frame, whose x axis runs along -x when it
     // faces down.  Scales of opposite sign mirror it, and so does facing
@@ -4622,8 +4633,8 @@ private:
         {
           const V3 q = v3 (P.x + cos (t) * j * cs - sin (t) * i * rs,
                            P.y + sin (t) * j * cs + cos (t) * i * rs, P.z);
-          D = call ("insert", ovl (D, nm, xy (toworld (F, q)), rot,
-                                   fabs (sx)));
+          D = call ("insert", ovl (D, nm, xy (toworld (F, q)),
+                                   "Rotation", rot, "Scale", fabs (sx)));
         }
       return D;
     }
@@ -4640,7 +4651,8 @@ private:
       if (! p)
         m_sk.add ("HATCH pattern '" + h.pattern + "' drawn as ANSI31");
       for (const auto& R : regs)
-        D = call ("hatch", ovl (D, R, name, h.angle, spacing));
+        D = call ("hatch", ovl (D, R, "Pattern", name, "Angle", h.angle,
+                                "Spacing", spacing));
       return D;
     }
     throw Bad {"skip"};

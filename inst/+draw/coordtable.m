@@ -152,13 +152,13 @@ function D = coordtable (P, ORIGIN, varargin)
   cellx = ORIGIN(1) + [0.4 * h, colw(1) + 0.4 * h, colw(1) + colw(2) + 0.4 * h];
 
   for c = 1:3
-    D = D.text ([cellx(c), top - rowh + 0.5 * h], opt.Heading{c}, h);
+    D = D.text ([cellx(c), top - rowh + 0.5 * h], opt.Heading{c}, 'Height', h);
   endfor
   for r = 1:n
     y = top - (r + 1) * rowh + 0.5 * h;
-    D = D.text ([cellx(1), y], opt.Labels{r}, h);
-    D = D.text ([cellx(2), y], sprintf (fmt, P(r,1)), h);
-    D = D.text ([cellx(3), y], sprintf (fmt, P(r,2)), h);
+    D = D.text ([cellx(1), y], opt.Labels{r}, 'Height', h);
+    D = D.text ([cellx(2), y], sprintf (fmt, P(r,1)), 'Height', h);
+    D = D.text ([cellx(3), y], sprintf (fmt, P(r,2)), 'Height', h);
   endfor
 
 endfunction
@@ -176,7 +176,8 @@ endfunction
 %! D.Colour = 'red';
 %! D = D.circle (pts, 1);
 %! D = D.text (pts + [2, 2], arrayfun (@num2str, 1:rows (pts), ...
-%!                                     'UniformOutput', false), 2.5);
+%!                                     'UniformOutput', false), ...
+%!             'Height', 2.5);
 %! D = D.merge (draw.coordtable (pts, [55, 35], 'Decimals', 2));
 %! plot (D, 'FontSize', 6);
 %! title ('the table is the dimension; the view is illustrative');

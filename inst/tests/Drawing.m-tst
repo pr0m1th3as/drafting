@@ -265,7 +265,7 @@
 %! assert_equal (D.Entities(1).height, 2.5);
 %! assert_equal (D.Entities(1).angle, 0);
 %!test  # height and rotation override the defaults
-%! D = draw.Drawing ().text ([0, 0], 'A', 7, 90);
+%! D = draw.Drawing ().text ([0, 0], 'A', 'Height', 7, 'Rotation', 90);
 %! assert_equal (D.Entities(1).height, 7);
 %! assert_equal (D.Entities(1).angle, 90);
 %!test  # the string is stored exactly as given
@@ -276,7 +276,8 @@
 %! assert_equal ({D.Entities.text}, {'A', 'A'});
 %! assert_equal (D.Entities(2).pts, [0, 10]);
 %!test  # or a cell of one per row, with height and rotation per row
-%! D = draw.Drawing ().text ([0, 0; 0, 10], {'A', 'B'}, [2.5, 5], [0; 90]);
+%! D = draw.Drawing ().text ([0, 0; 0, 10], {'A', 'B'}, 'Height', [2.5, 5], ...
+%!                          'Rotation', [0; 90]);
 %! assert_equal ({D.Entities.text}, {'A', 'B'});
 %! assert_equal ([D.Entities.height], [2.5, 5]);
 %! assert_equal ([D.Entities.angle], [0, 90]);
@@ -294,12 +295,20 @@
 %! draw.Drawing ().text ([0, 0; 1, 1], {'A', ''})
 %!error<draw.Drawing.text: P must be an N-by-2 matrix of point coordinates.> ...
 %! draw.Drawing ().text ([0; 0], 'A')
-%!error<draw.Drawing.text: H must be real, positive and finite, one value or one per row.> ...
-%! draw.Drawing ().text ([0, 0], 'A', 0)
-%!error<draw.Drawing.text: ROT must be real and finite, one value or one per row.> ...
-%! draw.Drawing ().text ([0, 0], 'A', 2.5, NaN)
+%!error<draw.Drawing.text: Name/Value arguments must come in pairs.> ...
+%! draw.Drawing ().text ([0, 0], 'A', 3.5)
+%!error<draw.Drawing.text: option names must be character vectors.> ...
+%! draw.Drawing ().text ([0, 0], 'A', 3.5, 90)
+%!error<draw.Drawing.text: unknown option 'Size'.> ...
+%! draw.Drawing ().text ([0, 0], 'A', 'Size', 3.5)
+%!error<draw.Drawing.text: Height must be real, positive and finite, one value or one per row.> ...
+%! draw.Drawing ().text ([0, 0], 'A', 'Height', 0)
+%!error<draw.Drawing.text: Height must be real, positive and finite, one value or one per row.> ...
+%! draw.Drawing ().text ([0, 0], 'A', 'Height', [])
+%!error<draw.Drawing.text: Rotation must be real and finite, one value or one per row.> ...
+%! draw.Drawing ().text ([0, 0], 'A', 'Rotation', NaN)
 
-%!test  # hatch defaults to ANSI31 at 2.5 mm and is always closed
+%!test  # hatch defaults to ANSI31 at its own spacing and is always closed
 %! R = geom.Region ([0, 0; 10, 0; 10, 10]);
 %! D = draw.Drawing ().hatch (R);
 %! assert_equal (D.Entities(1).type, 'hatch');
@@ -308,10 +317,17 @@
 %! assert_equal (D.Entities(1).closed, true);
 %! assert_equal (D.Entities(1).pattern, 'ANSI31');
 %! assert_equal (D.Entities(1).angle, 0);
-%! assert_equal (D.Entities(1).spacing, 2.5);
+%! assert_equal (D.Entities(1).spacing, 3.175);
+%!test  # each pattern has its own spacing
+%! D = draw.Drawing ().hatch (geom.Region ([0, 0; 1, 0; 1, 1]), ...
+%!                            'Pattern', 'ANSI32');
+%! assert_equal (D.Entities(1).spacing, 6.35);
+%!test  # an angle alone keeps the pattern's spacing
+%! D = draw.Drawing ().hatch (geom.Region ([0, 0; 1, 0; 1, 1]), 'Angle', 45);
+%! assert_equal ([D.Entities(1).angle, D.Entities(1).spacing], [45, 3.175]);
 %!test  # pattern, angle and spacing override the defaults
-%! D = draw.Drawing ().hatch (geom.Region ([0, 0; 1, 0; 1, 1]), 'ANSI37', ...
-%!                            45, 4);
+%! D = draw.Drawing ().hatch (geom.Region ([0, 0; 1, 0; 1, 1]), ...
+%!                            'Pattern', 'ANSI37', 'Angle', 45, 'Spacing', 4);
 %! assert_equal (D.Entities(1).pattern, 'ANSI37');
 %! assert_equal (D.Entities(1).angle, 45);
 %! assert_equal (D.Entities(1).spacing, 4);
@@ -327,29 +343,38 @@
 %! assert_equal (bbox (D), [10, 0, 20, 5], 1e-12);
 %!test  # a cell of regions, one entity each, filled alike
 %! R = {geom.Region([0, 0; 10, 0; 10, 5]), geom.Region([20, 0; 30, 0; 30, 5])};
-%! D = draw.Drawing ().hatch (R, 'ANSI37', 45, 4);
+%! D = draw.Drawing ().hatch (R, 'Pattern', 'ANSI37', 'Angle', 45, ...
+%!                            'Spacing', 4);
 %! assert_equal ({D.Entities.pattern}, {'ANSI37', 'ANSI37'});
 %! assert_equal ([D.Entities.angle], [45, 45]);
 %! assert_equal ([D.Entities.spacing], [4, 4]);
 %! assert_equal (D.Entities(2).shape.Outline.Vertices, R{2}.Outline.Vertices);
 %!error<draw.Drawing.hatch: invalid number of input arguments.> ...
 %! draw.Drawing ().hatch ()
-%!error<draw.Drawing.hatch: ANGLE and SPACING must be given together.> ...
-%! draw.Drawing ().hatch (geom.Region ([0, 0; 1, 0; 1, 1]), 'ANSI31', 45)
+%!error<draw.Drawing.hatch: Name/Value arguments must come in pairs.> ...
+%! draw.Drawing ().hatch (geom.Region ([0, 0; 1, 0; 1, 1]), 'ANSI31')
+%!error<draw.Drawing.hatch: option names must be character vectors.> ...
+%! draw.Drawing ().hatch (geom.Region ([0, 0; 1, 0; 1, 1]), 45, 4)
+%!error<draw.Drawing.hatch: unknown option 'Scale'.> ...
+%! draw.Drawing ().hatch (geom.Region ([0, 0; 1, 0; 1, 1]), 'Scale', 2)
 %!error<draw.Drawing.hatch: R must be a geom.Region; make one from a polygon with geom.Region \(P\).> ...
 %! draw.Drawing ().hatch ([0, 0; 1, 0; 1, 1])
 %!error<draw.Drawing.hatch: R must be a geom.Region object.> ...
 %! draw.Drawing ().hatch (geom.Polyline ([0, 0; 1, 0; 1, 1], 'Closed', true))
 %!error<draw.Drawing.hatch: R must not be an empty cell array.> ...
 %! draw.Drawing ().hatch (cell (1, 0))
-%!error<draw.Drawing.hatch: PATTERN must be a non-empty character vector.> ...
-%! draw.Drawing ().hatch (geom.Region ([0, 0; 1, 0; 1, 1]), '')
+%!error<draw.Drawing.hatch: Pattern must be a non-empty character vector.> ...
+%! draw.Drawing ().hatch (geom.Region ([0, 0; 1, 0; 1, 1]), 'Pattern', '')
 %!error<draw.Drawing.hatch: 'TARTAN' is not a defined pattern; use geom.hatchlines \(\) for the list.> ...
-%! draw.Drawing ().hatch (geom.Region ([0, 0; 1, 0; 1, 1]), 'TARTAN')
-%!error<draw.Drawing.hatch: ANGLE must be a real finite scalar.> ...
-%! draw.Drawing ().hatch (geom.Region ([0, 0; 1, 0; 1, 1]), 'ANSI31', NaN, 1)
-%!error<draw.Drawing.hatch: SPACING must be a real positive finite scalar.> ...
-%! draw.Drawing ().hatch (geom.Region ([0, 0; 1, 0; 1, 1]), 'ANSI31', 0, -1)
+%! draw.Drawing ().hatch (geom.Region ([0, 0; 1, 0; 1, 1]), 'Pattern', 'TARTAN')
+%!error<draw.Drawing.hatch: Angle must be a real finite scalar.> ...
+%! draw.Drawing ().hatch (geom.Region ([0, 0; 1, 0; 1, 1]), 'Angle', NaN)
+%!error<draw.Drawing.hatch: Angle must be a real finite scalar.> ...
+%! draw.Drawing ().hatch (geom.Region ([0, 0; 1, 0; 1, 1]), 'Angle', [])
+%!error<draw.Drawing.hatch: Spacing must be a real positive finite scalar.> ...
+%! draw.Drawing ().hatch (geom.Region ([0, 0; 1, 0; 1, 1]), 'Spacing', -1)
+%!error<draw.Drawing.hatch: Spacing must not be empty.> ...
+%! draw.Drawing ().hatch (geom.Region ([0, 0; 1, 0; 1, 1]), 'Spacing', [])
 %!error<draw.Drawing.hatch: R must lie in the xy plane.> ...
 %! draw.Drawing ().hatch (__tiltedregion__ ())
 
@@ -361,10 +386,10 @@
 %! assert_equal (D.Entities(1).direction, 'aligned');
 %! assert_equal (D.Entities(1).text, '');
 %!test  # the direction is normalised to lower case
-%! D = draw.Drawing ().dim ([0, 0], [10, 5], 3, 'HORIZONTAL');
+%! D = draw.Drawing ().dim ([0, 0], [10, 5], 3, 'Direction', 'HORIZONTAL');
 %! assert_equal (D.Entities(1).direction, 'horizontal');
 %!test  # a label overrides the measurement
-%! D = draw.Drawing ().dim ([0, 0], [10, 0], 5, 'aligned', 'MIN. 1200');
+%! D = draw.Drawing ().dim ([0, 0], [10, 0], 5, 'Text', 'MIN. 1200');
 %! assert_equal (D.Entities(1).text, 'MIN. 1200');
 %!error<draw.Drawing.dim: invalid number of input arguments.> ...
 %! draw.Drawing ().dim ([0, 0], [1, 1])
@@ -372,14 +397,22 @@
 %! draw.Drawing ().dim ([1, 1], [1, 1], 5)
 %!error<draw.Drawing.dim: OFFSET must be a real finite scalar.> ...
 %! draw.Drawing ().dim ([0, 0], [1, 1], Inf)
-%!error<draw.Drawing.dim: DIRECTION must be 'aligned', 'horizontal' or 'vertical'.> ...
-%! draw.Drawing ().dim ([0, 0], [1, 1], 5, 'diagonal')
+%!error<draw.Drawing.dim: Direction must be 'aligned', 'horizontal' or 'vertical'.> ...
+%! draw.Drawing ().dim ([0, 0], [1, 1], 5, 'Direction', 'diagonal')
 %!error<draw.Drawing.dim: a horizontal dimension needs two points differing in x.> ...
-%! draw.Drawing ().dim ([0, 0], [0, 10], 5, 'horizontal')
+%! draw.Drawing ().dim ([0, 0], [0, 10], 5, 'Direction', 'horizontal')
 %!error<draw.Drawing.dim: a vertical dimension needs two points differing in y.> ...
-%! draw.Drawing ().dim ([0, 0], [10, 0], 5, 'vertical')
-%!error<draw.Drawing.dim: LABEL must be a character vector.> ...
-%! draw.Drawing ().dim ([0, 0], [1, 1], 5, 'aligned', 42)
+%! draw.Drawing ().dim ([0, 0], [10, 0], 5, 'Direction', 'vertical')
+%!error<draw.Drawing.dim: Text must be a non-empty character vector.> ...
+%! draw.Drawing ().dim ([0, 0], [1, 1], 5, 'Text', 42)
+%!error<draw.Drawing.dim: Text must be a non-empty character vector.> ...
+%! draw.Drawing ().dim ([0, 0], [1, 1], 5, 'Text', '')
+%!error<draw.Drawing.dim: Name/Value arguments must come in pairs.> ...
+%! draw.Drawing ().dim ([0, 0], [1, 1], 5, 'horizontal')
+%!error<draw.Drawing.dim: option names must be character vectors.> ...
+%! draw.Drawing ().dim ([0, 0], [1, 1], 5, 1, 2)
+%!error<draw.Drawing.dim: unknown option 'Label'.> ...
+%! draw.Drawing ().dim ([0, 0], [1, 1], 5, 'Label', 'x')
 
 %!test  # layers lists the table, sorted, without duplicates
 %! D = draw.Drawing ();
@@ -410,7 +443,7 @@
 %! assert_equal (B, geom.bbox (P));
 %! assert_equal ([W, H], [1600, 1800]);
 %!test  # an ellipse extends to its extremes along each axis
-%! B = bbox (draw.Drawing ().ellipse ([0, 0], 10, 2, 30));
+%! B = bbox (draw.Drawing ().ellipse ([0, 0], 10, 2, 'Rotation', 30));
 %! assert_equal (B, [-sqrt(76), -sqrt(28), sqrt(76), sqrt(28)], 1e-12);
 
 %!test  # a bulge extends to the arc it stands for
@@ -419,7 +452,7 @@
 
 %!test  # an insert extends to the geometry it places
 %! B = draw.Drawing ().circle ([0, 0], 1);
-%! D = draw.Drawing ().block ('B', B).insert ('B', [100, 0], 0, 3);
+%! D = draw.Drawing ().block ('B', B).insert ('B', [100, 0], 'Scale', 3);
 %! assert_equal (bbox (D), [97, -3, 103, 3], 1e-12);
 
 %!test  # a circle extends by its radius on all four sides
@@ -436,10 +469,10 @@
 %! assert_equal (D.bbox (), [10 * cosd(45), -10 * sind(45), 10, ...
 %!                           10 * sind(45)], 1e-9);
 %!test  # only the insertion point of a text counts towards the extent
-%! D = draw.Drawing ().text ([5, 7], 'A LONG PIECE OF TEXT', 100);
+%! D = draw.Drawing ().text ([5, 7], 'A LONG PIECE OF TEXT', 'Height', 100);
 %! assert_equal (D.bbox (), [5, 7, 5, 7]);
 %!test  # only the measured points of a dimension count towards the extent
-%! D = draw.Drawing ().dim ([0, 0], [100, 0], -500, 'horizontal');
+%! D = draw.Drawing ().dim ([0, 0], [100, 0], -500, 'Direction', 'horizontal');
 %! assert_equal (D.bbox (), [0, 0, 100, 0]);
 %!test  # the extent spans every entity in the drawing
 %! D = draw.Drawing ().line ([-50, -50], [0, 0]).circle ([100, 100], 25);
@@ -788,7 +821,7 @@
 %! unwind_protect
 %!   D = draw.Drawing ();
 %!   D.Layer = 'DIM';
-%!   write (D.dim ([0, 0], [10, 0], -5, 'horizontal'), fn);
+%!   write (D.dim ([0, 0], [10, 0], -5, 'Direction', 'horizontal'), fn);
 %!   t = fileread (fn);
 %!   t = t(strfind (t, "BLOCKS")(1):end);
 %!   b = t(strfind (t, "\n*D1\n")(1):end);
@@ -812,7 +845,7 @@
 %! assert_equal (T.Entities(1).radius, 10);
 
 %!test  # text scales its height and rotates with the drawing
-%! D = draw.Drawing ().text ([0, 0], 'X', 2.5, 0);
+%! D = draw.Drawing ().text ([0, 0], 'X', 'Height', 2.5, 'Rotation', 0);
 %! T = D.transform ('rotate', 90);
 %! assert_equal (T.Entities(1).angle, 90, 1e-9);
 %! T2 = D.transform ('scale', 4);
@@ -820,7 +853,7 @@
 
 %!test  # a hatch rotates its pattern and scales its spacing
 %! R = geom.Region ([0, 0; 10, 0; 10, 10]);
-%! D = draw.Drawing ().hatch (R, 'ANSI31', 0, 2);
+%! D = draw.Drawing ().hatch (R, 'Pattern', 'ANSI31', 'Angle', 0, 'Spacing', 2);
 %! T = D.transform ('scale', 3);
 %! assert_equal (T.Entities(1).spacing, 6, 1e-12);
 %! assert_equal (bbox (T), [0, 0, 30, 30], 1e-12);
@@ -856,21 +889,21 @@
 %! assert_equal (mid, [-10*cosd(75), 10*sind(75)], 1e-9);
 
 %!test  # a quarter turn exchanges horizontal with vertical
-%! D = draw.Drawing ().dim ([0, 0], [50, 0], -10, 'horizontal');
+%! D = draw.Drawing ().dim ([0, 0], [50, 0], -10, 'Direction', 'horizontal');
 %! assert_equal (D.transform ('rotate', 90).Entities(1).direction, 'vertical');
 
 %!test  # a mirror leaves an axis-locked dimension on its axis
-%! D = draw.Drawing ().dim ([0, 0], [50, 0], -10, 'horizontal');
+%! D = draw.Drawing ().dim ([0, 0], [50, 0], -10, 'Direction', 'horizontal');
 %! T = D.transform ('mirror', 'x');
 %! assert_equal (T.Entities(1).direction, 'horizontal');
 
 %!test  # an aligned dimension rotates freely
-%! D = draw.Drawing ().dim ([0, 0], [50, 0], -10, 'aligned');
+%! D = draw.Drawing ().dim ([0, 0], [50, 0], -10, 'Direction', 'aligned');
 %! T = D.transform ('rotate', 30);
 %! assert_equal (T.Entities(1).direction, 'aligned');
 
 %!test  # a dimension scales its offset with the drawing
-%! D = draw.Drawing ().dim ([0, 0], [50, 0], -10, 'aligned');
+%! D = draw.Drawing ().dim ([0, 0], [50, 0], -10, 'Direction', 'aligned');
 %! assert_equal (D.transform ('scale', 2).Entities(1).offset, -20, 1e-12);
 
 %!test  # a drawing without arcs scales anisotropically without complaint
@@ -887,16 +920,19 @@
 %! assert_equal (T.Entities(1).pts, [10, 10], 1e-12);
 
 %!test  # an ellipse turns with the drawing
-%! D = draw.Drawing ().ellipse ([5, 0], 10, 5, 30).transform ('rotate', 90);
+%! D = draw.Drawing ().ellipse ([5, 0], 10, 5, 'Rotation', 30);
+%! D = D.transform ('rotate', 90);
 %! assert_equal (D.Entities(1).pts, [0, 5], 1e-12);
 %! assert_equal (D.Entities(1).angle, 120, 1e-12);
 
 %!test  # an ellipse scales with the drawing
-%! D = draw.Drawing ().ellipse ([5, 0], 10, 5, 30).transform ('scale', 2);
+%! D = draw.Drawing ().ellipse ([5, 0], 10, 5, 'Rotation', 30);
+%! D = D.transform ('scale', 2);
 %! assert_equal (D.Entities(1).radius, [20, 10], 1e-12);
 
 %!test  # an ellipse mirrors with the drawing
-%! D = draw.Drawing ().ellipse ([5, 0], 10, 5, 30).transform ('mirror', 'x');
+%! D = draw.Drawing ().ellipse ([5, 0], 10, 5, 'Rotation', 30);
+%! D = D.transform ('mirror', 'x');
 %! assert_equal (mod (D.Entities(1).angle, 360), 330, 1e-12);
 
 %!error<draw.Drawing.transform: entity 1 is an ellipse and the scaling is not uniform.> ...
@@ -904,7 +940,8 @@
 
 %!test  # an insert turns and scales with the drawing
 %! B = draw.Drawing ().line ([0, 0], [10, 0]);
-%! D = draw.Drawing ().block ('L', B).insert ('L', [5, 5], 30, 2);
+%! D = draw.Drawing ().block ('L', B);
+%! D = D.insert ('L', [5, 5], 'Rotation', 30, 'Scale', 2);
 %! T = transform (D, 'rotate', 90);
 %! assert_equal ([T.Entities.angle, T.Entities.scale], [120, 2], 1e-12);
 %! assert_equal (expand (transform (D, 'scale', 2)).Entities.pts, ...
@@ -917,18 +954,19 @@
 %! assert_equal (bbox (T), [0, 0, 10, 5], 1e-12);
 
 %!test  # a radius dimension scales, and its label follows the measurement
-%! D = draw.Drawing ().radius ([0, 0], 5, 0).transform ('scale', 2);
+%! D = draw.Drawing ().radius ([0, 0], 5, 'Angle', 0).transform ('scale', 2);
 %! assert_equal (D.Entities.radius, 10);
 %! E = entities (D, 'Dimensions', 'explode');
 %! assert_equal (E(end).text, 'R10');
 
 %!test  # a given label stays as it was given
-%! D = draw.Drawing ().radius ([0, 0], 5, 0, 'R5 MAX').transform ('scale', 2);
+%! D = draw.Drawing ().radius ([0, 0], 5, 'Angle', 0, 'Text', 'R5 MAX');
+%! D = D.transform ('scale', 2);
 %! E = entities (D, 'Dimensions', 'explode');
 %! assert_equal (E(end).text, 'R5 MAX');
 
 %!test  # a diameter dimension turns its measuring line with the drawing
-%! D = draw.Drawing ().diam ([0, 0], 5, 0).transform ('rotate', 90);
+%! D = draw.Drawing ().diam ([0, 0], 5, 'Angle', 0).transform ('rotate', 90);
 %! assert_equal (D.Entities.angle, 90, 1e-12);
 
 %!test  # a mirrored angular dimension measures the same angle
@@ -941,7 +979,7 @@
 %! assert_equal (transform (D, 'mirror', 'x').Entities.offset, -5, 1e-12);
 
 %!test  # and a horizontal one mirrored across the vertical keeps its side
-%! D = draw.Drawing ().dim ([0, 0], [10, 3], 5, 'horizontal');
+%! D = draw.Drawing ().dim ([0, 0], [10, 3], 5, 'Direction', 'horizontal');
 %! assert_equal (transform (D, 'mirror', 'y').Entities.offset, 5, 1e-12);
 
 %!test  # merge concatenates entities in order
@@ -1038,7 +1076,7 @@
 %! D = draw.Drawing ().angdim ([0, 0], [10, 0], [0, 10], 5);
 %! D.transform ('scale', [2, 1])
 %!error<draw.Drawing.transform: entity 1 is a 'horizontal' dimension and the transformation would leave it off its axis; make it 'aligned' first.> ...
-%! D = draw.Drawing ().dim ([0, 0], [50, 0], -10, 'horizontal');
+%! D = draw.Drawing ().dim ([0, 0], [50, 0], -10, 'Direction', 'horizontal');
 %! D.transform ('rotate', 30)
 %!error<draw.Drawing.merge: argument 1 is not a draw.Drawing object.> ...
 %! draw.Drawing ().merge (42)
@@ -1069,7 +1107,7 @@
 %!test  # rotation and scale reach the placed geometry
 %! part = draw.Drawing ().line ([0, 0], [10, 0]);
 %! D = draw.Drawing ().block ('p', part);
-%! X = D.insert ('p', [0, 0], 90, 2).expand ();
+%! X = D.insert ('p', [0, 0], 'Rotation', 90, 'Scale', 2).expand ();
 %! assert_equal (X.Entities(1).pts, [0, 0; 0, 20], 1e-9);
 
 %!test  # redefining a block changes every insert of it
@@ -1125,17 +1163,30 @@
 %! draw.Drawing ().block ('', draw.Drawing ())
 %!error<draw.Drawing.insert: no block named 'ghost' is defined; define it with block first.> ...
 %! draw.Drawing ().insert ('ghost', [0, 0])
-%!error<draw.Drawing.insert: SCALE must be a positive real finite scalar.> ...
+%!error<draw.Drawing.insert: Scale must be a positive real finite scalar.> ...
 %! D = draw.Drawing ().block ('p', draw.Drawing ());
-%! D.insert ('p', [0, 0], 0, 0)
+%! D.insert ('p', [0, 0], 'Scale', 0)
+%!error<draw.Drawing.insert: Rotation must be a real finite scalar.> ...
+%! D = draw.Drawing ().block ('p', draw.Drawing ());
+%! D.insert ('p', [0, 0], 'Rotation', [])
+%!error<draw.Drawing.insert: Name/Value arguments must come in pairs.> ...
+%! D = draw.Drawing ().block ('p', draw.Drawing ());
+%! D.insert ('p', [0, 0], 30)
+%!error<draw.Drawing.insert: option names must be character vectors.> ...
+%! D = draw.Drawing ().block ('p', draw.Drawing ());
+%! D.insert ('p', [0, 0], 30, 2)
+%!error<draw.Drawing.insert: unknown option 'Angle'.> ...
+%! D = draw.Drawing ().block ('p', draw.Drawing ());
+%! D.insert ('p', [0, 0], 'Angle', 30)
 
 %!test  # an ellipse keeps its two semi-axes and its rotation
-%! D = draw.Drawing ().ellipse ([1, 2], 20, 8, 30);
+%! D = draw.Drawing ().ellipse ([1, 2], 20, 8, 'Rotation', 30);
 %! assert_equal (D.Entities(1).pts, [1, 2]);
 %! assert_equal (D.Entities(1).radius, [20, 8]);
 %! assert_equal (D.Entities(1).angle, 30);
 %!test  # one ellipse per row, axes and rotation per row or for every row
-%! D = draw.Drawing ().ellipse ([0, 0; 50, 0], [20; 10], 8, [0, 45]);
+%! D = draw.Drawing ().ellipse ([0, 0; 50, 0], [20; 10], 8, ...
+%!                              'Rotation', [0, 45]);
 %! assert_equal (D.Entities(2).pts, [50, 0]);
 %! assert_equal (D.Entities(2).radius, [10, 8]);
 %! assert_equal (D.Entities(2).angle, 45);
@@ -1211,8 +1262,14 @@
 %! draw.Drawing ().ellipse ([0, 0; 1, 1], 5, [3, 2, 1])
 %!error<draw.Drawing.ellipse: C must be an N-by-2 matrix of point coordinates.> ...
 %! draw.Drawing ().ellipse ([0, 0, 0], 5, 3)
-%!error<draw.Drawing.ellipse: ROT must be real and finite, one value or one per row.> ...
-%! draw.Drawing ().ellipse ([0, 0], 5, 3, Inf)
+%!error<draw.Drawing.ellipse: Rotation must be real and finite, one value or one per row.> ...
+%! draw.Drawing ().ellipse ([0, 0], 5, 3, 'Rotation', Inf)
+%!error<draw.Drawing.ellipse: Name/Value arguments must come in pairs.> ...
+%! draw.Drawing ().ellipse ([0, 0], 5, 3, 30)
+%!error<draw.Drawing.ellipse: option names must be character vectors.> ...
+%! draw.Drawing ().ellipse ([0, 0], 5, 3, 30, 1)
+%!error<draw.Drawing.ellipse: unknown option 'Angle'.> ...
+%! draw.Drawing ().ellipse ([0, 0], 5, 3, 'Angle', 30)
 
 %!test  # a diameter dimension labels itself with the symbol and the figure
 %! D = draw.Drawing ().diam ([0, 0], 12.5);
@@ -1225,13 +1282,13 @@
 %! assert_equal (E(end).text, 'R8');
 
 %!test  # an explicit label wins over the measurement
-%! D = draw.Drawing ().diam ([0, 0], 5, 45, '%%c10 H7');
+%! D = draw.Drawing ().diam ([0, 0], 5, 'Angle', 45, 'Text', '%%c10 H7');
 %! assert_equal (D.Entities(1).text, '%%c10 H7');
 
 %!test  # a diameter runs right across the circle, a radius from the centre
-%! Ed = entities (draw.Drawing ().diam ([0, 0], 10, 0), ...
+%! Ed = entities (draw.Drawing ().diam ([0, 0], 10, 'Angle', 0), ...
 %!     'dimensions', 'explode');
-%! Er = entities (draw.Drawing ().radius ([0, 0], 10, 0), ...
+%! Er = entities (draw.Drawing ().radius ([0, 0], 10, 'Angle', 0), ...
 %!     'dimensions', 'explode');
 %! assert_equal (Ed(1).pts, [-10, 0; 10, 0], 1e-9);
 %! assert_equal (Er(1).pts, [0, 0; 10, 0], 1e-9);
@@ -1304,6 +1361,30 @@
 %! draw.Drawing ().diam ([0, 0])
 %!error<draw.Drawing.diam: R must be a real positive finite scalar.> ...
 %! draw.Drawing ().diam ([0, 0], 0)
+%!error<draw.Drawing.diam: Name/Value arguments must come in pairs.> ...
+%! draw.Drawing ().diam ([0, 0], 5, 45)
+%!error<draw.Drawing.diam: option names must be character vectors.> ...
+%! draw.Drawing ().diam ([0, 0], 5, 45, 'A')
+%!error<draw.Drawing.diam: unknown option 'Label'.> ...
+%! draw.Drawing ().diam ([0, 0], 5, 'Label', 'A')
+%!error<draw.Drawing.diam: Angle must be a real finite scalar.> ...
+%! draw.Drawing ().diam ([0, 0], 5, 'Angle', Inf)
+%!error<draw.Drawing.diam: Angle must be a real finite scalar.> ...
+%! draw.Drawing ().diam ([0, 0], 5, 'Angle', [])
+%!error<draw.Drawing.diam: Text must be a non-empty character vector.> ...
+%! draw.Drawing ().diam ([0, 0], 5, 'Text', '')
+%!error<draw.Drawing.radius: Text must be a non-empty character vector.> ...
+%! draw.Drawing ().radius ([0, 0], 5, 'Text', 42)
+%!error<draw.Drawing.radius: unknown option 'Ang'.> ...
+%! draw.Drawing ().radius ([0, 0], 5, 'Ang', 30)
+%!error<draw.Drawing.angdim: Name/Value arguments must come in pairs.> ...
+%! draw.Drawing ().angdim ([0, 0], [10, 0], [0, 10], 5, 'A')
+%!error<draw.Drawing.angdim: option names must be character vectors.> ...
+%! draw.Drawing ().angdim ([0, 0], [10, 0], [0, 10], 5, 1, 'A')
+%!error<draw.Drawing.angdim: unknown option 'Label'.> ...
+%! draw.Drawing ().angdim ([0, 0], [10, 0], [0, 10], 5, 'Label', 'A')
+%!error<draw.Drawing.angdim: Text must be a non-empty character vector.> ...
+%! draw.Drawing ().angdim ([0, 0], [10, 0], [0, 10], 5, 'Text', '')
 %!error<draw.Drawing.angdim: an arm point must differ from the vertex.> ...
 %! draw.Drawing ().angdim ([0, 0], [0, 0], [1, 1], 5)
 %!error<draw.Drawing.angdim: P1 and P2 lie on one ray from V, so they make no angle.> ...
@@ -1348,7 +1429,7 @@
 %! assert_equal (E(strcmp ({E.type}, 'TEXT')).text, '1.235');
 
 %!test  # an ordinate's label is literal when given
-%! D = draw.Drawing ().ordinate ([0, 0], [20, 15], 'x', [20, -10], 'A');
+%! D = draw.Drawing ().ordinate ([0, 0], [20, 15], 'x', [20, -10], 'Text', 'A');
 %! E = entities (D, 'dimensions', 'explode');
 %! assert_equal (E(strcmp ({E.type}, 'TEXT')).text, 'A');
 
@@ -1422,8 +1503,14 @@
 %! draw.Drawing ().ordinate ([0, 0], [1, 1], 'z', [1, 0])
 %!error<draw.Drawing.ordinate: L must be a real finite 1-by-2 vector.> ...
 %! draw.Drawing ().ordinate ([0, 0], [1, 1], 'x', 'a')
-%!error<draw.Drawing.ordinate: LABEL must be a character vector.> ...
-%! draw.Drawing ().ordinate ([0, 0], [1, 1], 'x', [1, 0], 5)
+%!error<draw.Drawing.ordinate: Text must be a non-empty character vector.> ...
+%! draw.Drawing ().ordinate ([0, 0], [1, 1], 'x', [1, 0], 'Text', 5)
+%!error<draw.Drawing.ordinate: Name/Value arguments must come in pairs.> ...
+%! draw.Drawing ().ordinate ([0, 0], [1, 1], 'x', [1, 0], 'A')
+%!error<draw.Drawing.ordinate: option names must be character vectors.> ...
+%! draw.Drawing ().ordinate ([0, 0], [1, 1], 'x', [1, 0], 1, 'A')
+%!error<draw.Drawing.ordinate: unknown option 'Label'.> ...
+%! draw.Drawing ().ordinate ([0, 0], [1, 1], 'x', [1, 0], 'Label', 'A')
 %!error<draw.Drawing.ordinate: an x ordinate needs L to differ from P in y.> ...
 %! draw.Drawing ().ordinate ([0, 0], [1, 1], 'x', [5, 1])
 %!error<draw.Drawing.ordinate: a y ordinate needs L to differ from P in x.> ...
@@ -1456,7 +1543,7 @@
 %!test  # text is drawn as written, not read as TeX
 %! f = figure ('visible', 'off');
 %! unwind_protect
-%!   D = draw.Drawing ().text ([0, 0], 'PART_NO {A}', 3.5);
+%!   D = draw.Drawing ().text ([0, 0], 'PART_NO {A}', 'Height', 3.5);
 %!   H = plot (D, 'Axes', axes ('parent', f));
 %!   assert_equal (get (H, 'interpreter'), 'none');
 %!   assert_equal (get (H, 'string'), 'PART_NO {A}');
@@ -1578,7 +1665,7 @@
 %!test  # an ellipse is plotted along its turned axes
 %! f = figure ('visible', 'off');
 %! unwind_protect
-%!   H = plot (draw.Drawing ().ellipse ([0, 0], 20, 5, 90), ...
+%!   H = plot (draw.Drawing ().ellipse ([0, 0], 20, 5, 'Rotation', 90), ...
 %!             'Axes', axes ('parent', f));
 %!   assert_equal ([max(get (H, 'xdata')), max(get (H, 'ydata'))], [5, 20], ...
 %!                 1e-9);
@@ -1778,7 +1865,7 @@
 %!test  # a dimension arrives already exploded, as the file will carry it
 %! f = figure ('visible', 'off');
 %! unwind_protect
-%!   D = draw.Drawing ().dim ([0, 0], [100, 0], -20, 'horizontal');
+%!   D = draw.Drawing ().dim ([0, 0], [100, 0], -20, 'Direction', 'horizontal');
 %!   H = plot (D, 'Axes', axes ('parent', f));
 %!   assert_equal (numel (H) > 1, true);
 %! unwind_protect_cleanup
@@ -2015,36 +2102,37 @@
 %!test  # a dimension explodes into six entities on its own layer
 %! D = draw.Drawing ();
 %! D.Layer = 'dims';
-%! D = D.dim ([0, 0], [100, 0], -20, 'horizontal');
+%! D = D.dim ([0, 0], [100, 0], -20, 'Direction', 'horizontal');
 %! E = entities (D, 'dimensions', 'explode');
 %! assert_equal (numel (E), 6);
 %! assert_equal ({E.type}, {'LINE', 'LINE', 'LINE', 'LINE', 'LINE', 'TEXT'});
 %! assert_equal (unique ({E.layer}), {'dims'});
 
 %!test  # the dimension line spans the measured points at the offset
-%! D = draw.Drawing ().dim ([0, 0], [100, 0], -20, 'horizontal');
+%! D = draw.Drawing ().dim ([0, 0], [100, 0], -20, 'Direction', 'horizontal');
 %! E = entities (D, 'dimensions', 'explode');
 %! assert_equal (E(3).pts, [0, -20; 100, -20], 1e-9);
 
 %!test  # an unlabelled dimension is annotated with what it measures
-%! D = draw.Drawing ().dim ([0, 0], [1600, 0], -50, 'horizontal');
+%! D = draw.Drawing ().dim ([0, 0], [1600, 0], -50, 'Direction', 'horizontal');
 %! E = entities (D, 'dimensions', 'explode');
 %! assert_equal (E(6).type, 'TEXT');
 %! assert_equal (E(6).text, '1600');
 
 %!test  # a label overrides the measurement
 %! E = entities (draw.Drawing ().dim ([0, 0], [1600, 0], -50, ...
-%!                                         'horizontal', 'MIN. 1600'), ...
+%!                                    'Direction', 'horizontal', ...
+%!                                    'Text', 'MIN. 1600'), ...
 %!                                            'dimensions', 'explode');
 %! assert_equal (E(6).text, 'MIN. 1600');
 
 %!test  # a horizontal dimension measures x alone, a vertical one y alone
 %! Eh = entities (draw.Drawing ().dim ([0, 0], [300, 400], 50, ...
-%!                                          'horizontal'), ...
+%!                                     'Direction', 'horizontal'), ...
 %!                                             'dimensions', 'explode');
-%! D = draw.Drawing ().dim ([0, 0], [300, 400], 50, 'vertical');
+%! D = draw.Drawing ().dim ([0, 0], [300, 400], 50, 'Direction', 'vertical');
 %! Ev = entities (D, 'dimensions', 'explode');
-%! Ea = entities (draw.Drawing ().dim ([0, 0], [300, 400], 50, 'aligned'), ...
+%! Ea = entities (draw.Drawing ().dim ([0, 0], [300, 400], 50), ...
 %!     'dimensions', 'explode');
 %! assert_equal (Eh(6).text, '300');
 %! assert_equal (Ev(6).text, '400');
@@ -2052,22 +2140,22 @@
 
 %!test  # both feet of a horizontal dimension land at the same height
 %! E = entities (draw.Drawing ().dim ([0, 0], [300, 400], -50, ...
-%!                                         'horizontal'), ...
+%!                                    'Direction', 'horizontal'), ...
 %!                                            'dimensions', 'explode');
 %! assert_equal (E(3).pts(1,2), E(3).pts(2,2), 1e-9);
 
 %!test  # both feet of a vertical dimension land at the same x
-%! D = draw.Drawing ().dim ([0, 0], [300, 400], -50, 'vertical');
+%! D = draw.Drawing ().dim ([0, 0], [300, 400], -50, 'Direction', 'vertical');
 %! E = entities (D, 'dimensions', 'explode');
 %! assert_equal (E(3).pts(1,1), E(3).pts(2,1), 1e-9);
 
 %!test  # a non-integral measurement is given to one decimal
-%! E = entities (draw.Drawing ().dim ([0, 0], [10, 10], 5, 'aligned'), ...
+%! E = entities (draw.Drawing ().dim ([0, 0], [10, 10], 5), ...
 %!     'dimensions', 'explode');
 %! assert_equal (E(6).text, '14.1');
 
 %!test  # DimScale multiplies the ornament without moving the dimension line
-%! D = draw.Drawing ().dim ([0, 0], [100, 0], -20, 'horizontal');
+%! D = draw.Drawing ().dim ([0, 0], [100, 0], -20, 'Direction', 'horizontal');
 %! E1 = entities (D, 'dimensions', 'explode');
 %! E50 = entities (D, 'DimScale', 50, 'dimensions', 'explode');
 %! assert_equal (E1(3).pts, E50(3).pts, 1e-9);
@@ -2075,20 +2163,22 @@
 
 %!test  # the label clears a dimension line drawn below the geometry
 %! E = entities (draw.Drawing ().dim ([0, 0], [100, 0], -20, ...
-%!                                         'horizontal'), 'DimScale', 10, ...
+%!                                    'Direction', 'horizontal'), ...
+%!               'DimScale', 10, ...
 %!                                            'dimensions', 'explode');
 %! liney = E(3).pts(1,2);
 %! assert_equal (E(6).pts(2) + E(6).height < liney, true);
 
 %!test  # and one drawn above it
 %! E = entities (draw.Drawing ().dim ([0, 0], [100, 0], 20, ...
-%!                                         'horizontal'), 'DimScale', 10, ...
+%!                                    'Direction', 'horizontal'), ...
+%!               'DimScale', 10, ...
 %!                                            'dimensions', 'explode');
 %! liney = E(3).pts(1,2);
 %! assert_equal (E(6).pts(2) > liney, true);
 
 %!test  # a horizontal label beside a vertical dimension clears it by its width
-%! D = draw.Drawing ().dim ([0, 0], [0, 100], 20, 'vertical');
+%! D = draw.Drawing ().dim ([0, 0], [0, 100], 20, 'Direction', 'vertical');
 %! E = entities (D, ...
 %!                    'DimScale', 10, 'dimensions', 'explode');
 %! linex = E(3).pts(1,1);
@@ -2098,23 +2188,27 @@
 
 %!test  # the label sits on the far side of the line from what it measures
 %! Eu = entities (draw.Drawing ().dim ([0, 0], [100, 0], 30, ...
-%!                                          'horizontal'), 'DimScale', 10, ...
+%!                                     'Direction', 'horizontal'), ...
+%!                'DimScale', 10, ...
 %!                                             'dimensions', 'explode');
 %! Ed = entities (draw.Drawing ().dim ([0, 0], [100, 0], -30, ...
-%!                                          'horizontal'), 'DimScale', 10, ...
+%!                                     'Direction', 'horizontal'), ...
+%!                'DimScale', 10, ...
 %!                                             'dimensions', 'explode');
 %! assert_equal (Eu(6).pts(2) > Eu(3).pts(1,2), true);
 %! assert_equal (Ed(6).pts(2) < Ed(3).pts(1,2), true);
 
 %!test  # the label is centred along a dimension across the sheet
 %! E = entities (draw.Drawing ().dim ([0, 0], [1000, 0], -30, ...
-%!                                         'horizontal'), 'DimScale', 10, ...
+%!                                    'Direction', 'horizontal'), ...
+%!               'DimScale', 10, ...
 %!                                            'dimensions', 'explode');
 %! wid = 0.6 * E(6).height * numel (E(6).text);
 %! assert_equal (abs (E(6).pts(1) + wid / 2 - 500) < 1e-9, true);
 
 %!test  # a zero offset still produces a drawable dimension
-%! E = entities (draw.Drawing ().dim ([0, 0], [100, 0], 0, 'horizontal'), ...
+%! E = entities (draw.Drawing ().dim ([0, 0], [100, 0], 0, ...
+%!                                    'Direction', 'horizontal'), ...
 %!     'dimensions', 'explode');
 %! assert_equal (numel (E), 6);
 %! assert_equal (all (isfinite ([E(1).pts(:); E(2).pts(:)])), true);
@@ -2149,9 +2243,9 @@
 %!test  # spacing given to the hatch reaches the generated lines
 %! D = draw.Drawing ();
 %! P = [0, 0; 20, 0; 20, 20; 0, 20];
-%! Ewide = entities (D.hatch (geom.Region (P), 'ANSI31', 0, 4), ...
+%! Ewide = entities (D.hatch (geom.Region (P), 'Spacing', 4), ...
 %!                   'dimensions', 'explode');
-%! Efine = entities (D.hatch (geom.Region (P), 'ANSI31', 0, 1), ...
+%! Efine = entities (D.hatch (geom.Region (P), 'Spacing', 1), ...
 %!                   'dimensions', 'explode');
 %! assert_equal (numel (Efine) > numel (Ewide), true);
 
@@ -2198,7 +2292,7 @@
 %!test  # a rotated text keeps its rotation and costs nothing
 %! [E0, L0] = entities (draw.Drawing ().text ([0, 0], 'A'), ...
 %!     'dimensions', 'explode');
-%! [E9, L9] = entities (draw.Drawing ().text ([0, 0], 'A', 2.5, 90), ...
+%! [E9, L9] = entities (draw.Drawing ().text ([0, 0], 'A', 'Rotation', 90), ...
 %!     'dimensions', 'explode');
 %! assert_equal (E0(1).rotation, 0);
 %! assert_equal (E9(1).rotation, 90);
@@ -2257,7 +2351,7 @@
 %! D = draw.Drawing ();
 %! D.Linetype = 'HIDDEN';
 %! D.Colour = 5;
-%! E = entities (D.dim ([0, 0], [100, 0], -20, 'horizontal'), ...
+%! E = entities (D.dim ([0, 0], [100, 0], -20, 'Direction', 'horizontal'), ...
 %!     'dimensions', 'explode');
 %! assert_equal (all (strcmp ({E.linetype}, 'HIDDEN')), true);
 %! assert_equal (all ([E.colour] == 5), true);
@@ -2294,7 +2388,8 @@
 %! assert_equal (! isempty (strfind (S, 'circle[radius=10mm]')), true);
 
 %!test  # an ellipse is drawn as one, its semi-axes divided by the scale
-%! S = tikz (draw.Drawing ().ellipse ([10, 20], 500, 250, 30), 'Scale', 50);
+%! S = tikz (draw.Drawing ().ellipse ([10, 20], 500, 250, 'Rotation', 30), ...
+%!           'Scale', 50);
 %! assert_equal (! isempty (strfind (S, ['\draw (10,20) ellipse[x radius', ...
 %!                                       '=10mm, y radius=5mm, rotate=30];'])), ...
 %!               true);
@@ -2305,14 +2400,15 @@
 %!                                       ' y radius=8mm];'])), true);
 
 %!test  # a turned ellipse is bounded by its exact extent, not by TikZ's
-%! S = tikz (draw.Drawing ().ellipse ([0, 0], 5, 5 / sqrt (3), 30), ...
-%!           'Scale', 1);
+%! S = tikz (draw.Drawing ().ellipse ([0, 0], 5, 5 / sqrt (3), ...
+%!                                    'Rotation', 30), 'Scale', 1);
 %! assert_equal (! isempty (strfind (S, ['\path (-4.56435,-3.53553)', ...
 %!                                       ' rectangle (4.56435,3.53553);'])), ...
 %!               true);
 
 %!test  # an ellipse on its axes keeps TikZ's bounding box
-%! S = tikz (draw.Drawing ().ellipse ([0, 0], 20, 8, 90), 'Scale', 1);
+%! S = tikz (draw.Drawing ().ellipse ([0, 0], 20, 8, 'Rotation', 90), ...
+%!           'Scale', 1);
 %! assert_equal (isempty (strfind (S, 'pgfinterruptboundingbox')), true);
 
 %!test  # an arc is unrolled so that the end angle exceeds the start
@@ -2331,11 +2427,11 @@
 %! assert_equal (! isempty (strfind (S, 'at (1,2) {NOTE}')), true);
 
 %!test  # a rotated text keeps its rotation, unlike the DXF path
-%! S = tikz (draw.Drawing ().text ([0, 0], 'A', 2.5, 90));
+%! S = tikz (draw.Drawing ().text ([0, 0], 'A', 'Height', 2.5, 'Rotation', 90));
 %! assert_equal (! isempty (strfind (S, 'rotate=90')), true);
 
 %!test  # text height is emitted in points at the plotted size
-%! S = tikz (draw.Drawing ().text ([0, 0], 'A', 125), 'Scale', 50);
+%! S = tikz (draw.Drawing ().text ([0, 0], 'A', 'Height', 125), 'Scale', 50);
 %! assert_equal (! isempty (strfind (S, '\fontsize{7.11319}')), true);
 
 %!test  # dimension text arrives at its nominal size, whatever the scale
@@ -2397,7 +2493,7 @@
 %!       # angle and spacing the hatch was given.
 %! S = tikz (draw.Drawing ().hatch (geom.Region ([1, 0; 11, 0; 11, 10])));
 %! assert_equal (! isempty (strfind (S, '-- cycle;')), true);
-%! assert_equal (numel (strfind (S, '\draw')) > 3, true);
+%! assert_equal (numel (strfind (S, '\draw')) > 1, true);
 %! assert_equal (isempty (strfind (S, 'pattern=')), true);
 
 %!test  # a drawing without a hatch does not ask for the patterns library
@@ -2405,12 +2501,13 @@
 %! assert_equal (isempty (strfind (S, 'usetikzlibrary')), true);
 
 %!test  # a dimension renders as five strokes and one node
-%! S = tikz (draw.Drawing ().dim ([0, 0], [100, 0], -20, 'horizontal'));
+%! S = tikz (draw.Drawing ().dim ([0, 0], [100, 0], -20, ...
+%!                                'Direction', 'horizontal'));
 %! assert_equal (numel (strfind (S, '\draw')), 5);
 %! assert_equal (numel (strfind (S, '\node')), 1);
 
 %!test  # the dimension line agrees with the one draw.Drawing.entities emits
-%! D = draw.Drawing ().dim ([0, 0], [300, 400], -50, 'horizontal');
+%! D = draw.Drawing ().dim ([0, 0], [300, 400], -50, 'Direction', 'horizontal');
 %! E = entities (D, 'dimensions', 'explode');
 %! S = tikz (D);
 %! expect = sprintf ('\\draw (%g,%g) -- (%g,%g);', E(3).pts(1,1), ...
@@ -2418,17 +2515,20 @@
 %! assert_equal (! isempty (strfind (S, expect)), true);
 
 %!test  # an unlabelled dimension is annotated with what it measures
-%! S = tikz (draw.Drawing ().dim ([0, 0], [1600, 0], -50, 'horizontal'));
+%! S = tikz (draw.Drawing ().dim ([0, 0], [1600, 0], -50, ...
+%!                                'Direction', 'horizontal'));
 %! assert_equal (! isempty (strfind (S, '{1600}')), true);
 
 %!test  # a label overrides the measurement and is escaped
-%! S = tikz (draw.Drawing ().dim ([0, 0], [1600, 0], -50, 'horizontal', ...
-%!                                     'MIN. 100%'));
+%! S = tikz (draw.Drawing ().dim ([0, 0], [1600, 0], -50, ...
+%!                                'Direction', 'horizontal', ...
+%!                                'Text', 'MIN. 100%'));
 %! assert_equal (! isempty (strfind (S, '{MIN. 100\%}')), true);
 
 %!test  # a dimension arrives already exploded, so the label is placed the same
 %!       # way here as it is in the file
-%! S = tikz (draw.Drawing ().dim ([0, 0], [100, 0], 20, 'horizontal'));
+%! S = tikz (draw.Drawing ().dim ([0, 0], [100, 0], 20, ...
+%!                                'Direction', 'horizontal'));
 %! assert_equal (! isempty (strfind (S, '\node')), true);
 %! assert_equal (numel (strfind (S, '\draw')) >= 5, true);
 
@@ -2526,18 +2626,18 @@
 %!test  # the spacing given to a hatch reaches the page, which the native
 %!       # pattern it replaced could not carry
 %! P = [0, 0; 40, 0; 40, 40; 0, 40];
-%! Swide = tikz (draw.Drawing ().hatch (geom.Region (P), 'ANSI31', 0, 8));
-%! Sfine = tikz (draw.Drawing ().hatch (geom.Region (P), 'ANSI31', 0, 2));
+%! Swide = tikz (draw.Drawing ().hatch (geom.Region (P), 'Spacing', 8));
+%! Sfine = tikz (draw.Drawing ().hatch (geom.Region (P), 'Spacing', 2));
 %! assert_equal (numel (strfind (Sfine, '\draw')) ...
 %!               > numel (strfind (Swide, '\draw')), true);
 
 %!test  # and a sectioned area is drawn with its outline
 %! P = [0, 0; 40, 0; 40, 40; 0, 40];
-%! S = tikz (draw.Drawing ().hatch (geom.Region (P), 'ANSI31'));
+%! S = tikz (draw.Drawing ().hatch (geom.Region (P), 'Pattern', 'ANSI31'));
 %! assert_equal (! isempty (strfind (S, '-- cycle;')), true);
 
 %!test  # a dimension lowers to one DIMENSION entity and a block for its picture
-%! D = draw.Drawing ().dim ([0, 0], [100, 0], -15, 'horizontal');
+%! D = draw.Drawing ().dim ([0, 0], [100, 0], -15, 'Direction', 'horizontal');
 %! [E, ~, BL] = entities (D);
 %! assert_equal (numel (E), 1);
 %! assert_equal (E.type, 'DIMENSION');
@@ -2547,32 +2647,32 @@
 %! assert_equal (numel (BL.entities), 6);
 
 %!test  # 'explode' restores the six drawn entities and emits no block
-%! D = draw.Drawing ().dim ([0, 0], [100, 0], -15, 'horizontal');
+%! D = draw.Drawing ().dim ([0, 0], [100, 0], -15, 'Direction', 'horizontal');
 %! [E, ~, BL] = entities (D, 'dimensions', 'explode');
 %! assert_equal (numel (E), 6);
 %! assert_equal (any (strcmp ({E.type}, 'DIMENSION')), false);
 %! assert_equal (isempty (BL), true);
 
 %!test  # each family carries its own DXF dimension type
-%! D = draw.Drawing ().dim ([0, 0], [10, 0], -5, 'horizontal');
+%! D = draw.Drawing ().dim ([0, 0], [10, 0], -5, 'Direction', 'horizontal');
 %! D = D.angdim ([0, 20], [10, 20], [8, 26], 5);
-%! D = D.diam ([40, 0], 6, 45).radius ([60, 0], 4, 30);
+%! D = D.diam ([40, 0], 6, 'Angle', 45).radius ([60, 0], 4, 'Angle', 30);
 %! E = entities (D);
 %! assert_equal (sort ([E.angles]), [0, 3, 4, 5]);
 
 %!test  # an auto label stays live, so the reader measures it for itself
-%! D = draw.Drawing ().diam ([0, 0], 20, 45);
+%! D = draw.Drawing ().diam ([0, 0], 20, 'Angle', 45);
 %! E = entities (D);
 %! assert_equal (E.text, '<>');
 
 %!test  # a label the caller gave is written literally instead
-%! D = draw.Drawing ().diam ([0, 0], 20, 45, '%%c20 H7');
+%! D = draw.Drawing ().diam ([0, 0], 20, 'Angle', 45, 'Text', '%%c20 H7');
 %! E = entities (D);
 %! assert_equal (E.text, '%%c20 H7');
 
 %!test  # the definition points are the measured points, which is the
 %!        # whole of what makes a dimension live
-%! D = draw.Drawing ().dim ([5, 5], [95, 5], -12, 'horizontal');
+%! D = draw.Drawing ().dim ([5, 5], [95, 5], -12, 'Direction', 'horizontal');
 %! E = entities (D);
 %! assert_equal (E.pts(3,:), [5, 5], 1e-9);
 %! assert_equal (E.pts(4,:), [95, 5], 1e-9);
@@ -2583,7 +2683,7 @@
 %!test  # plot passes DimScale through, so ornament can be sized for the plot
 %! f = figure ('visible', 'off');
 %! unwind_protect
-%!   D = draw.Drawing ().dim ([0, 0], [100, 0], -15, 'horizontal');
+%!   D = draw.Drawing ().dim ([0, 0], [100, 0], -15, 'Direction', 'horizontal');
 %!   ax = axes ('parent', f);
 %!   H = plot (D, 'Axes', ax, 'DimScale', 1);
 %!   n1 = min (__runlengths__ (H(strcmp (get (H, 'type'), 'line'))));
@@ -2614,21 +2714,21 @@
 %!                                 'Closed', true));
 %!  D = D.arc ([50, 30], 20, 0, 90);
 %!  D = D.circle ([50, 30], 10);
-%!  D = D.ellipse ([20, 45], 8, 4, 30);
+%!  D = D.ellipse ([20, 45], 8, 4, 'Rotation', 30);
 %!  D = D.point ([5, 5]);
-%!  D = D.text ([10, 50], 'TEXT', 3.5);
+%!  D = D.text ([10, 50], 'TEXT', 'Height', 3.5);
 %!  D = D.centremark ([50, 30], 12);
 %!  D = D.leader ([70, 40; 90, 55], 'NOTE');
-%!  D = D.hatch (geom.Region ([10, 10; 30, 10; 30, 25; 10, 25]), 'ANSI31', ...
-%!                45, 3);
+%!  D = D.hatch (geom.Region ([10, 10; 30, 10; 30, 25; 10, 25]), ...
+%!               'Angle', 45, 'Spacing', 3);
 %!  D = D.spline (geom.Spline ([10, 70; 30, 80; 50, 72]));
 %!  D = D.path (geom.Path ([60, 70; 80, 70; 90, 80]));
 %!  D = D.region (geom.Region ([110, 0; 130, 0; 130, 20; 110, 20]));
 %!  D = D.block ('BORE', bore).insert ('BORE', [80, 10]);
-%!  D = D.dim ([0, 0], [100, 0], -15, 'horizontal');
+%!  D = D.dim ([0, 0], [100, 0], -15, 'Direction', 'horizontal');
 %!  D = D.angdim ([0, 0], [30, 0], [20, 20], 25);
-%!  D = D.diam ([50, 30], 10, 45);
-%!  D = D.radius ([50, 30], 20, 200);
+%!  D = D.diam ([50, 30], 10, 'Angle', 45);
+%!  D = D.radius ([50, 30], 20, 'Angle', 200);
 %!  D = D.ordinate ([0, 0], [100, 60], 'x', [100, 75]);
 %!endfunction
 
@@ -2677,7 +2777,7 @@
 %! assert_equal (isempty (LOST), true);
 
 %!test  # an ellipse is one record with its centre, axes and rotation
-%! E = entities (draw.Drawing ().ellipse ([1, 2], 20, 8, 30));
+%! E = entities (draw.Drawing ().ellipse ([1, 2], 20, 8, 'Rotation', 30));
 %! assert_equal ({E.type, E.pts, E.radius, E.rotation}, ...
 %!               {'ELLIPSE', [1, 2], [20, 8], 30});
 
@@ -2686,14 +2786,15 @@
 %! assert_equal ({B.Entities.type}, {'line', 'line', 'line', 'line', ...
 %!                                   'line', 'text'});
 %!test  # and it is what plotting a dimension draws
-%! D = draw.Drawing ().dim ([0, 0], [100, 0], -20, 'horizontal');
+%! D = draw.Drawing ().dim ([0, 0], [100, 0], -20, 'Direction', 'horizontal');
 %! E = entities (__ornament__ (D, 1, 2));
 %! F = entities (D, 'dimensions', 'explode', 'DimScale', 2);
 %! assert_equal ({E.type}, {F.type});
 %! assert_equal (vertcat (E.pts), vertcat (F.pts));
 %!test  # its record states a dimension as DXF type 0 with its rotation
 %! [~, REC] = __ornament__ (draw.Drawing ().dim ([0, 0], [0, 50], 10, ...
-%!                                               'vertical'), 1, 1);
+%!                                               'Direction', 'vertical'), ...
+%!                          1, 1);
 %! assert_equal (REC.angles, 0);
 %! assert_equal (REC.rotation, 90);
 %! assert_equal (size (REC.pts), [6, 2]);
@@ -2917,7 +3018,7 @@
 %! unwind_protect
 %!   PL = geom.Polyline ([0, 0; 100, 0; 100, 50; 0, 50], 'Closed', true);
 %!   D = draw.Drawing ().polyline (PL);
-%!   D = D.text ([0, 55], 'A LONG LABEL ACROSS THE TOP', 5);
+%!   D = D.text ([0, 55], 'A LONG LABEL ACROSS THE TOP', 'Height', 5);
 %!   print (D, fn, 'Paper', 'A3', 'Scale', 1, 'Resolution', 300);
 %!   [w, h] = __inkmm__ (fn, 300);
 %!   assert_equal (w, 100, 1);
@@ -2963,7 +3064,7 @@
 
 %!test  # a dimension's text clears its own dimension line, below it
 %! [~, ~, BL] = entities (draw.Drawing ().dim ([0, 0], [100, 0], -15, ...
-%!                                             'horizontal'));
+%!                                             'Direction', 'horizontal'));
 %! p = BL(1).entities;
 %! L = p(strcmpi ({p.type}, 'LINE'));
 %! T = p(strcmpi ({p.type}, 'TEXT'));
@@ -2973,7 +3074,7 @@
 
 %!test  # and above it, when the dimension line is on the other side
 %! [~, ~, BL] = entities (draw.Drawing ().dim ([0, 0], [100, 0], 15, ...
-%!                                             'horizontal'));
+%!                                             'Direction', 'horizontal'));
 %! p = BL(1).entities;
 %! L = p(strcmpi ({p.type}, 'LINE'));
 %! T = p(strcmpi ({p.type}, 'TEXT'));
@@ -2985,7 +3086,7 @@
 %! fn = [tempname(), '.dxf'];
 %! unwind_protect
 %!   D = draw.Drawing ().line ([0, 0], [10, 0]).ellipse ([0, 0], 5, 2);
-%!   D = D.dim ([0, 0], [10, 0], -5, 'horizontal');
+%!   D = D.dim ([0, 0], [10, 0], -5, 'Direction', 'horizontal');
 %!   write (D, fn);
 %!   txt = fileread (fn);
 %!   assert_equal (numel (strfind (txt, "AC1015")), 1);

@@ -19,6 +19,7 @@
 ## @deftypefn  {drafting} {@var{S} =} geom.hatchlines (@var{P})
 ## @deftypefnx {drafting} {@var{S} =} geom.hatchlines (@var{P}, @var{Name}, @var{Value}, @dots{})
 ## @deftypefnx {drafting} {@var{NAMES} =} geom.hatchlines ()
+## @deftypefnx {drafting} {@var{C} =} geom.hatchlines (@var{NAME})
 ##
 ## The line segments that fill a boundary with a hatch pattern.
 ##
@@ -42,6 +43,12 @@
 ## @end table
 ##
 ## @code{@var{NAMES} = geom.hatchlines ()} lists the patterns defined.
+##
+## @code{@var{C} = geom.hatchlines (@var{NAME})} returns the definition of the
+## pattern @var{NAME}, matched regardless of case, as a 1-by-2 cell array
+## @code{@{@var{ANGLES}, @var{SPACING}@}}: the angles of its line families in
+## degrees and its own spacing in millimetres.  An unknown name returns an
+## empty 0-by-2 cell array, so the call also tests whether a pattern exists.
 ##
 ## @subheading Why this is a function and not a rendering detail
 ##
@@ -86,19 +93,23 @@
 
 function S = hatchlines (varargin)
 
-  ## Input validation
   T = {'ANSI31',     [45],       3.175; ...
        'ANSI32',     [45],       6.35; ...
        'ANSI37',     [45, 135],  3.175; ...
        'HORIZONTAL', [0],        3.175; ...
        'VERTICAL',   [90],       3.175; ...
        'CROSS',      [0, 90],    3.175};
-
+  ## Handle special cases first
   if (numel (varargin) == 0)
     S = T(:,1)';
     return;
   endif
+  if (ischar (varargin{1}))
+    S = T(strcmpi (T(:,1), varargin{1}), [2, 3]);
+    return;
+  endif
 
+  ## Input validation
   [errmsg, P] = geom.__checkpoly__ (varargin{1});
   if (! isempty (errmsg))
     error ("geom.hatchlines: %s", errmsg);
@@ -234,7 +245,7 @@ endfunction
 %!   D = D.polyline (geom.Polyline (Q, 'Closed', true));
 %!   S = geom.hatchlines (Q, 'Pattern', nm{1}, 'Spacing', 5);
 %!   D = D.line (S(:,1:2), S(:,3:4));
-%!   D = D.text ([x, -6], nm{1}, 3);
+%!   D = D.text ([x, -6], nm{1}, 'Height', 3);
 %!   x += 50;
 %! endfor
 %! plot (D);
@@ -244,6 +255,15 @@ endfunction
 %! N = geom.hatchlines ();
 %! assert_equal (iscellstr (N), true);
 %! assert_equal (any (strcmp ('ANSI31', N)), true);
+
+%!test  # a name returns the pattern's angles and spacing
+%! assert_equal (geom.hatchlines ('ANSI37'), {[45, 135], 3.175});
+
+%!test  # the name is matched regardless of case
+%! assert_equal (geom.hatchlines ('ansi32'), {45, 6.35});
+
+%!test  # an unknown name returns an empty cell array
+%! assert_equal (geom.hatchlines ('TARTAN'), cell (0, 2));
 
 %!test  # a square is filled, and every segment lies inside it
 %! P = [0, 0; 20, 0; 20, 20; 0, 20];

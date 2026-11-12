@@ -39,8 +39,8 @@ D.Linetype = 'CONTINUOUS';
 D.Colour = 'red';
 ## A single space as the label: the ticks and extension lines say "dimension"
 ## at this size, where a number would only be a smudge.
-D = D.dim (P(1,:), P(2,:), -22, 'horizontal', ' ');
-D = D.dim (P(2,:), P(3,:), -22, 'vertical', ' ');
+D = D.dim (P(1,:), P(2,:), -22, 'Direction', 'horizontal', 'Text', ' ');
+D = D.dim (P(2,:), P(3,:), -22, 'Direction', 'vertical', 'Text', ' ');
 
 f = figure ('visible', 'off');
 ax = axes ('parent', f);
