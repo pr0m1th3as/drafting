@@ -2080,6 +2080,7 @@ classdef Shape
     ## @deftypefn  {solid.Shape} {@var{S} =} shell (@var{S}, @var{F}, @var{T})
     ## @deftypefnx {solid.Shape} {@var{S} =} shell (@dots{}, @qcode{'Outward'}, @var{TF})
     ## @deftypefnx {solid.Shape} {@var{S} =} shell (@dots{}, @qcode{'Thickness'}, @{@var{FACES}, @var{T2}, @dots{}@})
+    ## @deftypefnx {solid.Shape} {@var{S} =} shell (@dots{}, @qcode{'Label'}, @var{L})
     ##
     ## Hollow a shape to a uniform wall thickness.
     ##
@@ -2115,6 +2116,19 @@ classdef Shape
     ## Walls too thick for the shape, which would meet in the middle, cannot
     ## be built and raise an error.
     ##
+    ## @code{@var{S} = shell (@dots{}, @qcode{'Label'}, @var{L})} names the
+    ## faces the shell makes, so that a later step finds them by name with
+    ## @code{solid.Shape.faces}.  @var{L} is an identifier, a letter followed
+    ## by letters, digits or underscores.  Each new face is named after the
+    ## face of @var{S} it lies against, its full name following @var{L} and
+    ## @code{inner}, or @code{outer} for walls grown outwards: the inside of
+    ## the front wall of a block labelled @code{plate} is
+    ## @code{cup.inner.plate.ymin}, and @code{cup.inner} is every inner face.
+    ## The ring an opened face leaves is @var{L}@code{.rim} followed by that
+    ## face's name, and keeps its own name too, being what is left of it.  A
+    ## face of @var{S} without a name gives its new face @var{L} and the role
+    ## alone.  The faces of @var{S} that stay keep their names.
+    ##
     ## @example
     ## @group
     ## ## An open box of 1 mm walls
@@ -2134,10 +2148,17 @@ classdef Shape
         error ("solid.Shape.shell: invalid number of input arguments.");
       endif
       [errmsg, opt] = options (varargin, struct ('Outward', false, ...
-                                                 'Thickness', {{}}));
+                                                 'Thickness', {{}}, ...
+                                                 'Label', ''));
       if (isempty (errmsg) && (! islogical (opt.Outward)
                                || ! isscalar (opt.Outward)))
         errmsg = "Outward must be true or false.";
+      endif
+      if (isempty (errmsg) && ! isempty (opt.Label)
+          && ! (ischar (opt.Label) && isrow (opt.Label)
+                && ! isempty (regexp (opt.Label, '^[A-Za-z]\w*$', 'once'))))
+        errmsg = strcat ("Label must be an identifier: a letter followed", ...
+                         " by letters, digits or underscores.");
       endif
       if (! isempty (errmsg))
         error ("solid.Shape.shell: %s", errmsg);
@@ -2191,7 +2212,8 @@ classdef Shape
       endif
 
       r = occt ('solid.Shape.shell', 'shell', this.Data, ...
-                unique (double (F)), double (T), logical (opt.Outward), TF, TT);
+                unique (double (F)), double (T), logical (opt.Outward), TF, ...
+                TT, opt.Label);
       A = this;
       this.Data = r{1};
       [this.Colour, this.Name] = inherit (r{2}, A);

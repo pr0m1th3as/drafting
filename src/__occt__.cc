@@ -1141,6 +1141,67 @@ sweptnames (const TopoDS_Shape& s, const string& label,
   return t;
 }
 
+// The names of the faces of R, the shell the offset OP made of S, whose
+// faces are named NAMES.  The faces of S kept or trimmed keep their names,
+// the rim an opened face is trimmed to among them.  Each face the offset
+// generated from a face of S is named by the label LABEL and ROLE, inner or
+// outer, followed by each name of that face, as "cup.inner.plate.ymin", or
+// by the label and role alone when it has none; the rim of each face of
+// OPEN is named so by "rim" too.
+static facetable
+shellnames (BRepOffset_MakeOffset& op, const TopoDS_Shape& s,
+            const facetable& names, const TopoDS_Shape& r,
+            const ShapeList& open, const string& label, const string& role)
+{
+  facetable t = carrynames ([&op] (const TopoDS_Shape& f)
+                            -> const TopTools_ListOfShape&
+                            { return op.Modified (f); }, {s}, {names}, r);
+  if (t.stale || label.empty ())
+  {
+    return t;
+  }
+  ShapeMap in, out;
+  TopExp::MapShapes (s, TopAbs_FACE, in);
+  TopExp::MapShapes (r, TopAbs_FACE, out);
+  t.faces.resize (out.Extent ());
+  const bool named
+    = (names.faces.size () == static_cast<size_t> (in.Extent ()));
+  auto give = [&] (const TopoDS_Shape& g, const string& prefix, int i)
+  {
+    const int j = out.FindIndex (g);
+    if (j == 0)
+    {
+      return;
+    }
+    if (! named || names.faces[i-1].empty ())
+    {
+      t.faces[j-1].insert ({prefix, {}});
+      return;
+    }
+    for (const facename& n : names.faces[i-1])
+    {
+      t.faces[j-1].insert ({n.label.empty () ? prefix
+                                             : prefix + "." + n.label,
+                            n.copy});
+    }
+  };
+  for (int i = 1; i <= in.Extent (); i++)
+  {
+    for (const TopoDS_Shape& g : op.Generated (in (i)))
+    {
+      give (g, label + "." + role, i);
+    }
+  }
+  for (const TopoDS_Shape& f : open)
+  {
+    for (const TopoDS_Shape& g : op.Modified (f))
+    {
+      give (g, label + ".rim", in.FindIndex (f));
+    }
+  }
+  return t;
+}
+
 // NAMES with LABEL.start and LABEL.end exchanged, for a side built from a
 // plane outwards and then turned over, whose far end is its start
 static void
@@ -6552,7 +6613,10 @@ function directly. \n\
     }
     else if (cmd == "shell")
     {
-      const TopoDS_Shape s = toshape (args(2), caller);
+      facetable names;
+      const TopoDS_Shape s = toshape (args(2), caller, names);
+      const string label = (args.length () > 8 ? args(8).string_value ()
+                                               : string ());
       const ShapeList open
         = picked (s, TopAbs_FACE, args(3).array_value ());
       // The walls grow inwards, or outwards when asked, each the default
@@ -6580,9 +6644,12 @@ function directly. \n\
       }
       op.MakeThickSolid ();
       TopoDS_Shape r;
+      facetable shellednames;
       if (op.IsDone ())
       {
         r = op.Shape ();
+        shellednames = shellnames (op, s, names, r, open, label,
+                                   outward ? "outer" : "inner");
         // With no face opened Open CASCADE returns the offset solid: inwards
         // the cavity, cut from the shape; outwards the outside, from which
         // the shape is cut
@@ -6602,8 +6669,18 @@ function directly. \n\
           cut.SetArguments (objects);
           cut.SetTools (tools);
           cut.Build ();
+          const TopoDS_Shape offset = r;
           r = (cut.HasErrors () || ! cut.IsDone ()) ? TopoDS_Shape ()
                                                     : cut.Shape ();
+          if (! r.IsNull ())
+          {
+            const modifiedfaces m = [&cut] (const TopoDS_Shape& f)
+                                    -> const TopTools_ListOfShape&
+                                    { return cut.Modified (f); };
+            shellednames = outward
+              ? carrynames (m, {offset, s}, {shellednames, names}, r)
+              : carrynames (m, {s, offset}, {names, shellednames}, r);
+          }
         }
       }
       // Walls too thick for the shape can leave it untouched rather than
@@ -6623,7 +6700,7 @@ function directly. \n\
         error ("%s: Open CASCADE could not hollow the shape.",
                caller.c_str ());
       }
-      out = traced (r, overlap (s, r));
+      out = traced (r, overlap (s, r), shellednames);
     }
 
     // A knurl on the cylindrical face F: its pitch, its depth (0 for the

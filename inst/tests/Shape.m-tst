@@ -838,6 +838,39 @@
 %! S = shell (C, faces (C, 'Normal', [0, 0, 1]), 1);
 %! assert_equal (volume (S), (192 - 99) * pi, 1e-9);
 %! assert_equal (isvalid (S), true);
+%!test  # new faces named after the faces they lie against
+%! P = solid.box (60, 40, 30, 'Label', 'plate');
+%! S = shell (P, faces (P, 'Label', 'plate.zmax'), 2, 'Label', 'cup');
+%! assert_equal (faces (S, 'Label', 'cup.inner.plate.ymin'), ...
+%!               faces (S, 'Normal', [0, 1, 0], ...
+%!                      'Within', [2, 2, 2, 58, 2, 30]));
+%! assert_equal (numel (faces (S, 'Label', 'cup.inner')), 5);
+%! assert_equal (numel (faces (S, 'Label', 'plate.ymin')), 1);
+%!test  # the rim keeps the opened face's own name too
+%! P = solid.box (60, 40, 30, 'Label', 'plate');
+%! S = shell (P, faces (P, 'Label', 'plate.zmax'), 2, 'Label', 'cup');
+%! assert_equal (faces (S, 'Label', 'cup.rim.plate.zmax'), ...
+%!               faces (S, 'Normal', [0, 0, 1], ...
+%!                      'Within', [0, 0, 30, 60, 40, 30]));
+%! assert_equal (faces (S, 'Label', 'plate.zmax'), ...
+%!               faces (S, 'Label', 'cup.rim'));
+%!test  # walls grown outwards are outer, a closed shell's too
+%! P = solid.box (60, 40, 30, 'Label', 'plate');
+%! S = shell (P, faces (P, 'Label', 'plate.zmax'), 2, 'Outward', true, ...
+%!            'Label', 'case');
+%! assert_equal (faces (S, 'Label', 'case.outer.plate.zmin'), ...
+%!               faces (S, 'Normal', [0, 0, -1], ...
+%!                      'Within', [-2, -2, -2, 62, 42, -2]));
+%! S = shell (P, [], 2, 'Outward', true, 'Label', 'case');
+%! assert_equal (numel (faces (S, 'Label', 'case.outer')), 6);
+%! assert_equal (numel (faces (S, 'Label', 'plate')), 6);
+%! S = shell (P, [], 2, 'Label', 'void');
+%! assert_equal (numel (faces (S, 'Label', 'void.inner')), 6);
+%!test  # a face without a name gives the label and role alone
+%! B = solid.box (60, 40, 30);
+%! S = shell (B, faces (B, 'Normal', [0, 0, 1]), 2, 'Label', 'cup');
+%! assert_equal (numel (faces (S, 'Label', 'cup.inner')), 5);
+%! assert_equal (numel (faces (S, 'Label', 'cup.rim')), 1);
 
 %!test  # through holes, several at once
 %! S = hole (solid.box (80, 40, 12), [20, 20, 12; 60, 20, 12], 8, Inf);
@@ -2284,6 +2317,8 @@
 %! shell (solid.Shape (), [], 0)
 %!error<solid.Shape.shell: S is empty, so there is nothing to hollow.> ...
 %! shell (solid.Shape (), [], 1)
+%!error<solid.Shape.shell: Label must be an identifier: a letter followed by letters, digits or underscores.> ...
+%! shell (solid.box (1, 1, 1), [], 0.1, 'Label', 'a.b')
 %!error<solid.Shape.hole: invalid number of input arguments.> ...
 %! hole (solid.Shape (), [0, 0, 0], 5)
 %!error<solid.Shape.hole: P must be an M-by-3 real matrix of finite values or a geom.UCS.> ...
