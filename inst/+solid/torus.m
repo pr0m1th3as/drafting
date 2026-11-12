@@ -18,6 +18,7 @@
 ## -*- texinfo -*-
 ## @deftypefn  {drafting} {@var{S} =} solid.torus (@var{R1}, @var{R2})
 ## @deftypefnx {drafting} {@var{S} =} solid.torus (@var{R1}, @var{R2}, @var{U})
+## @deftypefnx {drafting} {@var{S} =} solid.torus (@dots{}, 'Label', @var{L})
 ##
 ## A torus, the solid of a ring.
 ##
@@ -33,13 +34,18 @@
 ## the origin of the @code{geom.UCS} @var{U}, its tube circling the normal of
 ## @var{U} in the plane of @var{U}.
 ##
+## The option @qcode{'Label'} names the one face of the torus @var{L},
+## so that a later step finds it by its name with @code{solid.Shape.faces}.
+## @var{L} is an identifier, a letter followed by letters, digits or
+## underscores.
+##
 ## @seealso{solid.Shape, solid.sphere, geom.UCS}
 ## @end deftypefn
 
 function S = torus (R1, R2, varargin)
 
   ## Input validation
-  if (nargin < 2 || nargin > 3)
+  if (nargin < 2 || nargin > 5)
     error ("solid.torus: invalid number of input arguments.");
   endif
   if (! (isfloat (R1) && isreal (R1) && isscalar (R1) && isfinite (R1) &&
@@ -53,12 +59,13 @@ function S = torus (R1, R2, varargin)
   if (R2 >= R1)
     error ("solid.torus: R2 must be smaller than R1.");
   endif
-  [frame, errmsg] = solid.__primoptargs__ (varargin, {'centroid'}, [0, 0, 0]);
+  [frame, errmsg, label] = solid.__primoptargs__ (varargin, {'centroid'}, ...
+                                                  [0, 0, 0], true);
   if (! isempty (errmsg))
     error ("solid.torus: %s", errmsg);
   endif
 
-  S = __occt__ ('torus', 'solid.torus', double (R1), double (R2));
+  S = __occt__ ('torus', 'solid.torus', double (R1), double (R2), label);
   S = solid.Shape (__occt__ ('place', 'solid.torus', S, frame));
 
 endfunction
@@ -76,9 +83,15 @@ endfunction
 %! assert_equal (bbox (S), [-11, 0, -9, 13, 4, 15], 1e-6);
 %! assert_equal (centroid (S), [1, 2, 3], 1e-9);
 
+%!test  # its one face named by the label alone
+%! S = solid.torus (10, 2, 'Label', 'ring');
+%! assert_equal (faces (S, 'Label', 'ring'), 1);
+
 %!error<solid.torus: invalid number of input arguments.> solid.torus (1)
 %!error<solid.torus: invalid number of input arguments.> ...
-%! solid.torus (2, 1, geom.UCS (), 'Anchor')
+%! solid.torus (2, 1, geom.UCS (), 'Label', 'ring', 3)
+%!error<solid.torus: unknown option 'Anchor'.> ...
+%! solid.torus (2, 1, 'Anchor', 'centroid')
 %!error<solid.torus: U must be a geom.UCS object.> solid.torus (2, 1, 3)
 %!error<solid.torus: R1 must be a positive and finite real scalar.> ...
 %! solid.torus (0, 1)

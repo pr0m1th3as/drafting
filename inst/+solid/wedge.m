@@ -20,6 +20,7 @@
 ## @deftypefnx {drafting} {@var{S} =} solid.wedge (@var{DX}, @var{DY}, @var{DZ}, @var{TOP})
 ## @deftypefnx {drafting} {@var{S} =} solid.wedge (@dots{}, @var{U})
 ## @deftypefnx {drafting} {@var{S} =} solid.wedge (@dots{}, 'Anchor', @var{A})
+## @deftypefnx {drafting} {@var{S} =} solid.wedge (@dots{}, 'Label', @var{L})
 ##
 ## A wedge: a block whose top is smaller than its base.
 ##
@@ -46,6 +47,13 @@
 ## @qcode{'corner'}, the corner of the base at the least @math{x} and
 ## @math{y}, the default, or @qcode{'base'}, the centre of the base.
 ##
+## The option @qcode{'Label'} names the faces of the wedge as
+## @code{solid.box} names those of a block, so that a later step finds a
+## face by its name with @code{solid.Shape.faces}: @var{L}@code{.xmin} to
+## @var{L}@code{.zmax}, by the side of the base each stands on, a sloping
+## face as much as a square one, and @var{L}@code{.zmax} the top.  A top
+## that comes to a ridge or a point is no face and has no name.
+##
 ## @example
 ## @group
 ## ## A ramp 40 long, 20 wide and 10 high
@@ -61,7 +69,7 @@
 function S = wedge (DX, DY, DZ, TOP, varargin)
 
   ## Input validation
-  if (nargin < 4 || nargin > 7)
+  if (nargin < 4 || nargin > 9)
     error ("solid.wedge: invalid number of input arguments.");
   endif
   if (! (isfloat (DX) && isreal (DX) && isscalar (DX) && isfinite (DX) &&
@@ -90,15 +98,17 @@ function S = wedge (DX, DY, DZ, TOP, varargin)
   elseif (TOP(1) > TOP(3) || TOP(2) > TOP(4))
     error ("solid.wedge: TOP must have XMIN <= XMAX and YMIN <= YMAX.");
   endif
-  [frame, errmsg] = solid.__primoptargs__ (varargin, {'corner', 'base'}, ...
-                                           [0, 0, 0; double([DX, DY]) / 2, ...
-                                            0]);
+  [frame, errmsg, label] = solid.__primoptargs__ (varargin, {'corner', ...
+                                                  'base'}, ...
+                                                  [0, 0, 0; ...
+                                                   double([DX, DY]) / 2, 0], ...
+                                                  true);
   if (! isempty (errmsg))
     error ("solid.wedge: %s", errmsg);
   endif
 
   S = __occt__ ('wedge', 'solid.wedge', double (DX), double (DY), ...
-                double (DZ), TOP);
+                double (DZ), TOP, label);
   S = solid.Shape (__occt__ ('place', 'solid.wedge', S, frame));
 
 endfunction
@@ -129,9 +139,34 @@ endfunction
 %! assert_equal (bbox (S), [-9, -3, 3, 11, 7, 11], 1e-9);
 %! assert_equal (numel (faces (S, 'Normal', [0, -1, 0])), 1);
 
+%!test  # faces named by side, a steep slope by the side it stands on
+%! S = solid.wedge (10, 20, 30, 2, 'Label', 'stop');
+%! assert_equal (faces (S, 'Label', 'stop.zmax'), ...
+%!               faces (S, 'Normal', [0, 0, 1]));
+%! assert_equal (faces (S, 'Label', 'stop.zmin'), ...
+%!               faces (S, 'Normal', [0, 0, -1]));
+%! assert_equal (faces (S, 'Label', 'stop.ymin'), ...
+%!               faces (S, 'Normal', [0, -1, 0]));
+%! assert_equal (faces (S, 'Label', 'stop.xmin'), ...
+%!               faces (S, 'Normal', [-1, 0, 0]));
+%! assert_equal (faces (S, 'Label', 'stop.xmax'), ...
+%!               faces (S, 'Within', [2, 0, 0, 10, 20, 30]));
+%!test  # a top come to a ridge or a point is no face
+%! S = solid.wedge (40, 20, 10, 0, 'Label', 'ramp');
+%! assert_equal (numel (faces (S, 'Label', 'ramp')), 5);
+%! S = solid.wedge (20, 20, 10, [10, 10, 10, 10], 'Label', 'spire');
+%! assert_equal (numel (faces (S, 'Label', 'spire')), 5);
+%! assert_equal (corner (S, faces (S, 'Label', {'spire.xmin', ...
+%!                                              'spire.xmax'})), ...
+%!               [10, 10, 10], 1e-12);
+%!error<solid.Shape.faces: no face is named 'ramp.zmax'.> ...
+%! faces (solid.wedge (40, 20, 10, 0, 'Label', 'ramp'), 'Label', 'ramp.zmax')
+
 %!error<solid.wedge: invalid number of input arguments.> solid.wedge (1, 2, 3)
 %!error<solid.wedge: invalid number of input arguments.> ...
-%! solid.wedge (1, 2, 3, 1, geom.UCS (), 'Anchor', 'base', 4)
+%! solid.wedge (1, 2, 3, 1, geom.UCS (), 'Anchor', 'base', 'Label', 'a', 4)
+%!error<solid.wedge: Label must be an identifier: a letter followed by letters, digits or underscores.> ...
+%! solid.wedge (1, 2, 3, 1, 'Label', 'a b')
 %!error<solid.wedge: DX must be a positive and finite real scalar.> ...
 %! solid.wedge (0, 2, 3, 1)
 %!error<solid.wedge: DY must be a positive and finite real scalar.> ...

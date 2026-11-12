@@ -18,6 +18,7 @@
 ## -*- texinfo -*-
 ## @deftypefn  {drafting} {@var{S} =} solid.ellipsoid (@var{A}, @var{B}, @var{C})
 ## @deftypefnx {drafting} {@var{S} =} solid.ellipsoid (@var{A}, @var{B}, @var{C}, @var{U})
+## @deftypefnx {drafting} {@var{S} =} solid.ellipsoid (@dots{}, 'Label', @var{L})
 ##
 ## An ellipsoid.
 ##
@@ -34,6 +35,11 @@
 ## @math{x} axis, @var{B} along its @math{y} axis and @var{C} along its
 ## normal.
 ##
+## The option @qcode{'Label'} names the one face of the ellipsoid @var{L},
+## so that a later step finds it by its name with @code{solid.Shape.faces}.
+## @var{L} is an identifier, a letter followed by letters, digits or
+## underscores.
+##
 ## @example
 ## @group
 ## ## An egg-shaped knob 30 long, 20 across and 16 high, half sunk in a plate
@@ -48,7 +54,7 @@
 function S = ellipsoid (A, B, C, varargin)
 
   ## Input validation
-  if (nargin < 3 || nargin > 4)
+  if (nargin < 3 || nargin > 6)
     error ("solid.ellipsoid: invalid number of input arguments.");
   endif
   if (! (isfloat (A) && isreal (A) && isscalar (A) && isfinite (A) && A > 0))
@@ -60,17 +66,19 @@ function S = ellipsoid (A, B, C, varargin)
   if (! (isfloat (C) && isreal (C) && isscalar (C) && isfinite (C) && C > 0))
     error ("solid.ellipsoid: C must be a positive and finite real scalar.");
   endif
-  [frame, errmsg] = solid.__primoptargs__ (varargin, {'centroid'}, [0, 0, 0]);
+  [frame, errmsg, label] = solid.__primoptargs__ (varargin, {'centroid'}, ...
+                                                  [0, 0, 0], true);
   if (! isempty (errmsg))
     error ("solid.ellipsoid: %s", errmsg);
   endif
 
   F = double ([A, B, C]);
   if (all (F == F(1)))
-    S = __occt__ ('sphere', 'solid.ellipsoid', F(1));
+    S = __occt__ ('sphere', 'solid.ellipsoid', F(1), label);
   else
     S = __occt__ ('gscale', 'solid.ellipsoid', ...
-                  __occt__ ('sphere', 'solid.ellipsoid', 1), F, [0, 0, 0]);
+                  __occt__ ('sphere', 'solid.ellipsoid', 1, label), F, ...
+                  [0, 0, 0]);
   endif
   S = solid.Shape (__occt__ ('place', 'solid.ellipsoid', S, frame));
 
@@ -122,3 +130,11 @@ endfunction
 %! solid.ellipsoid (1, 2, Inf)
 %!error<solid.ellipsoid: U must be a geom.UCS object.> ...
 %! solid.ellipsoid (1, 2, 3, [0, 0, 1])
+%!error<solid.ellipsoid: unknown option 'Anchor'.> ...
+%! solid.ellipsoid (1, 2, 3, 'Anchor', 'centroid')
+%!test  # its one face named by the label alone, stretched or not
+%! S = solid.ellipsoid (15, 10, 8, geom.UCS ([0, 0, 1], [40, 30, 5]), ...
+%!                      'Label', 'knob');
+%! assert_equal (faces (S, 'Label', 'knob'), 1);
+%! S = solid.ellipsoid (5, 5, 5, 'Label', 'knob');
+%! assert_equal (faces (S, 'Label', 'knob'), 1);

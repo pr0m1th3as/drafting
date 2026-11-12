@@ -20,10 +20,11 @@
 ## frame that places it is returned, and the option 'Label'.
 ##
 ## ARGS holds the arguments after the primitive's sizes: none, a geom.UCS, and
-## for a primitive with more than one anchor, 'Anchor' and its name, with or
-## without the UCS.  ANCHORS lists the anchors the primitive offers, its
-## default first, and OFFSETS has one row for each, the point in the
-## primitive's own coordinates that lands on the UCS origin.
+## Name/Value pairs, with or without the UCS: 'Anchor' and its name for a
+## primitive with more than one anchor, and 'Label'.  ANCHORS lists the
+## anchors the primitive offers, its default first, and OFFSETS has one row
+## for each, the point in the primitive's own coordinates that lands on the
+## UCS origin.
 ##
 ## LABELLED is true for a primitive that names its faces, which then takes
 ## the option 'Label', returned in LABEL, empty when it is not given.
@@ -40,7 +41,7 @@ function [FRAME, errmsg, LABEL] = __primoptargs__ (ARGS, ANCHORS, OFFSETS,
   LABEL = '';
 
   U = geom.UCS ();
-  if (! isempty (ARGS) && (numel (ANCHORS) == 1 || ! ischar (ARGS{1})))
+  if (! isempty (ARGS) && ! ischar (ARGS{1}))
     U = ARGS{1};
     ARGS(1) = [];
     if (! isa (U, 'geom.UCS') || ! isscalar (U))
@@ -63,6 +64,11 @@ function [FRAME, errmsg, LABEL] = __primoptargs__ (ARGS, ANCHORS, OFFSETS,
     endif
     switch (lower (name))
       case 'anchor'
+        ## A primitive with one anchor has nothing to choose
+        if (numel (ANCHORS) == 1)
+          errmsg = sprintf ("unknown option '%s'.", name);
+          return;
+        endif
         k = [];
         if (ischar (val) && isrow (val))
           k = find (strcmp (val, ANCHORS));

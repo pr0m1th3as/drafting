@@ -18,6 +18,7 @@
 ## -*- texinfo -*-
 ## @deftypefn  {drafting} {@var{S} =} solid.sphere (@var{R})
 ## @deftypefnx {drafting} {@var{S} =} solid.sphere (@var{R}, @var{U})
+## @deftypefnx {drafting} {@var{S} =} solid.sphere (@dots{}, 'Label', @var{L})
 ##
 ## A sphere.
 ##
@@ -27,24 +28,30 @@
 ## @code{@var{S} = solid.sphere (@var{R}, @var{U})} centres it on the origin
 ## of the @code{geom.UCS} @var{U}, with its poles on the normal of @var{U}.
 ##
+## The option @qcode{'Label'} names the one face of the sphere @var{L},
+## so that a later step finds it by its name with @code{solid.Shape.faces}.
+## @var{L} is an identifier, a letter followed by letters, digits or
+## underscores.
+##
 ## @seealso{solid.Shape, solid.torus, geom.UCS}
 ## @end deftypefn
 
 function S = sphere (R, varargin)
 
   ## Input validation
-  if (nargin < 1 || nargin > 2)
+  if (nargin < 1 || nargin > 4)
     error ("solid.sphere: invalid number of input arguments.");
   endif
   if (! (isfloat (R) && isreal (R) && isscalar (R) && isfinite (R) && R > 0))
     error ("solid.sphere: R must be a positive and finite real scalar.");
   endif
-  [frame, errmsg] = solid.__primoptargs__ (varargin, {'centroid'}, [0, 0, 0]);
+  [frame, errmsg, label] = solid.__primoptargs__ (varargin, {'centroid'}, ...
+                                                  [0, 0, 0], true);
   if (! isempty (errmsg))
     error ("solid.sphere: %s", errmsg);
   endif
 
-  S = __occt__ ('sphere', 'solid.sphere', double (R));
+  S = __occt__ ('sphere', 'solid.sphere', double (R), label);
   S = solid.Shape (__occt__ ('place', 'solid.sphere', S, frame));
 
 endfunction
@@ -63,9 +70,17 @@ endfunction
 %! assert_equal (centroid (S), [4, 5, 6], 1e-9);
 %! assert_equal (volume (S), 32 / 3 * pi, 1e-9);
 
+%!test  # its one face named by the label alone
+%! S = solid.sphere (2, geom.UCS ([1, 1, 0], [4, 5, 6]), 'Label', 'ball');
+%! assert_equal (faces (S, 'Label', 'ball'), 1);
+
 %!error<solid.sphere: invalid number of input arguments.> solid.sphere ()
 %!error<solid.sphere: invalid number of input arguments.> ...
-%! solid.sphere (1, geom.UCS (), 'Anchor')
+%! solid.sphere (1, geom.UCS (), 'Label', 'ball', 2)
+%!error<solid.sphere: unknown option 'Anchor'.> ...
+%! solid.sphere (1, 'Anchor', 'centroid')
+%!error<solid.sphere: Label must be an identifier: a letter followed by letters, digits or underscores.> ...
+%! solid.sphere (1, 'Label', '_ball')
 %!error<solid.sphere: U must be a geom.UCS object.> solid.sphere (1, [0, 0, 1])
 %!error<solid.sphere: R must be a positive and finite real scalar.> ...
 %! solid.sphere (-5)

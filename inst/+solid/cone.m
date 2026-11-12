@@ -18,6 +18,7 @@
 ## -*- texinfo -*-
 ## @deftypefn  {drafting} {@var{S} =} solid.cone (@var{R1}, @var{R2}, @var{H})
 ## @deftypefnx {drafting} {@var{S} =} solid.cone (@var{R1}, @var{R2}, @var{H}, @var{U})
+## @deftypefnx {drafting} {@var{S} =} solid.cone (@dots{}, 'Label', @var{L})
 ##
 ## A right circular cone or truncated cone.
 ##
@@ -35,13 +36,21 @@
 ## the cone in the @code{geom.UCS} @var{U}, its axis along the normal of
 ## @var{U} and the centre of its base on the origin of @var{U}.
 ##
+## The option @qcode{'Label'} names the faces of the cone, so that a later
+## step finds a face by its name with @code{solid.Shape.faces}.  @var{L} is
+## an identifier, a letter followed by letters, digits or underscores, and
+## the faces are named @var{L}@code{.start}, the end of radius @var{R1},
+## @var{L}@code{.end}, the end of radius @var{R2}, and @var{L}@code{.side},
+## its slanting side.  An end of radius zero is a point, not a face, and has
+## no name: the tip of a cone is @code{solid.Shape.corner} of its side.
+##
 ## @seealso{solid.Shape, solid.cylinder, geom.UCS}
 ## @end deftypefn
 
 function S = cone (R1, R2, H, varargin)
 
   ## Input validation
-  if (nargin < 3 || nargin > 4)
+  if (nargin < 3 || nargin > 6)
     error ("solid.cone: invalid number of input arguments.");
   endif
   errmsg = checkradius (R1, 'R1');
@@ -58,12 +67,14 @@ function S = cone (R1, R2, H, varargin)
     error (strcat ("solid.cone: R1 and R2 must differ; a cone with equal", ...
                    " radii is a cylinder."));
   endif
-  [frame, errmsg] = solid.__primoptargs__ (varargin, {'base'}, [0, 0, 0]);
+  [frame, errmsg, label] = solid.__primoptargs__ (varargin, {'base'}, ...
+                                                  [0, 0, 0], true);
   if (! isempty (errmsg))
     error ("solid.cone: %s", errmsg);
   endif
 
-  S = __occt__ ('cone', 'solid.cone', double (R1), double (R2), double (H));
+  S = __occt__ ('cone', 'solid.cone', double (R1), double (R2), double (H), ...
+                label);
   S = solid.Shape (__occt__ ('place', 'solid.cone', S, frame));
 
 endfunction
@@ -101,10 +112,34 @@ endfunction
 %! assert_equal (bbox (S), [-2, -8, 0, 4, 2, 6], 1e-9);
 %! assert_equal (centroid (S), [1, -0.5, 3], 1e-9);
 
+%!test  # faces of a frustum named start, end and side
+%! S = solid.cone (4, 2, 10, 'Label', 'taper');
+%! assert_equal (faces (S, 'Label', 'taper.start'), ...
+%!               faces (S, 'Normal', [0, 0, -1]));
+%! assert_equal (faces (S, 'Label', 'taper.end'), ...
+%!               faces (S, 'Normal', [0, 0, 1]));
+%! assert_equal (faces (S, 'Label', 'taper.side'), faces (S, 'Type', 'cone'));
+%!test  # a pointed end has no face and no name
+%! S = solid.cone (3, 0, 10, geom.UCS ([0, -1, 0], [1, 2, 3]), 'Label', 'tip');
+%! assert_equal (numel (faces (S, 'Label', 'tip')), 2);
+%! assert_equal (corner (S, faces (S, 'Label', 'tip.side')), [1, -8, 3], 1e-9);
+%! S = solid.cone (0, 3, 10, 'Label', 'cup');
+%! assert_equal (faces (S, 'Label', 'cup.end'), faces (S, 'Normal', [0, 0, 1]));
+%!error<solid.Shape.faces: no face is named 'tip.end'.> ...
+%! faces (solid.cone (3, 0, 10, 'Label', 'tip'), 'Label', 'tip.end')
+%!error<solid.Shape.faces: no face is named 'cup.start'.> ...
+%! faces (solid.cone (0, 3, 10, 'Label', 'cup'), 'Label', 'cup.start')
+
 %!error<solid.cone: invalid number of input arguments.> solid.cone (1, 2)
 %!error<solid.cone: invalid number of input arguments.> ...
-%! solid.cone (1, 2, 3, geom.UCS (), 'Anchor')
-%!error<solid.cone: U must be a geom.UCS object.> solid.cone (1, 2, 3, 'base')
+%! solid.cone (1, 2, 3, geom.UCS (), 'Label', 'tip', 4)
+%!error<solid.cone: U must be a geom.UCS object.> solid.cone (1, 2, 3, [0, 0, 1])
+%!error<solid.cone: Name/Value arguments must come in pairs.> ...
+%! solid.cone (1, 2, 3, 'base')
+%!error<solid.cone: unknown option 'Anchor'.> ...
+%! solid.cone (1, 2, 3, 'Anchor', 'base')
+%!error<solid.cone: Label must be an identifier: a letter followed by letters, digits or underscores.> ...
+%! solid.cone (1, 2, 3, 'Label', 'tip.end')
 %!error<solid.cone: R1 must be a non-negative and finite real scalar.> ...
 %! solid.cone (-1, 2, 3)
 %!error<solid.cone: R2 must be a non-negative and finite real scalar.> ...

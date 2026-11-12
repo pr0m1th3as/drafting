@@ -123,6 +123,7 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <BRepPrimAPI_MakePrism.hxx>
 #include <BRepPrimAPI_MakeRevol.hxx>
 #include <BRepPrimAPI_MakeWedge.hxx>
+#include <BRepPrim_Wedge.hxx>
 #include <BRepPrimAPI_MakeSphere.hxx>
 #include <BRepPrimAPI_MakeTorus.hxx>
 #include <BRep_Tool.hxx>
@@ -1106,10 +1107,10 @@ boxrole (const TopoDS_Face& f)
   return string (1, "xyz"[k]) + (c[k] < 0 ? "min" : "max");
 }
 
-// The role of a face of a cylinder made up the z axis: "side" for its
-// curved face, "start" for the end it stands on and "end" for the other
+// The role of a face of a cylinder or cone made up the z axis: "side" for
+// its curved face, "start" for the end it stands on and "end" for the other
 static string
-cylinderrole (const TopoDS_Face& f)
+axialrole (const TopoDS_Face& f)
 {
   if (BRepAdaptor_Surface (f).GetType () != GeomAbs_Plane)
   {
@@ -5858,11 +5859,14 @@ function directly. \n\
                                     args(3).double_value ()).Shape ();
       const string label = (args.length () > 4 ? args(4).string_value ()
                                                : string ());
-      out = todata (s, labelled (s, label, cylinderrole));
+      out = todata (s, labelled (s, label, axialrole));
     }
     // A wedge: a block DX by DY at the base, DZ high, its top face spanning
     // XMIN to XMAX and YMIN to YMAX.  Open CASCADE builds a wedge with its
-    // height along y, so it is built in axes that turn that onto z.
+    // height along y, so it is built in axes that turn that onto z.  Its
+    // faces are named as a box's by the side the wedge itself says each is
+    // on, its own y being z here and its own z, -y: a sloping side may face
+    // more up than out.  A top collapsed to a ridge or a point is no face.
     else if (cmd == "wedge")
     {
       const double dx = args(2).double_value ();
@@ -5871,24 +5875,64 @@ function directly. \n\
       const NDArray top = args(5).array_value ();
       const gp_Ax2 axes (gp_Pnt (0, dy, 0), gp_Dir (0, -1, 0),
                          gp_Dir (1, 0, 0));
-      out = todata (BRepPrimAPI_MakeWedge (axes, dx, dz, dy, top(0),
-                                           dy - top(3), top(2), dy - top(1))
-                    .Shape ());
+      BRepPrimAPI_MakeWedge make (axes, dx, dz, dy, top(0), dy - top(3),
+                                  top(2), dy - top(1));
+      const TopoDS_Shape s = make.Shape ();
+      const string label = (args.length () > 6 ? args(6).string_value ()
+                                               : string ());
+      const BRepPrim_Direction side[6] = {BRepPrim_XMin, BRepPrim_XMax,
+                                          BRepPrim_YMin, BRepPrim_YMax,
+                                          BRepPrim_ZMin, BRepPrim_ZMax};
+      const char *role[6] = {"xmin", "xmax", "zmin", "zmax", "ymax", "ymin"};
+      vector<pair<TopoDS_Shape, string>> sides;
+      for (int k = 0; k < 6; k++)
+      {
+        if (make.Wedge ().HasFace (side[k]))
+        {
+          sides.push_back ({make.Wedge ().Face (side[k]), role[k]});
+        }
+      }
+      out = todata (s, labelled (s, label, [&sides] (const TopoDS_Face& f)
+                                 {
+                                   for (const auto& p : sides)
+                                   {
+                                     if (p.first.IsSame (f))
+                                     {
+                                       return p.second;
+                                     }
+                                   }
+                                   return string ();
+                                 }));
     }
     else if (cmd == "cone")
     {
-      out = todata (BRepPrimAPI_MakeCone (args(2).double_value (),
-                                          args(3).double_value (),
-                                          args(4).double_value ()).Shape ());
+      const TopoDS_Shape s
+        = BRepPrimAPI_MakeCone (args(2).double_value (),
+                                args(3).double_value (),
+                                args(4).double_value ()).Shape ();
+      const string label = (args.length () > 5 ? args(5).string_value ()
+                                               : string ());
+      out = todata (s, labelled (s, label, axialrole));
     }
+    // A sphere and a torus have one face, named by the label alone
     else if (cmd == "sphere")
     {
-      out = todata (BRepPrimAPI_MakeSphere (args(2).double_value ()).Shape ());
+      const TopoDS_Shape s
+        = BRepPrimAPI_MakeSphere (args(2).double_value ()).Shape ();
+      const string label = (args.length () > 3 ? args(3).string_value ()
+                                               : string ());
+      out = todata (s, labelled (s, label, [] (const TopoDS_Face&)
+                                           { return string (); }));
     }
     else if (cmd == "torus")
     {
-      out = todata (BRepPrimAPI_MakeTorus (args(2).double_value (),
-                                           args(3).double_value ()).Shape ());
+      const TopoDS_Shape s
+        = BRepPrimAPI_MakeTorus (args(2).double_value (),
+                                 args(3).double_value ()).Shape ();
+      const string label = (args.length () > 4 ? args(4).string_value ()
+                                               : string ());
+      out = todata (s, labelled (s, label, [] (const TopoDS_Face&)
+                                           { return string (); }));
     }
     // A primitive put in a UCS: its own axes laid on the frame's, whose rows
     // are the origin, x axis, y axis and normal
