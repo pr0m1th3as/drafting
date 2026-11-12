@@ -1202,6 +1202,43 @@ shellnames (BRepOffset_MakeOffset& op, const TopoDS_Shape& s,
   return t;
 }
 
+// The names T of the faces of R, the result of an operation on S whose
+// history MODIFIED gives, with every face the operation made named by the
+// label LABEL alone: every face of R that is no face of S, nor one a face of
+// S was modified into.  So the rounds and corner patches of a fillet are
+// named, whatever its history says they came from.
+static void
+madefaces (facetable& t, const TopoDS_Shape& s, const TopoDS_Shape& r,
+           const modifiedfaces& modified, const string& label)
+{
+  if (label.empty () || t.stale)
+  {
+    return;
+  }
+  ShapeMap in, out, old;
+  TopExp::MapShapes (s, TopAbs_FACE, in);
+  TopExp::MapShapes (r, TopAbs_FACE, out);
+  for (int i = 1; i <= in.Extent (); i++)
+  {
+    if (out.Contains (in (i)))
+    {
+      old.Add (in (i));
+    }
+    for (const TopoDS_Shape& g : modified (in (i)))
+    {
+      old.Add (g);
+    }
+  }
+  t.faces.resize (out.Extent ());
+  for (int j = 1; j <= out.Extent (); j++)
+  {
+    if (! old.Contains (out (j)))
+    {
+      t.faces[j-1].insert ({label, {}});
+    }
+  }
+}
+
 // NAMES with LABEL.start and LABEL.end exchanged, for a side built from a
 // plane outwards and then turned over, whose far end is its start
 static void
@@ -6493,6 +6530,11 @@ function directly. \n\
       const ShapeList edges
         = picked (s, TopAbs_EDGE, args(3).array_value ());
       const double size = args(4).array_value ()(0);
+      // The rounds or bevels, and the patches where they meet, named by
+      // the label after the size, or after the face and angle of a chamfer
+      const int at = (cmd == "fillet" ? 5 : 7);
+      const string label = (args.length () > at ? args(at).string_value ()
+                                                : string ());
       TopoDS_Shape r;
       origins L;
       if (cmd == "fillet")
@@ -6523,9 +6565,11 @@ function directly. \n\
         }
         r = op.Shape ();
         L = lineage (op, {s}, r);
-        names = carrynames ([&op] (const TopoDS_Shape& f)
-                            -> const TopTools_ListOfShape&
-                            { return op.Modified (f); }, {s}, {names}, r);
+        const modifiedfaces m = [&op] (const TopoDS_Shape& f)
+                                -> const TopTools_ListOfShape&
+                                { return op.Modified (f); };
+        names = carrynames (m, {s}, {names}, r);
+        madefaces (names, s, r, m, label);
       }
       else
       {
@@ -6585,9 +6629,11 @@ function directly. \n\
         }
         r = op.Shape ();
         L = lineage (op, {s}, r);
-        names = carrynames ([&op] (const TopoDS_Shape& f)
-                            -> const TopTools_ListOfShape&
-                            { return op.Modified (f); }, {s}, {names}, r);
+        const modifiedfaces m = [&op] (const TopoDS_Shape& f)
+                                -> const TopTools_ListOfShape&
+                                { return op.Modified (f); };
+        names = carrynames (m, {s}, {names}, r);
+        madefaces (names, s, r, m, label);
       }
       out = traced (r, L, names);
     }

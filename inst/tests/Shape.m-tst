@@ -636,6 +636,35 @@
 %! C = solid.cone (5, 0, 12);
 %! assert_equal (corner (C, faces (C, 'Type', 'cone')), [0, 0, 12], 1e-12);
 
+%!test  # the rounds of a fillet named by its label, the faces kept
+%! P = solid.box (60, 40, 10, 'Label', 'plate');
+%! S = fillet (P, edges (P, 'Face', 'plate.zmax'), 2, 'Label', 'edge_round');
+%! assert_equal (faces (S, 'Label', 'edge_round'), ...
+%!               faces (S, 'Type', 'cylinder'));
+%! assert_equal (numel (faces (S, 'Label', 'plate')), 6);
+%! assert_equal (faces (S, 'Label', 'edge_round', ...
+%!                      'Adjacent', {'plate.zmax', 'plate.ymin'}), ...
+%!               faces (S, 'Type', 'cylinder', 'Within', [0, 0, 8, 60, 2, 10]));
+%!test  # corner patches named too, each bordering the rounds that meet there
+%! P = solid.box (60, 40, 10, 'Label', 'plate');
+%! S = fillet (P, edges (P), 2, 'Label', 'edge_round');
+%! assert_equal (numel (faces (S, 'Label', 'edge_round')), 20);
+%! r = @(a, b) faces (S, 'Label', 'edge_round', 'Adjacent', {a, b});
+%! C = faces (S, 'Label', 'edge_round', 'Adjacent', ...
+%!            {r('plate.zmax', 'plate.ymin'), r('plate.zmax', 'plate.xmin'), ...
+%!             r('plate.ymin', 'plate.xmin')});
+%! assert_equal (C, faces (S, 'Type', 'sphere', 'Within', [0, 0, 8, 2, 2, 10]));
+%!test  # the bevels of a chamfer named by its label
+%! P = solid.box (60, 40, 10, 'Label', 'plate');
+%! S = chamfer (P, edges (P, 'Face', 'plate.zmax'), 1, 'Label', 'bevel');
+%! assert_equal (numel (faces (S, 'Label', 'bevel')), 4);
+%! assert_equal (numel (faces (S, 'Label', 'bevel', ...
+%!                            'Adjacent', {'plate.zmax', 'plate.ymin'})), 1);
+%! S = chamfer (P, edges (P, 'Face', 'plate.zmax'), 2, ...
+%!              faces (P, 'Label', 'plate.zmax'), 'Angle', 30, ...
+%!              'Label', 'bevel');
+%! assert_equal (numel (faces (S, 'Label', 'bevel')), 4);
+
 %!test  # four parallel edges rounded
 %! B = solid.box (10, 20, 30);
 %! S = fillet (B, edges (B, 'Direction', [0, 0, 1]), 2);
@@ -2218,6 +2247,14 @@
 %! fillet (solid.Shape (), 1)
 %!error<solid.Shape.fillet: E must be a vector of edge indices of S.> ...
 %! fillet (solid.Shape (), 1, 2)
+%!error<solid.Shape.fillet: Label must be an identifier: a letter followed by letters, digits or underscores.> ...
+%! fillet (solid.box (1, 1, 1), 1, 0.1, 'Label', 'a.b')
+%!error<solid.Shape.fillet: unknown option 'Radius'.> ...
+%! fillet (solid.box (1, 1, 1), 1, 0.1, 'Radius', 1)
+%!error<solid.Shape.chamfer: Label must not be empty.> ...
+%! chamfer (solid.box (1, 1, 1), 1, 0.1, 'Label', '')
+%!error<solid.Shape.chamfer: Label must be an identifier: a letter followed by letters, digits or underscores.> ...
+%! chamfer (solid.box (1, 1, 1), 1, 0.1, 'Label', 'a b')
 %!error<solid.Shape.fillet: E is empty: no edge was selected.> ...
 %! fillet (solid.Shape (), [], 2)
 %!error<solid.Shape.fillet: Open CASCADE could not round the edges.> ...

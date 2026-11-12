@@ -1807,7 +1807,8 @@ classdef Shape
   methods (Access = public)
 
     ## -*- texinfo -*-
-    ## @deftypefn {solid.Shape} {@var{S} =} fillet (@var{S}, @var{E}, @var{R})
+    ## @deftypefn  {solid.Shape} {@var{S} =} fillet (@var{S}, @var{E}, @var{R})
+    ## @deftypefnx {solid.Shape} {@var{S} =} fillet (@dots{}, @qcode{'Label'}, @var{L})
     ##
     ## Round edges of a shape to a radius.
     ##
@@ -1839,13 +1840,34 @@ classdef Shape
     ## @end group
     ## @end example
     ##
+    ## The option @qcode{'Label'} names every face the fillet makes @var{L}, an
+    ## identifier, a letter followed by letters, digits or underscores, so
+    ## that a later step finds them by name with @code{solid.Shape.faces}:
+    ## each round along an edge, and each patch where several meet at a
+    ## corner.  One of them is chosen from the rest with @qcode{'Adjacent'}:
+    ## a round borders the two faces of the edge it replaced, which keep their
+    ## names, and a corner patch borders only the rounds that meet there, so
+    ## it is chosen with @qcode{'Adjacent'} on them.  The edge itself is gone,
+    ## so @code{edges} with @qcode{'Between'} on its two faces then chooses
+    ## nothing.
+    ##
     ## @seealso{solid.Shape.edges, solid.Shape.facefillet, solid.Shape.chamfer}
     ## @end deftypefn
-    function this = fillet (this, E, R)
+    function this = fillet (this, E, R, varargin)
 
       ## Input validation
-      if (nargin != 3)
+      if (nargin < 3)
         error ("solid.Shape.fillet: invalid number of input arguments.");
+      endif
+      [errmsg, opt] = options (varargin, struct ('Label', ''));
+      if (isempty (errmsg) && ! isempty (opt.Label)
+          && ! (ischar (opt.Label) && isrow (opt.Label)
+                && ! isempty (regexp (opt.Label, '^[A-Za-z]\w*$', 'once'))))
+        errmsg = strcat ("Label must be an identifier: a letter followed", ...
+                         " by letters, digits or underscores.");
+      endif
+      if (! isempty (errmsg))
+        error ("solid.Shape.fillet: %s", errmsg);
       endif
       errmsg = checkindex (E, numedges (this), 'E', 'edge', false);
       if (! isempty (errmsg))
@@ -1858,7 +1880,7 @@ classdef Shape
       endif
 
       r = occt ('solid.Shape.fillet', 'fillet', this.Data, ...
-                unique (double (E)), double (R));
+                unique (double (E)), double (R), opt.Label);
       A = this;
       this.Data = r{1};
       [this.Colour, this.Name] = inherit (r{2}, A);
@@ -1964,6 +1986,7 @@ classdef Shape
     ## @deftypefn  {solid.Shape} {@var{S} =} chamfer (@var{S}, @var{E}, @var{D})
     ## @deftypefnx {solid.Shape} {@var{S} =} chamfer (@var{S}, @var{E}, [@var{D1}, @var{D2}], @var{F})
     ## @deftypefnx {solid.Shape} {@var{S} =} chamfer (@var{S}, @var{E}, @var{D}, @var{F}, @qcode{'Angle'}, @var{A})
+    ## @deftypefnx {solid.Shape} {@var{S} =} chamfer (@dots{}, @qcode{'Label'}, @var{L})
     ##
     ## Bevel edges of a shape.
     ##
@@ -2002,6 +2025,17 @@ classdef Shape
     ## @end group
     ## @end example
     ##
+    ## The option @qcode{'Label'} names every face the chamfer makes @var{L}, an
+    ## identifier, a letter followed by letters, digits or underscores, so
+    ## that a later step finds them by name with @code{solid.Shape.faces}:
+    ## each bevel along an edge, and each patch where several meet at a
+    ## corner.  One of them is chosen from the rest with @qcode{'Adjacent'}:
+    ## a bevel borders the two faces of the edge it replaced, which keep their
+    ## names, and a corner patch borders only the bevels that meet there, so
+    ## it is chosen with @qcode{'Adjacent'} on them.  The edge itself is gone,
+    ## so @code{edges} with @qcode{'Between'} on its two faces then chooses
+    ## nothing.
+    ##
     ## @seealso{solid.Shape.edges, solid.Shape.fillet}
     ## @end deftypefn
     function this = chamfer (this, E, D, varargin)
@@ -2017,7 +2051,13 @@ classdef Shape
         F = varargin{1};
         varargin(1) = [];
       endif
-      [errmsg, opt] = options (varargin, struct ('Angle', []));
+      [errmsg, opt] = options (varargin, struct ('Angle', [], 'Label', ''));
+      if (isempty (errmsg) && ! isempty (opt.Label)
+          && ! (ischar (opt.Label) && isrow (opt.Label)
+                && ! isempty (regexp (opt.Label, '^[A-Za-z]\w*$', 'once'))))
+        errmsg = strcat ("Label must be an identifier: a letter followed", ...
+                         " by letters, digits or underscores.");
+      endif
       if (! isempty (errmsg))
         error ("solid.Shape.chamfer: %s", errmsg);
       endif
@@ -2069,7 +2109,7 @@ classdef Shape
         A = 0;
       endif
       r = occt ('solid.Shape.chamfer', 'chamfer', this.Data, ...
-                unique (double (E)), double (D), F0, double (A));
+                unique (double (E)), double (D), F0, double (A), opt.Label);
       A = this;
       this.Data = r{1};
       [this.Colour, this.Name] = inherit (r{2}, A);
