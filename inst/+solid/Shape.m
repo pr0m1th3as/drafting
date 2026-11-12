@@ -1311,6 +1311,13 @@ classdef Shape
     ## leaves two plates and not where it crosses the gap between them.  The
     ## edge a fillet or chamfer has replaced lies between its two faces no
     ## more, and is not chosen.
+    ##
+    ## @item @qcode{'Copy'}
+    ## Copies of an array, as @code{solid.Shape.faces} takes them.  An edge is
+    ## chosen when a face it bounds is in one of them, whatever its other
+    ## face: with a row of bosses standing on a plate, @code{edges (@var{S},
+    ## 'Between', @{'plate.zmax', 'boss.side'@}, 'Copy', 2)} is the circle at
+    ## the foot of the second boss.
     ## @end table
     ##
     ## @example
@@ -1332,7 +1339,7 @@ classdef Shape
       [errmsg, opt] = options (varargin, struct ('Type', [], ...
                                                  'Direction', [], ...
                                                  'Within', [], 'Face', [], ...
-                                                 'Between', []));
+                                                 'Between', [], 'Copy', []));
       if (isempty (errmsg))
         [errmsg, opt.Type] = checktype (opt.Type, kinds, 'curve');
       endif
@@ -1365,6 +1372,9 @@ classdef Shape
           endif
         endfor
       endif
+      if (isempty (errmsg) && ! isempty (opt.Copy))
+        [errmsg, incopy] = incopies (this, opt.Copy, 'solid.Shape.edges');
+      endif
       if (! isempty (errmsg))
         error ("solid.Shape.edges: %s", errmsg);
       endif
@@ -1395,6 +1405,10 @@ classdef Shape
         apart = cellfun (@(f) numel (unique (f(ismember (f, [sides{:}])))) ...
                               >= 2, onfaces);
         keep &= one & two & apart;
+      endif
+      ## An edge with a face in the copies, whatever its other face
+      if (! isempty (opt.Copy))
+        keep &= cellfun (@(f) any (incopy(f)), onfaces);
       endif
       E = find (keep)';
 
@@ -1455,6 +1469,18 @@ classdef Shape
     ## round the top of a block are rounded, @code{faces (@var{S}, 'Type',
     ## 'cylinder', 'Adjacent', @{'plate.zmax', 'plate.ymin'@})} is the round
     ## along its front edge.
+    ##
+    ## @item @qcode{'Copy'}
+    ## The copies of @code{solid.Shape.copy}, @code{solid.Shape.rectarray}
+    ## or @code{solid.Shape.polararray} the faces come from, as each numbers
+    ## them: copy numbers, or @qcode{':'} for every copy.  A face is chosen
+    ## when it is in one of them, labelled or not: @code{faces (@var{S},
+    ## 'Copy', 2)} is the second pin of a row.  For arrays of arrays, a cell
+    ## array gives the copies of each in turn, the first array applied first,
+    ## and chooses every combination of them: @code{@{1:3, [2, 4]@}} is the
+    ## first three pins of a row in its second and fourth copies.  A face is
+    ## chosen only when it went through as many arrays as the cell has
+    ## elements.  Copies that no face is in are an error.
     ## @end table
     ##
     ## A face keeps its names through what is done to the shape later.  Moved,
@@ -1488,7 +1514,8 @@ classdef Shape
                'revolution', 'extrusion', 'bspline', 'other'};
       [errmsg, opt] = options (varargin, struct ('Type', [], 'Normal', [], ...
                                                  'Axis', [], 'Within', [], ...
-                                                 'Label', [], 'Adjacent', []));
+                                                 'Label', [], ...
+                                                 'Adjacent', [], 'Copy', []));
       if (isempty (errmsg))
         [errmsg, opt.Type] = checktype (opt.Type, kinds, 'surface');
       endif
@@ -1522,6 +1549,9 @@ classdef Shape
           endif
         endfor
       endif
+      if (isempty (errmsg) && ! isempty (opt.Copy))
+        [errmsg, incopy] = incopies (this, opt.Copy, 'solid.Shape.faces');
+      endif
       if (! isempty (errmsg))
         error ("solid.Shape.faces: %s", errmsg);
       endif
@@ -1535,6 +1565,9 @@ classdef Shape
       keep = true (numel (type), 1);
       if (! isempty (opt.Label))
         keep &= hit;
+      endif
+      if (! isempty (opt.Copy))
+        keep &= incopy;
       endif
       ## A face borders another when an edge, not a seam, lies between them
       if (! isempty (next))
@@ -3278,6 +3311,10 @@ classdef Shape
     ## pins standing apart cost little more than one.  This is OpenSCAD's
     ## @code{for} loop of @code{translate}.
     ##
+    ## The copy moved by row @var{k} of @var{D} is copy @var{k}, and
+    ## @code{solid.Shape.faces} and @code{solid.Shape.edges} choose its faces
+    ## with @qcode{'Copy'}.
+    ##
     ## @example
     ## @group
     ## ## Four pins on the corners of a square, one shape of four solids
@@ -3319,6 +3356,13 @@ classdef Shape
     ## shape, as @code{solid.Shape.copy} does.  This is a grid of holes cut
     ## into a plate in one subtraction, or of ribs, pins or bosses standing on
     ## it.
+    ##
+    ## The copies are numbered as Octave numbers the elements of an array of
+    ## size @var{COUNT}, along @math{x} first, so that the copy in row
+    ## @var{i}, column @var{j} and layer @var{k} is @code{sub2ind (@var{COUNT},
+    ## @var{i}, @var{j}, @var{k})}, a number that stays right when the counts
+    ## change.  @code{solid.Shape.faces} and @code{solid.Shape.edges} choose
+    ## the faces of a copy by its number with @qcode{'Copy'}.
     ##
     ## @example
     ## @group
@@ -3368,6 +3412,10 @@ classdef Shape
     ## the teeth of a wheel or the blades of a fan are.  With
     ## @qcode{'Rotate'} set to @code{false} each copy keeps the shape's own
     ## direction, moved as the centre of its bounding box moves.
+    ##
+    ## The copies are numbered from 1, where the shape is, in the order they
+    ## go round, and @code{solid.Shape.faces} and @code{solid.Shape.edges}
+    ## choose the faces of a copy by its number with @qcode{'Copy'}.
     ##
     ## @example
     ## @group
@@ -3525,6 +3573,8 @@ function C = copies (S, D, A, K, P, caller)
     if (any (D(k,:)))
       data{k} = occt (caller, 'translate', data{k}, D(k,:));
     endif
+    ## Its faces numbered as the K-th copy, for 'Copy' to choose them
+    data{k} = occt (caller, 'copyindex', data{k}, k);
     B(k,:) = occt (caller, 'bbox', data{k});
   endfor
   tol = 1e-9 * max ([1, abs(B(:))']);
@@ -3772,6 +3822,50 @@ function [errmsg, hit] = named (S, NAMES, OPTION, caller)
     endif
     hit |= m;
   endfor
+
+endfunction
+
+## The faces of S in the copies COPY gives, as a logical column with a row
+## for each face.  COPY is copy numbers, or ':' for every copy, for one level
+## of arrays, or a cell array with one of them for each level, the first
+## array applied first.  A face is in them when it went through as many
+## arrays as COPY has levels, and its copy in each is among those given for
+## it.  Returns an error message body, empty when COPY is valid and some face
+## of S is in it.
+function [errmsg, hit] = incopies (S, COPY, caller)
+
+  errmsg = '';
+  hit = [];
+  levels = COPY;
+  if (! iscell (levels))
+    levels = {levels};
+  endif
+  valid = @(c) (ischar (c) && strcmp (c, ':')) ...
+               || (isnumeric (c) && isreal (c) && isvector (c) ...
+                   && all (c == fix (c)) && all (c >= 1));
+  if (isempty (levels) || ! all (cellfun (valid, levels(:))))
+    errmsg = strcat ("Copy must be copy numbers or ':', or a cell array", ...
+                     " with one of them for each level of arrays.");
+    return;
+  endif
+  copies = cell (0, 1);
+  if (! isempty (S.Data))
+    info = occt (caller, 'names', S.Data);
+    copies = info{3};
+    if (info{2})
+      errmsg = strcat ("the names of the faces were written by another", ...
+                       " version of Open CASCADE; run the script again.");
+      return;
+    endif
+  endif
+  n = numel (levels);
+  given = @(c) numel (c) == n ...
+               && all (arrayfun (@(j) ischar (levels{j}) ...
+                                      || ismember (c(j), levels{j}), 1:n));
+  hit = cellfun (@(row) any (cellfun (given, row)), copies);
+  if (! any (hit))
+    errmsg = "no face is in the copies Copy gives.";
+  endif
 
 endfunction
 

@@ -1117,8 +1117,11 @@ cylinderrole (const TopoDS_Face& f)
   return outward (f).Z () < 0 ? "start" : "end";
 }
 
-// The names of the faces of a shape, a row of names for each face, and
-// whether they are stale, written by another version of Open CASCADE
+// The names of the faces of a shape, a row of names for each face, whether
+// they are stale, written by another version of Open CASCADE, and for each
+// face a row of the copies each name is in, one copy for each array it went
+// through.  A face that went through arrays without a name has a nameless
+// entry, an empty name, holding its copies.
 static Cell
 nameinfo (const TopoDS_Shape& s, const facetable& names)
 {
@@ -1126,21 +1129,58 @@ nameinfo (const TopoDS_Shape& s, const facetable& names)
   const bool fits = names.faces.empty ()
                     || names.faces.size () == static_cast<size_t> (n);
   Cell labels (n, 1);
+  Cell copies (n, 1);
   for (octave_idx_type i = 0; i < n; i++)
   {
     Cell row (1, 0);
+    Cell crow (1, 0);
     if (fits && ! names.faces.empty ())
     {
       row = Cell (1, names.faces[i].size ());
+      crow = Cell (1, names.faces[i].size ());
       octave_idx_type j = 0;
       for (const facename& f : names.faces[i])
       {
-        row(j++) = f.label;
+        RowVector c (f.copy.size ());
+        for (size_t k = 0; k < f.copy.size (); k++)
+        {
+          c(k) = f.copy[k];
+        }
+        row(j) = f.label;
+        crow(j++) = c;
       }
     }
     labels(i) = row;
+    copies(i) = crow;
   }
-  return Cell (ovl (labels, names.stale || ! fits));
+  return Cell (ovl (labels, names.stale || ! fits, copies));
+}
+
+// NAMES with the copy K added to every name, as the K-th copy of an array
+// is numbered; a face without a name is given a nameless entry holding it
+static facetable
+incopy (const TopoDS_Shape& s, facetable names, int k)
+{
+  if (names.stale)
+  {
+    return names;
+  }
+  names.faces.resize (count (s, TopAbs_FACE));
+  for (std::set<facename>& f : names.faces)
+  {
+    std::set<facename> next;
+    if (f.empty ())
+    {
+      next.insert ({"", {k}});
+    }
+    for (facename n : f)
+    {
+      n.copy.push_back (k);
+      next.insert (n);
+    }
+    f = next;
+  }
+  return names;
 }
 
 // The faces of a shape: the kind of surface each lies on, the outward normal
@@ -6858,6 +6898,13 @@ function directly. \n\
       facetable names;
       const TopoDS_Shape s = toshape (args(2), caller, names);
       out = nameinfo (s, names);
+    }
+    // The shape as the K-th copy of an array, its faces numbered so
+    else if (cmd == "copyindex")
+    {
+      facetable names;
+      const TopoDS_Shape s = toshape (args(2), caller, names);
+      out = todata (s, incopy (s, names, args(3).int_value ()));
     }
     // Closed loops in a plane checked as a region's loops are: see loopcheck
     else if (cmd == "loopcheck")
