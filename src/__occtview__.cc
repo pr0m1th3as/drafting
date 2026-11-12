@@ -1710,7 +1710,9 @@ private:
     }
 
     // A vertex is a feature of the part only where an edge that is neither
-    // skipped nor closed on itself meets it
+    // skipped nor closed on itself meets it, or where a surface closes to a
+    // point, as at the tip of a cone, its degenerate edge ending there: the
+    // corners solid.Shape.corner counts
     m_vertices.Clear ();
     m_vskip.clear ();
     TopExp::MapShapes (s, TopAbs_VERTEX, m_vertices);
@@ -1725,7 +1727,7 @@ private:
         for (const TopoDS_Shape& e : vanc (k))
         {
           const TopoDS_Edge& ed = TopoDS::Edge (e);
-          feature = feature
+          feature = feature || BRep_Tool::Degenerated (ed)
                     || (m_skip.count (m_edges.FindIndex (ed)) == 0
                         && ! TopExp::FirstVertex (ed).IsSame
                                (TopExp::LastVertex (ed)));

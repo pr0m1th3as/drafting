@@ -969,7 +969,8 @@ classdef Viewer < handle
     ##
     ## Every point snaps to what it lands on: a corner to its vertex, a
     ## circular edge to its centre, another edge to its midpoint, a face to
-    ## the point clicked.  Each is marked in the window.  On a triangle mesh
+    ## the point clicked.  The tip of a cone and the poles of a sphere are
+    ## corners too, as for @code{solid.Shape.corner}.  Each is marked in the window.  On a triangle mesh
     ## the face clicked is a triangle, which gives the plane where the mesh is
     ## flat, and a point snaps to a corner of the triangle under it or the
     ## middle of one of its sides when the click is near, or else lies where
@@ -3486,6 +3487,31 @@ endfunction
 %!   assert_equal (P, [60, 0, 10; 30, 0, 10], 1e-9);
 %!   assert_equal (strncmp (CODE, "[corner(S, faces(S, 'Label', ", 29), true);
 %!   assert_equal (eval (CODE), P, 1e-9);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
+%! ## The tip of a cone is a corner of its side
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   S = solid.cone (3, 0, 10, 'Label', 'tip');
+%!   V.Model = S;
+%!   [P, CODE] = V.__pick__ ('point', [V.__project__([0, 0, 10]); NaN, NaN]);
+%!   assert_equal (P, [0, 0, 10], 1e-9);
+%!   assert_equal (CODE, "corner (S, faces (S, 'Label', 'tip.side'))");
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
+%! ## The pole of a sphere snaps, but its one face has two corners
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Model = solid.sphere (5, 'Label', 'ball');
+%!   [P, CODE] = V.__pick__ ('point', [V.__project__([0, 0, 5]); NaN, NaN]);
+%!   assert_equal (P, [0, 0, 5], 1e-9);
+%!   assert_equal (CODE, "[0, 0, 5]");
 %! unwind_protect_cleanup
 %!   close (V);
 %! end_unwind_protect
