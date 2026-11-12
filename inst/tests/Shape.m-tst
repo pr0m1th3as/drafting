@@ -2790,6 +2790,15 @@
 %! H = hull (A, translate (A, [3, 0, 0]));
 %! assert_equal (H.Colour, []);
 %! assert_equal (H.Name, {});
+%!error<solid.Shape.faces: no face is named 'block'.> ...
+%! A = solid.box (10, 10, 10, 'Label', 'block');
+%! faces (hull (A, translate (A, [20, 0, 0])), 'Label', 'block')
+%!test  # its own faces named by the label alone
+%! A = solid.box (10, 10, 10, 'Label', 'block');
+%! H = hull (A, translate (A, [20, 0, 0]), 'Label', 'bar');
+%! assert_equal (faces (H, 'Label', 'bar'), 1:numfaces (H));
+%! assert_equal (faces (H, 'Label', 'bar', 'Normal', [0, 0, 1]), ...
+%!               faces (H, 'Within', [0, 0, 10, 30, 10, 10]));
 
 %!test  # a slot: inside the exact hull, within TOL
 %! C = solid.cylinder (5, 4);
@@ -2813,6 +2822,8 @@
 %!                       hull (S, 'Tolerance', 0.1)), true);
 %!error<solid.Shape.hull: Tolerance must be a positive and finite real scalar.> ...
 %! hull (solid.Shape (), 'Tolerance', 0)
+%!error<solid.Shape.hull: Label must be an identifier: a letter followed by letters, digits or underscores.> ...
+%! hull (solid.Shape (), 'Label', 'a b')
 %!error<solid.Shape.hull: every operand must be a solid.Shape object or an N-by-3 matrix of points.> ...
 %! hull (solid.Shape (), [0, 0])
 %!error<solid.Shape.hull: the hull is flat and encloses no volume.> ...

@@ -3457,6 +3457,7 @@ classdef Shape
     ## -*- texinfo -*-
     ## @deftypefn  {solid.Shape} {@var{H} =} hull (@var{A}, @var{B}, @dots{})
     ## @deftypefnx {solid.Shape} {@var{H} =} hull (@dots{}, @qcode{'Tolerance'}, @var{TOL})
+    ## @deftypefnx {solid.Shape} {@var{H} =} hull (@dots{}, @qcode{'Label'}, @var{L})
     ##
     ## The convex hull of shapes and points.
     ##
@@ -3476,7 +3477,11 @@ classdef Shape
     ## of curved faces.
     ##
     ## The hull is a new solid, no one operand's material, so it takes no
-    ## @code{Colour} and no @code{Name} from them.
+    ## @code{Colour} and no @code{Name} from them, and its faces no names.
+    ## The option @qcode{'Label'} names every face of it @var{L}, an
+    ## identifier, a letter followed by letters, digits or underscores, so
+    ## that a later step finds them by name with @code{solid.Shape.faces}; one
+    ## of them is chosen from the rest by @qcode{'Normal'} or @qcode{'Within'}.
     ##
     ## @example
     ## @group
@@ -3494,6 +3499,7 @@ classdef Shape
 
       ## Input validation
       TOL = 0.01;
+      label = '';
       k = find (cellfun (@ischar, varargin), 1);
       args = {};
       if (! isempty (k))
@@ -3516,6 +3522,14 @@ classdef Shape
                    isfinite (TOL) && TOL > 0))
               error (strcat ("solid.Shape.hull: Tolerance must be a", ...
                              " positive and finite real scalar."));
+            endif
+          case 'label'
+            label = val;
+            if (! (ischar (val) && isrow (val)
+                   && ! isempty (regexp (val, '^[A-Za-z]\w*$', 'once'))))
+              error (strcat ("solid.Shape.hull: Label must be an", ...
+                             " identifier: a letter followed by letters,", ...
+                             " digits or underscores."));
             endif
           otherwise
             error ("solid.Shape.hull: unknown option '%s'.", name);
@@ -3556,7 +3570,11 @@ classdef Shape
       catch
         error (flat);
       end_try_catch
-      H = solid.polyhedron (polymesh.Mesh (P, F));
+      if (isempty (label))
+        H = solid.polyhedron (polymesh.Mesh (P, F));
+      else
+        H = solid.polyhedron (polymesh.Mesh (P, F), 'Label', label);
+      endif
 
     endfunction
 
