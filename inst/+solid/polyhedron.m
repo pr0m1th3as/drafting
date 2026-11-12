@@ -18,6 +18,7 @@
 ## -*- texinfo -*-
 ## @deftypefn  {drafting} {@var{S} =} solid.polyhedron (@var{M})
 ## @deftypefnx {drafting} {@var{S} =} solid.polyhedron (@var{M}, 'Merge', @var{TF})
+## @deftypefnx {drafting} {@var{S} =} solid.polyhedron (@dots{}, 'Label', @var{L})
 ##
 ## A solid bounded by a closed triangle mesh.
 ##
@@ -41,6 +42,13 @@
 ## By default, triangles that lie in one plane and meet are merged into one
 ## face, so a box meshed with twelve triangles has six faces.  With
 ## @qcode{'Merge'} set to @code{false} every triangle stays a face.
+##
+## The option @qcode{'Label'} names every face of the solid @var{L}, so that
+## a later step finds them by their name with @code{solid.Shape.faces}.
+## @var{L} is an identifier, a letter followed by letters, digits or
+## underscores.  The faces of a mesh have no roles of their own, so one of
+## them is chosen from the rest by @qcode{'Normal'}, @qcode{'Within'} or
+## @qcode{'Adjacent'}.
 ##
 ## @example
 ## @group
@@ -67,6 +75,7 @@ function S = polyhedron (M, varargin)
     error ("solid.polyhedron: Name/Value arguments must come in pairs.");
   endif
   merge = true;
+  label = '';
   for ii = 1:2:numel (varargin)
     name = varargin{ii};
     val = varargin{ii+1};
@@ -79,6 +88,14 @@ function S = polyhedron (M, varargin)
         if (! islogical (merge) || ! isscalar (merge))
           error ("solid.polyhedron: Merge must be true or false.");
         endif
+      case 'label'
+        label = val;
+        if (! (ischar (label) && isrow (label)
+               && ! isempty (regexp (label, '^[A-Za-z]\w*$', 'once'))))
+          error (strcat ("solid.polyhedron: Label must be an identifier:", ...
+                         " a letter followed by letters, digits or", ...
+                         " underscores."));
+        endif
       otherwise
         error ("solid.polyhedron: unknown option '%s'.", name);
     endswitch
@@ -88,7 +105,7 @@ function S = polyhedron (M, varargin)
   [V, ~, j] = unique (M.Vertices, 'rows');
   F = reshape (j(M.Faces), size (M.Faces));
   S = solid.Shape (__occt__ ('polyhedron', 'solid.polyhedron', V, F, ...
-                             logical (merge)));
+                             logical (merge), label));
 
 endfunction
 
@@ -177,6 +194,18 @@ endfunction
 %! assert_equal (isvalid (T), true);
 %! assert_equal (volume (T), volume (S) / 4, -1e-9);
 
+%!test  # every face named by the label, merged or not
+%! M = tessellate (solid.box (10, 20, 30));
+%! S = solid.polyhedron (M, 'Label', 'hull');
+%! assert_equal (faces (S, 'Label', 'hull'), 1:6);
+%! S = solid.polyhedron (M, 'Merge', false, 'Label', 'hull');
+%! assert_equal (faces (S, 'Label', 'hull'), 1:12);
+%!test  # the faces of a void inside named too
+%! [V, F] = boxmesh ([10, 10, 10]);
+%! S = solid.polyhedron (polymesh.Mesh ([V; V / 2 + 2.5], [F; F + 8]), ...
+%!                       'Label', 'shell');
+%! assert_equal (numel (faces (S, 'Label', 'shell')), numfaces (S));
+
 %!error<solid.polyhedron: invalid number of input arguments.> ...
 %! solid.polyhedron ()
 %!error<solid.polyhedron: Name/Value arguments must come in pairs.> ...
@@ -199,6 +228,10 @@ endfunction
 %! solid.polyhedron (polymesh.Mesh (eye (3), [1, 2, 3]), 'Merge', 2)
 %!error<solid.polyhedron: Merge must be true or false.> ...
 %! solid.polyhedron (polymesh.Mesh (eye (3), [1, 2, 3]), 'Merge', 1)
+%!error<solid.polyhedron: Label must be an identifier: a letter followed by letters, digits or underscores.> ...
+%! solid.polyhedron (polymesh.Mesh (eye (3), [1, 2, 3]), 'Label', 'a.b')
+%!error<solid.polyhedron: Label must be an identifier: a letter followed by letters, digits or underscores.> ...
+%! solid.polyhedron (polymesh.Mesh (eye (3), [1, 2, 3]), 'Label', '')
 %!error<solid.polyhedron: the mesh has no triangles.> ...
 %! solid.polyhedron (polymesh.Mesh ())
 %!error<solid.polyhedron: the mesh is not closed: 3 edges belong to one triangle only.> ...

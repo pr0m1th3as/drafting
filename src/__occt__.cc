@@ -5936,11 +5936,17 @@ function directly. \n\
     }
     // A primitive put in a UCS: its own axes laid on the frame's, whose rows
     // are the origin, x axis, y axis and normal
+    // A polyhedron's faces, triangles or triangles merged, are all named by
+    // the label alone
     else if (cmd == "polyhedron")
     {
-      out = todata (polyhedron (args(2).matrix_value (),
-                                args(3).matrix_value (),
-                                args(4).bool_value (), caller));
+      const TopoDS_Shape s = polyhedron (args(2).matrix_value (),
+                                         args(3).matrix_value (),
+                                         args(4).bool_value (), caller);
+      const string label = (args.length () > 5 ? args(5).string_value ()
+                                               : string ());
+      out = todata (s, labelled (s, label, [] (const TopoDS_Face&)
+                                           { return string (); }));
     }
     else if (cmd == "surface")
     {
