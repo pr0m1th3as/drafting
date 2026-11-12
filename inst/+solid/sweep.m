@@ -77,6 +77,29 @@
 ## @var{L}@code{.side} or @var{L}@code{.hole}.  Without @qcode{'Label'} no face
 ## is named, whatever labels the region carries.
 ##
+## The segments of @var{P} can be labelled too, by @qcode{'Label'} where the
+## @code{geom.Path} is made, and the arcs @code{geom.Path.fillet} rounds its
+## corners with by the fillet's own @qcode{'Label'}.  A path label names no
+## face: each wall, of the outline or of a hole, records the labels of the
+## path segments it was swept along, and @code{solid.Shape.faces} and
+## @code{solid.Shape.edges} choose by them with @qcode{'Along'}.  The two ends
+## run along no segment.  Without @qcode{'Label'} on the sweep the path labels
+## are unused, as the region's are.
+##
+## @example
+## @group
+## ## A bracket of 10 x 6 bar bent through a radius of 8, then the long faces
+## ## of its arm and the top face of the arm alone
+## R = geom.Region ([-5, -3; 5, -3; 5, 3; -5, 3], ...
+##                  'Label', @{'', '', 'top', ''@});
+## P = geom.Path ([0, 0, 0; 0, 0, 40; 30, 0, 40], ...
+##                'Label', @{'upright', 'arm'@});
+## S = solid.sweep (R, fillet (P, 8, 'Label', 'bend'), 'Label', 'bracket');
+## arm = faces (S, 'Label', 'bracket.side', 'Along', 'arm');
+## arm_top = faces (S, 'Label', 'bracket.side.top', 'Along', 'arm');
+## @end group
+## @end example
+##
 ## @seealso{geom.Path, geom.Spline, geom.Region, solid.extrude, solid.helix}
 ## @end deftypefn
 
@@ -311,6 +334,50 @@ endfunction
 %! S = solid.sweep (R, geom.Path ([0, 0, 0; 0, 0, 20]), 'Label', 'tube');
 %! assert_equal (faces (S, 'Label', 'tube.hole.roof'), ...
 %!               faces (S, 'Within', [-1, 1, 0, 1, 1, 20]));
+
+%!test  # each wall runs along the path segment it is swept along
+%! R = geom.Region ([-5, -3; 5, -3; 5, 3; -5, 3]);
+%! P = geom.Path ([0, 0, 0; 0, 0, 40; 30, 0, 40], ...
+%!                'Label', {'upright', 'arm'});
+%! S = solid.sweep (R, P, 'Label', 'bracket');
+%! assert_equal (faces (S, 'Label', 'bracket.side', 'Along', 'arm'), ...
+%!               faces (S, 'Label', 'bracket.side', ...
+%!                      'Within', [-5, -3, 35, 30, 3, 45]));
+%! assert_equal (numel (faces (S, 'Along', 'upright')), 4);
+%!test  # a section label and a path label together
+%! R = geom.Region ([-5, -3; 5, -3; 5, 3; -5, 3], ...
+%!                  'Label', {'', '', 'top', ''});
+%! P = geom.Path ([0, 0, 0; 0, 0, 40; 30, 0, 40], ...
+%!                'Label', {'upright', 'arm'});
+%! S = solid.sweep (R, P, 'Label', 'bracket');
+%! assert_equal (faces (S, 'Label', 'bracket.side.top', 'Along', 'arm'), ...
+%!               faces (S, 'Within', [-5, 3, 35, 30, 3, 45]));
+%!test  # the arc of a path fillet runs along its label
+%! R = geom.Region ([-5, -3; 5, -3; 5, 3; -5, 3]);
+%! P = fillet (geom.Path ([0, 0, 0; 0, 0, 40; 30, 0, 40], ...
+%!                        'Label', {'upright', 'arm'}), 8, 'Label', 'bend');
+%! S = solid.sweep (R, P, 'Label', 'bracket');
+%! assert_equal (numel (faces (S, 'Along', 'bend')), 4);
+%! assert_equal (numel (faces (S, 'Along', {'upright', 'bend'})), 8);
+%!test  # the walls of a hole run along the path too
+%! H = geom.Polyline ([-1, -1; -1, 1; 1, 1; 1, -1], 'Closed', true);
+%! R = geom.Region ([-3, -3; 3, -3; 3, 3; -3, 3], {H});
+%! P = geom.Path ([0, 0, 0; 0, 0, 40; 30, 0, 40], ...
+%!                'Label', {'upright', 'arm'});
+%! S = solid.sweep (R, P, 'Label', 'duct');
+%! assert_equal (numel (faces (S, 'Label', 'duct.hole', 'Along', 'arm')), 4);
+%!test  # the ends run along no segment
+%! R = geom.Region ([-5, -3; 5, -3; 5, 3; -5, 3]);
+%! P = geom.Path ([0, 0, 0; 0, 0, 40; 30, 0, 40], ...
+%!                'Label', {'upright', 'arm'});
+%! S = solid.sweep (R, P, 'Label', 'bracket');
+%! assert_equal (faces (S, 'Label', 'bracket.end', 'Along', 'arm'), ...
+%!               zeros (1, 0));
+%!error<solid.Shape.faces: no face runs along 'arm'.> ...
+%! faces (solid.sweep (geom.Region ([-5, -3; 5, -3; 5, 3; -5, 3]), ...
+%!                     geom.Path ([0, 0, 0; 0, 0, 40; 30, 0, 40], ...
+%!                                'Label', {'upright', 'arm'})), ...
+%!        'Along', 'arm')
 
 %!error<solid.sweep: invalid number of input arguments.> ...
 %! solid.sweep (geom.Region ([0, 0; 1, 0; 1, 1]))

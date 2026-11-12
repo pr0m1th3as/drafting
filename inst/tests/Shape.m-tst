@@ -587,6 +587,56 @@
 %! unwind_protect_cleanup
 %!   delete (f);
 %! end_unwind_protect
+%!test  # path labels stay through a boolean, faces merged flush with both
+%! R = geom.Region ([-5, -3; 5, -3; 5, 3; -5, 3]);
+%! P = geom.Path ([0, 0, 0; 0, 0, 40; 30, 0, 40], ...
+%!                'Label', {'upright', 'arm'});
+%! S = solid.sweep (R, P, 'Label', 'bracket');
+%! S = subtract (S, translate (solid.box (4, 4, 4), [-2, -5, 10]));
+%! arm = faces (S, 'Along', 'arm');
+%! assert_equal (numel (arm), 4);
+%! flush = [faces(S, 'Label', 'bracket', 'Normal', [0, 1, 0]), ...
+%!          faces(S, 'Label', 'bracket', 'Normal', [0, -1, 0])];
+%! assert_equal (intersect (arm, faces (S, 'Along', 'upright')), sort (flush));
+%!test  # path labels stay with the bytes of a shape saved and loaded
+%! R = geom.Region ([-5, -3; 5, -3; 5, 3; -5, 3]);
+%! P = geom.Path ([0, 0, 0; 0, 0, 40; 30, 0, 40], ...
+%!                'Label', {'upright', 'arm'});
+%! S = solid.sweep (R, P, 'Label', 'bracket');
+%! d = S.Data;
+%! f = [tempname(), '.mat'];
+%! unwind_protect
+%!   save ('-binary', f, 'd');
+%!   clear d;
+%!   load (f);
+%!   assert_equal (numel (faces (solid.Shape (d), 'Along', 'arm')), 4);
+%! unwind_protect_cleanup
+%!   delete (f);
+%! end_unwind_protect
+%!test  # path labels in the copies of an array
+%! R = geom.Region ([-5, -3; 5, -3; 5, 3; -5, 3]);
+%! P = geom.Path ([0, 0, 0; 0, 0, 40; 30, 0, 40], ...
+%!                'Label', {'upright', 'arm'});
+%! S = solid.sweep (R, P, 'Label', 'bracket');
+%! A = rectarray (S, [2, 1, 1], [50, 0, 0]);
+%! assert_equal (faces (A, 'Along', 'arm', 'Copy', 2), ...
+%!               faces (A, 'Label', 'bracket.side', ...
+%!                      'Within', [45, -3, 35, 80, 3, 45]));
+%!test  # the edges of the faces along a path segment
+%! R = geom.Region ([-5, -3; 5, -3; 5, 3; -5, 3]);
+%! P = geom.Path ([0, 0, 0; 0, 0, 40; 30, 0, 40], ...
+%!                'Label', {'upright', 'arm'});
+%! S = solid.sweep (R, P, 'Label', 'bracket');
+%! assert_equal (edges (S, 'Along', 'arm'), ...
+%!               edges (S, 'Face', faces (S, 'Along', 'arm')));
+%!error<solid.Shape.faces: Along must be a path label or a cell array of path labels, each a valid Octave identifier or keyword.> ...
+%! faces (solid.box (1, 1, 1), 'Along', 'a.b')
+%!error<solid.Shape.faces: Along must not be empty.> ...
+%! faces (solid.box (1, 1, 1), 'Along', {})
+%!error<solid.Shape.edges: Along must be a path label or a cell array of path labels, each a valid Octave identifier or keyword.> ...
+%! edges (solid.box (1, 1, 1), 'Along', 3)
+%!error<solid.Shape.edges: no face runs along 'arm'.> ...
+%! edges (solid.box (1, 1, 1, 'Label', 'plate'), 'Along', 'arm')
 
 %!test  # the outward normal of a flat face
 %! S = solid.box (60, 40, 10, 'Label', 'plate');

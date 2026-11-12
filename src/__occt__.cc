@@ -1207,11 +1207,13 @@ segmentnames (facetable& t, const TopoDS_Shape& s, const edgelabels& segs,
     }
     const std::set<facename> old = t.faces[i];
     t.faces[i].clear ();
-    for (const facename& n : old)
+    for (facename n : old)
     {
+      const string role = n.label;
       for (const string& label : given[i])
       {
-        t.faces[i].insert ({n.label + "." + label, n.copy});
+        n.label = role + "." + label;
+        addname (t.faces[i], n);
       }
     }
   }
@@ -1254,11 +1256,10 @@ shellnames (BRepOffset_MakeOffset& op, const TopoDS_Shape& s,
       t.faces[j-1].insert ({prefix, {}});
       return;
     }
-    for (const facename& n : names.faces[i-1])
+    for (facename n : names.faces[i-1])
     {
-      t.faces[j-1].insert ({n.label.empty () ? prefix
-                                             : prefix + "." + n.label,
-                            n.copy});
+      n.label = (n.label.empty () ? prefix : prefix + "." + n.label);
+      addname (t.faces[j-1], n);
     }
   };
   for (int i = 1; i <= in.Extent (); i++)
@@ -1333,7 +1334,7 @@ swapends (facetable& names, const string& label)
       {
         n.label = label + ".start";
       }
-      next.insert (n);
+      addname (next, n);
     }
     f = next;
   }
@@ -1372,8 +1373,9 @@ axialrole (const TopoDS_Face& f)
 // The names of the faces of a shape, a row of names for each face, whether
 // they are stale, written by another version of Open CASCADE, and for each
 // face a row of the copies each name is in, one copy for each array it went
-// through.  A face that went through arrays without a name has a nameless
-// entry, an empty name, holding its copies.
+// through, and for each face a row of the path labels any of its names was
+// swept along.  A face that went through arrays without a name has a
+// nameless entry, an empty name, holding its copies.
 static Cell
 nameinfo (const TopoDS_Shape& s, const facetable& names)
 {
@@ -1382,10 +1384,12 @@ nameinfo (const TopoDS_Shape& s, const facetable& names)
                     || names.faces.size () == static_cast<size_t> (n);
   Cell labels (n, 1);
   Cell copies (n, 1);
+  Cell along (n, 1);
   for (octave_idx_type i = 0; i < n; i++)
   {
     Cell row (1, 0);
     Cell crow (1, 0);
+    std::set<string> arow;
     if (fits && ! names.faces.empty ())
     {
       row = Cell (1, names.faces[i].size ());
@@ -1400,12 +1404,20 @@ nameinfo (const TopoDS_Shape& s, const facetable& names)
         }
         row(j) = f.label;
         crow(j++) = c;
+        arow.insert (f.along.begin (), f.along.end ());
       }
     }
     labels(i) = row;
     copies(i) = crow;
+    Cell a (1, arow.size ());
+    octave_idx_type j = 0;
+    for (const string& l : arow)
+    {
+      a(j++) = l;
+    }
+    along(i) = a;
   }
-  return Cell (ovl (labels, names.stale || ! fits, copies));
+  return Cell (ovl (labels, names.stale || ! fits, copies, along));
 }
 
 // NAMES with the copy K added to every name, as the K-th copy of an array
@@ -1428,7 +1440,7 @@ incopy (const TopoDS_Shape& s, facetable names, int k)
     for (facename n : f)
     {
       n.copy.push_back (k);
-      next.insert (n);
+      addname (next, n);
     }
     f = next;
   }
@@ -3502,11 +3514,12 @@ roundtools (const TopoDS_Face& A, const TopoDS_Face& M, const TopoDS_Face& B,
 // start where the spine begins and its end where it ends, and its walls
 // those of the outline, or with OUTLINE false those of a hole, its ends
 // then unnamed; each wall swept from an edge of SEGS also by that edge's
-// segment label
+// segment label.  Every name of a wall swept along an edge of PATH, an edge
+// of the spine, records that edge's label as one it runs along.
 static TopoDS_Shape
 pipe (const TopoDS_Wire& spine, const TopoDS_Wire& w, const edgelabels& segs,
-      bool frenet, const string& caller, const string& label, bool outline,
-      facetable& names)
+      const edgelabels& path, bool frenet, const string& caller,
+      const string& label, bool outline, facetable& names)
 {
   BRepOffsetAPI_MakePipeShell op (spine);
   if (frenet)
@@ -3533,6 +3546,27 @@ pipe (const TopoDS_Wire& spine, const TopoDS_Wire& w, const edgelabels& segs,
                       outline);
   segmentnames (names, s, segs, [&op] (const TopoDS_Shape& e)
                 -> const TopTools_ListOfShape& { return op.Generated (e); });
+  if (names.faces.empty () || path.empty ())
+  {
+    return s;
+  }
+  ShapeMap map;
+  TopExp::MapShapes (s, TopAbs_FACE, map);
+  for (const auto& [e, along] : path)
+  {
+    for (const TopoDS_Shape& g : op.Generated (e))
+    {
+      const int i = map.FindIndex (g);
+      if (i == 0)
+      {
+        continue;
+      }
+      for (const facename& n : names.faces[i-1])
+      {
+        n.along.insert (along);
+      }
+    }
+  }
   return s;
 }
 
@@ -6594,23 +6628,25 @@ function directly. \n\
     }
     // Named start at the path's first point, end at its last (none for a
     // closed path), side for the walls of the outline and hole for those of
-    // the holes
+    // the holes; each wall runs along the labels of the path's segments it
+    // was swept along
     else if (cmd == "sweep")
     {
       const region r = toregion (args(2));
-      const TopoDS_Wire spine = chain (args(3));
+      edgelabels path;
+      const TopoDS_Wire spine = chain (args(3), path);
       const string label = (args.length () > 4 ? args(4).string_value ()
                                                : string ());
       vector<TopoDS_Shape> holes;
       vector<facetable> holenames (r.holes.size ());
       for (size_t k = 0; k < r.holes.size (); k++)
       {
-        holes.push_back (pipe (spine, r.holes[k], r.holelabels[k], false,
-                               caller, label, false, holenames[k]));
+        holes.push_back (pipe (spine, r.holes[k], r.holelabels[k], path,
+                               false, caller, label, false, holenames[k]));
       }
       facetable names;
-      const TopoDS_Shape outer = pipe (spine, r.outer, r.outerlabels, false,
-                                       caller, label, true, names);
+      const TopoDS_Shape outer = pipe (spine, r.outer, r.outerlabels, path,
+                                       false, caller, label, true, names);
       const TopoDS_Shape s = cutall (outer, holes, caller, names, holenames);
       out = todata (s, names);
     }
@@ -6646,12 +6682,12 @@ function directly. \n\
       vector<facetable> holenames (r.holes.size ());
       for (size_t k = 0; k < r.holes.size (); k++)
       {
-        holes.push_back (pipe (spine, r.holes[k], r.holelabels[k], true,
-                               caller, label, false, holenames[k]));
+        holes.push_back (pipe (spine, r.holes[k], r.holelabels[k], edgelabels (),
+                               true, caller, label, false, holenames[k]));
       }
       facetable names;
-      const TopoDS_Shape outer = pipe (spine, r.outer, r.outerlabels, true,
-                                       caller, label, true, names);
+      const TopoDS_Shape outer = pipe (spine, r.outer, r.outerlabels, edgelabels (),
+                                       true, caller, label, true, names);
       const TopoDS_Shape s = cutall (outer, holes, caller, names, holenames);
       out = todata (s, names);
     }
@@ -6845,7 +6881,10 @@ function directly. \n\
                 const int j = after.FindIndex (g);
                 if (j > 0 && ! made.faces[j-1].empty ())
                 {
-                  rnames.faces[j-1].insert (own.begin (), own.end ());
+                  for (const facename& n : own)
+                  {
+                    addname (rnames.faces[j-1], n);
+                  }
                 }
               }
             }
@@ -7009,7 +7048,10 @@ function directly. \n\
           const int j = after.FindIndex (x.Current ());
           if (j > 0)
           {
-            rnames.faces[j-1].insert (own.begin (), own.end ());
+            for (const facename& n : own)
+            {
+              addname (rnames.faces[j-1], n);
+            }
           }
         }
       }
@@ -7734,7 +7776,7 @@ function directly. \n\
           if (it != rename.end ())
           {
             n.label = it->second;
-            next.insert (n);
+            addname (next, n);
           }
         }
         f = next;

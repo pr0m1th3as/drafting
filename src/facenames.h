@@ -39,13 +39,18 @@
 #include <TopTools_ListOfShape.hxx>
 #include <TopoDS_Shape.hxx>
 
-// One name of a face: its label, as dotted levels with the role last, and
-// its copy in each array or several-item operation it went through, the
-// first applied first
+// One name of a face: its label, as dotted levels with the role last, its
+// copy in each array or several-item operation it went through, the first
+// applied first, and the labels of the path segments it was swept along,
+// none for a face not swept or swept along a path without labels.  Two
+// names are the same name when their labels and copies agree: a face has
+// one of them, running along every segment either ran along, so ALONG is
+// outside the order, and can grow on a name already in a set.
 struct facename
 {
   std::string label;
   std::vector<int> copy;
+  mutable std::set<std::string> along;
 
   bool operator < (const facename& other) const
   {
@@ -68,6 +73,10 @@ struct facetable
 };
 
 // The names T as they are written into a shape's bytes
+// N added to the names NAMES of a face, its path labels joined to those of
+// the same name when NAMES has it already
+void addname (std::set<facename>& names, const facename& n);
+
 std::string writenames (const facetable& t);
 
 // The names written by writenames into BYTES, stale when another version of

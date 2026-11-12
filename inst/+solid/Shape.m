@@ -1318,6 +1318,11 @@ classdef Shape
     ## face: with a row of bosses standing on a plate, @code{edges (@var{S},
     ## 'Between', @{'plate.zmax', 'boss.side'@}, 'Copy', 2)} is the circle at
     ## the foot of the second boss.
+    ##
+    ## @item @qcode{'Along'}
+    ## Labels of the segments of a sweep's path, as @code{solid.Shape.faces}
+    ## takes them.  An edge is chosen when a face it bounds was swept along
+    ## one of them, whatever its other face.
     ## @end table
     ##
     ## @example
@@ -1339,7 +1344,8 @@ classdef Shape
       [errmsg, opt] = options (varargin, struct ('Type', [], ...
                                                  'Direction', [], ...
                                                  'Within', [], 'Face', [], ...
-                                                 'Between', [], 'Copy', []));
+                                                 'Between', [], 'Copy', [], ...
+                                                 'Along', []));
       if (isempty (errmsg))
         [errmsg, opt.Type] = checktype (opt.Type, kinds, 'curve');
       endif
@@ -1375,6 +1381,9 @@ classdef Shape
       if (isempty (errmsg) && ! isempty (opt.Copy))
         [errmsg, incopy] = incopies (this, opt.Copy, 'solid.Shape.edges');
       endif
+      if (isempty (errmsg) && ! isempty (opt.Along))
+        [errmsg, along] = runsalong (this, opt.Along, 'solid.Shape.edges');
+      endif
       if (! isempty (errmsg))
         error ("solid.Shape.edges: %s", errmsg);
       endif
@@ -1409,6 +1418,10 @@ classdef Shape
       ## An edge with a face in the copies, whatever its other face
       if (! isempty (opt.Copy))
         keep &= cellfun (@(f) any (incopy(f)), onfaces);
+      endif
+      ## An edge with a face swept along the segments, whatever its other face
+      if (! isempty (opt.Along))
+        keep &= cellfun (@(f) any (along(f)), onfaces);
       endif
       E = find (keep)';
 
@@ -1481,6 +1494,19 @@ classdef Shape
     ## first three pins of a row in its second and fourth copies.  A face is
     ## chosen only when it went through as many arrays as the cell has
     ## elements.  Copies that no face is in are an error.
+    ##
+    ## @item @qcode{'Along'}
+    ## The label of a segment of the path a solid was swept along by
+    ## @code{solid.sweep}, given by @qcode{'Label'} where the
+    ## @code{geom.Path} was made, or a cell array of such labels chosen
+    ## together.  A face is chosen when it was swept along a segment with the
+    ## label.  With a bar swept by @code{solid.sweep (@var{R}, @var{P},
+    ## 'Label', 'bracket')} along @code{@var{P} = geom.Path ([0, 0, 0; 0, 0,
+    ## 40; 30, 0, 40], 'Label', @{'upright', 'arm'@})}, @code{faces (@var{S},
+    ## 'Label', 'bracket.side', 'Along', 'arm')} is the four long faces of the
+    ## arm.  The walls of the section's holes run along the path as its sides
+    ## do; the two ends of the sweep run along no segment.  A label that no
+    ## face runs along is an error.
     ## @end table
     ##
     ## A face keeps its names through what is done to the shape later.  Moved,
@@ -1515,7 +1541,8 @@ classdef Shape
       [errmsg, opt] = options (varargin, struct ('Type', [], 'Normal', [], ...
                                                  'Axis', [], 'Within', [], ...
                                                  'Label', [], ...
-                                                 'Adjacent', [], 'Copy', []));
+                                                 'Adjacent', [], 'Copy', [], ...
+                                                 'Along', []));
       if (isempty (errmsg))
         [errmsg, opt.Type] = checktype (opt.Type, kinds, 'surface');
       endif
@@ -1552,6 +1579,9 @@ classdef Shape
       if (isempty (errmsg) && ! isempty (opt.Copy))
         [errmsg, incopy] = incopies (this, opt.Copy, 'solid.Shape.faces');
       endif
+      if (isempty (errmsg) && ! isempty (opt.Along))
+        [errmsg, along] = runsalong (this, opt.Along, 'solid.Shape.faces');
+      endif
       if (! isempty (errmsg))
         error ("solid.Shape.faces: %s", errmsg);
       endif
@@ -1568,6 +1598,9 @@ classdef Shape
       endif
       if (! isempty (opt.Copy))
         keep &= incopy;
+      endif
+      if (! isempty (opt.Along))
+        keep &= along;
       endif
       ## A face borders another when an edge, not a seam, lies between them
       if (! isempty (next))
@@ -4276,6 +4309,48 @@ function [errmsg, hit] = incopies (S, COPY, caller)
   if (! any (hit))
     errmsg = "no face is in the copies Copy gives.";
   endif
+
+endfunction
+
+## The faces of S swept along the path segments ALONG labels, as a logical
+## column with a row for each face.  ALONG is a label or a cell array of
+## labels, each an identifier or a keyword, and a face is chosen when one of
+## its names was swept along a segment with one of them.  Returns an error
+## message body, empty when every label is well formed and some face of S
+## runs along it.
+function [errmsg, hit] = runsalong (S, ALONG, caller)
+
+  errmsg = '';
+  hit = [];
+  if (ischar (ALONG))
+    ALONG = {ALONG};
+  endif
+  valid = @(c) isrow (c) && (isvarname (c) || iskeyword (c));
+  if (! (iscellstr (ALONG) && ! isempty (ALONG)
+         && all (cellfun (valid, ALONG(:)))))
+    errmsg = strcat ("Along must be a path label or a cell array of path", ...
+                     " labels, each a valid Octave identifier or keyword.");
+    return;
+  endif
+  along = cell (0, 1);
+  if (! isempty (S.Data))
+    info = occt (caller, 'names', S.Data);
+    along = info{4};
+    if (info{2})
+      errmsg = strcat ("the names of the faces were written by another", ...
+                       " version of Open CASCADE; run the script again.");
+      return;
+    endif
+  endif
+  hit = false (numel (along), 1);
+  for k = 1:numel (ALONG)
+    m = cellfun (@(row) any (strcmp (row, ALONG{k})), along);
+    if (! any (m))
+      errmsg = sprintf ("no face runs along '%s'.", ALONG{k});
+      return;
+    endif
+    hit |= m;
+  endfor
 
 endfunction
 

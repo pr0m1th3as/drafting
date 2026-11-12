@@ -21,7 +21,9 @@
 // the format, 1; the version of Open CASCADE that wrote them, as
 // OCC_VERSION_HEX gives it; flags, 1 for stale; the number of faces; then
 // for each face the number of its names, and for each name the length of its
-// label, the label, the number of its copy levels and each copy.
+// label, the label, the number of its copy levels and each copy, and the
+// number of the path labels it was swept along and each one's length and
+// text.
 
 #include "facenames.h"
 
@@ -81,6 +83,16 @@ get32 (const std::string& b, size_t& at, uint32_t& v)
   return true;
 }
 
+void
+addname (std::set<facename>& names, const facename& n)
+{
+  const auto [it, fresh] = names.insert (n);
+  if (! fresh)
+  {
+    it->along.insert (n.along.begin (), n.along.end ());
+  }
+}
+
 std::string
 writenames (const facetable& t)
 {
@@ -105,6 +117,12 @@ writenames (const facetable& t)
       for (int c : n.copy)
       {
         put32 (b, static_cast<uint32_t> (c));
+      }
+      put32 (b, n.along.size ());
+      for (const std::string& a : n.along)
+      {
+        put32 (b, a.size ());
+        b += a;
       }
     }
   }
@@ -160,7 +178,21 @@ readnames (const std::string& b)
         get32 (b, at, v);
         n.copy.push_back (static_cast<int> (v));
       }
-      t.faces[i].insert (n);
+      uint32_t nalong;
+      if (! get32 (b, at, nalong) || nalong > (b.size () - at) / 4)
+      {
+        return refused;
+      }
+      for (uint32_t c = 0; c < nalong; c++)
+      {
+        if (! get32 (b, at, len) || len > b.size () - at)
+        {
+          return refused;
+        }
+        n.along.insert (b.substr (at, len));
+        at += len;
+      }
+      addname (t.faces[i], n);
     }
   }
   if (at != b.size ())
@@ -227,7 +259,10 @@ carrynames (const modifiedfaces& modified,
         const int j = out.FindIndex (g);
         if (j > 0)
         {
-          r.faces[j-1].insert (own.begin (), own.end ());
+          for (const facename& n : own)
+          {
+            addname (r.faces[j-1], n);
+          }
         }
       };
       give (in (i));
