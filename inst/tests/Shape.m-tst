@@ -844,6 +844,38 @@
 %! assert_equal (volume (S), 38400 - 2 * 16 * pi * 12, 1e-9);
 %! assert_equal (numfaces (S), 8);
 %! assert_equal (isvalid (S), true);
+%!test  # a hole's faces named wall and bottom, a through hole no bottom
+%! B = solid.box (40, 30, 20);
+%! S = hole (B, [10, 10, 20], 6, 10, 'Label', 'bore');
+%! assert_equal (faces (S, 'Label', 'bore.wall'), ...
+%!               faces (S, 'Type', 'cylinder'));
+%! assert_equal (faces (S, 'Label', 'bore.bottom'), ...
+%!               faces (S, 'Normal', [0, 0, 1], ...
+%!                      'Within', [7, 7, 10, 13, 13, 10]));
+%! S = hole (B, [10, 10, 20], 6, 10, 'Tip', 118, 'Label', 'bore');
+%! assert_equal (faces (S, 'Label', 'bore.bottom'), faces (S, 'Type', 'cone'));
+%! S = hole (B, [10, 10, 20], 6, Inf, 'Label', 'bore');
+%! assert_equal (numel (faces (S, 'Label', 'bore')), 1);
+%!test  # a counterbore's wall and step, a countersink's cone
+%! B = solid.box (40, 30, 20);
+%! S = hole (B, [10, 10, 20], 6.6, Inf, 'Counterbore', [11, 6], ...
+%!           'Label', 'seat');
+%! assert_equal (faces (S, 'Label', 'seat.step'), ...
+%!               faces (S, 'Normal', [0, 0, 1], ...
+%!                      'Within', [4, 4, 14, 16, 16, 14]));
+%! assert_equal (numel (faces (S, 'Label', {'seat.wall', ...
+%!                                          'seat.counterbore'})), 2);
+%! S = hole (B, [10, 10, 20], 6.6, Inf, 'Countersink', 12, 'Label', 'seat');
+%! assert_equal (faces (S, 'Label', 'seat.countersink'), ...
+%!               faces (S, 'Type', 'cone'));
+%!test  # the hole at each row of P is a copy
+%! B = solid.box (40, 30, 20);
+%! S = hole (B, [10, 10, 20; 30, 10, 20], 6, 10, 'Label', 'bore');
+%! assert_equal (faces (S, 'Label', 'bore.wall', 'Copy', 2), ...
+%!               faces (S, 'Type', 'cylinder', ...
+%!                      'Within', [26.9, 6.9, 9.9, 33.1, 13.1, 20.1]));
+%! S = hole (B, [10, 10, 20; 30, 10, 20], 6, 10);
+%! assert_equal (numel (faces (S, 'Copy', 2)), 2);
 
 %!test  # a blind hole, flat and with a drill tip
 %! B = solid.box (80, 40, 12);
@@ -2300,6 +2332,8 @@
 %! hole (solid.box (30, 10, 4), [15, 3, 4; 15, 7, 4], 7, Inf)
 %!error<solid.Shape.hole: Tip applies to blind holes only.> ...
 %! hole (solid.Shape (), [0, 0, 0], 5, Inf, 'Tip', 118)
+%!error<solid.Shape.hole: Label must be an identifier: a letter followed by letters, digits or underscores.> ...
+%! hole (solid.Shape (), [0, 0, 0], 5, Inf, 'Label', 'a.b')
 %!error<solid.Shape.thread: invalid number of input arguments.> ...
 %! thread (solid.Shape (), [0, 0, 0], 'M6')
 %!error<solid.Shape.thread: P must be an M-by-3 real matrix of finite values or a geom.UCS.> ...

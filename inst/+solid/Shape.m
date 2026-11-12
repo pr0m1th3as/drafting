@@ -2346,6 +2346,17 @@ classdef Shape
     ## the point of a 118 degree drill by default; false leaves it
     ## flat-bottomed, as an end mill or a flat-bottom drill leaves it.  Every
     ## other blind hole is flat-bottomed by default, as an end mill leaves it.
+    ##
+    ## @item @qcode{'Label'}
+    ## An identifier @var{L}, a letter followed by letters, digits or
+    ## underscores, that names the faces the holes make, so that a later step
+    ## finds them by name with @code{solid.Shape.faces}: @var{L}@code{.wall},
+    ## the bore, @var{L}@code{.bottom}, the drill point or flat floor of a
+    ## blind hole, @var{L}@code{.counterbore}, the wall of a counterbore, and
+    ## @var{L}@code{.step}, its floor, and @var{L}@code{.countersink}, the
+    ## cone of a countersink.  A through hole has no bottom.  The hole at row
+    ## @var{k} of @var{P}, or of @qcode{'At'}, is copy @var{k}, chosen with
+    ## @qcode{'Copy'}.
     ## @end table
     ##
     ## A counterbore and a countersink cannot both be given, and a tip applies
@@ -2393,13 +2404,20 @@ classdef Shape
                                                  'Tip', [], ...
                                                  'Material', [], ...
                                                  'Engagement', [], ...
-                                                 'Custom', []));
+                                                 'Custom', [], 'Label', []));
       if (isempty (errmsg))
         [errmsg, P, opt.Direction] = placement (P, opt.Direction, opt.At);
+      endif
+      if (isempty (errmsg) && ! isempty (opt.Label)
+          && ! (ischar (opt.Label) && isrow (opt.Label)
+                && ! isempty (regexp (opt.Label, '^[A-Za-z]\w*$', 'once'))))
+        errmsg = strcat ("Label must be an identifier: a letter followed", ...
+                         " by letters, digits or underscores.");
       endif
       if (! isempty (errmsg))
         error ("solid.Shape.hole: %s", errmsg);
       endif
+      L = opt.Label;
       cb = opt.Counterbore;
       cs = opt.Countersink;
       tapped = ischar (D) && isempty (opt.Clearance);
@@ -2513,20 +2531,39 @@ classdef Shape
       ## The cutters of one hole, running up the z axis from the origin.  The
       ## drill comes from outside, so each also clears the axis back to beyond
       ## the part, which leaves a hole entering a sloping face clean all round.
-      T = {translate(solid.cylinder (D / 2, reach + DEPTH), [0, 0, -reach])};
+      ## Each cutter's faces are given the roles they play in the hole: the
+      ## bore its wall and its flat bottom, a counterbore its wall and its
+      ## floor, the step, a countersink its cone and the cylinder over it.
+      ## A drill point is the bottom.
+      bore = {'tool.side', 'wall'; 'tool.end', 'bottom'};
+      sides = @(role) {'tool.side', role};
+      T = {translate(roled (solid.cylinder (D / 2, reach + DEPTH, ...
+                                            'Label', 'tool'), L, bore), ...
+                     [0, 0, -reach])};
       if (! isempty (cb))
-        T{end+1} = translate (solid.cylinder (cb(1) / 2, reach + cb(2)), ...
+        T{end+1} = translate (roled (solid.cylinder (cb(1) / 2, ...
+                                                     reach + cb(2), ...
+                                                     'Label', 'tool'), L, ...
+                                     {'tool.side', 'counterbore'; ...
+                                      'tool.end', 'step'}), ...
                               [0, 0, -reach]);
       endif
       if (! isempty (cs))
         h = (cs(1) - D) / 2 / tand (cs(2) / 2);
-        T{end+1} = translate (solid.cone (cs(1) / 2, D / 2, h), [0, 0, cs(3)]);
-        T{end+1} = translate (solid.cylinder (cs(1) / 2, reach + cs(3)), ...
+        T{end+1} = translate (roled (solid.cone (cs(1) / 2, D / 2, h, ...
+                                                 'Label', 'tool'), L, ...
+                                     sides ('countersink')), [0, 0, cs(3)]);
+        T{end+1} = translate (roled (solid.cylinder (cs(1) / 2, ...
+                                                     reach + cs(3), ...
+                                                     'Label', 'tool'), L, ...
+                                     sides ('countersink')), ...
                               [0, 0, -reach]);
       endif
       if (! isempty (tip))
-        T{end+1} = translate (solid.cone (D / 2, 0, D / 2 / tand (tip / 2)), ...
-                              [0, 0, DEPTH]);
+        T{end+1} = translate (roled (solid.cone (D / 2, 0, ...
+                                                 D / 2 / tand (tip / 2), ...
+                                                 'Label', 'tool'), L, ...
+                                     sides ('bottom')), [0, 0, DEPTH]);
       endif
 
       ## Turned onto the direction and placed at every point
@@ -2560,13 +2597,19 @@ classdef Shape
         for i = 1:rows (P)
           z = leaves (this, P(i,:), opt.Direction, reach);
           if (z <= DEPTH + 1e-9 && ! isempty (cs))
-            E = {translate(solid.cone (D / 2, cs(1) / 2, h), ...
+            E = {translate(roled (solid.cone (D / 2, cs(1) / 2, h, ...
+                                              'Label', 'tool'), L, ...
+                                  sides ('countersink')), ...
                            [0, 0, z - cs(3) - h]), ...
-                 translate(solid.cylinder (cs(1) / 2, reach + cs(3)), ...
+                 translate(roled (solid.cylinder (cs(1) / 2, ...
+                                                  reach + cs(3), ...
+                                                  'Label', 'tool'), L, ...
+                                  sides ('countersink')), ...
                            [0, 0, z - cs(3)])};
           elseif (z > DEPTH + 1e-9 && point)
-            E = {translate(solid.cone (D / 2, 0, D / 2 / tand (59)), ...
-                           [0, 0, DEPTH])};
+            E = {translate(roled (solid.cone (D / 2, 0, D / 2 / tand (59), ...
+                                              'Label', 'tool'), L, ...
+                                  sides ('bottom')), [0, 0, DEPTH])};
           else
             continue;
           endif
@@ -2577,6 +2620,12 @@ classdef Shape
           endfor
         endfor
       endif
+
+      ## The hole at row I of P is copy I, for 'Copy' to choose it
+      for t = 1:numel (tools)
+        tools{t} = solid.Shape (occt ('solid.Shape.hole', 'copyindex', ...
+                                      tools{t}.Data, owner(t)));
+      endfor
 
       ## A hole may break into another, never cut a solid into pieces, as
       ## one drilled through the roots of a knurl leaves its teeth loose
@@ -4347,6 +4396,22 @@ function T = aim (T, V)
   elseif (v(3) < 0)
     T = cellfun (@(t) rotate (t, 180, [1, 0, 0]), T, 'UniformOutput', false);
   endif
+
+endfunction
+
+## The cutter C, a primitive made with the label 'tool', its faces given the
+## roles they play in the feature labelled L that it cuts: ROLES has a row
+## for each, the name C gives the face and the role.  Every other face of C
+## is left without a name, and every face when L is empty.
+function C = roled (C, L, ROLES)
+
+  from = {};
+  to = {};
+  if (! isempty (L))
+    from = ROLES(:,1)';
+    to = cellfun (@(r) [L, '.', r], ROLES(:,2)', 'UniformOutput', false);
+  endif
+  C = solid.Shape (occt ('solid.Shape.hole', 'relabel', C.Data, from, to));
 
 endfunction
 

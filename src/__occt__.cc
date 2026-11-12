@@ -7331,6 +7331,36 @@ function directly. \n\
       const TopoDS_Shape s = toshape (args(2), caller, names);
       out = nameinfo (s, names);
     }
+    // The shape with every name in the cell FROM renamed to the one at the
+    // same place in TO, and every other name dropped: the faces of a tool
+    // given the roles of the feature it cuts
+    else if (cmd == "relabel")
+    {
+      facetable names;
+      const TopoDS_Shape s = toshape (args(2), caller, names);
+      const Cell from = args(3).cell_value ();
+      const Cell to = args(4).cell_value ();
+      map<string, string> rename;
+      for (octave_idx_type k = 0; k < from.numel (); k++)
+      {
+        rename[from(k).string_value ()] = to(k).string_value ();
+      }
+      for (std::set<facename>& f : names.faces)
+      {
+        std::set<facename> next;
+        for (facename n : f)
+        {
+          const auto it = rename.find (n.label);
+          if (it != rename.end ())
+          {
+            n.label = it->second;
+            next.insert (n);
+          }
+        }
+        f = next;
+      }
+      out = todata (s, names);
+    }
     // The shape with the start and end of the label given exchanged
     else if (cmd == "swapends")
     {
