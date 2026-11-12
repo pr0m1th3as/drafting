@@ -2537,33 +2537,34 @@ classdef Shape
       ## A drill point is the bottom.
       bore = {'tool.side', 'wall'; 'tool.end', 'bottom'};
       sides = @(role) {'tool.side', role};
+      hc = 'solid.Shape.hole';
       T = {translate(roled (solid.cylinder (D / 2, reach + DEPTH, ...
-                                            'Label', 'tool'), L, bore), ...
+                                            'Label', 'tool'), L, bore, hc), ...
                      [0, 0, -reach])};
       if (! isempty (cb))
         T{end+1} = translate (roled (solid.cylinder (cb(1) / 2, ...
                                                      reach + cb(2), ...
                                                      'Label', 'tool'), L, ...
                                      {'tool.side', 'counterbore'; ...
-                                      'tool.end', 'step'}), ...
+                                      'tool.end', 'step'}, hc), ...
                               [0, 0, -reach]);
       endif
       if (! isempty (cs))
         h = (cs(1) - D) / 2 / tand (cs(2) / 2);
         T{end+1} = translate (roled (solid.cone (cs(1) / 2, D / 2, h, ...
                                                  'Label', 'tool'), L, ...
-                                     sides ('countersink')), [0, 0, cs(3)]);
+                                     sides ('countersink'), hc), [0, 0, cs(3)]);
         T{end+1} = translate (roled (solid.cylinder (cs(1) / 2, ...
                                                      reach + cs(3), ...
                                                      'Label', 'tool'), L, ...
-                                     sides ('countersink')), ...
+                                     sides ('countersink'), hc), ...
                               [0, 0, -reach]);
       endif
       if (! isempty (tip))
         T{end+1} = translate (roled (solid.cone (D / 2, 0, ...
                                                  D / 2 / tand (tip / 2), ...
                                                  'Label', 'tool'), L, ...
-                                     sides ('bottom')), [0, 0, DEPTH]);
+                                     sides ('bottom'), hc), [0, 0, DEPTH]);
       endif
 
       ## Turned onto the direction and placed at every point
@@ -2599,17 +2600,17 @@ classdef Shape
           if (z <= DEPTH + 1e-9 && ! isempty (cs))
             E = {translate(roled (solid.cone (D / 2, cs(1) / 2, h, ...
                                               'Label', 'tool'), L, ...
-                                  sides ('countersink')), ...
+                                  sides ('countersink'), hc), ...
                            [0, 0, z - cs(3) - h]), ...
                  translate(roled (solid.cylinder (cs(1) / 2, ...
                                                   reach + cs(3), ...
                                                   'Label', 'tool'), L, ...
-                                  sides ('countersink')), ...
+                                  sides ('countersink'), hc), ...
                            [0, 0, z - cs(3)])};
           elseif (z > DEPTH + 1e-9 && point)
             E = {translate(roled (solid.cone (D / 2, 0, D / 2 / tand (59), ...
                                               'Label', 'tool'), L, ...
-                                  sides ('bottom')), [0, 0, DEPTH])};
+                                  sides ('bottom'), hc), [0, 0, DEPTH])};
           else
             continue;
           endif
@@ -2880,6 +2881,7 @@ classdef Shape
     ## -*- texinfo -*-
     ## @deftypefn  {solid.Shape} {@var{S} =} pocket (@var{S}, @var{R}, @var{DEPTH})
     ## @deftypefnx {solid.Shape} {@var{S} =} pocket (@dots{}, @qcode{'Taper'}, @var{A})
+    ## @deftypefnx {solid.Shape} {@var{S} =} pocket (@dots{}, @qcode{'Label'}, @var{L})
     ##
     ## Cut a pocket into a shape.
     ##
@@ -2910,6 +2912,16 @@ classdef Shape
     ## widen to match.  @var{A} is in the range @math{(-90, 90)}.  A region
     ## with splines takes no taper, as for @code{solid.extrude}.
     ##
+    ## @code{@var{S} = pocket (@dots{}, @qcode{'Label'}, @var{L})} names the
+    ## faces the pocket makes, so that a later step finds them by name with
+    ## @code{solid.Shape.faces}.  @var{L} is an identifier, a letter followed
+    ## by letters, digits or underscores, and the faces are named
+    ## @var{L}@code{.floor}, the bottom of the pocket, @var{L}@code{.wall},
+    ## the walls cut by the outline of the region, and @var{L}@code{.island},
+    ## the walls of the islands its holes leave standing.  A pocket right
+    ## through has no floor.  The pocket of each region of a cell array is a
+    ## copy, chosen with @qcode{'Copy'}.
+    ##
     ## Pocketing the empty shape leaves it empty.
     ##
     ## @example
@@ -2930,16 +2942,15 @@ classdef Shape
       if (nargin < 3)
         error ("solid.Shape.pocket: invalid number of input arguments.");
       endif
-      if (iscell (R))
-        if (isempty (R))
-          error ("solid.Shape.pocket: R must not be an empty cell array.");
-        endif
-        for k = 1:numel (R)
-          this = pocket (this, R{k}, DEPTH, varargin{:});
-        endfor
-        return;
+      if (iscell (R) && isempty (R))
+        error ("solid.Shape.pocket: R must not be an empty cell array.");
       endif
-      if (! isa (R, 'geom.Region') || ! isscalar (R))
+      regions = R;
+      if (! iscell (R))
+        regions = {R};
+      endif
+      if (! all (cellfun (@(r) isa (r, 'geom.Region') && isscalar (r), ...
+                          regions(:))))
         error ("solid.Shape.pocket: R must be a geom.Region object.");
       endif
       if (! isfloat (DEPTH) || ! isreal (DEPTH) || ! isscalar (DEPTH)
@@ -2947,40 +2958,61 @@ classdef Shape
         error (strcat ("solid.Shape.pocket: DEPTH must be positive, or Inf", ...
                        " for a pocket right through."));
       endif
-      [errmsg, opt] = options (varargin, struct ('Taper', 0));
+      [errmsg, opt] = options (varargin, struct ('Taper', 0, 'Label', []));
       if (isempty (errmsg) && (! isfloat (opt.Taper)
                                || ! isreal (opt.Taper)
                                || ! isscalar (opt.Taper)
                                || ! (abs (opt.Taper) < 90)))
         errmsg = "Taper must be an angle in the range (-90, 90) degrees.";
       endif
+      if (isempty (errmsg) && ! isempty (opt.Label)
+          && ! (ischar (opt.Label) && isrow (opt.Label)
+                && ! isempty (regexp (opt.Label, '^[A-Za-z]\w*$', 'once'))))
+        errmsg = strcat ("Label must be an identifier: a letter followed", ...
+                         " by letters, digits or underscores.");
+      endif
       if (! isempty (errmsg))
         error ("solid.Shape.pocket: %s", errmsg);
       endif
 
-      if (isempty (this.Data))
-        return;
-      endif
+      ## The regions of a cell are cut one after another, each a copy
+      for k = 1:numel (regions)
+        if (isempty (this.Data))
+          return;
+        endif
+        Rk = regions{k};
 
-      ## How far the part reaches from the region's origin, which is how far
-      ## the cutter clears outwards and how deep a pocket through goes
-      B = bbox (this);
-      [X, Y, Z] = ndgrid (B([1, 4]), B([2, 5]), B([3, 6]));
-      reach = max (sqrt (sum (([X(:), Y(:), Z(:)] - R.UCS.Origin) .^ 2, ...
-                              2))) + 1;
-      if (isinf (DEPTH))
-        DEPTH = reach;
-      endif
+        ## How far the part reaches from the region's origin, which is how
+        ## far the cutter clears outwards and how deep a pocket through goes
+        B = bbox (this);
+        [X, Y, Z] = ndgrid (B([1, 4]), B([2, 5]), B([3, 6]));
+        reach = max (sqrt (sum (([X(:), Y(:), Z(:)] - Rk.UCS.Origin) .^ 2, ...
+                                2))) + 1;
+        depth = DEPTH;
+        if (isinf (depth))
+          depth = reach;
+        endif
 
-      ## The cutter: the region clearing outwards, tapering inwards
-      try
-        tool = solid.extrude (R, [reach, double(DEPTH)], ...
-                              'Taper', [0, double(opt.Taper)]);
-      catch err
-        error ("solid.Shape.pocket: %s", ...
-               regexprep (err.message, '^solid\.extrude: ', ''));
-      end_try_catch
-      this = subtract (this, tool);
+        ## The cutter: the region clearing outwards, tapering inwards, its
+        ## faces the pocket's floor, its walls and the walls of its islands
+        try
+          tool = solid.extrude (Rk, [reach, double(depth)], ...
+                                'Taper', [0, double(opt.Taper)], ...
+                                'Label', 'tool');
+        catch err
+          error ("solid.Shape.pocket: %s", ...
+                 regexprep (err.message, '^solid\.extrude: ', ''));
+        end_try_catch
+        tool = roled (tool, opt.Label, {'tool.start', 'floor'; ...
+                                        'tool.side', 'wall'; ...
+                                        'tool.hole', 'island'}, ...
+                      'solid.Shape.pocket');
+        if (iscell (R))
+          tool = solid.Shape (occt ('solid.Shape.pocket', 'copyindex', ...
+                                    tool.Data, k));
+        endif
+        this = subtract (this, tool);
+      endfor
 
     endfunction
 
@@ -4403,7 +4435,7 @@ endfunction
 ## roles they play in the feature labelled L that it cuts: ROLES has a row
 ## for each, the name C gives the face and the role.  Every other face of C
 ## is left without a name, and every face when L is empty.
-function C = roled (C, L, ROLES)
+function C = roled (C, L, ROLES, caller)
 
   from = {};
   to = {};
@@ -4411,7 +4443,7 @@ function C = roled (C, L, ROLES)
     from = ROLES(:,1)';
     to = cellfun (@(r) [L, '.', r], ROLES(:,2)', 'UniformOutput', false);
   endif
-  C = solid.Shape (occt ('solid.Shape.hole', 'relabel', C.Data, from, to));
+  C = solid.Shape (occt (caller, 'relabel', C.Data, from, to));
 
 endfunction
 
