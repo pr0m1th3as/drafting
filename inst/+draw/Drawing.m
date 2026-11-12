@@ -159,6 +159,27 @@ classdef Drawing
     ## @end deftp
     LineWeight = 'byLayer';
 
+    ## -*- texinfo -*-
+    ## @deftp {draw.Drawing} {property} Decimals
+    ##
+    ## The precision of measured dimensions
+    ##
+    ## The number of decimal places a dimension shows its measurement to, an
+    ## integer from 0 to 8, 2 by default.  Trailing zeros are dropped, so at 2
+    ## a length of 25 reads 25, one of 25.5 reads 25.5 and one of 25.256 reads
+    ## 25.26; an angle follows the same rule.  A dimension given its own
+    ## @qcode{'Text'} is not affected.
+    ##
+    ## Unlike @code{Layer} or @code{Colour}, it is a setting of the whole
+    ## drawing and governs every dimension, those drawn before it was set
+    ## included.  The dimensions in a block show the precision of the drawing
+    ## the block is placed in, not the block's own.  A DXF file states it in
+    ## its dimension style, so a CAD program that measures the dimensions
+    ## again shows them the same way.
+    ##
+    ## @end deftp
+    Decimals = 2;
+
   endproperties
 
   properties (SetAccess = private)
@@ -287,6 +308,16 @@ classdef Drawing
                        " index from 0 to 256."));
       endif
       this.Colour = C;
+
+    endfunction
+
+    function this = set.Decimals (this, N)
+
+      if (! isnumeric (N) || ! isreal (N) || ! isscalar (N)
+          || ! isfinite (N) || N != fix (N) || N < 0 || N > 8)
+        error ("draw.Drawing: DECIMALS must be an integer from 0 to 8.");
+      endif
+      this.Decimals = double (N);
 
     endfunction
 
@@ -541,7 +572,8 @@ classdef Drawing
       endif
       opt = struct ('dimScale', dimScale, 'hatchMode', hatchMode, ...
                     'hatchScale', hatchScale, 'chordTol', chordTol, ...
-                    'bulgeMode', bulgeMode, 'dimMode', dimMode);
+                    'bulgeMode', bulgeMode, 'dimMode', dimMode, ...
+                    'decimals', D.Decimals);
       resolve = strcmp (layerMode, 'resolve');
       [E, LOST, DIMS] = breakdown (D.Entities, opt, 0);
       E = resolvelayers (E, D.Layers, resolve, false);
@@ -588,14 +620,16 @@ classdef Drawing
     endfunction
 
     ## The picture of the ornament IDX of D, a dimension, centre mark or
-    ## leader, as a drawing of its lines and text at DIMSCALE, and for a
-    ## dimension the record a file states it by: the definition points in the
-    ## order of DXF group codes 10, 11, 13, 14, 15 and 16, the DXF dimension
-    ## type, the text and the rotation.  One implementation of the ornament
-    ## serves every backend.
-    function [B, REC] = __ornament__ (D, IDX, DIMSCALE)
+    ## leader, as a drawing of its lines and text at DIMSCALE, its measurement
+    ## to DECIMALS places, and for a dimension the record a file states it by:
+    ## the definition points in the order of DXF group codes 10, 11, 13, 14, 15
+    ## and 16, the DXF dimension type, the text and the rotation.  One
+    ## implementation of the ornament serves every backend.  DECIMALS is the
+    ## caller's, since a block's dimensions take the precision of the drawing
+    ## it is placed in.
+    function [B, REC] = __ornament__ (D, IDX, DIMSCALE, DECIMALS)
 
-      if (nargin != 3)
+      if (nargin != 4)
         error ("draw.Drawing.__ornament__: invalid number of input arguments.");
       endif
       if (! isnumeric (IDX) || ! isscalar (IDX) || IDX != fix (IDX)
@@ -609,18 +643,23 @@ classdef Drawing
         error (strcat ("draw.Drawing.__ornament__: DIMSCALE must be a real", ...
                        " positive finite scalar."));
       endif
+      if (! isnumeric (DECIMALS) || ! isscalar (DECIMALS)
+          || DECIMALS != fix (DECIMALS) || DECIMALS < 0 || DECIMALS > 8)
+        error (strcat ("draw.Drawing.__ornament__: DECIMALS must be an", ...
+                       " integer from 0 to 8."));
+      endif
 
       e = D.Entities(IDX);
       REC = [];
       switch (e.type)
         case 'dim'
-          parts = explodedim (e, DIMSCALE);
+          parts = explodedim (e, DIMSCALE, DECIMALS);
         case {'diam', 'radius'}
-          parts = explodecirc (e, DIMSCALE);
+          parts = explodecirc (e, DIMSCALE, DECIMALS);
         case 'angdim'
-          parts = explodeang (e, DIMSCALE);
+          parts = explodeang (e, DIMSCALE, DECIMALS);
         case 'ordinate'
-          parts = explodeord (e, DIMSCALE);
+          parts = explodeord (e, DIMSCALE, DECIMALS);
         case 'centremark'
           parts = explodemark (e, DIMSCALE);
         case 'leader'
@@ -633,7 +672,7 @@ classdef Drawing
       B = draw.Drawing ();
       B.Entities = partsentities (parts);
       if (! any (strcmp (e.type, {'centremark', 'leader'})))
-        d = dimrecord (e, '', e.type);
+        d = dimrecord (e, '', e.type, DECIMALS);
         REC = struct ('pts', d.pts, 'angles', d.angles, 'text', d.text, ...
                       'rotation', d.rotation);
       endif
@@ -1620,9 +1659,9 @@ classdef Drawing
     ## The option @qcode{'Text'} overrides the measured value with the literal
     ## string @var{S}, for the cases every drawing eventually has --- a nominal
     ## size, a range, a note in place of a number.  Without it the backend
-    ## formats the measurement it computes.  A dimension therefore carries no
-    ## text of its own by default, which is precisely what keeps it truthful
-    ## when the geometry changes.
+    ## formats the measurement it computes, to the drawing's @code{Decimals}
+    ## places.  A dimension therefore carries no text of its own by default,
+    ## which is precisely what keeps it truthful when the geometry changes.
     ##
     ## @end deftypefn
     function this = dim (this, P1, P2, OFFSET, varargin)
@@ -1844,9 +1883,10 @@ classdef Drawing
     ## reads each position straight off the datum, and no error adds up along a
     ## chain of dimensions.
     ##
-    ## The label is the distance, without sign, to a micron, measured each time
-    ## the drawing is plotted or written, so it follows the geometry; the
-    ## option @qcode{'Text'} gives the literal text @var{S} instead.
+    ## The label is the distance, without sign, to the drawing's
+    ## @code{Decimals} places, measured each time the drawing is plotted or
+    ## written, so it follows the geometry; the option @qcode{'Text'} gives the
+    ## literal text @var{S} instead.
     ##
     ## @example
     ## @group
@@ -3733,6 +3773,7 @@ function [E, LOST, DIMS] = breakdown (src, opt, nDim)
   chordTol = opt.chordTol;
   bulgeMode = opt.bulgeMode;
   dimMode = opt.dimMode;
+  decimals = opt.decimals;
   E = emptyentity ();
   LOST = struct ('index', {}, 'type', {}, 'reason', {});
   DIMS = struct ('name', {}, 'entities', {});
@@ -3804,12 +3845,12 @@ function [E, LOST, DIMS] = breakdown (src, opt, nDim)
         endfor
 
       case {'diam', 'radius'}
-        parts = explodecirc (e, dimScale);
+        parts = explodecirc (e, dimScale, decimals);
         if (strcmp (dimMode, 'associative'))
           nDim++;
           bn = sprintf ('*D%d', nDim);
           DIMS(end+1) = struct ('name', bn, 'entities', {parts});
-          E(end+1) = dimrecord (e, bn, e.type);
+          E(end+1) = dimrecord (e, bn, e.type, decimals);
         else
           for kk = 1:numel (parts)
             E(end+1) = parts(kk);
@@ -3817,12 +3858,12 @@ function [E, LOST, DIMS] = breakdown (src, opt, nDim)
         endif
 
       case 'angdim'
-        parts = explodeang (e, dimScale);
+        parts = explodeang (e, dimScale, decimals);
         if (strcmp (dimMode, 'associative'))
           nDim++;
           bn = sprintf ('*D%d', nDim);
           DIMS(end+1) = struct ('name', bn, 'entities', {parts});
-          E(end+1) = dimrecord (e, bn, 'angdim');
+          E(end+1) = dimrecord (e, bn, 'angdim', decimals);
           continue;
         endif
         for kk = 1:numel (parts)
@@ -3830,12 +3871,12 @@ function [E, LOST, DIMS] = breakdown (src, opt, nDim)
         endfor
 
       case 'ordinate'
-        parts = explodeord (e, dimScale);
+        parts = explodeord (e, dimScale, decimals);
         if (strcmp (dimMode, 'associative'))
           nDim++;
           bn = sprintf ('*D%d', nDim);
           DIMS(end+1) = struct ('name', bn, 'entities', {parts});
-          E(end+1) = dimrecord (e, bn, 'ordinate');
+          E(end+1) = dimrecord (e, bn, 'ordinate', decimals);
         else
           for kk = 1:numel (parts)
             E(end+1) = parts(kk);
@@ -3885,12 +3926,12 @@ function [E, LOST, DIMS] = breakdown (src, opt, nDim)
         endif
 
       case 'dim'
-        parts = explodedim (e, dimScale);
+        parts = explodedim (e, dimScale, decimals);
         if (strcmp (dimMode, 'associative'))
           nDim++;
           bn = sprintf ('*D%d', nDim);
           DIMS(end+1) = struct ('name', bn, 'entities', {parts});
-          E(end+1) = dimrecord (e, bn, 'dim');
+          E(end+1) = dimrecord (e, bn, 'dim', decimals);
         else
           for jj = 1:numel (parts)
             E(end+1) = parts(jj);
@@ -4615,7 +4656,7 @@ endfunction
 ## block that holds its picture.  The definition points are what makes the
 ## dimension associative: a CAD application re-measures from them, which is why
 ## the text is emitted as "<>" unless the caller overrode it.
-function d = dimrecord (e, blockname, kind)
+function d = dimrecord (e, blockname, kind, n)
 
   d = mkent ('DIMENSION', e, [0, 0]);
   d.block = blockname;
@@ -4625,7 +4666,7 @@ function d = dimrecord (e, blockname, kind)
   ## case the two are indistinguishable on the sheet and "<>" keeps it live.
   d.text = '<>';
   if (isfield (e, 'text') && ! isempty (e.text)
-      && ! strcmp (e.text, autolabel (e, kind)))
+      && ! strcmp (e.text, autolabel (e, kind, n)))
     d.text = e.text;
   endif
 
@@ -4684,29 +4725,37 @@ function d = dimrecord (e, blockname, kind)
 
 endfunction
 
-## The label a dimension gives itself from its own measurement, which is what
-## 'diam', 'radius' and 'angdim' store when the caller names none.  Kept
+## The label a diameter, radius or angular dimension gives itself from its
+## own measurement, to N decimal places, when the caller names none.  Kept
 ## beside dimrecord so the two cannot drift apart.
-function t = autolabel (e, kind)
+function t = autolabel (e, kind, n)
 
-  ## Three decimals is a micron in millimetres, finer than anything this
-  ## package's own output is accurate to and past any drawing's need; two for
-  ## an angle, which a drawing states to a hundredth at most
   switch (kind)
     case 'diam'
-      t = sprintf ('%%%%c%g', round (2 * e.radius * 1000) / 1000);
+      t = ['%%c', decfmt(2 * e.radius, n)];
     case 'radius'
-      t = sprintf ('R%g', round (e.radius * 1000) / 1000);
+      t = ['R', decfmt(e.radius, n)];
     case 'angdim'
       V = e.pts(1,:);
       P1 = e.pts(2,:);
       P2 = e.pts(3,:);
       a = mod (atan2d (P2(2) - V(2), P2(1) - V(1)) ...
                - atan2d (P1(2) - V(2), P1(1) - V(1)), 360);
-      t = sprintf ('%g%%%%d', round (a * 100) / 100);
+      t = [decfmt(a, n), '%%d'];
     otherwise
       t = '';
   endswitch
+
+endfunction
+
+## The measurement V to N decimal places, trailing zeros dropped, as a CAD
+## program writes it with DIMZIN 8: 25, 25.5, 25.26
+function s = decfmt (v, n)
+
+  s = sprintf ('%.*f', n, round (v * 10 ^ n) / 10 ^ n);
+  if (n > 0)
+    s = regexprep (s, '\.?0+$', '');
+  endif
 
 endfunction
 
@@ -4742,7 +4791,7 @@ endfunction
 ## A diameter or radius dimension: the measuring line, a tick where it meets
 ## the feature, and the text.  A diameter runs right across; a radius runs from
 ## the centre out, which is why the two share everything but their first point.
-function parts = explodecirc (e, scale)
+function parts = explodecirc (e, scale, ndec)
 
   tick = 1.25 * scale;
   hgt = 2.5 * scale;
@@ -4766,7 +4815,7 @@ function parts = explodecirc (e, scale)
   t = mkent ('TEXT', e, outer + 0.5 * hgt * (u + n));
   t.text = e.text;
   if (isempty (t.text))
-    t.text = autolabel (e, e.type);
+    t.text = autolabel (e, e.type, ndec);
   endif
   t.height = hgt;
   t.rotation = 0;
@@ -4776,7 +4825,7 @@ endfunction
 
 ## An angular dimension: the arc between the arms, a tick at each end, and the
 ## text outside the arc at its middle
-function parts = explodeang (e, scale)
+function parts = explodeang (e, scale, ndec)
 
   tick = 1.25 * scale;
   hgt = 2.5 * scale;
@@ -4800,7 +4849,7 @@ function parts = explodeang (e, scale)
   t = mkent ('TEXT', e, V + (e.radius + 0.5 * hgt) * [cosd(am), sind(am)]);
   t.text = e.text;
   if (isempty (t.text))
-    t.text = autolabel (e, e.type);
+    t.text = autolabel (e, e.type, ndec);
   endif
   t.height = hgt;
   t.rotation = 0;
@@ -4811,7 +4860,7 @@ endfunction
 ## An ordinate dimension: the leader from the feature, clear of it by a gap,
 ## jogging across its middle third where its end is off the line through the
 ## feature, and the distance past its end
-function parts = explodeord (e, scale)
+function parts = explodeord (e, scale, ndec)
 
   gap = 1.0 * scale;
   hgt = 2.5 * scale;
@@ -4837,7 +4886,7 @@ function parts = explodeord (e, scale)
 
   if (isempty (e.text))
     v = abs (P(3-k) - O(3-k));
-    label = sprintf ('%g', round (v * 1000) / 1000);
+    label = decfmt (v, ndec);
   else
     label = e.text;
   endif
@@ -4974,7 +5023,7 @@ endfunction
 ## each measured point is carried onto the dimension line along N.  A
 ## horizontal dimension between points at different heights therefore gets
 ## extension lines of different lengths, which is exactly right.
-function parts = explodedim (e, scale)
+function parts = explodedim (e, scale, ndec)
 
   P1 = e.pts(1,:);
   P2 = e.pts(2,:);
@@ -5017,12 +5066,7 @@ function parts = explodedim (e, scale)
 
   ## The label, horizontal whatever the dimension measures
   if (isempty (e.text))
-    m = abs (dot (d, U));
-    if (abs (m - round (m)) < 1e-9)
-      label = sprintf ('%d', round (m));
-    else
-      label = sprintf ('%.1f', m);
-    endif
+    label = decfmt (abs (dot (d, U)), ndec);
   else
     label = e.text;
   endif

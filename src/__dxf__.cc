@@ -543,6 +543,8 @@ struct WOpts
   bool expand = false;
   double dimscale = 1;
   bool fill = false;
+  // The places a dimension shows its measurement to, the drawing's Decimals
+  int decimals = 2;
 };
 
 class Writer
@@ -1145,7 +1147,7 @@ ltyperecord (ostringstream& s, const string& name, bool r12,
 }
 
 static void
-dimstylebody (ostringstream& s, bool drafting)
+dimstylebody (ostringstream& s, bool drafting, const WOpts& opt)
 {
   if (drafting)
   {
@@ -1160,6 +1162,17 @@ dimstylebody (ostringstream& s, bool drafting)
     putn (s, 142, 1.25);   // DIMTSZ
     putn (s, 147, 0.625);  // DIMGAP
     puti (s, 77, 1);       // DIMTAD
+    // The measurement as the drawing shows it, trailing zeros dropped, so a
+    // reader measuring the dimension again writes what the picture says.
+    // R12 has no places in a style and takes them from $LUPREC and $AUPREC.
+    puti (s, 78, 8);       // DIMZIN
+    if (! opt.r12)
+    {
+      puti (s, 79, 2);                // DIMAZIN
+      puti (s, 179, opt.decimals);    // DIMADEC
+      puti (s, 271, opt.decimals);    // DIMDEC
+      puti (s, 278, 46);              // DIMDSEP, a full stop
+    }
   }
   else
   {
@@ -1228,6 +1241,10 @@ Writer::emitr12 (ostringstream& s)
   // whatever the receiving installation has set
   put (s, 9, "$LTSCALE");
   putn (s, 40, opt.ltscale);
+  put (s, 9, "$LUPREC");
+  puti (s, 70, opt.decimals);
+  put (s, 9, "$AUPREC");
+  puti (s, 70, opt.decimals);
   put (s, 0, "ENDSEC");
 
   put (s, 0, "SECTION");
@@ -1269,7 +1286,7 @@ Writer::emitr12 (ostringstream& s)
   put (s, 0, "DIMSTYLE");
   put (s, 2, "DRAFTING");
   puti (s, 70, 0);
-  dimstylebody (s, true);
+  dimstylebody (s, true, opt);
   put (s, 0, "ENDTAB");
   put (s, 0, "ENDSEC");
 
@@ -1477,7 +1494,7 @@ Writer::emitr2000 (ostringstream& s)
   put (s, 100, "AcDbDimStyleTableRecord");
   put (s, 2, "Standard");
   puti (s, 70, 0);
-  dimstylebody (s, false);
+  dimstylebody (s, false, opt);
   put (s, 0, "DIMSTYLE");
   put (s, 105, rDimDraft);
   put (s, 330, tDimst);
@@ -1485,7 +1502,7 @@ Writer::emitr2000 (ostringstream& s)
   put (s, 100, "AcDbDimStyleTableRecord");
   put (s, 2, "DRAFTING");
   puti (s, 70, 0);
-  dimstylebody (s, true);
+  dimstylebody (s, true, opt);
   put (s, 0, "ENDTAB");
 
   table ("BLOCK_RECORD", tBrec, 2 + blocks.size ());
@@ -2242,7 +2259,8 @@ drawingitems (Writer& w, vector<Item>& dest, const octave_value& D,
         octave_value_list r
           = octave::feval ("__ornament__",
                            ovl (D, static_cast<double> (i + 1),
-                                w.opt.dimscale), 2);
+                                w.opt.dimscale,
+                                static_cast<double> (w.opt.decimals)), 2);
         octave_value B = r(0);
         octave_value rec = r(1);
         if (rec.isempty () || w.opt.explode)
@@ -2514,6 +2532,8 @@ cmdwrite (const octave_value_list& args)
              opts(k).string_value ().c_str ());
   }
 
+  if (drawing)
+    w.decimals = prop (objs(0), "Decimals").int_value ();
   Writer wr (w);
   if (drawing)
   {

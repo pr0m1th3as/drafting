@@ -531,6 +531,17 @@
 %! D = draw.Drawing (); D.Linetype = 42;
 %!error<draw.Drawing: COLOUR must be a name or an integer index from 0 to 256.> ...
 %! D = draw.Drawing (); D.Colour = 300;
+%!error<draw.Drawing: DECIMALS must be an integer from 0 to 8.> ...
+%! D = draw.Drawing (); D.Decimals = 9;
+%!error<draw.Drawing: DECIMALS must be an integer from 0 to 8.> ...
+%! D = draw.Drawing (); D.Decimals = 1.5;
+%!error<draw.Drawing: DECIMALS must be an integer from 0 to 8.> ...
+%! D = draw.Drawing (); D.Decimals = -1;
+%!error<draw.Drawing: DECIMALS must be an integer from 0 to 8.> ...
+%! D = draw.Drawing (); D.Decimals = '2';
+
+%!test  # Decimals is 2 by default
+%! assert_equal (draw.Drawing ().Decimals, 2);
 %!error<draw.colour: 'puce' is not a named colour> ...
 %! D = draw.Drawing (); D.Colour = 'puce';
 
@@ -1403,10 +1414,10 @@
 %! v = str2double (strrep (E(end).text, '%%d', ''));
 %! assert_equal (abs (v - round (v * 100) / 100) < 1e-12, true);
 
-%!test  # and a measured length to a micron
+%!test  # and a measured length to two decimals
 %! D = draw.Drawing ().diam ([0, 0], 6.17283945);
 %! E = entities (D, 'Dimensions', 'explode');
-%! assert_equal (E(end).text, '%%c12.346');
+%! assert_equal (E(end).text, '%%c12.35');
 
 %!test  # an x ordinate is the distance of the feature from the datum in x
 %! D = draw.Drawing ().ordinate ([0, 0], [20, 15], 'x', [20, -10]);
@@ -1423,10 +1434,10 @@
 %! E = entities (D, 'dimensions', 'explode');
 %! assert_equal (E(strcmp ({E.type}, 'TEXT')).text, '30');
 
-%!test  # the distance is stated to a micron
+%!test  # the distance is stated to two decimals
 %! D = draw.Drawing ().ordinate ([0, 0], [1.23456, 0], 'x', [1.23456, -5]);
 %! E = entities (D, 'dimensions', 'explode');
-%! assert_equal (E(strcmp ({E.type}, 'TEXT')).text, '1.235');
+%! assert_equal (E(strcmp ({E.type}, 'TEXT')).text, '1.23');
 
 %!test  # an ordinate's label is literal when given
 %! D = draw.Drawing ().ordinate ([0, 0], [20, 15], 'x', [20, -10], 'Text', 'A');
@@ -2149,10 +2160,53 @@
 %! E = entities (D, 'dimensions', 'explode');
 %! assert_equal (E(3).pts(1,1), E(3).pts(2,1), 1e-9);
 
-%!test  # a non-integral measurement is given to one decimal
+%!test  # a non-integral measurement is given to two decimals
 %! E = entities (draw.Drawing ().dim ([0, 0], [10, 10], 5), ...
 %!     'dimensions', 'explode');
-%! assert_equal (E(6).text, '14.1');
+%! assert_equal (E(6).text, '14.14');
+
+%!test  # trailing zeros are dropped
+%! E = entities (draw.Drawing ().dim ([0, 0], [25.5, 0], 5), ...
+%!     'dimensions', 'explode');
+%! assert_equal (E(6).text, '25.5');
+
+%!test  # Decimals sets the places of every dimension
+%! D = draw.Drawing ().dim ([0, 0], [10, 10], 5);
+%! D.Decimals = 3;
+%! E = entities (D, 'dimensions', 'explode');
+%! assert_equal (E(6).text, '14.142');
+
+%!test  # at 0 a measurement is a whole number
+%! D = draw.Drawing ().diam ([0, 0], 6.17283945);
+%! D.Decimals = 0;
+%! E = entities (D, 'dimensions', 'explode');
+%! assert_equal (E(end).text, '%%c12');
+
+%!test  # an angle follows Decimals too
+%! D = draw.Drawing ().angdim ([0, 0], [10, 0], [10, 7], 5);
+%! D.Decimals = 1;
+%! E = entities (D, 'dimensions', 'explode');
+%! assert_equal (E(end).text, '35%%d');
+
+%!test  # Decimals governs dimensions drawn before it was set
+%! D = draw.Drawing ().radius ([0, 0], 1.23456);
+%! D.Decimals = 4;
+%! E = entities (D, 'dimensions', 'explode');
+%! assert_equal (E(end).text, 'R1.2346');
+
+%!test  # a dimension in a block takes the precision of the drawing
+%! B = draw.Drawing ().dim ([0, 0], [10, 10], 5);
+%! B.Decimals = 0;
+%! D = draw.Drawing ().block ('B', B).insert ('B', [0, 0]);
+%! D.Decimals = 3;
+%! E = entities (D, 'dimensions', 'explode');
+%! assert_equal (E(strcmp ({E.type}, 'TEXT')).text, '14.142');
+
+%!test  # a label equal to the measurement at the drawing's precision stays live
+%! D = draw.Drawing ().diam ([0, 0], 6.17283945, 'Text', '%%c12.346');
+%! D.Decimals = 3;
+%! E = entities (D);
+%! assert_equal (E.text, '<>');
 
 %!test  # DimScale multiplies the ornament without moving the dimension line
 %! D = draw.Drawing ().dim ([0, 0], [100, 0], -20, 'Direction', 'horizontal');
@@ -2827,74 +2881,76 @@
 %!               {'ELLIPSE', [1, 2], [20, 8], 30});
 
 %!test  # the picture of a dimension is its extension lines, ticks and label
-%! B = __ornament__ (draw.Drawing ().dim ([0, 0], [100, 0], -20), 1, 1);
+%! B = __ornament__ (draw.Drawing ().dim ([0, 0], [100, 0], -20), 1, 1, 2);
 %! assert_equal ({B.Entities.type}, {'line', 'line', 'line', 'line', ...
 %!                                   'line', 'text'});
 %!test  # and it is what plotting a dimension draws
 %! D = draw.Drawing ().dim ([0, 0], [100, 0], -20, 'Direction', 'horizontal');
-%! E = entities (__ornament__ (D, 1, 2));
+%! E = entities (__ornament__ (D, 1, 2, 2));
 %! F = entities (D, 'dimensions', 'explode', 'DimScale', 2);
 %! assert_equal ({E.type}, {F.type});
 %! assert_equal (vertcat (E.pts), vertcat (F.pts));
 %!test  # its record states a dimension as DXF type 0 with its rotation
 %! [~, REC] = __ornament__ (draw.Drawing ().dim ([0, 0], [0, 50], 10, ...
 %!                                               'Direction', 'vertical'), ...
-%!                          1, 1);
+%!                          1, 1, 2);
 %! assert_equal (REC.angles, 0);
 %! assert_equal (REC.rotation, 90);
 %! assert_equal (size (REC.pts), [6, 2]);
 %! assert_equal (REC.text, '<>');
 %!test  # a diameter: its line, two ticks and the label, DXF type 3
-%! [B, REC] = __ornament__ (draw.Drawing ().diam ([0, 0], 5), 1, 1);
+%! [B, REC] = __ornament__ (draw.Drawing ().diam ([0, 0], 5), 1, 1, 2);
 %! assert_equal ({B.Entities.type}, {'line', 'line', 'line', 'text'});
 %! assert_equal (REC.angles, 3);
 %!test  # a radius: its line, one tick and the label, DXF type 4
-%! [B, REC] = __ornament__ (draw.Drawing ().radius ([0, 0], 5), 1, 1);
+%! [B, REC] = __ornament__ (draw.Drawing ().radius ([0, 0], 5), 1, 1, 2);
 %! assert_equal ({B.Entities.type}, {'line', 'line', 'text'});
 %! assert_equal (REC.angles, 4);
 %!test  # an angle: its arc, two ticks and the label, DXF type 5
 %! D = draw.Drawing ().angdim ([0, 0], [10, 0], [0, 10], 5);
-%! [B, REC] = __ornament__ (D, 1, 1);
+%! [B, REC] = __ornament__ (D, 1, 1, 2);
 %! assert_equal ({B.Entities.type}, {'arc', 'line', 'line', 'text'});
 %! assert_equal (REC.angles, 5);
 %!test  # an ordinate measuring x: its leader and the label, DXF type 70
 %! D = draw.Drawing ().ordinate ([0, 0], [20, 15], 'x', [20, -10]);
-%! [B, REC] = __ornament__ (D, 1, 1);
+%! [B, REC] = __ornament__ (D, 1, 1, 2);
 %! assert_equal ({B.Entities.type}, {'polyline', 'text'});
 %! assert_equal (REC.angles, 70);
 %!test  # an ordinate measuring y is DXF type 6
 %! D = draw.Drawing ().ordinate ([0, 0], [20, 15], 'y', [-10, 15]);
-%! [~, REC] = __ornament__ (D, 1, 1);
+%! [~, REC] = __ornament__ (D, 1, 1, 2);
 %! assert_equal (REC.angles, 6);
 %!test  # a centre mark is its cross and has no record
-%! [B, REC] = __ornament__ (draw.Drawing ().centremark ([0, 0], 12), 1, 1);
+%! [B, REC] = __ornament__ (draw.Drawing ().centremark ([0, 0], 12), 1, 1, 2);
 %! assert_equal ({B.Entities.type}, {'line', 'line'});
 %! assert_equal (REC, []);
 %!test  # a leader is its path, its arrow and its note
 %! D = draw.Drawing ().leader ([0, 0; 10, 10], 'NOTE');
-%! [B, REC] = __ornament__ (D, 1, 1);
+%! [B, REC] = __ornament__ (D, 1, 1, 2);
 %! assert_equal ({B.Entities.type}, {'polyline', 'line', 'line', 'text'});
 %! assert_equal (REC, []);
 %!test  # the picture keeps the layer, line type and colour it was drawn on
 %! D = draw.Drawing ();
 %! D.Layer = 'DIMS';
 %! D.Colour = 'red';
-%! B = __ornament__ (D.diam ([0, 0], 5), 1, 1);
+%! B = __ornament__ (D.diam ([0, 0], 5), 1, 1, 2);
 %! assert_equal (unique ({B.Entities.layer}), {'DIMS'});
 %! assert_equal (unique ([B.Entities.colour]), 1);
 %!test  # the ornament scales with DIMSCALE
 %! D = draw.Drawing ().diam ([0, 0], 5);
-%! B1 = __ornament__ (D, 1, 1);
-%! B4 = __ornament__ (D, 1, 4);
+%! B1 = __ornament__ (D, 1, 1, 2);
+%! B4 = __ornament__ (D, 1, 4, 2);
 %! assert_equal (B4.Entities(4).height, 4 * B1.Entities(4).height);
 %!error<draw.Drawing.__ornament__: invalid number of input arguments.> ...
 %! __ornament__ (draw.Drawing ().diam ([0, 0], 5), 1)
 %!error<draw.Drawing.__ornament__: IDX must be the index of an entity of D.> ...
-%! __ornament__ (draw.Drawing ().diam ([0, 0], 5), 2, 1)
+%! __ornament__ (draw.Drawing ().diam ([0, 0], 5), 2, 1, 2)
 %!error<draw.Drawing.__ornament__: DIMSCALE must be a real positive finite scalar.> ...
-%! __ornament__ (draw.Drawing ().diam ([0, 0], 5), 1, 0)
+%! __ornament__ (draw.Drawing ().diam ([0, 0], 5), 1, 0, 2)
+%!error<draw.Drawing.__ornament__: DECIMALS must be an integer from 0 to 8.> ...
+%! __ornament__ (draw.Drawing ().diam ([0, 0], 5), 1, 1, 9)
 %!error<draw.Drawing.__ornament__: entity 1 is a line, not a dimension, centre mark or leader.> ...
-%! __ornament__ (draw.Drawing ().line ([0, 0], [1, 0]), 1, 1)
+%! __ornament__ (draw.Drawing ().line ([0, 0], [1, 0]), 1, 1, 2)
 
 %!test  # the records of one drawing put into another
 %! D = draw.Drawing ().line ([0, 0; 1, 1], [1, 0; 2, 1]);
@@ -3167,6 +3223,39 @@
 %!   D = draw.Drawing ().line ([0, 0], [10, 0]).arc ([0, 0], 3, 0, 90);
 %!   write (D.dim ([0, 0], [10, 0], -5), fn, 'Version', 'R12');
 %!   assert_equal (numel (strfind (fileread (fn), "AC1009")), 1);
+%! unwind_protect_cleanup
+%!   [~] = unlink (fn);
+%! end_unwind_protect
+%!test  # write: the dimension style states the drawing's precision
+%! fn = [tempname(), '.dxf'];
+%! unwind_protect
+%!   D = draw.Drawing ().dim ([0, 0], [10, 0], -5);
+%!   D.Decimals = 3;
+%!   write (D, fn);
+%!   txt = fileread (fn);
+%!   assert_equal (numel (strfind (txt, sprintf ("271\n3\n"))), 1);
+%!   assert_equal (numel (strfind (txt, sprintf ("179\n3\n"))), 1);
+%! unwind_protect_cleanup
+%!   [~] = unlink (fn);
+%! end_unwind_protect
+%!test  # write: and drops trailing zeros, as the picture does
+%! fn = [tempname(), '.dxf'];
+%! unwind_protect
+%!   write (draw.Drawing ().dim ([0, 0], [10, 0], -5), fn);
+%!   txt = fileread (fn);
+%!   assert_equal (numel (strfind (txt, sprintf (" 78\n8\n"))), 1);
+%!   assert_equal (numel (strfind (txt, sprintf (" 79\n2\n"))), 1);
+%! unwind_protect_cleanup
+%!   [~] = unlink (fn);
+%! end_unwind_protect
+%!test  # write: R12 states the precision in its header
+%! fn = [tempname(), '.dxf'];
+%! unwind_protect
+%!   D = draw.Drawing ().dim ([0, 0], [10, 0], -5);
+%!   D.Decimals = 1;
+%!   write (D, fn, 'Version', 'R12');
+%!   txt = fileread (fn);
+%!   assert_equal (numel (strfind (txt, sprintf ("$LUPREC\n 70\n1\n"))), 1);
 %! unwind_protect_cleanup
 %!   [~] = unlink (fn);
 %! end_unwind_protect

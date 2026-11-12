@@ -2,7 +2,7 @@
 # name: cache
 # type: cell
 # rows: 3
-# columns: 248
+# columns: 249
 # name: <cell-element>
 # type: sq_string
 # elements: 1
@@ -105,6 +105,42 @@ It governs what is appended after it is set, never what came before.
 # elements: 1
 # length: 18
 The current colour
+
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 21
+draw.Drawing.Decimals
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 729
+draw.Drawing: property Decimals
+The precision of measured dimensions
+
+The number of decimal places a dimension shows its measurement to, an
+integer from 0 to 8, 2 by default. Trailing zeros are dropped, so at 2
+a length of 25 reads 25, one of 25.5 reads 25.5 and one of 25.256 reads
+25.26; an angle follows the same rule. A dimension given its own
+'Text' is not affected.
+
+Unlike Layer or Colour, it is a setting of the whole
+drawing and governs every dimension, those drawn before it was set
+included. The dimensions in a block show the precision of the drawing
+the block is placed in, not the block's own. A DXF file states it in
+its dimension style, so a CAD program that measures the dimensions
+again shows them the same way.
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 36
+The precision of measured dimensions
 
 
 
@@ -612,7 +648,7 @@ draw.Drawing.dim
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1151
+# length: 1185
 draw.Drawing: D = dim (D, P1, P2, OFFSET)
 draw.Drawing: D = dim (..., 'Direction', DIR)
 draw.Drawing: D = dim (..., 'Text', S)
@@ -637,9 +673,9 @@ and is an error.
 The option 'Text' overrides the measured value with the literal
 string S, for the cases every drawing eventually has --- a nominal
 size, a range, a note in place of a number. Without it the backend
-formats the measurement it computes. A dimension therefore carries no
-text of its own by default, which is precisely what keeps it truthful
-when the geometry changes.
+formats the measurement it computes, to the drawing's Decimals
+places. A dimension therefore carries no text of its own by default,
+which is precisely what keeps it truthful when the geometry changes.
 
 
 # name: <cell-element>
@@ -1114,7 +1150,7 @@ draw.Drawing.ordinate
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1527
+# length: 1548
 draw.Drawing: D = ordinate (D, O, P, AXIS, L)
 draw.Drawing: D = ordinate (..., 'Text', S)
 Append an ordinate dimension, the distance of a point from a datum.
@@ -1133,9 +1169,10 @@ and a row of y values along the other. A machinist or a program
 reads each position straight off the datum, and no error adds up along a
 chain of dimensions.
 
-The label is the distance, without sign, to a micron, measured each time
-the drawing is plotted or written, so it follows the geometry; the
-option 'Text' gives the literal text S instead.
+The label is the distance, without sign, to the drawing's
+Decimals places, measured each time the drawing is plotted or
+written, so it follows the geometry; the option 'Text' gives the
+literal text S instead.
 
 ## A plate with two holes, dimensioned from its lower left corner
 D = draw.Drawing ();
