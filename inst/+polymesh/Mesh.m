@@ -140,7 +140,7 @@ classdef Mesh
     ## @deftypefn  {polymesh.Mesh} {@var{M} =} polymesh.Mesh ()
     ## @deftypefnx {polymesh.Mesh} {@var{M} =} polymesh.Mesh (@var{V}, @var{F})
     ## @deftypefnx {polymesh.Mesh} {@var{M} =} polymesh.Mesh (@var{S})
-    ## @deftypefnx {polymesh.Mesh} {@var{M} =} polymesh.Mesh (@dots{}, @var{name}, @var{value})
+    ## @deftypefnx {polymesh.Mesh} {@var{M} =} polymesh.Mesh (@dots{}, @var{Name}, @var{Value})
     ##
     ## Make a triangle mesh.
     ##
@@ -260,11 +260,11 @@ classdef Mesh
     ## into lines, arcs and splines within a tolerance, so that a faceted
     ## bore is a circle again.
     ##
-    ## @code{@var{R} = section (@var{M}, @var{U}, @qcode{'Tolerance'},
-    ## @var{T})} heals a mesh with gaps: where the cut through it breaks off,
-    ## ends closer than @var{T} are joined, nearest first, and points of the
-    ## cut closer than @var{T} are taken as one.  The default @var{T} is a
-    ## millionth of the size of the mesh, which joins nothing but rounding.
+    ## @code{@var{R} = section (@var{M}, @var{U}, 'Tolerance', @var{T})} heals
+    ## a mesh with gaps: where the cut through it breaks off, ends closer than
+    ## @var{T} are joined, nearest first, and points of the cut closer than
+    ## @var{T} are taken as one.  The default @var{T} is a millionth of the
+    ## size of the mesh, which joins nothing but rounding.
     ##
     ## @code{[@var{R}, @var{OPEN}] = section (@dots{})} returns in @var{OPEN}
     ## what could not be made into regions, as a cell array of @math{N}-by-2
@@ -374,7 +374,7 @@ classdef Mesh
     ## written to it.
     ## @end itemize
     ##
-    ## @code{write (@var{M}, @var{FILE}, @qcode{'Encoding'}, @var{E})}
+    ## @code{write (@var{M}, @var{FILE}, 'Encoding', @var{E})}
     ## writes a PLY file as text, each coordinate in the fewest digits that
     ## read back as the same number, when @var{E} is @qcode{'ascii'}, or
     ## binary when it is @qcode{'binary'}, the default; no other format

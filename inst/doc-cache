@@ -8009,7 +8009,7 @@ polymesh.Mesh.Mesh
 polymesh.Mesh: M = polymesh.Mesh ()
 polymesh.Mesh: M = polymesh.Mesh (V, F)
 polymesh.Mesh: M = polymesh.Mesh (S)
-polymesh.Mesh: M = polymesh.Mesh (..., name, value)
+polymesh.Mesh: M = polymesh.Mesh (..., Name, Value)
 Make a triangle mesh.
 
 M = polymesh.Mesh () returns the empty mesh, which has no
@@ -8395,11 +8395,11 @@ apart by how they nest. geom.Region.fit turns the polygon back
 into lines, arcs and splines within a tolerance, so that a faceted
 bore is a circle again.
 
-R = section (M, U, 'Tolerance',
-T) heals a mesh with gaps: where the cut through it breaks off,
-ends closer than T are joined, nearest first, and points of the
-cut closer than T are taken as one. The default T is a
-millionth of the size of the mesh, which joins nothing but rounding.
+R = section (M, U, 'Tolerance', T) heals
+a mesh with gaps: where the cut through it breaks off, ends closer than
+T are joined, nearest first, and points of the cut closer than
+T are taken as one. The default T is a millionth of the
+size of the mesh, which joins nothing but rounding.
 
 [R, OPEN] = section (...) returns in OPEN
 what could not be made into regions, as a cell array of N-by-2

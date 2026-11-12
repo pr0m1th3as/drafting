@@ -93,7 +93,7 @@
 ## faces that use it grey; each is a warning.  A colour outside 0 to 1 is
 ## an error.
 ##
-## @code{@var{M} = polymesh.read (@var{FILE}, @qcode{'Tolerance'}, @var{T})}
+## @code{@var{M} = polymesh.read (@var{FILE}, 'Tolerance', @var{T})}
 ## welds points that lie within @var{T} of one another, not only those that
 ## are equal, which closes the hairline gaps some programs leave in a mesh.
 ## The default @var{T} is 0.
