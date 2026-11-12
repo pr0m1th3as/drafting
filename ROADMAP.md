@@ -69,12 +69,14 @@ it changes what the package is. In rough order of value:
 
 | Group | Content |
 |---|---|
-| Dimensional tolerances | symmetric (`±0.05`), limit dimensions (`25.05/24.95`), and ISO fits (`H7`, `g6`) resolved to real limits from the standard tables |
-| Feature control frames | profile and runout first, the frames on every blade, vane, printed part and shaft; then position, flatness, concentricity and perpendicularity; with datum references and material-condition modifiers |
-| Baseline and chain dimensions | datum-referenced running dimensions over a point set, building on `ordinate`, and chain-dimension helpers |
-| Surface finish | Ra/Rz finish symbols |
-| Section and detail marks | cutting planes with view direction, circled detail callouts carrying their own scale |
-| Balloons and parts list | numbered leaders and a bill of materials table |
+| Dimensional tolerances | symmetric (`±0.05`), deviations (`+0.1/-0.05`) and limit dimensions (`25.05/24.95`); ISO fits (`25 H7 (+0.021/0)`) from the whole ISO 286 system, fit pairs (`H7/g6`) and angle tolerances; a general tolerance in the title block |
+| Feature control frames | all 14 symbols of ISO 1101, a Ø zone, up to three datums with common datums, the modifiers for maximum and least material, projected and common zones, all-around, a count above the frame and two frames stacked; datum feature symbols |
+| Baseline and chain dimensions | baseline dimensions from one datum, building on `ordinate`, and chains whose overall or one auxiliary link is shown in parentheses |
+| Surface finish | the full single-requirement symbol and the general indication |
+
+Every group follows ISO; ASME Y14.5 is not covered. A tolerance belongs to
+its dimension, so the measured value stays live, and every new symbol is
+drawn as lines and arcs rather than taken from a font.
 
 Tolerances and feature control frames come first: without them the output
 cannot specify a part. `draw.coordtable` and `draw.titleblock` set the pattern
@@ -165,9 +167,9 @@ its own viewport at its own scale, arranged around a title block.
 
 A `draw.Sheet` holding placed, independently scaled viewports over a set of
 `Drawing`s turns the package's main output from a figure into a drawing. It is
-where the section and detail marks of 0.3.0 acquire something to point at, and
-the natural home for DXF paper-space layouts, which R2000 can hold. `print`
-already emits true vector PDF, so a sheet of viewports prints as vector.
+where section and detail marks acquire something to point at, and the natural
+home for DXF paper-space layouts, which R2000 can hold. `print` already emits
+true vector PDF, so a sheet of viewports prints as vector.
 
 ## Drawings of solids (0.5.0)
 
@@ -205,8 +207,8 @@ never from a second look at the thread data. A solid read from a STEP
 file records no intent, so it gets the geometric annotation only.
 
 **Order.** Views need the sheet of 0.4.0, with a viewport that can be clipped
-to a circle for a detail view. Dimensions from intent need the tolerances,
-fits and section and detail marks of 0.3.0.
+to a circle for a detail view. Dimensions from intent need the tolerances
+and fits of 0.3.0, and section and detail marks.
 
 **Verifying it.** Drawings are asserted as the DXF output is: the extent of
 each view, the centres and radii of projected holes, which edges are hidden
@@ -235,6 +237,11 @@ expectations, and the test suite remains `pkg test`.
 same list of primitives `entities` gives `plot` and `tikz`, so it is a third
 consumer rather than a new architecture. It serves documentation, the web, and
 everyone without a CAD program.
+
+**Section and detail marks, balloons and a parts list.** Cutting planes with
+their view direction, circled detail callouts carrying their own scale,
+numbered leaders, and a bill of materials table. They are out of 0.3.0 and no
+version is set; the views of the drawings of solids need the marks.
 
 **Weld symbols.** The symbols of ISO 2553 on an arrow and reference line:
 the elementary and supplementary symbols, the weld's size and length, and
