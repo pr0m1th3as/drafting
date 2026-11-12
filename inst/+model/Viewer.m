@@ -386,6 +386,7 @@ classdef Viewer < handle
           ask = "Pick a flat face for the plane";
           do
             [r, CLICKS, SHOWN] = one (this, 'face', ask, CLICKS, SHOWN);
+            RF = r;
             n = [];
             if (strcmp (r{1}, 'face'))
               k = str2double (r{2});
@@ -400,6 +401,7 @@ classdef Viewer < handle
           told = "Plane: a flat face.\n";
           ask = [told "Pick the start of the x axis"];
           [p1, r, CLICKS, SHOWN] = point (this, ask, CLICKS, SHOWN);
+          RP = {r};
           told = describe ("Start of x", r, scale);
           ask = [told "Pick a point towards +x"];
           do
@@ -407,16 +409,20 @@ classdef Viewer < handle
             A = struct ('normal', n, 'face', f, 'points', [p1; p2]);
             ask = "No direction in the face: pick another point towards +x";
           until (isvalidaxes (A))
+          RP{2} = r;
           told = describe ("Towards +x", r, scale);
         else
+          RF = {};
           ask = "Pick the start of the x axis";
           [p1, r, CLICKS, SHOWN] = point (this, ask, CLICKS, SHOWN);
+          RP = {r};
           told = describe ("Start of x", r, scale);
           ask = [told "Pick a point towards +x"];
           do
             [p2, r, CLICKS, SHOWN] = point (this, ask, CLICKS, SHOWN);
             ask = "Pick a point away from the first, towards +x";
           until (! isequal (p1, p2))
+          RP{2} = r;
           told = describe ("Towards +x", r, scale);
           ask = [told "Pick a point on the +y side"];
           do
@@ -424,16 +430,19 @@ classdef Viewer < handle
             A = struct ('points', [p1; p2; p3]);
             ask = "That point is on the x axis: pick one on the +y side";
           until (isvalidaxes (A))
+          RP{3} = r;
           told = describe ("+y side", r, scale);
         endif
 
         ## The origin
         O = zeros (0, 3);
+        RO = {};
         [r, CLICKS, SHOWN] = one (this, 'point', ...
                                   [told "Pick the origin, or Enter to keep", ...
                                    " the start of x"], CLICKS, SHOWN);
         if (strcmp (r{1}, 'point'))
           O = str2double (r(2:4));
+          RO = {r};
           told = describe ("Origin", r, scale);
           [r, CLICKS, SHOWN] = one (this, 'point', ...
                                     [told "Pick a point to take the", ...
@@ -441,6 +450,7 @@ classdef Viewer < handle
                                      " here"], CLICKS, SHOWN);
           if (strcmp (r{1}, 'point'))
             O(2,:) = str2double (r(2:4));
+            RO{2} = r;
           endif
         endif
         U = model.Viewer.__ucs__ (A, O);
@@ -462,6 +472,12 @@ classdef Viewer < handle
                                          ", "));
       CODE = sprintf ("geom.UCS (%s, %s, %s)", v (U.Normal), v (U.Origin), ...
                       v (U.Origin + U.XAxis));
+      if (isa (S, 'solid.Shape') && isempty (st.model))
+        named = ucscode (S, U, RF, RP, RO, scale, st.name);
+        if (! isempty (named))
+          CODE = named;
+        endif
+      endif
 
     endfunction
 
@@ -979,17 +995,57 @@ classdef Viewer < handle
     ##
     ## A pick depends on the shape it was made on, so
     ## @code{[@var{U}, @var{CODE}] = pickucs (@dots{})} also returns
-    ## @var{CODE}, the expression that makes the same UCS from coordinates, as
-    ## a character vector to put in the script in place of the pick.
-    ## @code{eval (@var{CODE})} gives the UCS again, to the ten significant
-    ## digits @var{CODE} carries.
+    ## @var{CODE}, the expression that makes the same UCS, as a character
+    ## vector to put in the script in place of the pick, laid out in lines of
+    ## at most 80 columns.  @code{eval (@var{CODE})} gives the UCS again.
+    ##
+    ## On a solid whose faces have names, @var{CODE} makes the UCS from them,
+    ## so that it follows the part when an earlier step changes.  The normal
+    ## is @code{solid.Shape.normal} of the face picked, and each point is
+    ## written as @code{model.Viewer.pick} with @qcode{'point'} writes it, by
+    ## @code{solid.Shape.corner}, @code{solid.Shape.centre} or
+    ## @code{solid.Shape.midpoint}:
+    ##
+    ## @itemize
+    ## @item
+    ## with @kbd{Enter} for the origin and the start of @math{x} on the face's
+    ## plane, @code{geom.UCS (@var{N}, @var{P1}, @var{P2})}, the origin at the
+    ## start of @math{x};
+    ##
+    ## @item
+    ## with one point for the origin on the face's plane,
+    ## @code{geom.UCS (@var{N}, @var{O}, @var{O} + (@var{P2} - @var{P1}))},
+    ## @math{x} running from it as from the start of @math{x} to the point
+    ## towards @math{+x};
+    ##
+    ## @item
+    ## with an origin laid into the plane from a point off it, or taken from
+    ## two points, the same with the origin as its coordinates;
+    ##
+    ## @item
+    ## with @var{MODE} @qcode{'points'} and @kbd{Enter} for the origin,
+    ## @code{geom.UCS.threepoint (@var{P1}, @var{P2}, @var{P3})}.
+    ## @end itemize
+    ##
+    ## A face or point without a name is written by its coordinates.  With
+    ## @var{MODE} @qcode{'points'} and an origin picked, on a mesh, on an
+    ## assembly and on a shape without names, @var{CODE} makes the UCS from
+    ## coordinates, to the ten significant digits it carries.
     ##
     ## @example
     ## @group
+    ## ## The top of a block made with 'Label', 'plate', x along its front
     ## [U, CODE] = pickucs (V);
-    ## CODE
-    ## @result{} CODE = geom.UCS ([0, 0, 1], [20, 20, 12], [21, 20, 12])
-    ## R.UCS = geom.UCS ([0, 0, 1], [20, 20, 12], [21, 20, 12]);
+    ## R.UCS = geom.UCS (normal (part, faces (part, 'Label', 'plate.zmax')), ...
+    ##                   corner (part, faces (part, 'Label', ...
+    ##                                        @{'plate.xmin', 'plate.ymin', ...
+    ##                                         'plate.zmax'@})), ...
+    ##                   corner (part, faces (part, 'Label', ...
+    ##                                        @{'plate.xmax', 'plate.ymin', ...
+    ##                                         'plate.zmax'@})));
+    ##
+    ## ## The same picked on a block without names
+    ## R.UCS = geom.UCS ([0, 0, 1], [0, 0, 12], [1, 0, 12]);
     ## @end group
     ## @end example
     ##
@@ -2185,6 +2241,144 @@ function Q = pointcode (S, R, P, SP)
 
 endfunction
 
+## The code that makes the UCS U picked on the solid S from the names of its
+## faces, as one expression laid out by wrapped; empty when no part of it
+## comes from names or it does not make U.  RF is the viewer's reply for
+## the face picked, empty in the points mode, RP its replies for the two or
+## three points of the axes and RO those for the origin, none, one or two.
+## The normal is normal of the face, its vector for a face without a name,
+## and each point as pointcode writes it.  The origin is the start of x when
+## that lies in the face's plane, or the one point picked for it when that
+## does, x running from it as from the start of x towards the second point;
+## an origin laid into the plane, or taken from two points, is its
+## coordinates.  The points mode gives threepoint of its three points, and
+## its coordinates when an origin was picked.  A point lies in the plane
+## within a millionth of SCALE, the size of the part.  The shape is named
+## NAME in the code.
+function Q = ucscode (S, U, RF, RP, RO, SCALE, NAME)
+
+  Q = '';
+  names = __occt__ ('names', 'model.Viewer.pickucs', S.Data);
+  if (names{2})
+    return;
+  endif
+  at = @(r) str2double (r(2:4));
+  pt = cellfun (@(r) pointcode (S, r, at (r), ' '), RP, 'UniformOutput', false);
+  tol = 1e-6 * max (SCALE, 1);
+  if (isempty (RF))
+    if (! isempty (RO))
+      return;
+    endif
+    args = pt;
+    head = "geom.UCS.threepoint (";
+  else
+    info = __occt__ ('faces', 'model.Viewer.pickucs', S.Data);
+    k = str2double (RF{2});
+    n = info{2}(k,:);
+    f = str2double (RF(3:5));
+    inplane = @(p) abs ((p - f) * n') <= tol;
+    F = namedfaces (S, k, info, names, ' ');
+    N = valuetext (n);
+    if (! isempty (F))
+      N = sprintf ("normal (__shape__, %s)", F);
+    endif
+    step = sprintf ("(%s - %s)", pt{2}, pt{1});
+    if (isempty (RO) && inplane (at (RP{1})))
+      args = {N, pt{1}, pt{2}};
+    elseif (isscalar (RO) && inplane (at (RO{1})))
+      o = pointcode (S, RO{1}, at (RO{1}), ' ');
+      args = {N, o, sprintf("%s + %s", o, step)};
+    else
+      o = valuetext (U.Origin);
+      args = {N, o, sprintf("%s + %s", o, step)};
+    endif
+    head = "geom.UCS (";
+  endif
+  code = [head, strjoin(args, ", "), ")"];
+  if (isempty (strfind (code, '__shape__')))
+    return;
+  endif
+  try
+    V = eval (strrep (code, '__shape__', 'S'));
+    same = norm (V.Normal - U.Normal) <= 1e-6 ...
+           && norm (V.XAxis - U.XAxis) <= 1e-6 ...
+           && norm (V.Origin - U.Origin) <= tol;
+  catch
+    same = false;
+  end_try_catch
+  if (same)
+    Q = wrapped (strrep (code, '__shape__', NAME));
+  endif
+
+endfunction
+
+## The code C laid out in lines of at most 80 columns, counted from column
+## 0.  It breaks after every comma between the arguments of its outer call,
+## the next argument aligned under the first.  Inside an argument it breaks
+## after a comma where the line would otherwise pass 80 columns before the
+## next place it could break, and before a ' + ' or ' - ' where the operand
+## that follows would pass them, the rest aligned after the bracket that
+## holds it.  Each break ends its line with ' ...'.
+function T = wrapped (C)
+
+  T = '';
+  col = 0;
+  open = [];
+  k = 1;
+  n = numel (C);
+  ## The places a line can break: after the ', ' at K, before the operator
+  ## of the ' + ' or ' - ' at K
+  comma = @(k) k < n && C(k) == ',' && C(k+1) == ' ';
+  oper = @(k) k + 2 <= n && C(k) == ' ' && any (C(k+1) == '+-') ...
+              && C(k+2) == ' ';
+  while (k <= n)
+    ch = C(k);
+    if (comma (k) || oper (k))
+      ## What follows up to the next place to break, or for an operator its
+      ## whole operand
+      from = k + 2 * comma (k) + oper (k);
+      j = from + 1;
+      d = 0;
+      while (j <= n && ! ((comma (k) || d == 0)
+                          && (comma (j) || oper (j)
+                              || (d == 0 && any (C(j) == ')]}')))))
+        d += any (C(j) == '([{') - any (C(j) == ')]}');
+        j += 1;
+      endwhile
+      room = col + comma (k) + (j - from) + 4 > 80;
+      if (comma (k))
+        if (numel (open) == 1 || room)
+          T = [T, ", ...", "\n", repmat(' ', 1, open(end))];
+          col = open(end);
+        else
+          T = [T, ", "];
+          col += 2;
+        endif
+        k += 2;
+      else
+        if (room)
+          T = [T, " ...", "\n", repmat(' ', 1, open(end))];
+          col = open(end);
+        else
+          T(end+1) = ' ';
+          col += 1;
+        endif
+        k += 1;
+      endif
+      continue;
+    endif
+    T(end+1) = ch;
+    col += 1;
+    if (any (ch == '([{'))
+      open(end+1) = col;
+    elseif (any (ch == ')]}'))
+      open(end) = [];
+    endif
+    k += 1;
+  endwhile
+
+endfunction
+
 ## Whether the code Q, run on the shape __shape__, gives the point P, to a
 ## millionth of its size; code that errs gives none
 function TF = rebuilds (__shape__, Q, P)
@@ -3140,6 +3334,128 @@ endfunction
 %!   W = eval (CODE);
 %!   assert_equal ([W.Normal, W.Origin, W.XAxis], ...
 %!                 [U.Normal, U.Origin, U.XAxis], 1e-9);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
+%! ## A face and two corners of it, by their names
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   S = solid.box (60, 40, 10, 'Label', 'plate');
+%!   V.Model = S;
+%!   px = @(p) V.__project__ (p);
+%!   C = [px([30, 20, 10]); px([0, 0, 10]); px([60, 0, 10]); NaN, NaN];
+%!   [U, ~, CODE] = V.__pickucs__ ('face', C);
+%!   pad = repmat (' ', 1, 41);
+%!   L = {"geom.UCS (normal (S, faces (S, 'Label', 'plate.zmax')), ...", ...
+%!        ["          corner (S, faces (S, 'Label', {'plate.xmin',", ...
+%!         " 'plate.ymin', ..."], ...
+%!        [pad, "'plate.zmax'})), ..."], ...
+%!        ["          corner (S, faces (S, 'Label', {'plate.xmax',", ...
+%!         " 'plate.ymin', ..."], ...
+%!        [pad, "'plate.zmax'})))"]};
+%!   assert_equal (CODE, strjoin (L, "\n"));
+%!   assert_equal (eval (CODE) == U, true);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
+%! ## An origin in the plane, x running from it as from the start
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   S = solid.box (60, 40, 10, 'Label', 'plate');
+%!   V.Model = S;
+%!   px = @(p) V.__project__ (p);
+%!   C = [px([30, 20, 10]); px([0, 0, 10]); px([60, 0, 10]); ...
+%!        px([30, 40, 10]); NaN, NaN];
+%!   [U, ~, CODE] = V.__pickucs__ ('face', C);
+%!   L = strsplit (CODE, "\n");
+%!   assert_equal (L{2}, ["          midpoint (S, edges (S, 'Between',", ...
+%!                        " {'plate.ymax', 'plate.zmax'})), ..."]);
+%!   assert_equal (strncmp (strtrim (L{4}), "+ (", 3), true);
+%!   assert_equal (eval (CODE) == U, true);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
+%! ## An origin laid into the plane is its coordinates
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   S = solid.box (60, 40, 10, 'Label', 'plate');
+%!   V.Model = S;
+%!   px = @(p) V.__project__ (p);
+%!   C = [px([30, 20, 10]); px([0, 0, 10]); px([60, 0, 10]); px([60, 0, 0]); ...
+%!        NaN, NaN];
+%!   [U, ~, CODE] = V.__pickucs__ ('face', C);
+%!   L = strsplit (CODE, "\n");
+%!   assert_equal (L{2}, "          [60, 0, 10], ...");
+%!   assert_equal (eval (CODE) == U, true);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
+%! ## An origin from two points is its coordinates
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   S = solid.box (60, 40, 10, 'Label', 'plate');
+%!   V.Model = S;
+%!   px = @(p) V.__project__ (p);
+%!   C = [px([30, 20, 10]); px([0, 0, 10]); px([60, 0, 10]); ...
+%!        px([30, 0, 10]); px([0, 20, 10]); NaN, NaN];
+%!   [U, ~, CODE] = V.__pickucs__ ('face', C);
+%!   L = strsplit (CODE, "\n");
+%!   assert_equal (L{2}, "          [30, 20, 10], ...");
+%!   assert_equal (eval (CODE) == U, true);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
+%! ## Every line of the code within 80 columns
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   S = solid.box (60, 40, 10, 'Label', 'plate');
+%!   V.Model = S;
+%!   px = @(p) V.__project__ (p);
+%!   C = [px([30, 20, 10]); px([0, 0, 10]); px([60, 0, 10]); ...
+%!        px([30, 40, 10]); NaN, NaN];
+%!   [U, ~, CODE] = V.__pickucs__ ('face', C);
+%!   assert_equal (all (cellfun (@numel, strsplit (CODE, "\n")) <= 80), true);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
+%! ## Three corners by their names
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   S = solid.box (60, 40, 10, 'Label', 'plate');
+%!   V.Model = S;
+%!   px = @(p) V.__project__ (p);
+%!   C = [px([0, 0, 10]); px([60, 0, 10]); px([0, 40, 10]); NaN, NaN];
+%!   [U, ~, CODE] = V.__pickucs__ ('points', C);
+%!   assert_equal (strncmp (CODE, "geom.UCS.threepoint (corner (S, ", 32), ...
+%!                 true);
+%!   assert_equal (eval (CODE) == U, true);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
+%! ## Three points and an origin are coordinates
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   S = solid.box (60, 40, 10, 'Label', 'plate');
+%!   V.Model = S;
+%!   px = @(p) V.__project__ (p);
+%!   C = [px([0, 0, 10]); px([60, 0, 10]); px([0, 40, 10]); px([30, 0, 10]); ...
+%!        NaN, NaN];
+%!   [U, ~, CODE] = V.__pickucs__ ('points', C);
+%!   assert_equal (CODE, "geom.UCS ([0, 0, 1], [30, 0, 10], [31, 0, 10])");
 %! unwind_protect_cleanup
 %!   close (V);
 %! end_unwind_protect
