@@ -187,7 +187,8 @@ classdef Region
     endfunction
 
     ## -*- texinfo -*-
-    ## @deftypefn {geom.Region} {@var{R} =} fillet (@var{R}, @var{RADIUS})
+    ## @deftypefn  {geom.Region} {@var{R} =} fillet (@var{R}, @var{RADIUS})
+    ## @deftypefnx {geom.Region} {@var{R} =} fillet (@dots{}, @qcode{'Label'}, @var{L})
     ##
     ## Round the corners of a region.
     ##
@@ -211,17 +212,21 @@ classdef Region
     ## @end group
     ## @end example
     ##
+    ## The option @qcode{'Label'} names every arc @var{L}, on the outline and
+    ## in the holes alike, as @code{geom.Path.fillet} does; the segments keep
+    ## their labels.
+    ##
     ## @seealso{geom.Path.fillet}
     ## @end deftypefn
-    function this = fillet (this, RADIUS)
+    function this = fillet (this, RADIUS, varargin)
 
-      ## Input validation
-      if (nargin != 2)
+      ## Input validation, Name/Value pairs passed to geom.Path.fillet
+      if (nargin < 2 || mod (numel (varargin), 2) != 0)
         error ("geom.Region.fillet: invalid number of input arguments.");
       endif
 
       try
-        O = fillet (this.Outline, RADIUS);
+        O = fillet (this.Outline, RADIUS, varargin{:});
       catch err
         error ("geom.Region.fillet: OUTLINE: %s", ...
                regexprep (err.message, '^geom\.Path\.fillet: ', ''));
@@ -229,7 +234,7 @@ classdef Region
       H = this.Holes;
       for k = 1:numel (H)
         try
-          H{k} = fillet (H{k}, RADIUS);
+          H{k} = fillet (H{k}, RADIUS, varargin{:});
         catch err
           error ("geom.Region.fillet: HOLES{%d}: %s", k, ...
                  regexprep (err.message, '^geom\.Path\.fillet: ', ''));
@@ -243,6 +248,7 @@ classdef Region
     ## @deftypefn  {geom.Region} {@var{R} =} chamfer (@var{R}, @var{D})
     ## @deftypefnx {geom.Region} {@var{R} =} chamfer (@var{R}, [@var{D1}, @var{D2}])
     ## @deftypefnx {geom.Region} {@var{R} =} chamfer (@var{R}, @var{D}, @qcode{'Angle'}, @var{A})
+    ## @deftypefnx {geom.Region} {@var{R} =} chamfer (@dots{}, @qcode{'Label'}, @var{L})
     ##
     ## Cut the corners of a region.
     ##
@@ -253,7 +259,8 @@ classdef Region
     ## before and after each corner in the order the region stores its
     ## vertices: anticlockwise round the outline, clockwise round the holes.
     ## To cut only some corners, cut the outline or a hole as a path and make
-    ## the region again.
+    ## the region again.  The option @qcode{'Label'} names every cut, on the
+    ## outline and in the holes alike, as @code{geom.Path.chamfer} does.
     ##
     ## @seealso{geom.Path.chamfer, geom.Region.fillet}
     ## @end deftypefn
@@ -352,6 +359,7 @@ classdef Region
     function this = fit (this, MODE = 'arcs', varargin)
 
       ## Input validation
+      refuselabelled ({this}, "fit");
       if (! ischar (MODE) || ! any (strcmp (MODE, {'lines', 'arcs', 'curves'})))
         error ("geom.Region.fit: MODE must be 'lines', 'arcs' or 'curves'.");
       endif
@@ -457,6 +465,7 @@ classdef Region
     ## @end deftypefn
     function R = union (varargin)
 
+      refuselabelled (varargin, "union");
       R = combine ('union', 'geom.Region.union', varargin);
 
     endfunction
@@ -476,6 +485,7 @@ classdef Region
     ## @end deftypefn
     function R = subtract (varargin)
 
+      refuselabelled (varargin, "subtract");
       R = combine ('subtract', 'geom.Region.subtract', varargin);
 
     endfunction
@@ -494,6 +504,7 @@ classdef Region
     ## @end deftypefn
     function R = intersect (varargin)
 
+      refuselabelled (varargin, "intersect");
       R = combine ('intersect', 'geom.Region.intersect', varargin);
 
     endfunction
@@ -542,6 +553,7 @@ classdef Region
       if (nargin < 2)
         error ("geom.Region.offset: invalid number of input arguments.");
       endif
+      refuselabelled ({this}, "offset");
       if (! isfloat (D) || ! isreal (D) || ! isscalar (D) || ! isfinite (D))
         error ("geom.Region.offset: D must be a finite real scalar.");
       endif
@@ -624,6 +636,7 @@ classdef Region
       if (nargin < 1)
         error ("geom.Region.hull: invalid number of input arguments.");
       endif
+      refuselabelled (varargin, "hull");
       L = {};
       P = zeros (0, 2);
       for k = 1:nargin
@@ -701,6 +714,7 @@ classdef Region
       if (nargin != 2 && nargin != 4)
         error ("geom.Region.resize: invalid number of input arguments.");
       endif
+      refuselabelled ({this}, "resize");
       if (! isfloat (SZ) || ! isreal (SZ) || numel (SZ) != 2
           || ! all (isfinite (SZ)) || any (SZ < 0) || ! any (SZ > 0))
         error (strcat ("geom.Region.resize: SZ must be a 2-element vector", ...
@@ -745,6 +759,7 @@ classdef Region
       if (nargin < 2 || nargin > 3)
         error ("geom.Region.mirror: invalid number of input arguments.");
       endif
+      refuselabelled ({this}, "mirror");
       if (! isnumeric (N) || ! isreal (N) || numel (N) != 2
           || ! all (isfinite (N)) || ! any (N != 0))
         error (strcat ("geom.Region.mirror: N must be a nonzero real", ...
@@ -781,6 +796,7 @@ classdef Region
       if (nargin != 2)
         error ("geom.Region.copy: invalid number of input arguments.");
       endif
+      refuselabelled ({this}, "copy");
       if (! isfloat (D) || ! isreal (D) || ! ismatrix (D)
           || columns (D) != 2 || rows (D) < 1 || ! all (isfinite (D(:))))
         error (strcat ("geom.Region.copy: D must be an N-by-2 real matrix", ...
@@ -820,6 +836,7 @@ classdef Region
       if (nargin != 3)
         error ("geom.Region.rectarray: invalid number of input arguments.");
       endif
+      refuselabelled ({this}, "rectarray");
       [errmsg, D] = geom.__grid__ (COUNT, SPACING, 2);
       if (! isempty (errmsg))
         error ("geom.Region.rectarray: %s", errmsg);
@@ -868,6 +885,7 @@ classdef Region
       if (nargin < 3 || nargin > 6)
         error ("geom.Region.polararray: invalid number of input arguments.");
       endif
+      refuselabelled ({this}, "polararray");
       P = [0, 0];
       if (! isempty (varargin) && ! ischar (varargin{1}))
         P = varargin{1};
@@ -904,6 +922,7 @@ classdef Region
     ## -*- texinfo -*-
     ## @deftypefn  {geom.Region} {@var{R} =} geom.Region (@var{OUTLINE})
     ## @deftypefnx {geom.Region} {@var{R} =} geom.Region (@var{OUTLINE}, @var{HOLES})
+    ## @deftypefnx {geom.Region} {@var{R} =} geom.Region (@dots{}, 'Label', @var{L})
     ##
     ## Make a region.
     ##
@@ -946,14 +965,79 @@ classdef Region
     ## An invalid region is refused with an error naming the outline or hole at
     ## fault.
     ##
+    ## The segments of a region can be labelled, so that a solid made from it
+    ## names the face each segment makes, as @code{rib.side.web}; see
+    ## @code{solid.extrude}.  The labels of a loop are given where its
+    ## vertices are written, one label for each segment in the order the
+    ## vertices are written, @code{''} for a segment left unnamed:
+    ##
+    ## @itemize
+    ## @item
+    ## an outline given as a matrix of vertices, or as a polyline, path or
+    ## spline without labels, is labelled by @code{'Label', @var{L}}: the
+    ## segment from row 1 to row 2 first, and last the one back to row 1; a
+    ## spline is one segment;
+    ##
+    ## @item
+    ## an outline given as a @code{geom.Polyline} or @code{geom.Path} made
+    ## with @qcode{'Label'} keeps its labels, and @qcode{'Label'} cannot be
+    ## given to the region as well;
+    ##
+    ## @item
+    ## a hole is labelled by giving it as a @code{geom.Polyline} or
+    ## @code{geom.Path} made with @qcode{'Label'}; @qcode{'Label'} of the
+    ## region never labels a hole.
+    ## @end itemize
+    ##
+    ## A loop the region turns round to store it keeps each label on the
+    ## segment it was written for.  The labels are read from the loops, as
+    ## @code{@var{R}.Outline.Labels}.  @code{geom.Region.fillet} and
+    ## @code{geom.Region.chamfer} keep them; every other operation that
+    ## reshapes a region refuses one with labels.
+    ##
+    ## @example
+    ## @group
+    ## ## An angle section with a keyway, its inside corner and keyway named
+    ## key = geom.Polyline ([18, 1; 22, 1; 22, 3; 18, 3], 'Closed', true, ...
+    ##                      'Label', @{'key_floor', '', 'key_top', ''@});
+    ## R = geom.Region ([0, 0; 40, 0; 40, 5; 5, 5; 5, 30; 0, 30], @{key@}, ...
+    ##                  'Label', @{'', '', '', 'inside', '', ''@});
+    ## @end group
+    ## @end example
+    ##
     ## @end deftypefn
-    function this = Region (OUTLINE, HOLES = {})
+    function this = Region (OUTLINE, varargin)
 
       ## Input validation
-      if (nargin < 1 || nargin > 2)
+      if (nargin < 1 || nargin > 4)
         error ("geom.Region: invalid number of input arguments.");
       endif
+      ## The holes, if any, then the labels of the outline
+      HOLES = {};
+      if (! isempty (varargin) && ! ischar (varargin{1}))
+        HOLES = varargin{1};
+        varargin(1) = [];
+      endif
+      label = [];
+      if (! isempty (varargin))
+        if (numel (varargin) != 2)
+          error ("geom.Region: Name/Value arguments must come in pairs.");
+        elseif (! ischar (varargin{1}) || ! isrow (varargin{1}))
+          error ("geom.Region: option names must be character vectors.");
+        elseif (! strcmpi (varargin{1}, 'label'))
+          error ("geom.Region: unknown option '%s'.", varargin{1});
+        endif
+        label = varargin{2};
+      endif
       [errmsg, O] = toloop (OUTLINE, 'OUTLINE', []);
+      if (isempty (errmsg) && ! isempty (label))
+        if (! isempty (O.Labels))
+          errmsg = strcat ("Label cannot be given for an OUTLINE that has", ...
+                           " labels of its own.");
+        else
+          [errmsg, O] = __labelled__ (O, label);
+        endif
+      endif
       if (! isempty (errmsg))
         error ("geom.Region: %s", errmsg);
       endif
@@ -1572,6 +1656,26 @@ function K = loopcheck (L, U, caller)
 
 endfunction
 
+
+## Raise the error, under the name of the method OP, when a region in ARGS,
+## a cell array of regions and cell arrays of regions, has labelled segments:
+## OP does not carry the labels of segments
+function refuselabelled (ARGS, OP)
+
+  for k = 1:numel (ARGS)
+    a = ARGS{k};
+    if (iscell (a))
+      refuselabelled (a, OP);
+    elseif (isa (a, 'geom.Region')
+            && (! isempty (a.Outline.Labels)
+                || any (cellfun (@(h) ! isempty (h.Labels), a.Holes))))
+      error (strcat ("geom.Region.%s: the segments of a region are", ...
+                     " labelled, and %s does not carry their labels."), ...
+             OP, OP);
+    endif
+  endfor
+
+endfunction
 %!test
 %! R = geom.Region ([0, 0; 60, 0; 60, 40; 0, 40]);
 %! assert_equal (R.Outline.Vertices, [0, 0, 0; 60, 0, 0; 60, 40, 0; 0, 40, 0]);
@@ -2381,3 +2485,42 @@ endfunction
 %!error<geom.Region.write: R12 cannot hold a region.> ...
 %! write (geom.Region (geom.Polyline ([0, 0; 1, 0; 1, 1], 'Closed', true)), ...
 %!        'a.dxf', 'Version', 'R12')
+
+%!test  # the outline labelled as written, kept when turned anticlockwise
+%! R = geom.Region ([0, 0; 0, 10; 10, 10; 10, 0], ...
+%!                  'Label', {'left', 'top', 'right', 'bottom'});
+%! assert_equal (R.Outline.Vertices(:,1:2), [0, 0; 10, 0; 10, 10; 0, 10]);
+%! assert_equal (R.Outline.Labels, {'bottom', 'right', 'top', 'left'});
+%!test  # labels from the loops, a hole kept on its sides when turned
+%! key = geom.Polyline ([18, 1; 22, 1; 22, 3; 18, 3], 'Closed', true, ...
+%!                      'Label', {'key_floor', '', 'key_top', ''});
+%! O = geom.Polyline ([0, 0; 40, 0; 40, 5; 0, 5], 'Closed', true, ...
+%!                    'Label', {'a', 'b', 'c', 'd'});
+%! R = geom.Region (O, {key});
+%! assert_equal (R.Outline.Labels, {'a', 'b', 'c', 'd'});
+%! assert_equal (R.Holes{1}.Labels, {'', 'key_top', '', 'key_floor'});
+%!test  # a fillet and a chamfer keep the labels, naming their arcs
+%! R = geom.Region ([0, 0; 40, 0; 40, 20; 0, 20], ...
+%!                  'Label', {'a', 'b', 'c', 'd'});
+%! assert_equal (fillet (R, 2, 'Label', 'r').Outline.Labels, ...
+%!               {'r', 'a', 'r', 'b', 'r', 'c', 'r', 'd'});
+%! assert_equal (chamfer (R, 1).Outline.Labels, ...
+%!               {'', 'a', '', 'b', '', 'c', '', 'd'});
+%!error<geom.Region: Label cannot be given for an OUTLINE that has labels of its own.> ...
+%! geom.Region (geom.Polyline ([0, 0; 1, 0; 1, 1], 'Closed', true, ...
+%!                             'Label', {'a', 'b', 'c'}), ...
+%!              'Label', {'a', 'b', 'c'})
+%!error<geom.Region: Label must have one entry for each of the 3 segments.> ...
+%! geom.Region ([0, 0; 1, 0; 1, 1], 'Label', {'a', 'b'})
+%!error<geom.Region: unknown option 'Name'.> ...
+%! geom.Region ([0, 0; 1, 0; 1, 1], 'Name', 'a')
+%!error<geom.Region.union: the segments of a region are labelled, and union does not carry their labels.> ...
+%! union (geom.Region ([0, 0; 1, 0; 1, 1], 'Label', {'a', 'b', 'c'}), ...
+%!        geom.Region ([0, 0; 1, 0; 0, 1]))
+%!error<geom.Region.offset: the segments of a region are labelled, and offset does not carry their labels.> ...
+%! offset (geom.Region ([0, 0; 1, 0; 1, 1], 'Label', {'a', 'b', 'c'}), 1)
+%!error<geom.Region.mirror: the segments of a region are labelled, and mirror does not carry their labels.> ...
+%! mirror (geom.Region ([0, 0; 1, 0; 1, 1], 'Label', {'a', 'b', 'c'}), [1, 0])
+%!error<geom.Region.rectarray: the segments of a region are labelled, and rectarray does not carry their labels.> ...
+%! rectarray (geom.Region ([0, 0; 1, 0; 1, 1], 'Label', {'a', 'b', 'c'}), ...
+%!            [2, 1], [3, 0])

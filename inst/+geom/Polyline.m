@@ -71,6 +71,20 @@ classdef Polyline
     ## @end deftp
     Closed = false;
 
+    ## -*- texinfo -*-
+    ## @deftp {geom.Polyline} {property} Labels
+    ##
+    ## Labels of the segments
+    ##
+    ## A row cell array with the label of each segment, the segment leaving
+    ## vertex @math{i} at element @math{i}, @code{''} for a segment left
+    ## unnamed; empty when the polyline has no labels.  The labels are given
+    ## with @qcode{'Label'} when the polyline is made, and name the faces a
+    ## solid made from it takes from each segment.
+    ##
+    ## @end deftp
+    Labels = cell (1, 0);
+
   endproperties
 
   properties
@@ -140,6 +154,15 @@ classdef Polyline
     ## @item @qcode{'UCS'}
     ## The @code{geom.UCS} the vertices are coordinates in, the world
     ## @math{xy} plane by default.
+    ##
+    ## @item @qcode{'Label'}
+    ## A cell array with a label for each segment, in the order the vertices are
+    ## written: the segment from the first to the second, and so on, and for
+    ## a closed one, last the segment back to the first.  Each label is an
+    ## identifier, a letter followed by letters, digits or underscores, or
+    ## @code{''} for a segment left unnamed.  A solid made from it names the
+    ## face each segment makes by its label, as @code{rib.side.web}; see
+    ## @code{solid.extrude}.
     ## @end table
     ##
     ## @example
@@ -166,7 +189,7 @@ classdef Polyline
       if (mod (numel (varargin), 2) != 0)
         error ("geom.Polyline: Name/Value arguments must come in pairs.");
       endif
-      opt = struct ('Closed', false, 'UCS', geom.UCS ());
+      opt = struct ('Closed', false, 'UCS', geom.UCS (), 'Label', []);
       for ii = 1:2:numel (varargin)
         name = varargin{ii};
         val = varargin{ii+1};
@@ -178,6 +201,8 @@ classdef Polyline
             opt.Closed = val;
           case 'ucs'
             opt.UCS = val;
+          case 'label'
+            opt.Label = val;
           otherwise
             error ("geom.Polyline: unknown option '%s'.", name);
         endswitch
@@ -215,12 +240,20 @@ classdef Polyline
       this.Vertices = P;
       this.Closed = closed;
       this.UCS = opt.UCS;
+      if (! isempty (opt.Label))
+        [errmsg, this.Labels] = geom.__checklabels__ (opt.Label, ...
+                                                      rows (P) - ! closed);
+        if (! isempty (errmsg))
+          error ("geom.Polyline: %s", errmsg);
+        endif
+      endif
 
     endfunction
 
     ## -*- texinfo -*-
     ## @deftypefn  {geom.Polyline} {@var{PL} =} fillet (@var{PL}, @var{RADIUS})
     ## @deftypefnx {geom.Polyline} {@var{PL} =} fillet (@var{PL}, @var{RADIUS}, @var{IDX})
+    ## @deftypefnx {geom.Polyline} {@var{PL} =} fillet (@dots{}, @qcode{'Label'}, @var{L})
     ##
     ## Round the corners of a polyline.
     ##
@@ -246,14 +279,49 @@ classdef Polyline
     ## @end group
     ## @end example
     ##
+    ## The option @qcode{'Label'} names the arc each corner becomes, an
+    ## identifier, a letter followed by letters, digits or underscores; without
+    ## it the arc is unnamed.  The segments of @var{PL} keep their labels, a
+    ## segment used up and dropped taking its label with it.
+    ##
     ## @seealso{geom.Region.fillet}
     ## @end deftypefn
-    function this = fillet (this, RADIUS, IDX = [])
+    function this = fillet (this, RADIUS, varargin)
 
       ## Input validation
       if (nargin < 2)
         error ("geom.Polyline.fillet: invalid number of input arguments.");
       endif
+      ## The corners, if any, then Name/Value pairs
+      IDX = [];
+      if (! isempty (varargin) && ! ischar (varargin{1}))
+        IDX = varargin{1};
+        varargin(1) = [];
+      endif
+      if (mod (numel (varargin), 2) != 0)
+        error (strcat ("geom.Polyline.fillet: Name/Value arguments must", ...
+                       " come in pairs."));
+      endif
+      label = '';
+      for ii = 1:2:numel (varargin)
+        name = varargin{ii};
+        val = varargin{ii+1};
+        if (! ischar (name) || ! isrow (name))
+          error (strcat ("geom.Polyline.fillet: option names must be", ...
+                         " character vectors."));
+        endif
+        switch (lower (name))
+          case 'label'
+            label = val;
+            if (! isvarname (label))
+              error (strcat ("geom.Polyline.fillet: Label must be an", ...
+                             " identifier: a letter followed by letters,", ...
+                             " digits or underscores."));
+            endif
+          otherwise
+            error ("geom.Polyline.fillet: unknown option '%s'.", name);
+        endswitch
+      endfor
       if (! isfloat (RADIUS) || ! isreal (RADIUS) || ! isscalar (RADIUS)
           || ! isfinite (RADIUS) || ! (RADIUS > 0))
         error (strcat ("geom.Polyline.fillet: RADIUS must be a positive", ...
@@ -274,7 +342,8 @@ classdef Polyline
       endif
 
       ## Each rounded corner becomes the arc between its tangent points
-      this.Vertices = cut (V, C, t, t, tan (C.th / 4));
+      [this.Vertices, this.Labels] = cut (V, C, t, t, tan (C.th / 4), ...
+                                          this.Labels, label);
 
     endfunction
 
@@ -283,6 +352,7 @@ classdef Polyline
     ## @deftypefnx {geom.Polyline} {@var{PL} =} chamfer (@var{PL}, [@var{D1}, @var{D2}])
     ## @deftypefnx {geom.Polyline} {@var{PL} =} chamfer (@dots{}, @var{IDX})
     ## @deftypefnx {geom.Polyline} {@var{PL} =} chamfer (@dots{}, @qcode{'Angle'}, @var{A})
+    ## @deftypefnx {geom.Polyline} {@var{PL} =} chamfer (@dots{}, @qcode{'Label'}, @var{L})
     ##
     ## Cut the corners of a polyline.
     ##
@@ -318,6 +388,11 @@ classdef Polyline
     ## @end group
     ## @end example
     ##
+    ## The option @qcode{'Label'} names the straight cut each corner becomes,
+    ## an identifier, a letter followed by letters, digits or underscores;
+    ## without it the cut is unnamed.  The segments of @var{PL} keep their
+    ## labels, a segment used up and dropped taking its label with it.
+    ##
     ## @seealso{geom.Polyline.fillet, geom.Region.chamfer}
     ## @end deftypefn
     function this = chamfer (this, D, varargin)
@@ -337,6 +412,7 @@ classdef Polyline
         varargin(1) = [];
       endif
       A = [];
+      label = '';
       for ii = 1:2:numel (varargin)
         name = varargin{ii};
         val = varargin{ii+1};
@@ -345,6 +421,13 @@ classdef Polyline
                          " character vectors."));
         endif
         switch (lower (name))
+          case 'label'
+            label = val;
+            if (! isvarname (label))
+              error (strcat ("geom.Polyline.chamfer: Label must be an", ...
+                             " identifier: a letter followed by letters,", ...
+                             " digits or underscores."));
+            endif
           case 'angle'
             A = val;
             if (! isfloat (A) || ! isreal (A) || ! isscalar (A)
@@ -387,7 +470,9 @@ classdef Polyline
         error ("geom.Polyline.chamfer: %s", errmsg);
       endif
 
-      this.Vertices = cut (V, C, tin, tout, zeros (1, rows (V)));
+      [this.Vertices, this.Labels] = cut (V, C, tin, tout, ...
+                                          zeros (1, rows (V)), ...
+                                          this.Labels, label);
 
     endfunction
 
@@ -515,16 +600,26 @@ endfunction
 
 ## The vertices V with each corner of C replaced by the points TIN back along
 ## the segment into it and TOUT along the segment out of it, the first given
-## the bulge B of the corner, the second none
-function W = cut (V, C, TIN, TOUT, B)
+## the bulge B of the corner, the second none.  The labels OWN of the
+## segments follow them as T, the arc or straight cut at a corner taking
+## LABEL, '' for none.
+function [W, T] = cut (V, C, TIN, TOUT, B, OWN, LABEL)
 
+  n = rows (V);
+  if (isempty (OWN))
+    OWN = repmat ({''}, 1, n - ! C.closed);
+  endif
+  OWN(end+1:n) = {''};
+  T = num2cell (OWN(:));
   W = num2cell (V, 2);
   for i = C.idx
     a = V(i,1:2) - TIN(i) * C.u(i,:) / norm (C.u(i,:));
     b = V(i,1:2) + TOUT(i) * C.v(i,:) / norm (C.v(i,:));
     W{i} = [a, B(i); b, 0];
+    T{i} = {LABEL; OWN{i}};
   endfor
   W = vertcat (W{:});
+  T = vertcat (T{:});
 
   ## A round or cut that takes a whole side ends where the next begins,
   ## leaving a straight segment of no length, whose first vertex goes
@@ -534,7 +629,15 @@ function W = cut (V, C, TIN, TOUT, B)
   else
     L = [sqrt(sum (diff (W(:,1:2)) .^ 2, 2)); Inf];
   endif
-  W = W(! (W(:,3) == 0 & L <= 1e-9 * max (C.len)),:);
+  keep = ! (W(:,3) == 0 & L <= 1e-9 * max (C.len));
+  W = W(keep,:);
+  T = T(keep)';
+  if (! C.closed)
+    T(end) = [];
+  endif
+  if (all (cellfun (@isempty, T)))
+    T = cell (1, 0);
+  endif
 
 endfunction
 
@@ -754,3 +857,18 @@ endfunction
 %! write (geom.Polyline ([0, 0; 1, 0]), 'a.dxf', 'Fill', true)
 %!error<geom.Polyline.write: option names must be character vectors.> ...
 %! write (geom.Polyline ([0, 0; 1, 0]), 'a.dxf', 1, true)
+
+%!test  # labels, carried by a fillet and a chamfer
+%! PL = geom.Polyline ([0, 0; 40, 0; 40, 5; 5, 5; 5, 30; 0, 30], ...
+%!                     'Closed', true, ...
+%!                     'Label', {'base', 'toe', '', 'inside', '', 'back'});
+%! assert_equal (PL.Labels, {'base', 'toe', '', 'inside', '', 'back'});
+%! F = fillet (PL, 2, 4, 'Label', 'corner');
+%! assert_equal (F.Labels, {'base', 'toe', '', 'corner', 'inside', '', ...
+%!                          'back'});
+%! C = chamfer (PL, 1, 4, 'Label', 'bevel');
+%! assert_equal (C.Labels, {'base', 'toe', '', 'bevel', 'inside', '', 'back'});
+%!error<geom.Polyline: Label must have one entry for each of the 2 segments.> ...
+%! geom.Polyline ([0, 0; 1, 0; 1, 1], 'Label', {'a', 'b', 'c'})
+%!error<geom.Polyline.chamfer: Label must be an identifier: a letter followed by letters, digits or underscores.> ...
+%! chamfer (geom.Polyline ([0, 0; 1, 0; 1, 1]), 0.1, 'Label', '1')

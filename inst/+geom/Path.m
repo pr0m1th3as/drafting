@@ -93,6 +93,20 @@ classdef Path
     ## @end deftp
     Closed = false;
 
+    ## -*- texinfo -*-
+    ## @deftp {geom.Path} {property} Labels
+    ##
+    ## Labels of the segments
+    ##
+    ## A row cell array with the label of each segment, the segment leaving
+    ## vertex @math{i} at element @math{i}, @code{''} for a segment left
+    ## unnamed; empty when the path has no labels.  The labels are given with
+    ## @qcode{'Label'} when the path is made, and name the faces a solid made
+    ## from the path takes from each segment.
+    ##
+    ## @end deftp
+    Labels = cell (1, 0);
+
   endproperties
 
   properties
@@ -200,6 +214,22 @@ classdef Path
       this.Vertices = this.Vertices(k,:);
       this.Midpoints = M;
       this.Splines = S;
+      ## Each label stays with its segment
+      if (! isempty (this.Labels))
+        this.Labels = this.Labels(g(1:numel (this.Labels)));
+      endif
+
+    endfunction
+
+    ## The path with its segments labelled L, as 'Label' gives them; ERRMSG
+    ## is the error body, empty when L is valid
+    function [errmsg, this] = __labelled__ (this, L)
+
+      [errmsg, L] = geom.__checklabels__ (L, rows (this.Vertices) ...
+                                             - ! this.Closed);
+      if (isempty (errmsg))
+        this.Labels = L;
+      endif
 
     endfunction
 
@@ -364,16 +394,26 @@ classdef Path
     ## @item @qcode{'UCS'}
     ## The @code{geom.UCS} the points are coordinates in, the world coordinate
     ## system by default.
+    ##
+    ## @item @qcode{'Label'}
+    ## A cell array with a label for each segment, in the order the points are
+    ## written: the segment from the first to the second, and so on, and for
+    ## a closed one, last the segment back to the first.  Each label is an
+    ## identifier, a letter followed by letters, digits or underscores, or
+    ## @code{''} for a segment left unnamed.  A solid made from it names the
+    ## face each segment makes by its label, as @code{rib.side.web}; see
+    ## @code{solid.extrude}.
     ## @end table
     ##
     ## @code{@var{P} = geom.Path (@var{PL})} makes the path of the
     ## @code{geom.Polyline} @var{PL}, in its UCS, open or closed as @var{PL}
-    ## is, with its arcs kept exact.
+    ## is, with its arcs kept exact and its labels kept.
     ##
     ## @code{@var{P} = geom.Path (@var{SP})} makes the path of one segment
     ## along the @code{geom.Spline} @var{SP}, in its UCS.  A closed spline
     ## makes a closed path of one vertex, its first point, the spline running
-    ## from it round and back.
+    ## from it round and back.  @code{geom.Path (@var{SP}, 'Label',
+    ## @{@var{L}@})} labels that one segment @var{L}.
     ##
     ## @example
     ## @group
@@ -398,11 +438,21 @@ classdef Path
         this.Splines = cell (rows (this.Vertices), 1);
         this.Closed = V.Closed;
         this.UCS = V.UCS;
+        this.Labels = V.Labels;
         return;
       endif
       if (isa (V, 'geom.Spline'))
+        ## Its one segment labelled with 'Label' alone
+        label = cell (1, 0);
         if (nargin > 1)
-          error ("geom.Path: invalid number of input arguments.");
+          if (nargin != 3 || ! ischar (varargin{1})
+              || ! strcmpi (varargin{1}, 'label'))
+            error ("geom.Path: invalid number of input arguments.");
+          endif
+          [errmsg, label] = geom.__checklabels__ (varargin{2}, 1);
+          if (! isempty (errmsg))
+            error ("geom.Path: %s", errmsg);
+          endif
         endif
         SP = V;
         SP.UCS = geom.UCS ();
@@ -417,6 +467,7 @@ classdef Path
           this.Splines = {SP; []};
         endif
         this.UCS = V.UCS;
+        this.Labels = label;
         return;
       endif
       if (! isfloat (V) || ! isreal (V) || ! ismatrix (V)
@@ -428,7 +479,7 @@ classdef Path
       if (mod (numel (varargin), 2) != 0)
         error ("geom.Path: Name/Value arguments must come in pairs.");
       endif
-      opt = struct ('Closed', false, 'UCS', geom.UCS ());
+      opt = struct ('Closed', false, 'UCS', geom.UCS (), 'Label', []);
       for ii = 1:2:numel (varargin)
         name = varargin{ii};
         val = varargin{ii+1};
@@ -440,6 +491,8 @@ classdef Path
             opt.Closed = val;
           case 'ucs'
             opt.UCS = val;
+          case 'label'
+            opt.Label = val;
           otherwise
             error ("geom.Path: unknown option '%s'.", name);
         endswitch
@@ -475,12 +528,20 @@ classdef Path
       this.Splines = cell (rows (V), 1);
       this.Closed = closed;
       this.UCS = opt.UCS;
+      if (! isempty (opt.Label))
+        [errmsg, this.Labels] = geom.__checklabels__ (opt.Label, ...
+                                                      rows (V) - ! closed);
+        if (! isempty (errmsg))
+          error ("geom.Path: %s", errmsg);
+        endif
+      endif
 
     endfunction
 
     ## -*- texinfo -*-
     ## @deftypefn  {geom.Path} {@var{P} =} fillet (@var{P}, @var{RADIUS})
     ## @deftypefnx {geom.Path} {@var{P} =} fillet (@var{P}, @var{RADIUS}, @var{IDX})
+    ## @deftypefnx {geom.Path} {@var{P} =} fillet (@dots{}, @qcode{'Label'}, @var{L})
     ##
     ## Round the corners of a path.
     ##
@@ -499,14 +560,48 @@ classdef Path
     ## segment or into the round of the next corner, is refused.  Rounds that
     ## use up a segment between them meet, and the segment is dropped.
     ##
+    ## The option @qcode{'Label'} names the arc each corner becomes, an
+    ## identifier, a letter followed by letters, digits or underscores; without
+    ## it the arc is unnamed.  The segments of @var{P} keep their labels, a
+    ## segment used up and dropped taking its label with it.
+    ##
     ## @seealso{geom.Polyline.fillet}
     ## @end deftypefn
-    function this = fillet (this, RADIUS, IDX = [])
+    function this = fillet (this, RADIUS, varargin)
 
       ## Input validation
       if (nargin < 2)
         error ("geom.Path.fillet: invalid number of input arguments.");
       endif
+      ## The corners, if any, then Name/Value pairs
+      IDX = [];
+      if (! isempty (varargin) && ! ischar (varargin{1}))
+        IDX = varargin{1};
+        varargin(1) = [];
+      endif
+      if (mod (numel (varargin), 2) != 0)
+        error ("geom.Path.fillet: Name/Value arguments must come in pairs.");
+      endif
+      label = '';
+      for ii = 1:2:numel (varargin)
+        name = varargin{ii};
+        val = varargin{ii+1};
+        if (! ischar (name) || ! isrow (name))
+          error (strcat ("geom.Path.fillet: option names must be", ...
+                         " character vectors."));
+        endif
+        switch (lower (name))
+          case 'label'
+            label = val;
+            if (! isvarname (label))
+              error (strcat ("geom.Path.fillet: Label must be an", ...
+                             " identifier: a letter followed by letters,", ...
+                             " digits or underscores."));
+            endif
+          otherwise
+            error ("geom.Path.fillet: unknown option '%s'.", name);
+        endswitch
+      endfor
       if (! isfloat (RADIUS) || ! isreal (RADIUS) || ! isscalar (RADIUS)
           || ! isfinite (RADIUS) || ! (RADIUS > 0))
         error (strcat ("geom.Path.fillet: RADIUS must be a positive and", ...
@@ -533,7 +628,7 @@ classdef Path
         Mid(i,:) = this.Vertices(i,:) ...
                    + d / norm (d) * RADIUS * (1 / cos (C.th(i) / 2) - 1);
       endfor
-      this = cut (this, C, t, t, Mid);
+      this = cut (this, C, t, t, Mid, label);
 
     endfunction
 
@@ -542,6 +637,7 @@ classdef Path
     ## @deftypefnx {geom.Path} {@var{P} =} chamfer (@var{P}, [@var{D1}, @var{D2}])
     ## @deftypefnx {geom.Path} {@var{P} =} chamfer (@dots{}, @var{IDX})
     ## @deftypefnx {geom.Path} {@var{P} =} chamfer (@dots{}, @qcode{'Angle'}, @var{A})
+    ## @deftypefnx {geom.Path} {@var{P} =} chamfer (@dots{}, @qcode{'Label'}, @var{L})
     ##
     ## Cut the corners of a path.
     ##
@@ -567,6 +663,11 @@ classdef Path
     ## of the next corner, or an angle at which the cut misses the segment
     ## after the corner, is refused.
     ##
+    ## The option @qcode{'Label'} names the straight cut each corner becomes,
+    ## an identifier, a letter followed by letters, digits or underscores;
+    ## without it the cut is unnamed.  The segments of @var{P} keep their
+    ## labels, a segment used up and dropped taking its label with it.
+    ##
     ## @seealso{geom.Path.fillet, geom.Polyline.chamfer}
     ## @end deftypefn
     function this = chamfer (this, D, varargin)
@@ -586,6 +687,7 @@ classdef Path
         varargin(1) = [];
       endif
       A = [];
+      label = '';
       for ii = 1:2:numel (varargin)
         name = varargin{ii};
         val = varargin{ii+1};
@@ -599,6 +701,13 @@ classdef Path
                 || ! (A > 0) || ! (A < 180))
               error (strcat ("geom.Path.chamfer: Angle must be in the", ...
                              " range (0, 180) degrees."));
+            endif
+          case 'label'
+            label = val;
+            if (! isvarname (label))
+              error (strcat ("geom.Path.chamfer: Label must be an", ...
+                             " identifier: a letter followed by letters,", ...
+                             " digits or underscores."));
             endif
           otherwise
             error ("geom.Path.chamfer: unknown option '%s'.", name);
@@ -634,7 +743,7 @@ classdef Path
         error ("geom.Path.chamfer: %s", errmsg);
       endif
 
-      this = cut (this, C, tin, tout, NaN (n, 3));
+      this = cut (this, C, tin, tout, NaN (n, 3), label);
 
     endfunction
 
@@ -667,6 +776,9 @@ classdef Path
     ##           geom.Path ([20, 0, 50; 20, 0, 0]));
     ## @end group
     ## @end example
+    ##
+    ## The joined path keeps the labels of the segments of every piece, in
+    ## order; the segments of a piece without labels are left unnamed.
     ##
     ## @end deftypefn
     function this = join (varargin)
@@ -712,6 +824,20 @@ classdef Path
           error ("geom.Path.join: path %d is closed.", k);
         endif
       endfor
+
+      ## The labels of the pieces in turn, '' for the segments of one without
+      L = cell (1, 0);
+      for k = 1:numel (varargin)
+        P = varargin{k};
+        if (isempty (P.Labels))
+          L = [L, repmat({''}, 1, rows (P.Vertices) - 1)];
+        else
+          L = [L, P.Labels];
+        endif
+      endfor
+      if (all (cellfun (@isempty, L)))
+        L = cell (1, 0);
+      endif
 
       this = varargin{1};
       V = this.Vertices;
@@ -768,6 +894,7 @@ classdef Path
       this.Midpoints = M;
       this.Splines = S;
       this.Closed = closed;
+      this.Labels = L;
 
     endfunction
 
@@ -864,23 +991,33 @@ classdef Path
     ## The path P with each corner of C replaced by the points TIN back along
     ## the segment into it and TOUT along the segment out of it, joined by an
     ## arc through MID or a straight segment where MID is NaN.  A straight
-    ## segment that the cuts at its ends used up is dropped.
-    function P = cut (P, C, TIN, TOUT, MID)
+    ## segment that the cuts at its ends used up is dropped.  Each segment
+    ## keeps its label, and each arc or straight cut takes LABEL, '' for none.
+    function P = cut (P, C, TIN, TOUT, MID, LABEL)
 
       V = P.Vertices;
+      n = rows (V);
       W = num2cell (V, 2);
       N = num2cell (P.Midpoints, 2);
       S = num2cell (P.Splines);
+      own = P.Labels;
+      if (isempty (own))
+        own = repmat ({''}, 1, n - ! P.Closed);
+      endif
+      own(end+1:n) = {''};
+      T = num2cell (own(:));
       for i = C.idx
         a = V(i,:) - TIN(i) * C.u(i,:) / C.lu(i);
         b = V(i,:) + TOUT(i) * C.v(i,:) / C.lv(i);
         W{i} = [a; b];
         N{i} = [MID(i,:); NaN, NaN, NaN];
         S{i} = cell (2, 1);
+        T{i} = {LABEL; own{i}};
       endfor
       W = vertcat (W{:});
       N = vertcat (N{:});
       S = vertcat (S{:});
+      T = vertcat (T{:});
       k = rows (W);
       if (P.Closed)
         L = sqrt (sum ((W([2:k, 1],:) - W) .^ 2, 2));
@@ -891,6 +1028,14 @@ classdef Path
       P.Vertices = W(! gone,:);
       P.Midpoints = N(! gone,:);
       P.Splines = S(! gone);
+      T = T(! gone)';
+      if (! P.Closed)
+        T(end) = [];
+      endif
+      if (all (cellfun (@isempty, T)))
+        T = cell (1, 0);
+      endif
+      P.Labels = T;
 
     endfunction
 
@@ -1808,3 +1953,50 @@ endfunction
 %! write (geom.Path ([0, 0; 1, 0]))
 %!error<geom.Path.write: R12 cannot hold a path.> ...
 %! write (geom.Path ([0, 0; 1, 0]), 'a.dxf', 'Version', 'R12')
+
+%!test  # labels, one for each segment, '' left unnamed
+%! P = geom.Path ([0, 0; 10, 0; 10, 10], 'Label', {'leg', ''});
+%! assert_equal (P.Labels, {'leg', ''});
+%! P = geom.Path ([0, 0; 10, 0; 10, 10], 'Closed', true, ...
+%!                'Label', {'a', 'b', 'c'});
+%! assert_equal (P.Labels, {'a', 'b', 'c'});
+%! P = geom.Path ([0, 0; 1, 0], 'Label', {''});
+%! assert_equal (P.Labels, cell (1, 0));
+%!test  # labels from a polyline, and on a spline's one segment
+%! PL = geom.Polyline ([0, 0, 0; 10, 0, 1; 10, 10, 0], ...
+%!                     'Label', {'line', 'arc'});
+%! P = geom.Path (PL);
+%! assert_equal (P.Labels, {'line', 'arc'});
+%! SP = geom.Spline ([0, 0; 5, 3; 10, 0; 5, -3], 'Closed', true);
+%! P = geom.Path (SP, 'Label', {'curve'});
+%! assert_equal (P.Labels, {'curve'});
+%!test  # a fillet keeps the labels, its arcs named by its own
+%! P = geom.Path ([0, 0; 10, 0; 10, 10; 0, 10], 'Closed', true, ...
+%!                'Label', {'a', 'b', 'c', 'd'});
+%! Q = fillet (P, 2, 'Label', 'r');
+%! assert_equal (Q.Labels, {'r', 'a', 'r', 'b', 'r', 'c', 'r', 'd'});
+%! Q = fillet (P, 2, 3);
+%! assert_equal (Q.Labels, {'a', 'b', '', 'c', 'd'});
+%! Q = chamfer (geom.Path ([0, 0; 10, 0; 10, 10]), 1, 'Label', 'bevel');
+%! assert_equal (Q.Labels, {'', 'bevel', ''});
+%!test  # a segment two rounds use up goes, and its label with it
+%! P = geom.Path ([0, 0; 10, 0; 10, 4; 0, 4], 'Closed', true, ...
+%!                'Label', {'a', 'b', 'c', 'd'});
+%! Q = fillet (P, 2);
+%! assert_equal (Q.Labels, {'', 'a', '', '', 'c', ''});
+%!test  # join keeps the labels in order
+%! A = geom.Path ([0, 0; 10, 0; 10, 10], 'Label', {'leg1', 'leg2'});
+%! assert_equal (join (A, geom.Path ([10, 10; 0, 10])).Labels, ...
+%!               {'leg1', 'leg2', ''});
+%!error<geom.Path: Label must have one entry for each of the 2 segments.> ...
+%! geom.Path ([0, 0; 10, 0; 10, 10], 'Label', {'a'})
+%!error<geom.Path: Label must be a cell array of character vectors.> ...
+%! geom.Path ([0, 0; 10, 0], 'Label', 'a')
+%!error<geom.Path: Label must contain valid identifiers, one for each segment, or '' for a segment left unnamed.> ...
+%! geom.Path ([0, 0; 10, 0], 'Label', {'end'})
+%!error<geom.Path: invalid number of input arguments.> ...
+%! geom.Path (geom.Spline ([0, 0; 5, 3; 10, 0]), 'Closed', true)
+%!error<geom.Path.fillet: Label must be an identifier: a letter followed by letters, digits or underscores.> ...
+%! fillet (geom.Path ([0, 0; 10, 0; 10, 10]), 1, 'Label', 'a.b')
+%!error<geom.Path.fillet: unknown option 'Radius'.> ...
+%! fillet (geom.Path ([0, 0; 10, 0; 10, 10]), 1, 'Radius', 2)
