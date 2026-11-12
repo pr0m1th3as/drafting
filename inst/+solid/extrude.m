@@ -70,6 +70,19 @@
 ## @item @qcode{'Scale'}
 ## The factor by which the region is scaled about its origin at the far end
 ## of the extrusion, changing evenly along the height.  It is 1 by default.
+##
+## @item @qcode{'Label'}
+## An identifier @var{L}, a letter followed by letters, digits or
+## underscores, that names the faces of the solid, so that a later step
+## finds a face by its name with @code{solid.Shape.faces}:
+## @var{L}@code{.start}, the end face on the side the region's normal points
+## away from, @var{L}@code{.end}, the end face on the side it points to,
+## @var{L}@code{.side}, every face of the walls rising from the outline, and
+## @var{L}@code{.hole}, every face of the walls of the holes.  The ends are
+## named the same way whatever the sign of @var{H}, so the start of an
+## extrusion along the normal lies in the region's plane, and of one against
+## it at the far end.  The solids of a cell array of regions are copies 1, 2
+## and so on of the label, chosen with @qcode{'Copy'}.
 ## @end table
 ##
 ## Twist and scale apply to an extrusion to one side and cannot be combined
@@ -106,6 +119,11 @@ function S = extrude (R, H, varargin)
     endif
     S = cellfun (@(r) solid.extrude (r, H, varargin{:}), R, ...
                  'UniformOutput', false);
+    ## The solid of region K is copy K, for 'Copy' to choose it
+    for k = 1:numel (S)
+      S{k} = solid.Shape (__occt__ ('copyindex', 'solid.extrude', ...
+                                    S{k}.Data, k));
+    endfor
     S = union (S{:});
     return;
   endif
@@ -122,7 +140,7 @@ function S = extrude (R, H, varargin)
   if (mod (numel (varargin), 2) != 0)
     error ("solid.extrude: Name/Value arguments must come in pairs.");
   endif
-  opt = struct ('Taper', 0, 'Twist', 0, 'Scale', 1);
+  opt = struct ('Taper', 0, 'Twist', 0, 'Scale', 1, 'Label', '');
   for ii = 1:2:numel (varargin)
     name = varargin{ii};
     val = varargin{ii+1};
@@ -136,6 +154,14 @@ function S = extrude (R, H, varargin)
         opt.Twist = val;
       case 'scale'
         opt.Scale = val;
+      case 'label'
+        opt.Label = val;
+        if (! (ischar (val) && isrow (val)
+               && ! isempty (regexp (val, '^[A-Za-z]\w*$', 'once'))))
+          error (strcat ("solid.extrude: Label must be an identifier: a", ...
+                         " letter followed by letters, digits or", ...
+                         " underscores."));
+        endif
       otherwise
         error ("solid.extrude: unknown option '%s'.", name);
     endswitch
@@ -171,7 +197,7 @@ function S = extrude (R, H, varargin)
 
   H = double (H);
   if (twisted)
-    S = twist (R, H, double (opt.Twist), double (opt.Scale));
+    S = twist (R, H, double (opt.Twist), double (opt.Scale), opt.Label);
     return;
   endif
   if (isscalar (H))
@@ -182,14 +208,14 @@ function S = extrude (R, H, varargin)
     A = [A, A];
   endif
   S = solid.Shape (__occt__ ('extrude', 'solid.extrude', D, H(1), H(2), ...
-                             A(1), A(2)));
+                             A(1), A(2), opt.Label));
 
 endfunction
 
 ## An extrusion of R to the signed height H, turning by TW degrees and scaled
 ## to SC at its far end: a loft through the region turned and scaled every 10
 ## degrees, ruled and exact when it does not turn
-function S = twist (R, H, TW, SC)
+function S = twist (R, H, TW, SC, LABEL)
 
   U = R.UCS;
   n = max (4, ceil (abs (TW) / 10)) * (TW != 0) + (TW == 0);
@@ -203,7 +229,16 @@ function S = twist (R, H, TW, SC)
     Rk.UCS = geom.UCS (U.Normal, o, o + X);
     sections{k+1} = Rk;
   endfor
-  S = solid.loft (sections, 'Ruled', TW == 0);
+  if (isempty (LABEL))
+    S = solid.loft (sections, 'Ruled', TW == 0);
+  else
+    S = solid.loft (sections, 'Ruled', TW == 0, 'Label', LABEL);
+    ## Against the normal the loft starts in the region's plane, which is
+    ## then the end, its far end the start
+    if (H < 0)
+      S = solid.Shape (__occt__ ('swapends', 'solid.extrude', S.Data, LABEL));
+    endif
+  endif
 
 endfunction
 
@@ -352,15 +387,67 @@ endfunction
 %! assert_equal (volume (S), 300, 1e-9);
 %! assert_equal (numfaces (S), 6);
 
-%!test  # a cell of one region is that region
+%!test  # a cell of one region is that region, as copy 1
 %! R = geom.Region ([0, 0; 10, 0; 10, 20; 0, 20]);
-%! assert_equal (isequal (solid.extrude ({R}, 5), solid.extrude (R, 5)), true);
+%! C = solid.extrude ({R}, 5);
+%! S = solid.extrude (R, 5);
+%! assert_equal (volume (C), volume (S));
+%! assert_equal (bbox (C), bbox (S));
+%! assert_equal (faces (C, 'Copy', 1), 1:numfaces (S));
 
 %!test  # the options apply to every region
 %! R = {geom.Region([0, 0; 10, 0; 10, 10; 0, 10]), ...
 %!      geom.Region([20, 0; 30, 0; 30, 10; 20, 10])};
 %! S = solid.extrude (R, 5, 'Scale', 0.5);
 %! assert_equal (volume (S), 2 * 5 / 3 * (100 + 25 + 50), 1e-9);
+
+%!test  # faces named start, end, side and hole
+%! R = geom.Region ([0, 0; 40, 0; 40, 20; 0, 20], {[10, 10, 1; 14, 10, 1]});
+%! S = solid.extrude (R, 6, 'Label', 'plate');
+%! assert_equal (faces (S, 'Label', 'plate.start'), ...
+%!               faces (S, 'Normal', [0, 0, -1]));
+%! assert_equal (faces (S, 'Label', 'plate.end'), ...
+%!               faces (S, 'Normal', [0, 0, 1]));
+%! assert_equal (faces (S, 'Label', 'plate.hole'), ...
+%!               faces (S, 'Type', 'cylinder'));
+%! assert_equal (numel (faces (S, 'Label', 'plate.side')), 4);
+%!test  # the start on the side the normal points away from, whatever H
+%! R = geom.Region ([0, 0; 40, 0; 40, 20; 0, 20]);
+%! S = solid.extrude (R, -6, 'Label', 'plate');
+%! assert_equal (faces (S, 'Label', 'plate.start'), ...
+%!               faces (S, 'Within', [0, 0, -6, 40, 20, -6]));
+%! S = solid.extrude (R, [4, 2], 'Label', 'plate');
+%! assert_equal (faces (S, 'Label', 'plate.start'), ...
+%!               faces (S, 'Within', [0, 0, -2, 40, 20, -2]));
+%! assert_equal (faces (S, 'Label', 'plate.end'), ...
+%!               faces (S, 'Within', [0, 0, 4, 40, 20, 4]));
+%!test  # tapered, to one side or both, each side its own taper
+%! R = geom.Region ([0, 0; 40, 0; 40, 20; 0, 20], {[10, 10, 1; 14, 10, 1]});
+%! S = solid.extrude (R, -6, 'Taper', 5, 'Label', 'cast');
+%! assert_equal (faces (S, 'Label', 'cast.start'), ...
+%!               faces (S, 'Normal', [0, 0, -1]));
+%! assert_equal (faces (S, 'Label', 'cast.hole'), faces (S, 'Type', 'cone'));
+%! S = solid.extrude (R, [4, 2], 'Taper', [0, 3], 'Label', 'cast');
+%! assert_equal (faces (S, 'Label', 'cast.start'), ...
+%!               faces (S, 'Within', [-1, -1, -2, 41, 21, -2]));
+%! assert_equal (faces (S, 'Label', 'cast.end'), ...
+%!               faces (S, 'Within', [0, 0, 4, 40, 20, 4]));
+%! assert_equal (numel (faces (S, 'Label', 'cast.side')), 8);
+%!test  # twisted against the normal, its far end the start
+%! R = geom.Region ([0, 0; 40, 0; 40, 20; 0, 20]);
+%! S = solid.extrude (R, -6, 'Twist', 30, 'Label', 'bar');
+%! assert_equal (faces (S, 'Label', 'bar.start'), ...
+%!               faces (S, 'Normal', [0, 0, -1]));
+%! assert_equal (faces (S, 'Label', 'bar.end'), ...
+%!               faces (S, 'Normal', [0, 0, 1]));
+%! assert_equal (volume (S), volume (solid.extrude (R, 6, 'Twist', 30)), ...
+%!               -1e-9);
+%!test  # the solids of a cell of regions are copies of the label
+%! S = solid.extrude ({geom.Region([0, 0; 10, 0; 10, 10; 0, 10]), ...
+%!                     geom.Region([20, 0; 30, 0; 30, 10; 20, 10])}, 5, ...
+%!                    'Label', 'tile');
+%! assert_equal (faces (S, 'Label', 'tile.end', 'Copy', 2), ...
+%!               faces (S, 'Within', [20, 0, 5, 30, 10, 5]));
 
 %!error<solid.extrude: invalid number of input arguments.> ...
 %! solid.extrude (geom.Region ([0, 0; 1, 0; 1, 1]))
@@ -405,3 +492,5 @@ endfunction
 %!                                         'Closed', true)), 1, 'Taper', 2)
 %!error<solid.extrude: Taper cannot be combined with Twist or Scale.> ...
 %! solid.extrude (geom.Region ([0, 0; 1, 0; 1, 1]), 1, 'Taper', 3, 'Scale', 2)
+%!error<solid.extrude: Label must be an identifier: a letter followed by letters, digits or underscores.> ...
+%! solid.extrude (geom.Region ([0, 0; 1, 0; 1, 1]), 1, 'Label', 'a.b')

@@ -914,14 +914,23 @@ loopcheck (const Cell& L, const Matrix& f)
 // One side of an extrusion of R, height H along its normal, its walls leaning
 // in by A radians (out when A is negative), corners kept sharp as a drafted
 // wall's are: each outline is joined by straight lines to its offset at the
-// top, and the holes are cut from the outline.
+// top, and the holes are cut from the outline.  Its faces are named in
+// NAMES by the label LABEL as an extrusion's are, its start on the plane.
 static TopoDS_Shape
-taperedside (const region& r, double h, double a, const string& caller);
+taperedside (const region& r, double h, double a, const string& caller,
+             const string& label, facetable& names);
 
 // S less every shape in TOOLS, in one operation
 static TopoDS_Shape
 cutall (const TopoDS_Shape& s, const vector<TopoDS_Shape>& tools,
         const string& caller);
+
+// The same, NAMES the names of the faces of S on the way in and of the
+// result on the way out, and TOOLNAMES those of each tool
+static TopoDS_Shape
+cutall (const TopoDS_Shape& s, const vector<TopoDS_Shape>& tools,
+        const string& caller, facetable& names,
+        const vector<facetable>& toolnames);
 
 // The sub-shapes of one kind picked by 1-based indices into the map of all of
 // them, which is the order in which the queries report them.  The indices have
@@ -1087,6 +1096,72 @@ labelled (const TopoDS_Shape& s, const string& label,
     t.faces[i-1].insert ({r.empty () ? label : label + "." + r, {}});
   }
   return t;
+}
+
+// The names of the faces of the solid S swept or lofted from a profile by
+// an operation given the label LABEL: "start" for the faces of FIRST, the
+// profile where it begins, "end" for those of LAST, where it ends, "side"
+// for the faces of WALLS, the walls of the outline, and "hole" for every
+// other.  With CAPS false the faces of FIRST and LAST have no name, as the
+// ends of a tool cutting a hole, which the cut takes away.
+static facetable
+sweptnames (const TopoDS_Shape& s, const string& label,
+            const TopoDS_Shape& first, const TopoDS_Shape& last,
+            const ShapeMap& walls, bool caps)
+{
+  ShapeMap a, b;
+  if (! first.IsNull ())
+  {
+    TopExp::MapShapes (first, TopAbs_FACE, a);
+  }
+  if (! last.IsNull ())
+  {
+    TopExp::MapShapes (last, TopAbs_FACE, b);
+  }
+  facetable t = labelled (s, label, [&] (const TopoDS_Face& f)
+                          {
+                            return a.Contains (f) ? string ("start")
+                                   : b.Contains (f) ? string ("end")
+                                   : walls.Contains (f) ? string ("side")
+                                   : string ("hole");
+                          });
+  if (! caps && ! t.faces.empty ())
+  {
+    ShapeMap all;
+    TopExp::MapShapes (s, TopAbs_FACE, all);
+    for (int i = 1; i <= all.Extent (); i++)
+    {
+      if (a.Contains (all (i)) || b.Contains (all (i)))
+      {
+        t.faces[i-1].clear ();
+      }
+    }
+  }
+  return t;
+}
+
+// NAMES with LABEL.start and LABEL.end exchanged, for a side built from a
+// plane outwards and then turned over, whose far end is its start
+static void
+swapends (facetable& names, const string& label)
+{
+  for (std::set<facename>& f : names.faces)
+  {
+    std::set<facename> next;
+    for (facename n : f)
+    {
+      if (n.label == label + ".start")
+      {
+        n.label = label + ".end";
+      }
+      else if (n.label == label + ".end")
+      {
+        n.label = label + ".start";
+      }
+      next.insert (n);
+    }
+    f = next;
+  }
 }
 
 // The role of a face of a block made along the axes: the axis its outward
@@ -3038,6 +3113,35 @@ cutall (const TopoDS_Shape& s, const vector<TopoDS_Shape>& tools,
   return boolean (op, caller, "holes");
 }
 
+static TopoDS_Shape
+cutall (const TopoDS_Shape& s, const vector<TopoDS_Shape>& tools,
+        const string& caller, facetable& names,
+        const vector<facetable>& toolnames)
+{
+  if (tools.empty ())
+  {
+    return s;
+  }
+  ShapeList objects, list;
+  objects.Append (s);
+  for (const TopoDS_Shape& t : tools)
+  {
+    list.Append (t);
+  }
+  BRepAlgoAPI_Cut op;
+  op.SetArguments (objects);
+  op.SetTools (list);
+  const TopoDS_Shape r = boolean (op, caller, "holes");
+  vector<TopoDS_Shape> src {s};
+  src.insert (src.end (), tools.begin (), tools.end ());
+  vector<facetable> srcnames {names};
+  srcnames.insert (srcnames.end (), toolnames.begin (), toolnames.end ());
+  names = carrynames ([&op] (const TopoDS_Shape& f)
+                      -> const TopTools_ListOfShape&
+                      { return op.Modified (f); }, src, srcnames, r);
+  return r;
+}
+
 // The two pieces a full round cuts away where the middle face M meets its
 // sides A and B, the three flat and parallel to the direction D of their
 // edges.  The round is the cylinder tangent to all three; each piece lies
@@ -3272,9 +3376,13 @@ planarize (const TopoDS_Shape& s, facetable& names)
   return r;
 }
 
-// The solid between a wire and its offset lifted, by straight lines
+// The solid between a wire and its offset lifted, by straight lines, its
+// faces named in NAMES by the label LABEL: its start on A and end on B, and
+// its walls those of the outline, or with OUTLINE false those of a hole,
+// its ends then unnamed
 static TopoDS_Shape
-ruled (const TopoDS_Wire& a, const TopoDS_Wire& b, const string& caller)
+ruled (const TopoDS_Wire& a, const TopoDS_Wire& b, const string& caller,
+       const string& label, bool outline, facetable& names)
 {
   BRepOffsetAPI_ThruSections op (true, true);
   op.AddWire (a);
@@ -3284,30 +3392,64 @@ ruled (const TopoDS_Wire& a, const TopoDS_Wire& b, const string& caller)
   {
     error ("%s: Open CASCADE could not compute the taper.", caller.c_str ());
   }
-  return op.Shape ();
+  const TopoDS_Shape s = op.Shape ();
+  ShapeMap walls;
+  if (outline)
+  {
+    TopExp::MapShapes (s, TopAbs_FACE, walls);
+  }
+  names = sweptnames (s, label, op.FirstShape (), op.LastShape (), walls,
+                      outline);
+  return s;
+}
+
+// The prism of the face F along V, its faces named in NAMES by the label
+// LABEL: its start on F, its end opposite, and each wall by the outline or
+// the hole of F whose edge it rises from
+static TopoDS_Shape
+prism (const TopoDS_Face& f, const gp_Vec& v, const string& label,
+       facetable& names)
+{
+  BRepPrimAPI_MakePrism op (f, v);
+  const TopoDS_Shape s = op.Shape ();
+  ShapeMap walls;
+  for (TopExp_Explorer x (BRepTools::OuterWire (f), TopAbs_EDGE); x.More ();
+       x.Next ())
+  {
+    for (const TopoDS_Shape& g : op.Generated (x.Current ()))
+    {
+      walls.Add (g);
+    }
+  }
+  names = sweptnames (s, label, op.FirstShape (), op.LastShape (), walls,
+                      true);
+  return s;
 }
 
 static TopoDS_Shape
-taperedside (const region& r, double h, double a, const string& caller)
+taperedside (const region& r, double h, double a, const string& caller,
+             const string& label, facetable& names)
 {
   const gp_Vec up = gp_Vec (r.normal) * h;
   if (a == 0)
   {
-    return BRepPrimAPI_MakePrism (planarface (r), up).Shape ();
+    return prism (planarface (r), up, label, names);
   }
   // The section at the top is the region offset by the run of the wall:
   // its outline in, its holes out, for walls leaning in
   const double d = h * tan (a);
   vector<TopoDS_Shape> holes;
+  vector<facetable> holenames;
   for (const TopoDS_Wire& w : r.holes)
   {
-    holes.push_back (ruled (w, offsetwire (w, d, up, caller), caller));
+    holenames.push_back (facetable ());
+    holes.push_back (ruled (w, offsetwire (w, d, up, caller), caller, label,
+                            false, holenames.back ()));
   }
-  // A new solid, whose faces have no names yet
-  facetable none;
-  return planarize (cutall (ruled (r.outer, offsetwire (r.outer, -d, up,
-                                                       caller), caller),
-                            holes, caller), none);
+  const TopoDS_Shape outer = ruled (r.outer, offsetwire (r.outer, -d, up,
+                                                         caller), caller,
+                                    label, true, names);
+  return planarize (cutall (outer, holes, caller, names, holenames), names);
 }
 
 // A document of Open CASCADE's framework for names and colours (XDE), in
@@ -5983,41 +6125,61 @@ function directly. \n\
       const double h2 = args(4).double_value ();
       const double a1 = args(5).double_value () * M_PI / 180;
       const double a2 = args(6).double_value () * M_PI / 180;
+      // Named start on the side the normal points away from, end on the
+      // side it points to, side for the walls of the outline and hole for
+      // those of the holes
+      const string label = (args.length () > 7 ? args(7).string_value ()
+                                               : string ());
       if (a1 == 0 && a2 == 0)
       {
         gp_Trsf t;
         t.SetTranslation (gp_Vec (r.normal) * -h2);
-        out = todata (BRepPrimAPI_MakePrism
-                        (transform (planarface (r), t),
-                         gp_Vec (r.normal) * (h1 + h2)).Shape ());
+        facetable names;
+        const TopoDS_Shape s
+          = prism (TopoDS::Face (transform (planarface (r), t)),
+                   gp_Vec (r.normal) * (h1 + h2), label, names);
+        out = todata (s, names);
       }
       else
       {
-        ShapeList sides;
+        vector<TopoDS_Shape> sides;
+        vector<facetable> sidenames;
         if (h1 > 0)
         {
-          sides.Append (taperedside (r, h1, a1, caller));
+          sidenames.push_back (facetable ());
+          sides.push_back (taperedside (r, h1, a1, caller, label,
+                                        sidenames.back ()));
         }
         if (h2 > 0)
         {
-          // The far side is a near side mirrored in the region's plane
+          // The far side is a near side mirrored in the region's plane,
+          // which starts at its far end
           gp_Trsf m;
           m.SetMirror (gp_Ax2 (r.origin, r.normal));
-          sides.Append (transform (taperedside (r, h2, a2, caller), m));
+          facetable names;
+          const TopoDS_Shape near = taperedside (r, h2, a2, caller, label,
+                                                 names);
+          swapends (names, label);
+          sides.push_back (transform (near, m, names));
+          sidenames.push_back (names);
         }
-        if (sides.Extent () == 1)
+        if (sides.size () == 1)
         {
-          out = todata (sides.First ());
+          out = todata (sides[0], sidenames[0]);
         }
         else
         {
           ShapeList objects, tools;
-          objects.Append (sides.First ());
-          tools.Append (sides.Last ());
+          objects.Append (sides[0]);
+          tools.Append (sides[1]);
           BRepAlgoAPI_Fuse op;
           op.SetArguments (objects);
           op.SetTools (tools);
-          out = todata (boolean (op, caller, "extrusion"));
+          const TopoDS_Shape s = boolean (op, caller, "extrusion");
+          out = todata (s, carrynames ([&op] (const TopoDS_Shape& f)
+                                       -> const TopTools_ListOfShape&
+                                       { return op.Modified (f); },
+                                       sides, sidenames, s));
         }
       }
     }
@@ -6045,8 +6207,13 @@ function directly. \n\
       {
         rs.push_back (toregion (R(i)));
       }
+      // Named start on the first section, end on the last, side for the
+      // walls of the outlines and hole for those of the holes
+      const string label = (args.length () > 4 ? args(4).string_value ()
+                                               : string ());
       // The outlines lofted, less each hole lofted through its sections
-      auto loft = [&] (std::function<TopoDS_Wire (const region&)> pick)
+      auto loft = [&] (std::function<TopoDS_Wire (const region&)> pick,
+                       bool outline, facetable& names)
       {
         BRepOffsetAPI_ThruSections op (true, ruled);
         for (const region& r : rs)
@@ -6059,17 +6226,29 @@ function directly. \n\
           error ("%s: Open CASCADE could not compute the loft.",
                  caller.c_str ());
         }
-        return op.Shape ();
+        const TopoDS_Shape s = op.Shape ();
+        ShapeMap walls;
+        if (outline)
+        {
+          TopExp::MapShapes (s, TopAbs_FACE, walls);
+        }
+        names = sweptnames (s, label, op.FirstShape (), op.LastShape (),
+                            walls, outline);
+        return s;
       };
+      facetable names;
       const TopoDS_Shape outer = loft ([] (const region& r)
-                                       { return r.outer; });
+                                       { return r.outer; }, true, names);
       vector<TopoDS_Shape> holes;
+      vector<facetable> holenames (rs[0].holes.size ());
       for (size_t k = 0; k < rs[0].holes.size (); k++)
       {
         holes.push_back (loft ([k] (const region& r)
-                               { return r.holes[k]; }));
+                               { return r.holes[k]; }, false,
+                               holenames[k]));
       }
-      out = todata (cutall (outer, holes, caller));
+      const TopoDS_Shape s = cutall (outer, holes, caller, names, holenames);
+      out = todata (s, names);
     }
     else if (cmd == "sweep")
     {
@@ -7038,6 +7217,14 @@ function directly. \n\
       facetable names;
       const TopoDS_Shape s = toshape (args(2), caller, names);
       out = nameinfo (s, names);
+    }
+    // The shape with the start and end of the label given exchanged
+    else if (cmd == "swapends")
+    {
+      facetable names;
+      const TopoDS_Shape s = toshape (args(2), caller, names);
+      swapends (names, args(3).string_value ());
+      out = todata (s, names);
     }
     // A point of an edge, its centre when asked, otherwise its midpoint
     else if (cmd == "edgepoint")

@@ -18,6 +18,7 @@
 ## -*- texinfo -*-
 ## @deftypefn  {drafting} {@var{S} =} solid.loft (@var{REGIONS})
 ## @deftypefnx {drafting} {@var{S} =} solid.loft (@var{REGIONS}, @qcode{'Ruled'}, @var{TF})
+## @deftypefnx {drafting} {@var{S} =} solid.loft (@dots{}, @qcode{'Label'}, @var{L})
 ##
 ## A solid passing through regions.
 ##
@@ -43,6 +44,14 @@
 ## loft between polygons has flat faces and a crease at every intermediate
 ## section.  It is @code{false} by default, which passes one smooth surface
 ## through every section.  With two sections both give the same solid.
+##
+## The option @qcode{'Label'} names the faces of the loft, so that a later
+## step finds a face by its name with @code{solid.Shape.faces}.  @var{L} is
+## an identifier, a letter followed by letters, digits or underscores, and
+## the faces are named @var{L}@code{.start}, the first section,
+## @var{L}@code{.end}, the last, @var{L}@code{.side}, every face of the
+## walls swept by the outlines, and @var{L}@code{.hole}, every face of the
+## walls swept by the holes.
 ##
 ## @example
 ## @group
@@ -75,7 +84,7 @@ function S = loft (REGIONS, varargin)
   if (mod (numel (varargin), 2) != 0)
     error ("solid.loft: Name/Value arguments must come in pairs.");
   endif
-  opt = struct ('Ruled', false);
+  opt = struct ('Ruled', false, 'Label', '');
   for ii = 1:2:numel (varargin)
     name = varargin{ii};
     val = varargin{ii+1};
@@ -85,6 +94,14 @@ function S = loft (REGIONS, varargin)
     switch (lower (name))
       case 'ruled'
         opt.Ruled = val;
+      case 'label'
+        opt.Label = val;
+        if (! (ischar (val) && isrow (val)
+               && ! isempty (regexp (val, '^[A-Za-z]\w*$', 'once'))))
+          error (strcat ("solid.loft: Label must be an identifier: a", ...
+                         " letter followed by letters, digits or", ...
+                         " underscores."));
+        endif
       otherwise
         error ("solid.loft: unknown option '%s'.", name);
     endswitch
@@ -97,7 +114,8 @@ function S = loft (REGIONS, varargin)
   for k = 1:numel (REGIONS)
     [~, D{k}] = solid.__region__ (REGIONS{k}, 'REGIONS');
   endfor
-  S = solid.Shape (__occt__ ('loft', 'solid.loft', D, logical (opt.Ruled)));
+  S = solid.Shape (__occt__ ('loft', 'solid.loft', D, logical (opt.Ruled), ...
+                             opt.Label));
 
 endfunction
 
@@ -167,6 +185,20 @@ endfunction
 %! assert_equal (volume (S), 20 * __area__ (R.Outline), -1e-9);
 %! assert_equal (isvalid (S), true);
 
+%!test  # faces named start, end, side and hole
+%! base = geom.Region ([-10, -10; 10, -10; 10, 10; -10, 10], ...
+%!                     {[3, 0, 1; -3, 0, 1]});
+%! top = geom.Region ([6, 0, 1; -6, 0, 1], {[2, 0, 1; -2, 0, 1]});
+%! top.UCS = geom.UCS ([0, 0, 1], [0, 0, 30]);
+%! S = solid.loft ({base, top}, 'Label', 'duct');
+%! assert_equal (faces (S, 'Label', 'duct.start'), ...
+%!               faces (S, 'Normal', [0, 0, -1]));
+%! assert_equal (faces (S, 'Label', 'duct.end'), ...
+%!               faces (S, 'Normal', [0, 0, 1]));
+%! assert_equal (numel (faces (S, 'Label', 'duct')), numfaces (S));
+%! assert_equal (isempty (faces (S, 'Label', 'duct.hole')), false);
+%! assert_equal (isempty (faces (S, 'Label', 'duct.side')), false);
+
 %!error<solid.loft: invalid number of input arguments.> solid.loft ()
 %!error<solid.loft: REGIONS must be a cell array of at least two geom.Region objects.> ...
 %! solid.loft (geom.Region ([0, 0; 1, 0; 1, 1]))
@@ -198,3 +230,6 @@ endfunction
 %!error<solid.loft: Ruled must be true or false.> ...
 %! solid.loft ({geom.Region([0, 0; 1, 0; 1, 1]), ...
 %!              geom.Region([0, 0; 1, 0; 1, 1])}, 'Ruled', 1)
+%!error<solid.loft: Label must be an identifier: a letter followed by letters, digits or underscores.> ...
+%! solid.loft ({geom.Region([0, 0; 1, 0; 1, 1]), ...
+%!              geom.Region([0, 0; 1, 0; 1, 1])}, 'Label', '1a')
