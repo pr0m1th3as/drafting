@@ -1597,6 +1597,202 @@ classdef Shape
 
     endfunction
 
+    ## -*- texinfo -*-
+    ## @deftypefn {solid.Shape} {@var{N} =} normal (@var{S}, @var{F})
+    ##
+    ## The outward normal of a flat face.
+    ##
+    ## @code{@var{N} = normal (@var{S}, @var{F})} returns the unit vector
+    ## square to the face of @var{S} indexed by @var{F}, as
+    ## @code{solid.Shape.faces} returns it, pointing out of the material, as
+    ## a row @code{[@var{nx}, @var{ny}, @var{nz}]}.  @var{F} must be one face,
+    ## and flat: a curved face has no one normal.  With the centre of a rim
+    ## from @code{solid.Shape.centre} it gives the axis of a hole or a boss,
+    ## and with the points of @code{solid.Shape.corner} and
+    ## @code{solid.Shape.midpoint} it places a @code{geom.UCS} on a face that
+    ## follows the face when the part changes:
+    ##
+    ## @example
+    ## @group
+    ## ## A frame on the top of a block, its origin on a corner
+    ## S = solid.box (60, 40, 10, 'Label', 'plate');
+    ## top = faces (S, 'Label', 'plate.zmax');
+    ## O = corner (S, faces (S, 'Label', {'plate.zmax', 'plate.xmin', ...
+    ##                                    'plate.ymin'}));
+    ## X = corner (S, faces (S, 'Label', {'plate.zmax', 'plate.xmax', ...
+    ##                                    'plate.ymin'}));
+    ## U = geom.UCS (normal (S, top), O, X);
+    ## @end group
+    ## @end example
+    ##
+    ## @seealso{solid.Shape.faces, solid.Shape.centre, solid.Shape.corner,
+    ## solid.Shape.midpoint, geom.UCS}
+    ## @end deftypefn
+    function N = normal (this, F)
+
+      if (nargin != 2)
+        error ("solid.Shape.normal: invalid number of input arguments.");
+      endif
+      errmsg = checkindex (F, numfaces (this), 'F', 'face', false);
+      if (isempty (errmsg) && numel (F) != 1)
+        errmsg = sprintf ("F must be one face, not %d.", numel (F));
+      endif
+      if (! isempty (errmsg))
+        error ("solid.Shape.normal: %s", errmsg);
+      endif
+
+      info = occt ('solid.Shape.normal', 'faces', this.Data);
+      [type, n] = info{1:2};
+      if (! strcmp (type{F}, 'plane'))
+        error ("solid.Shape.normal: F must be a flat face.");
+      endif
+      N = n(F,:);
+
+    endfunction
+
+    ## -*- texinfo -*-
+    ## @deftypefn {solid.Shape} {@var{C} =} centre (@var{S}, @var{E})
+    ##
+    ## The centre of a circular or elliptic edge.
+    ##
+    ## @code{@var{C} = centre (@var{S}, @var{E})} returns the centre of the
+    ## circle or ellipse that the edge of @var{S} indexed by @var{E}, as
+    ## @code{solid.Shape.edges} returns it, lies on, as a row
+    ## @code{[@var{x}, @var{y}, @var{z}]}.  @var{E} must be one edge, a whole
+    ## circle or an arc of one, or an ellipse or an arc of one: the rim of a
+    ## hole, the foot of a boss, a rounded corner of a plate.
+    ##
+    ## @example
+    ## @group
+    ## ## The centre of the circle where a boss meets a plate
+    ## S = union (solid.box (60, 40, 10, 'Label', 'plate'), ...
+    ##            solid.cylinder (5, 20, geom.UCS ([0, 0, 1], [20, 20, 10]), ...
+    ##                            'Label', 'boss'));
+    ## centre (S, edges (S, 'Between', @{'plate.zmax', 'boss.side'@}))
+    ## @result{} 20   20   10
+    ## @end group
+    ## @end example
+    ##
+    ## @seealso{solid.Shape.edges, solid.Shape.normal, solid.Shape.midpoint,
+    ## solid.Shape.corner}
+    ## @end deftypefn
+    function C = centre (this, E)
+
+      if (nargin != 2)
+        error ("solid.Shape.centre: invalid number of input arguments.");
+      endif
+      errmsg = checkindex (E, numedges (this), 'E', 'edge', false);
+      if (isempty (errmsg) && numel (E) != 1)
+        errmsg = sprintf ("E must be one edge, not %d.", numel (E));
+      endif
+      if (! isempty (errmsg))
+        error ("solid.Shape.centre: %s", errmsg);
+      endif
+
+      info = occt ('solid.Shape.centre', 'edges', this.Data);
+      if (! any (strcmp (info{1}{E}, {'circle', 'ellipse'})))
+        error (strcat ("solid.Shape.centre: E must be a circle, an arc of", ...
+                       " one or an ellipse."));
+      endif
+      C = occt ('solid.Shape.centre', 'edgepoint', this.Data, double (E), ...
+                true);
+
+    endfunction
+
+    ## -*- texinfo -*-
+    ## @deftypefn {solid.Shape} {@var{P} =} midpoint (@var{S}, @var{E})
+    ##
+    ## The point halfway along an edge.
+    ##
+    ## @code{@var{P} = midpoint (@var{S}, @var{E})} returns the point that
+    ## divides the edge of @var{S} indexed by @var{E}, as
+    ## @code{solid.Shape.edges} returns it, into two halves of equal length,
+    ## as a row @code{[@var{x}, @var{y}, @var{z}]}.  @var{E} must be one edge,
+    ## of any kind; the midpoint of an arc lies on the arc, not on its chord.
+    ##
+    ## @example
+    ## @group
+    ## ## The middle of the front top edge of a block
+    ## S = solid.box (60, 40, 10, 'Label', 'plate');
+    ## midpoint (S, edges (S, 'Between', @{'plate.zmax', 'plate.ymin'@}))
+    ## @result{} 30   0   10
+    ## @end group
+    ## @end example
+    ##
+    ## @seealso{solid.Shape.edges, solid.Shape.centre, solid.Shape.corner,
+    ## solid.Shape.normal}
+    ## @end deftypefn
+    function P = midpoint (this, E)
+
+      if (nargin != 2)
+        error ("solid.Shape.midpoint: invalid number of input arguments.");
+      endif
+      errmsg = checkindex (E, numedges (this), 'E', 'edge', false);
+      if (isempty (errmsg) && numel (E) != 1)
+        errmsg = sprintf ("E must be one edge, not %d.", numel (E));
+      endif
+      if (! isempty (errmsg))
+        error ("solid.Shape.midpoint: %s", errmsg);
+      endif
+
+      P = occt ('solid.Shape.midpoint', 'edgepoint', this.Data, double (E), ...
+                false);
+
+    endfunction
+
+    ## -*- texinfo -*-
+    ## @deftypefn {solid.Shape} {@var{P} =} corner (@var{S}, @var{F})
+    ##
+    ## The corner that faces share.
+    ##
+    ## @code{@var{P} = corner (@var{S}, @var{F})} returns the one corner that
+    ## all the faces of @var{S} indexed by @var{F}, as
+    ## @code{solid.Shape.faces} returns them, share, as a row @code{[@var{x},
+    ## @var{y}, @var{z}]}.  Give as many faces as pick the corner out: three
+    ## for the corner of a block, two for a corner that only two faces meet
+    ## at, one where a face has a single corner.  Faces that share no corner,
+    ## or more than one, are an error.
+    ##
+    ## A corner is where the edges of a face meet.  The point where a full
+    ## circle starts and ends, and the ends of a seam, the line along which a
+    ## curved face closes on itself, are not corners, so the side of a cone
+    ## alone gives its tip, and the side of a cylinder gives none.
+    ##
+    ## @example
+    ## @group
+    ## ## The top corner of a block above the origin, and the tip of a cone
+    ## S = solid.box (60, 40, 10, 'Label', 'plate');
+    ## corner (S, faces (S, 'Label', {'plate.zmax', 'plate.xmin', ...
+    ##                                'plate.ymin'}))
+    ## @result{} 0   0   10
+    ## C = solid.cone (5, 0, 12);
+    ## P = corner (C, faces (C, 'Type', 'cone'));   # the tip, at [0, 0, 12]
+    ## @end group
+    ## @end example
+    ##
+    ## @seealso{solid.Shape.faces, solid.Shape.centre, solid.Shape.midpoint,
+    ## solid.Shape.normal}
+    ## @end deftypefn
+    function P = corner (this, F)
+
+      if (nargin != 2)
+        error ("solid.Shape.corner: invalid number of input arguments.");
+      endif
+      errmsg = checkindex (F, numfaces (this), 'F', 'face', false);
+      if (! isempty (errmsg))
+        error ("solid.Shape.corner: %s", errmsg);
+      endif
+
+      P = occt ('solid.Shape.corner', 'corners', this.Data, double (F(:)'));
+      if (rows (P) == 0)
+        error ("solid.Shape.corner: the faces F share no corner.");
+      elseif (rows (P) > 1)
+        error ("solid.Shape.corner: the faces F share %d corners, not one.", ...
+               rows (P));
+      endif
+
+    endfunction
+
   endmethods
 
 ################################################################################

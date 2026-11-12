@@ -129,6 +129,7 @@ this program; if not, see <http://www.gnu.org/licenses/>.
 #include <BinTools.hxx>
 #include <Bnd_Box.hxx>
 #include <ElCLib.hxx>
+#include <GCPnts_AbscissaPoint.hxx>
 #include <GC_MakeArcOfCircle.hxx>
 #include <GeomConvert.hxx>
 #include <GeomConvert_ApproxCurve.hxx>
@@ -1181,6 +1182,95 @@ incopy (const TopoDS_Shape& s, facetable names, int k)
     f = next;
   }
   return names;
+}
+
+// A point of the edge E of S, as a row: the centre of the circle or ellipse
+// it lies on when CENTRE is true, otherwise the point halfway along its
+// length
+static RowVector
+edgepoint (const TopoDS_Shape& s, int e, bool centre)
+{
+  ShapeMap map;
+  TopExp::MapShapes (s, TopAbs_EDGE, map);
+  const BRepAdaptor_Curve c (TopoDS::Edge (map (e)));
+  gp_Pnt p;
+  if (centre)
+  {
+    p = (c.GetType () == GeomAbs_Circle ? c.Circle ().Location ()
+                                        : c.Ellipse ().Location ());
+  }
+  else
+  {
+    const double len = GCPnts_AbscissaPoint::Length (c);
+    const GCPnts_AbscissaPoint half (c, len / 2, c.FirstParameter ());
+    p = c.Value (half.Parameter ());
+  }
+  RowVector r (3);
+  r(0) = p.X ();
+  r(1) = p.Y ();
+  r(2) = p.Z ();
+  return r;
+}
+
+// The corners the faces F of S all share, a row each.  A vertex of a face is
+// a corner of it where an edge of the face that is neither a seam nor closed
+// on itself ends, or where the face's surface closes to a point, as at the
+// tip of a cone; the vertex where a full circle starts and ends, and the
+// ends of a seam, are not.
+static Matrix
+sharedcorners (const TopoDS_Shape& s, const NDArray& F)
+{
+  ShapeMap fmap;
+  TopExp::MapShapes (s, TopAbs_FACE, fmap);
+  vector<ShapeMap> corners;
+  for (octave_idx_type k = 0; k < F.numel (); k++)
+  {
+    const TopoDS_Face f = TopoDS::Face (fmap (static_cast<int> (F(k))));
+    ShapeListMap around;
+    TopExp::MapShapesAndAncestors (f, TopAbs_VERTEX, TopAbs_EDGE, around);
+    ShapeMap own;
+    for (int i = 1; i <= around.Extent (); i++)
+    {
+      bool corner = false;
+      for (const TopoDS_Shape& g : around (i))
+      {
+        const TopoDS_Edge& edge = TopoDS::Edge (g);
+        corner = corner || BRep_Tool::Degenerated (edge)
+                 || (! BRep_Tool::IsClosed (edge, f)
+                     && ! TopExp::FirstVertex (edge)
+                          .IsSame (TopExp::LastVertex (edge)));
+      }
+      if (corner)
+      {
+        own.Add (around.FindKey (i));
+      }
+    }
+    corners.push_back (own);
+  }
+  vector<gp_Pnt> shared;
+  if (! corners.empty ())
+  {
+    for (int i = 1; i <= corners[0].Extent (); i++)
+    {
+      bool all = true;
+      for (size_t k = 1; k < corners.size () && all; k++)
+      {
+        all = corners[k].Contains (corners[0] (i));
+      }
+      if (all)
+      {
+        shared.push_back (BRep_Tool::Pnt (TopoDS::Vertex (corners[0] (i))));
+      }
+    }
+  }
+  Matrix P (shared.size (), 3);
+  for (size_t i = 0; i < shared.size (); i++)
+  {
+    P(i,0) = shared[i].X ();
+    P(i,1) = shared[i].Y ();
+    P(i,2) = shared[i].Z ();
+  }
+  return P;
 }
 
 // The faces of a shape: the kind of surface each lies on, the outward normal
@@ -6898,6 +6988,16 @@ function directly. \n\
       facetable names;
       const TopoDS_Shape s = toshape (args(2), caller, names);
       out = nameinfo (s, names);
+    }
+    // A point of an edge, its centre when asked, otherwise its midpoint
+    else if (cmd == "edgepoint")
+    {
+      out = edgepoint (toshape (args(2), caller), args(3).int_value (),
+                       args(4).bool_value ());
+    }
+    else if (cmd == "corners")
+    {
+      out = sharedcorners (toshape (args(2), caller), args(3).array_value ());
     }
     // The shape as the K-th copy of an array, its faces numbered so
     else if (cmd == "copyindex")
