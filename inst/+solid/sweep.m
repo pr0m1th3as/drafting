@@ -16,7 +16,8 @@
 ## this program; if not, see <http://www.gnu.org/licenses/>.
 
 ## -*- texinfo -*-
-## @deftypefn {drafting} {@var{S} =} solid.sweep (@var{R}, @var{P})
+## @deftypefn  {drafting} {@var{S} =} solid.sweep (@var{R}, @var{P})
+## @deftypefnx {drafting} {@var{S} =} solid.sweep (@dots{}, 'Label', @var{L})
 ##
 ## A solid swept by a region along a path.
 ##
@@ -58,20 +59,36 @@
 ## solid that intersects itself; check such a result with
 ## @code{solid.Shape.isvalid}.
 ##
+## The option @qcode{'Label'} names the faces of the solid, so that a later
+## step finds a face by its name with @code{solid.Shape.faces}.  @var{L} is
+## an identifier, a letter followed by letters, digits or underscores, and
+## the faces are named @var{L}@code{.start}, the end at the first point of
+## @var{P}, @var{L}@code{.end}, the end at its last, @var{L}@code{.side},
+## every face of the walls swept by the outline, and @var{L}@code{.hole},
+## every face of the walls swept by the holes.  A ring swept along a closed
+## path has no ends.  The solids of a cell array of regions are copies 1, 2
+## and so on of the label, chosen with @qcode{'Copy'}.
+##
 ## @seealso{geom.Path, geom.Spline, geom.Region, solid.extrude, solid.helix}
 ## @end deftypefn
 
-function S = sweep (R, P)
+function S = sweep (R, P, varargin)
 
   ## Input validation
-  if (nargin != 2)
+  if (nargin < 2)
     error ("solid.sweep: invalid number of input arguments.");
   endif
   if (iscell (R))
     if (isempty (R))
       error ("solid.sweep: R must not be an empty cell array.");
     endif
-    S = cellfun (@(r) solid.sweep (r, P), R, 'UniformOutput', false);
+    S = cellfun (@(r) solid.sweep (r, P, varargin{:}), R, ...
+                 'UniformOutput', false);
+    ## The solid of region K is copy K, for 'Copy' to choose it
+    for k = 1:numel (S)
+      S{k} = solid.Shape (__occt__ ('copyindex', 'solid.sweep', ...
+                                    S{k}.Data, k));
+    endfor
     S = union (S{:});
     return;
   endif
@@ -91,9 +108,33 @@ function S = sweep (R, P)
   if (any (t <= -1 + 1e-12))
     error ("solid.sweep: P must not turn back on itself.");
   endif
+  if (mod (numel (varargin), 2) != 0)
+    error ("solid.sweep: Name/Value arguments must come in pairs.");
+  endif
+  label = '';
+  for ii = 1:2:numel (varargin)
+    name = varargin{ii};
+    val = varargin{ii+1};
+    if (! ischar (name) || ! isrow (name))
+      error ("solid.sweep: option names must be character vectors.");
+    endif
+    switch (lower (name))
+      case 'label'
+        label = val;
+        if (! (ischar (val) && isrow (val)
+               && ! isempty (regexp (val, '^[A-Za-z]\w*$', 'once'))))
+          error (strcat ("solid.sweep: Label must be an identifier: a", ...
+                         " letter followed by letters, digits or", ...
+                         " underscores."));
+        endif
+      otherwise
+        error ("solid.sweep: unknown option '%s'.", name);
+    endswitch
+  endfor
 
 
-  S = solid.Shape (__occt__ ('sweep', 'solid.sweep', D, __data__ (P)));
+  S = solid.Shape (__occt__ ('sweep', 'solid.sweep', D, __data__ (P), ...
+                             label));
 
 endfunction
 
@@ -216,8 +257,51 @@ endfunction
 %! assert_equal (volume (S), 2 * pi ^ 2 * 10, -1e-6);
 %! assert_equal (isvalid (S), true);
 
+%!test  # faces named start, end and side; a side in pieces, one a segment
+%! R = geom.Region ([-5, -3; 5, -3; 5, 3; -5, 3]);
+%! S = solid.sweep (R, geom.Path ([0, 0, 0; 0, 0, 40; 30, 0, 40]), ...
+%!                  'Label', 'bracket');
+%! assert_equal (faces (S, 'Label', 'bracket.start'), ...
+%!               faces (S, 'Within', [-5, -3, 0, 5, 3, 0]));
+%! assert_equal (faces (S, 'Label', 'bracket.end'), ...
+%!               faces (S, 'Normal', [1, 0, 0], ...
+%!                      'Within', [30, -5, 35, 30, 5, 45]));
+%! assert_equal (numel (faces (S, 'Label', 'bracket.side')), 8);
+%!test  # a side split at a bend too, where the path joins smoothly
+%! R = geom.Region ([-5, -3; 5, -3; 5, 3; -5, 3]);
+%! P = fillet (geom.Path ([0, 0, 0; 0, 0, 40; 30, 0, 40]), 8);
+%! S = solid.sweep (R, P, 'Label', 'bracket');
+%! assert_equal (numel (faces (S, 'Label', 'bracket.side')), 12);
+%!test  # a tube's bore named hole, a ring along a closed path no ends
+%! T = geom.Region ([1.5, 0, 1; -1.5, 0, 1], {[1, 0, 1; -1, 0, 1]});
+%! S = solid.sweep (T, geom.Path ([0, 0, 0; 0, 0, 20]), 'Label', 'tube');
+%! assert_equal (numel (faces (S, 'Label', 'tube.hole')), 1);
+%! C = geom.Path ([20, 0, 0; 0, 20, 0; -20, 0, 0; 0, -20, 0], 'Closed', true);
+%! Q = geom.Region ([-2, -2; 2, -2; 2, 2; -2, 2]);
+%! Q.UCS = geom.UCS ([-1, 1, 0], [20, 0, 0]);
+%! S = solid.sweep (Q, C, 'Label', 'ring');
+%! assert_equal (numel (faces (S, 'Label', 'ring.side')), numfaces (S));
+%!test  # the solids of a cell of regions are copies of the label
+%! R = {geom.Region([0, 0; 10, 0; 10, 10; 0, 10]), ...
+%!      geom.Region([20, 0; 30, 0; 30, 10; 20, 10])};
+%! S = solid.sweep (R, geom.Path ([0, 0, 0; 0, 0, 5]), 'Label', 'tile');
+%! assert_equal (faces (S, 'Label', 'tile.end', 'Copy', 2), ...
+%!               faces (S, 'Within', [20, 0, 5, 30, 10, 5]));
+
 %!error<solid.sweep: invalid number of input arguments.> ...
 %! solid.sweep (geom.Region ([0, 0; 1, 0; 1, 1]))
+%!error<solid.sweep: Name/Value arguments must come in pairs.> ...
+%! solid.sweep (geom.Region ([0, 0; 1, 0; 1, 1]), ...
+%!              geom.Path ([0, 0, 0; 0, 0, 1]), 'Label')
+%!error<solid.sweep: unknown option 'Twist'.> ...
+%! solid.sweep (geom.Region ([0, 0; 1, 0; 1, 1]), ...
+%!              geom.Path ([0, 0, 0; 0, 0, 1]), 'Twist', 1)
+%!error<solid.sweep: option names must be character vectors.> ...
+%! solid.sweep (geom.Region ([0, 0; 1, 0; 1, 1]), ...
+%!              geom.Path ([0, 0, 0; 0, 0, 1]), 1, 2)
+%!error<solid.sweep: Label must be an identifier: a letter followed by letters, digits or underscores.> ...
+%! solid.sweep (geom.Region ([0, 0; 1, 0; 1, 1]), ...
+%!              geom.Path ([0, 0, 0; 0, 0, 1]), 'Label', 'a-b')
 %!test  # a cell of two regions, swept alike
 %! R = {geom.Region([0, 0; 10, 0; 10, 10; 0, 10]), ...
 %!      geom.Region([20, 0; 30, 0; 30, 10; 20, 10])};

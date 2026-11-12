@@ -17,6 +17,7 @@
 
 ## -*- texinfo -*-
 ## @deftypefn  {drafting} {@var{S} =} solid.helix (@var{R}, @var{PITCH}, @var{TURNS})
+## @deftypefnx {drafting} {@var{S} =} solid.helix (@dots{}, 'Label', @var{L})
 ##
 ## A coil, swept by a region turning about its own axis as it rises.
 ##
@@ -50,6 +51,16 @@
 ## adds nothing.  The surfaces are splines fitted to the exact helix, so a
 ## volume or extent agrees with that to a few parts in a million.
 ##
+## The option @qcode{'Label'} names the faces of the coil, so that a later
+## step finds a face by its name with @code{solid.Shape.faces}.  @var{L} is
+## an identifier, a letter followed by letters, digits or underscores, and
+## the faces are named @var{L}@code{.start}, the end in the region's plane
+## where the coil begins, @var{L}@code{.end}, the end after @var{TURNS},
+## @var{L}@code{.side}, every face of the walls swept by the outline, and
+## @var{L}@code{.hole}, every face of the walls swept by the holes.  The
+## solids of a cell array of regions are copies 1, 2 and so on of the
+## label, chosen with @qcode{'Copy'}.
+##
 ## @example
 ## @group
 ## ## A compression spring along z: wire of diameter 2 on a mean diameter of
@@ -63,18 +74,23 @@
 ## @seealso{geom.Region, solid.revolve, solid.sweep}
 ## @end deftypefn
 
-function S = helix (R, PITCH, TURNS)
+function S = helix (R, PITCH, TURNS, varargin)
 
   ## Input validation
-  if (nargin != 3)
+  if (nargin < 3)
     error ("solid.helix: invalid number of input arguments.");
   endif
   if (iscell (R))
     if (isempty (R))
       error ("solid.helix: R must not be an empty cell array.");
     endif
-    S = cellfun (@(r) solid.helix (r, PITCH, TURNS), R, ...
+    S = cellfun (@(r) solid.helix (r, PITCH, TURNS, varargin{:}), R, ...
                  'UniformOutput', false);
+    ## The solid of region K is copy K, for 'Copy' to choose it
+    for k = 1:numel (S)
+      S{k} = solid.Shape (__occt__ ('copyindex', 'solid.helix', ...
+                                    S{k}.Data, k));
+    endfor
     S = union (S{:});
     return;
   endif
@@ -99,11 +115,34 @@ function S = helix (R, PITCH, TURNS)
          isfinite (TURNS) && TURNS > 0))
     error ("solid.helix: TURNS must be a positive and finite real scalar.");
   endif
+  if (mod (numel (varargin), 2) != 0)
+    error ("solid.helix: Name/Value arguments must come in pairs.");
+  endif
+  label = '';
+  for ii = 1:2:numel (varargin)
+    name = varargin{ii};
+    val = varargin{ii+1};
+    if (! ischar (name) || ! isrow (name))
+      error ("solid.helix: option names must be character vectors.");
+    endif
+    switch (lower (name))
+      case 'label'
+        label = val;
+        if (! (ischar (val) && isrow (val)
+               && ! isempty (regexp (val, '^[A-Za-z]\w*$', 'once'))))
+          error (strcat ("solid.helix: Label must be an identifier: a", ...
+                         " letter followed by letters, digits or", ...
+                         " underscores."));
+        endif
+      otherwise
+        error ("solid.helix: unknown option '%s'.", name);
+    endswitch
+  endfor
 
   ## The spine runs through the middle of the region's radial extent
   r = (min (Q(:,1)) + max (Q(:,1))) / 2;
   S = solid.Shape (__occt__ ('helix', 'solid.helix', D, double (PITCH), ...
-                             double (TURNS), r));
+                             double (TURNS), r, label));
 
 endfunction
 
@@ -140,8 +179,30 @@ endfunction
 %! assert_equal (numsolids (S), 1);
 %! assert_equal (isvalid (S), true);
 
+%!test  # faces named start, end and side
+%! R = geom.Region ([9, 1, 1; 11, 1, 1]);
+%! R.UCS = geom.UCS ([0, -1, 0], [0, 0, 0]);
+%! S = solid.helix (R, 4, 5, 'Label', 'spring');
+%! assert_equal (normal (S, faces (S, 'Label', 'spring.start')), ...
+%!               [0, -1, 0], 1e-12);
+%! assert_equal (numel (faces (S, 'Label', 'spring.end')), 1);
+%! assert_equal (numel (faces (S, 'Label', 'spring')), numfaces (S));
+%!test  # a tube's bore named hole, copies of a cell
+%! R = geom.Region ([9, 1, 1; 11, 1, 1], {[9.5, 1, 1; 10.5, 1, 1]});
+%! S = solid.helix (R, 4, 1, 'Label', 'coil');
+%! assert_equal (isempty (faces (S, 'Label', 'coil.hole')), false);
+%! R = {geom.Region([1, 0; 2, 0; 2, 1]), geom.Region([4, 0; 5, 0; 5, 1])};
+%! S = solid.helix (R, 2, 1, 'Label', 'coil');
+%! assert_equal (isempty (faces (S, 'Label', 'coil', 'Copy', 2)), false);
+
 %!error<solid.helix: invalid number of input arguments.> ...
 %! solid.helix (geom.Region ([1, 0; 2, 0; 2, 1]), 2)
+%!error<solid.helix: Name/Value arguments must come in pairs.> ...
+%! solid.helix (geom.Region ([1, 0; 2, 0; 2, 1]), 2, 1, 'Label')
+%!error<solid.helix: unknown option 'Turns'.> ...
+%! solid.helix (geom.Region ([1, 0; 2, 0; 2, 1]), 2, 1, 'Turns', 2)
+%!error<solid.helix: Label must be an identifier: a letter followed by letters, digits or underscores.> ...
+%! solid.helix (geom.Region ([1, 0; 2, 0; 2, 1]), 2, 1, 'Label', '')
 %!test  # a cell of two regions, two coils in one shape
 %! R1 = geom.Region ([2, 0; 3, 0; 3, 1; 2, 1]);
 %! R2 = geom.Region ([5, 0; 6, 0; 6, 1; 5, 1]);

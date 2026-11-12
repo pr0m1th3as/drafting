@@ -3268,10 +3268,14 @@ roundtools (const TopoDS_Face& A, const TopoDS_Face& M, const TopoDS_Face& B,
 }
 
 // A wire swept along SPINE into a solid, with sharp corners or, along a
-// helix, the Frenet frame
+// helix, the Frenet frame, its faces named in NAMES by the label LABEL: its
+// start where the spine begins and its end where it ends, and its walls
+// those of the outline, or with OUTLINE false those of a hole, its ends
+// then unnamed
 static TopoDS_Shape
 pipe (const TopoDS_Wire& spine, const TopoDS_Wire& w, bool frenet,
-      const string& caller)
+      const string& caller, const string& label, bool outline,
+      facetable& names)
 {
   BRepOffsetAPI_MakePipeShell op (spine);
   if (frenet)
@@ -3288,7 +3292,15 @@ pipe (const TopoDS_Wire& spine, const TopoDS_Wire& w, bool frenet,
   {
     error ("%s: Open CASCADE could not compute the sweep.", caller.c_str ());
   }
-  return op.Shape ();
+  const TopoDS_Shape s = op.Shape ();
+  ShapeMap walls;
+  if (outline)
+  {
+    TopExp::MapShapes (s, TopAbs_FACE, walls);
+  }
+  names = sweptnames (s, label, op.FirstShape (), op.LastShape (), walls,
+                      outline);
+  return s;
 }
 
 // A wire offset by D in its plane, outwards for a positive D whichever way
@@ -6271,17 +6283,27 @@ function directly. \n\
       const TopoDS_Shape s = cutall (outer, holes, caller, names, holenames);
       out = todata (s, names);
     }
+    // Named start at the path's first point, end at its last (none for a
+    // closed path), side for the walls of the outline and hole for those of
+    // the holes
     else if (cmd == "sweep")
     {
       const region r = toregion (args(2));
       const TopoDS_Wire spine = chain (args(3));
+      const string label = (args.length () > 4 ? args(4).string_value ()
+                                               : string ());
       vector<TopoDS_Shape> holes;
-      for (const TopoDS_Wire& h : r.holes)
+      vector<facetable> holenames (r.holes.size ());
+      for (size_t k = 0; k < r.holes.size (); k++)
       {
-        holes.push_back (pipe (spine, h, false, caller));
+        holes.push_back (pipe (spine, r.holes[k], false, caller, label,
+                               false, holenames[k]));
       }
-      out = todata (cutall (pipe (spine, r.outer, false, caller), holes,
-                            caller));
+      facetable names;
+      const TopoDS_Shape outer = pipe (spine, r.outer, false, caller, label,
+                                       true, names);
+      const TopoDS_Shape s = cutall (outer, holes, caller, names, holenames);
+      out = todata (s, names);
     }
 
     // A helix turns a region about its plane's y axis while it rises along
@@ -6307,13 +6329,22 @@ function directly. \n\
                              gp_Ax3 (r.origin, r.y, r.x));
       const TopoDS_Wire spine = TopoDS::Wire (transform
                                   (BRepBuilderAPI_MakeWire (e).Wire (), place));
+      // Named start in the region's plane, end after the turns, side for
+      // the walls of the outline and hole for those of the holes
+      const string label = (args.length () > 6 ? args(6).string_value ()
+                                               : string ());
       vector<TopoDS_Shape> holes;
-      for (const TopoDS_Wire& h : r.holes)
+      vector<facetable> holenames (r.holes.size ());
+      for (size_t k = 0; k < r.holes.size (); k++)
       {
-        holes.push_back (pipe (spine, h, true, caller));
+        holes.push_back (pipe (spine, r.holes[k], true, caller, label,
+                               false, holenames[k]));
       }
-      out = todata (cutall (pipe (spine, r.outer, true, caller), holes,
-                            caller));
+      facetable names;
+      const TopoDS_Shape outer = pipe (spine, r.outer, true, caller, label,
+                                       true, names);
+      const TopoDS_Shape s = cutall (outer, holes, caller, names, holenames);
+      out = todata (s, names);
     }
 
     // Features on chosen edges and faces
