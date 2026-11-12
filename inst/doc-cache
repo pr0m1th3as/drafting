@@ -7505,12 +7505,13 @@ model.Viewer.pick
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 3302
+# length: 5936
 model.Viewer: [E, F] = pick (V)
 model.Viewer: [E, F, ECODE, FCODE] = pick (V)
 model.Viewer: [E, CODE] = pick (V, 'edge')
 model.Viewer: [F, CODE] = pick (V, 'face')
 model.Viewer: [I, CODE] = pick (V, 'solid')
+model.Viewer: [P, CODE] = pick (V, 'point')
 model.Viewer: [P, F] = pick (V)
 Pick edges and faces of a solid, or points on a mesh, with the mouse.
 
@@ -7528,16 +7529,40 @@ indices are the first output.
 Indices belong to the shape they were picked on, and a script that holds
 them breaks as soon as an earlier step adds a feature. So pick
 also returns, as a character vector, the code that selects the same
-items by kind, direction and position: CODE for one kind, and
-ECODE and FCODE for edges and faces picked together, empty
-where none was picked. The code selects exactly the items picked: one
+items: CODE for one kind, and ECODE and FCODE for
+edges and faces picked together, empty where none was picked. The code
+selects exactly the items picked.
+
+A face with a name, given by the 'Label' of the step that made
+it, is found by that name, as solid.Shape.faces takes it, so
+the code keeps finding the face when an earlier step changes. Where
+the name has other faces too, the code narrows it by what tells the
+face apart, tried in this order and kept only where needed: the copy
+of an array it is in ('Copy'), the segment of a sweep's path it
+runs along ('Along'), the named faces it borders
+('Adjacent'), its normal, kind or axis, and last the box round
+it ('Within'). Faces picked together are found by a name they
+share, else by a list of their names, else one by one. A face of
+several names is found by the one that gives the shortest code.
+
+An edge is found by the names of the faces it bounds, as
+solid.Shape.edges takes them: 'Between' a name of each
+of its two faces, or 'Face' with the name of the one face that
+has a name, narrowed where needed by 'Copy', 'Along',
+its kind, its direction and last the box round it. Edges picked
+together are found by 'Face' with a name of the faces they
+bound, or with the names of faces they go all round, else
+'Between' a face they all bound and the others, else one by
+one; the shortest code is kept.
+
+Items with no names are found by kind, direction and position: one
 query where what they share finds them alone, else one query for each,
 joined, and their indices only where an item cannot be told apart from
-the others by any query. It names the shape by the variable the viewer
-shows, and eval (CODE) gives the indices again: in the
-order picked where it names the items one by one, and in increasing
-order where one query names them all. Put it in the script in place
-of the numbers:
+the others by any query. The code names the shape by
+the variable the viewer shows, and eval (CODE) gives the
+indices again: in the order picked where it names the items one by
+one, and in increasing order where one query names them all. Put it
+in the script in place of the numbers:
 
 ## Four upright edges picked on a block 80 by 40 by 12
 [E, CODE] = pick (V, 'edge');
@@ -7545,6 +7570,14 @@ of the numbers:
 E = edges (part, 'Type', 'line', 'Direction', [0, 0, 1], ...
 'Within', [0, 0, 0, 80, 40, 12]);
 part = fillet (part, E, 3);
+
+## The same edges of a block made with 'Label', 'plate'
+E = edges (part, 'Face', 'plate', 'Direction', [0, 0, 1]);
+
+## The round of the third of six rounded blocks in a ring, on its front
+[F, CODE] = pick (V, 'face');
+F = faces (ring, 'Label', 'edge_round', 'Copy', 3, ...
+'Adjacent', 'plate.ymin');
 
 [I, CODE] = pick (V, 'solid') picks
 whole solids: a click on any face of a solid selects it, and I
@@ -7555,10 +7588,31 @@ drawn in orange. CODE is what selects the same solids in
 opacity, as code: the name they share, else the path they
 share, where either selects them alone, else their indices.
 
+[P, CODE] = pick (V, 'point') picks
+points: each click snaps as for model.Viewer.pickucs, a corner
+to its vertex, a circular edge to its centre, another edge to its
+midpoint halfway along its length, a face to the point clicked, and is
+marked, until Enter; Escape cancels, returning nothing.
+P is an N-by-3 matrix of the points in the order picked.
+CODE rebuilds them from the names of the faces: a corner as
+solid.Shape.corner of the fewest named faces that meet there
+and share no other corner, a centre or midpoint as
+solid.Shape.centre or solid.Shape.midpoint of the edge,
+found as for an edge picked; a point on a face, and one the names
+cannot rebuild, by its coordinates. Several points are the rows of one
+matrix. On a mesh, on an assembly and on a shape without names
+CODE is the coordinates.
+
+## The top front right corner of a block made with 'Label', 'plate'
+[P, CODE] = pick (V, 'point');
+P = corner (part, faces (part, 'Label', ...
+{'plate.xmax', 'plate.ymin', 'plate.zmax'}));
+
 When the viewer shows a model.Assembly, picking only tells its
 solids apart, since the parts of an assembly are edited as parts, not
-in the assembly. pick (V) then picks solids, and
-'edge' and 'face' are refused.
+in the assembly. pick (V) then picks solids,
+'point' picks points, and 'edge' and 'face' are
+refused.
 
 When the viewer shows a polymesh.Mesh, [P, F]
 = pick (V) waits while you click points on it, each marked
@@ -7569,7 +7623,8 @@ on, a row of the mesh's Faces, and the triangle's unit normal,
 turned as its corners run. A click that misses the mesh adds nothing.
 Enter finishes and Escape cancels, returning nothing. A
 mesh has no edges, faces or solids in the sense of a solid, so
-'edge', 'face' and 'solid' are refused.
+'edge', 'face' and 'solid' are refused;
+'point' picks points as on a solid.
 
 See also:
 solid.Shape.edges,
@@ -7596,7 +7651,7 @@ model.Viewer.pickucs
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 2070
+# length: 3473
 model.Viewer: U = pickucs (V)
 model.Viewer: U = pickucs (V, MODE)
 model.Viewer: [U, CODE] = pickucs (...)
@@ -7612,8 +7667,8 @@ second, laid in the face, is +x. The points can be anywhere on
 the part, two corners along an edge for instance. With MODE
 'points' no face is picked; three points give the axes instead,
 +x from the first to the second and the third on the +y
-side, as for geom.UCS.threepoint. MODE is
-'face' by default.
+side, as for geom.UCS.threepoint. MODE is 'face'
+by default.
 
 The origin comes second. Click one point and the origin is there, laid
 in the plane. Click a second and the origin takes its x from the
@@ -7622,25 +7677,60 @@ where a fillet or chamfer leaves no vertex to click. Press Enter
 at once to keep the origin at the first point of the axes.
 
 Every point snaps to what it lands on: a corner to its vertex, a
-circular edge to its centre, another edge to its midpoint, a face to
-the point clicked. Each is marked in the window. On a triangle mesh
-the face clicked is a triangle, which gives the plane where the mesh is
-flat, and a point snaps to a corner of the triangle under it or the
-middle of one of its sides when the click is near, or else lies where
-it was clicked. The shape can be
-turned between clicks, and Escape cancels with an error.
+circular edge to its centre, another edge to its midpoint, a face to the
+point clicked. The tip of a cone and the poles of a sphere are corners
+too, as for solid.Shape.corner. Each is marked in the window.
+On a triangle mesh the face clicked is a triangle, which gives the plane
+where the mesh is flat, and a point snaps to a corner of the triangle
+under it or the middle of one of its sides when the click is near, or
+else lies where it was clicked. The shape can be turned between clicks,
+and Escape cancels with an error.
 
 A pick depends on the shape it was made on, so
 [U, CODE] = pickucs (...) also returns
-CODE, the expression that makes the same UCS from coordinates, as
-a character vector to put in the script in place of the pick.
-eval (CODE) gives the UCS again, to the ten significant
-digits CODE carries.
+CODE, the expression that makes the same UCS, as a character
+vector to put in the script in place of the pick, laid out in lines of
+at most 80 columns. eval (CODE) gives the UCS again.
 
+On a solid whose faces have names, CODE makes the UCS from them,
+so that it follows the part when an earlier step changes. The normal
+is solid.Shape.normal of the face picked, and each point is
+written as model.Viewer.pick with 'point' writes it, by
+solid.Shape.corner, solid.Shape.centre or
+solid.Shape.midpoint:
+
+with Enter for the origin and the start of x on the face's
+plane, geom.UCS (N, P1, P2), the origin at the
+start of x;
+
+with one point for the origin on the face's plane,
+geom.UCS (N, O, O + (P2 - P1)),
+x running from it as from the start of x to the point
+towards +x;
+
+with an origin laid into the plane from a point off it, or taken from
+two points, the same with the origin as its coordinates;
+
+with MODE 'points' and Enter for the origin,
+geom.UCS.threepoint (P1, P2, P3).
+
+A face or point without a name is written by its coordinates. With
+MODE 'points' and an origin picked, on a mesh, on an
+assembly and on a shape without names, CODE makes the UCS from
+coordinates, to the ten significant digits it carries.
+
+## The top of a block made with 'Label', 'plate', x along its front
 [U, CODE] = pickucs (V);
-CODE
-=> CODE = geom.UCS ([0, 0, 1], [20, 20, 12], [21, 20, 12])
-R.UCS = geom.UCS ([0, 0, 1], [20, 20, 12], [21, 20, 12]);
+R.UCS = geom.UCS (normal (part, faces (part, 'Label', 'plate.zmax')), ...
+corner (part, faces (part, 'Label', ...
+{'plate.xmin', 'plate.ymin', ...
+'plate.zmax'})), ...
+corner (part, faces (part, 'Label', ...
+{'plate.xmax', 'plate.ymin', ...
+'plate.zmax'})));
+
+## The same picked on a block without names
+R.UCS = geom.UCS ([0, 0, 1], [0, 0, 12], [1, 0, 12]);
 
 See also:
 geom.UCS,
@@ -7665,10 +7755,10 @@ model.Viewer.view
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 2345
+# length: 2440
 model.Viewer: view (V, AZ, EL)
-model.Viewer: view (V, AZ, EL, ZOOM)
-model.Viewer: view (V, AZ, EL, ZOOM, TARGET)
+model.Viewer: view (..., 'Zoom', ZOOM)
+model.Viewer: view (..., 'Target', TARGET)
 model.Viewer: [AZ, EL, ZOOM, TARGET] = view (V)
 Set or query the direction the viewer looks from, and how close.
 
@@ -7682,23 +7772,25 @@ straight down. The z axis points up the window; looking
 straight down or up, the y axis does, turned by AZ. The
 mouse still turns the view afterwards.
 
-view (V, AZ, EL, ZOOM) then magnifies
-the shape ZOOM times about the centre of the window: 1 is the
-shape fitted, 2 shows it twice as large and 0.5 half as large.
+The option 'Zoom' then magnifies the shape ZOOM times
+about the centre of the window: 1, the default, is the shape fitted, 2
+shows it twice as large and 0.5 half as large.
 
-view (V, AZ, EL, ZOOM, TARGET)
-looks at the point TARGET, a 3-element vector in millimetres,
-instead of the middle of the shape: the point Octave calls the camera
-target. It is put at the centre of the window, ZOOM magnifies
-about it, and the mouse turns the view about it afterwards, as after a
-double click. So a detail is seen close up from a script.
+The option 'Target' looks at the point TARGET, a
+3-element vector in millimetres, instead of the middle of the shape:
+the point Octave calls the camera target. It is put at the centre of
+the window, ZOOM magnifies about it, and the mouse turns the view
+about it afterwards, as after a double click. So a detail is seen
+close up from a script.
 
 [AZ, EL, ZOOM, TARGET] = view (V)
 returns the view as it is now, however it got there: the angles it
 looks from, AZ from -180 to 180, its magnification against the
 shape fitted, and the point at the centre of the window, wherever the
-view was panned to. Given back to view, they restore it, so a
-view found with the mouse can be kept in a script. After T,
+view was panned to. Given back to view, as
+view (V, AZ, EL, 'Zoom', ZOOM, 'Target',
+TARGET), they restore it, so a view found with the mouse can be
+kept in a script. After T,
 the mouse can also turn the view about the line of sight, which they
 do not hold, so such a view is restored upright.
 
@@ -7714,12 +7806,12 @@ part = solid.box (80, 40, 4);
 V = show (part);
 view (V, 30, 60);
 ## Closer, on the middle of the part
-view (V, 30, 60, 2);
+view (V, 30, 60, 'Zoom', 2);
 ## Four times larger, on a corner
-view (V, 30, 60, 4, [80, 40, 4]);
+view (V, 30, 60, 'Zoom', 4, 'Target', [80, 40, 4]);
 ## Keep a view found with the mouse, and restore it
 [az, el, zoom, target] = view (V);
-view (V, az, el, zoom, target);
+view (V, az, el, 'Zoom', zoom, 'Target', target);
 
 See also:
 solid.Shape.show

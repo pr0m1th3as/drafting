@@ -524,7 +524,7 @@ classdef Assembly
     ## @code{model.read} names the placements of a 3MF file after their
     ## parts.  An STL, OBJ or PLY file holds @code{tessellate (@var{A})}.
     ##
-    ## @code{write (@dots{}, @qcode{'Tolerance'}, @var{TOL})} sets, for a
+    ## @code{write (@dots{}, 'Tolerance', @var{TOL})} sets, for a
     ## mesh, how far its facets may stray from the parts' surfaces, as
     ## @code{solid.Shape.tessellate} takes it, 0.01 by default.
     ##

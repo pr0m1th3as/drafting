@@ -639,7 +639,7 @@ classdef Viewer < handle
     ## @end group
     ## @end example
     ##
-    ## @code{@var{V} = model.Viewer (@qcode{'Hidden'}, true)} never shows its
+    ## @code{@var{V} = model.Viewer ('Hidden', true)} never shows its
     ## window.  It draws and picks all the same, which is how the viewer is
     ## tested.
     ##
@@ -897,7 +897,7 @@ classdef Viewer < handle
     ## @end group
     ## @end example
     ##
-    ## @code{[@var{I}, @var{CODE}] = pick (@var{V}, @qcode{'solid'})} picks
+    ## @code{[@var{I}, @var{CODE}] = pick (@var{V}, 'solid')} picks
     ## whole solids: a click on any face of a solid selects it, and @var{I}
     ## returns the indices of the solids picked, in the order you picked them,
     ## numbered as @code{solid.Shape.solids} and @code{model.Assembly.solids}
@@ -906,7 +906,7 @@ classdef Viewer < handle
     ## @code{opacity}, as code: the name they share, else the path they
     ## share, where either selects them alone, else their indices.
     ##
-    ## @code{[@var{P}, @var{CODE}] = pick (@var{V}, @qcode{'point'})} picks
+    ## @code{[@var{P}, @var{CODE}] = pick (@var{V}, 'point')} picks
     ## points: each click snaps as for @code{model.Viewer.pickucs}, a corner
     ## to its vertex, a circular edge to its centre, another edge to its
     ## midpoint halfway along its length, a face to the point clicked, and is
@@ -974,8 +974,8 @@ classdef Viewer < handle
     ## the part, two corners along an edge for instance.  With @var{MODE}
     ## @qcode{'points'} no face is picked; three points give the axes instead,
     ## @math{+x} from the first to the second and the third on the @math{+y}
-    ## side, as for @code{geom.UCS.threepoint}.  @var{MODE} is
-    ## @qcode{'face'} by default.
+    ## side, as for @code{geom.UCS.threepoint}.  @var{MODE} is @qcode{'face'}
+    ## by default.
     ##
     ## The origin comes second.  Click one point and the origin is there, laid
     ## in the plane.  Click a second and the origin takes its @math{x} from the
@@ -984,14 +984,14 @@ classdef Viewer < handle
     ## at once to keep the origin at the first point of the axes.
     ##
     ## Every point snaps to what it lands on: a corner to its vertex, a
-    ## circular edge to its centre, another edge to its midpoint, a face to
-    ## the point clicked.  The tip of a cone and the poles of a sphere are
-    ## corners too, as for @code{solid.Shape.corner}.  Each is marked in the window.  On a triangle mesh
-    ## the face clicked is a triangle, which gives the plane where the mesh is
-    ## flat, and a point snaps to a corner of the triangle under it or the
-    ## middle of one of its sides when the click is near, or else lies where
-    ## it was clicked.  The shape can be
-    ## turned between clicks, and @kbd{Escape} cancels with an error.
+    ## circular edge to its centre, another edge to its midpoint, a face to the
+    ## point clicked.  The tip of a cone and the poles of a sphere are corners
+    ## too, as for @code{solid.Shape.corner}.  Each is marked in the window.
+    ## On a triangle mesh the face clicked is a triangle, which gives the plane
+    ## where the mesh is flat, and a point snaps to a corner of the triangle
+    ## under it or the middle of one of its sides when the click is near, or
+    ## else lies where it was clicked.  The shape can be turned between clicks,
+    ## and @kbd{Escape} cancels with an error.
     ##
     ## A pick depends on the shape it was made on, so
     ## @code{[@var{U}, @var{CODE}] = pickucs (@dots{})} also returns
@@ -1187,8 +1187,8 @@ classdef Viewer < handle
 
     ## -*- texinfo -*-
     ## @deftypefn  {model.Viewer} {} view (@var{V}, @var{AZ}, @var{EL})
-    ## @deftypefnx {model.Viewer} {} view (@var{V}, @var{AZ}, @var{EL}, @var{ZOOM})
-    ## @deftypefnx {model.Viewer} {} view (@var{V}, @var{AZ}, @var{EL}, @var{ZOOM}, @var{TARGET})
+    ## @deftypefnx {model.Viewer} {} view (@dots{}, @qcode{'Zoom'}, @var{ZOOM})
+    ## @deftypefnx {model.Viewer} {} view (@dots{}, @qcode{'Target'}, @var{TARGET})
     ## @deftypefnx {model.Viewer} {[@var{AZ}, @var{EL}, @var{ZOOM}, @var{TARGET}] =} view (@var{V})
     ##
     ## Set or query the direction the viewer looks from, and how close.
@@ -1203,23 +1203,25 @@ classdef Viewer < handle
     ## straight down or up, the @math{y} axis does, turned by @var{AZ}.  The
     ## mouse still turns the view afterwards.
     ##
-    ## @code{view (@var{V}, @var{AZ}, @var{EL}, @var{ZOOM})} then magnifies
-    ## the shape @var{ZOOM} times about the centre of the window: 1 is the
-    ## shape fitted, 2 shows it twice as large and 0.5 half as large.
+    ## The option @qcode{'Zoom'} then magnifies the shape @var{ZOOM} times
+    ## about the centre of the window: 1, the default, is the shape fitted, 2
+    ## shows it twice as large and 0.5 half as large.
     ##
-    ## @code{view (@var{V}, @var{AZ}, @var{EL}, @var{ZOOM}, @var{TARGET})}
-    ## looks at the point @var{TARGET}, a 3-element vector in millimetres,
-    ## instead of the middle of the shape: the point Octave calls the camera
-    ## target.  It is put at the centre of the window, @var{ZOOM} magnifies
-    ## about it, and the mouse turns the view about it afterwards, as after a
-    ## double click.  So a detail is seen close up from a script.
+    ## The option @qcode{'Target'} looks at the point @var{TARGET}, a
+    ## 3-element vector in millimetres, instead of the middle of the shape:
+    ## the point Octave calls the camera target.  It is put at the centre of
+    ## the window, @var{ZOOM} magnifies about it, and the mouse turns the view
+    ## about it afterwards, as after a double click.  So a detail is seen
+    ## close up from a script.
     ##
     ## @code{[@var{AZ}, @var{EL}, @var{ZOOM}, @var{TARGET}] = view (@var{V})}
     ## returns the view as it is now, however it got there: the angles it
     ## looks from, @var{AZ} from -180 to 180, its magnification against the
     ## shape fitted, and the point at the centre of the window, wherever the
-    ## view was panned to.  Given back to @code{view}, they restore it, so a
-    ## view found with the mouse can be kept in a script.  After @kbd{T},
+    ## view was panned to.  Given back to @code{view}, as
+    ## @code{view (@var{V}, @var{AZ}, @var{EL}, 'Zoom', @var{ZOOM}, 'Target',
+    ## @var{TARGET})}, they restore it, so a view found with the mouse can be
+    ## kept in a script.  After @kbd{T},
     ## the mouse can also turn the view about the line of sight, which they
     ## do not hold, so such a view is restored upright.
     ##
@@ -1237,12 +1239,12 @@ classdef Viewer < handle
     ## V = show (part);
     ## view (V, 30, 60);
     ## ## Closer, on the middle of the part
-    ## view (V, 30, 60, 2);
+    ## view (V, 30, 60, 'Zoom', 2);
     ## ## Four times larger, on a corner
-    ## view (V, 30, 60, 4, [80, 40, 4]);
+    ## view (V, 30, 60, 'Zoom', 4, 'Target', [80, 40, 4]);
     ## ## Keep a view found with the mouse, and restore it
     ## [az, el, zoom, target] = view (V);
-    ## view (V, az, el, zoom, target);
+    ## view (V, az, el, 'Zoom', zoom, 'Target', target);
     ## @end group
     ## @end example
     ##
@@ -1251,7 +1253,7 @@ classdef Viewer < handle
     function varargout = view (this, varargin)
 
       ## Input validation
-      if (! any (numel (varargin) == [0, 2, 3, 4]))
+      if (numel (varargin) == 1)
         error ("model.Viewer.view: invalid number of input arguments.");
       endif
       ZOOM = 1;
@@ -1271,22 +1273,36 @@ classdef Viewer < handle
           error (strcat ("model.Viewer.view: EL must be a real scalar in", ...
                          " the range [-90, 90] degrees."));
         endif
-        if (numel (varargin) > 2)
-          ZOOM = varargin{3};
-          if (! isfloat (ZOOM) || ! isreal (ZOOM) || ! isscalar (ZOOM)
-              || ! isfinite (ZOOM) || ! (ZOOM > 0))
-            error (strcat ("model.Viewer.view: ZOOM must be a positive and", ...
-                           " finite real scalar."));
-          endif
+        opts = varargin(3:end);
+        if (mod (numel (opts), 2) != 0)
+          error ("model.Viewer.view: Name/Value arguments must come in pairs.");
         endif
-        if (numel (varargin) > 3)
-          TARGET = varargin{4};
-          if (! isfloat (TARGET) || ! isreal (TARGET) || numel (TARGET) != 3
-              || ! isvector (TARGET) || ! all (isfinite (TARGET)))
-            error (strcat ("model.Viewer.view: TARGET must be a real", ...
-                           " 3-element vector of finite values."));
+        for ii = 1:2:numel (opts)
+          name = opts{ii};
+          val = opts{ii+1};
+          if (! ischar (name) || ! isrow (name))
+            error (strcat ("model.Viewer.view: option names must be", ...
+                           " character vectors."));
           endif
-        endif
+          switch (lower (name))
+            case 'zoom'
+              if (! isfloat (val) || ! isreal (val) || ! isscalar (val)
+                  || ! isfinite (val) || ! (val > 0))
+                error (strcat ("model.Viewer.view: Zoom must be a positive", ...
+                               " and finite real scalar."));
+              endif
+              ZOOM = val;
+            case 'target'
+              if (! isfloat (val) || ! isreal (val) || numel (val) != 3
+                  || ! isvector (val) || ! all (isfinite (val)))
+                error (strcat ("model.Viewer.view: Target must be a real", ...
+                               " 3-element vector of finite values."));
+              endif
+              TARGET = val;
+            otherwise
+              error ("model.Viewer.view: unknown option '%s'.", name);
+          endswitch
+        endfor
       endif
       if (! isopen (this))
         error ("model.Viewer.view: the viewer's window is not open.");
@@ -1326,7 +1342,7 @@ classdef Viewer < handle
     ## in the format its extension names, as @code{imwrite} writes it; PNG
     ## keeps every pixel.
     ##
-    ## @code{capture (@dots{}, @qcode{'Size'}, [@var{W}, @var{H}])} draws the
+    ## @code{capture (@dots{}, 'Size', [@var{W}, @var{H}])} draws the
     ## picture @var{W} pixels wide and @var{H} high instead, whatever the size
     ## of the window, so a picture for print can be finer than the screen.
     ## The view keeps its height: a picture of another shape than the window
@@ -2681,7 +2697,7 @@ endfunction
 %!   V.__drag__ ([450, 350], [520, 280]);
 %!   I = capture (V);
 %!   [az, el, zoom, target] = view (V);
-%!   view (V, az, el, zoom, target);
+%!   view (V, az, el, 'Zoom', zoom, 'Target', target);
 %!   assert_equal (nnz (any (capture (V) != I, 3)) <= 20, true);
 %! unwind_protect_cleanup
 %!   close (V);
@@ -2816,7 +2832,7 @@ endfunction
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
 %!   V.Model = solid.box (10, 20, 30);
-%!   view (V, 30, 60, 2.5);
+%!   view (V, 30, 60, 'Zoom', 2.5);
 %!   [az, el, zoom] = view (V);
 %!   assert_equal ([az, el, zoom], [30, 60, 2.5]);
 %! unwind_protect_cleanup
@@ -2828,7 +2844,7 @@ endfunction
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
 %!   V.Model = solid.box (10, 20, 30);
-%!   view (V, 30, 60, 2);
+%!   view (V, 30, 60, 'Zoom', 2);
 %!   view (V, 30, 60);
 %!   [~, ~, zoom] = view (V);
 %!   assert_equal (zoom, 1);
@@ -2843,7 +2859,7 @@ endfunction
 %!   V.Model = solid.box (10, 20, 30);
 %!   view (V, 0, 0);
 %!   a = norm (diff ([V.__project__([0, 0, 0]); V.__project__([10, 0, 0])]));
-%!   view (V, 0, 0, 2);
+%!   view (V, 0, 0, 'Zoom', 2);
 %!   b = norm (diff ([V.__project__([0, 0, 0]); V.__project__([10, 0, 0])]));
 %!   assert_equal (b / a, 2, 0.02);
 %! unwind_protect_cleanup
@@ -2855,7 +2871,7 @@ endfunction
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
 %!   V.Model = solid.box (80, 40, 4);
-%!   view (V, 30, 60, 4, [80, 40, 4]);
+%!   view (V, 30, 60, 'Zoom', 4, 'Target', [80, 40, 4]);
 %!   [az, el, zoom, target] = view (V);
 %!   assert_equal ([az, el, zoom, target], [30, 60, 4, 80, 40, 4]);
 %! unwind_protect_cleanup
@@ -2867,7 +2883,7 @@ endfunction
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
 %!   V.Model = solid.box (80, 40, 4);
-%!   view (V, 30, 60, 4, [80, 40, 4]);
+%!   view (V, 30, 60, 'Zoom', 4, 'Target', [80, 40, 4]);
 %!   assert_equal (V.__project__ ([80, 40, 4]), [450, 350], 1);
 %! unwind_protect_cleanup
 %!   close (V);
@@ -2878,9 +2894,21 @@ endfunction
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
 %!   V.Model = solid.box (80, 40, 4);
-%!   view (V, 30, 60, 4);
+%!   view (V, 30, 60, 'Zoom', 4);
 %!   [~, ~, ~, target] = view (V);
 %!   assert_equal (target, [40, 20, 2], 1e-9);
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
+%! ## A target set without a zoom keeps the shape fitted
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   V.Model = solid.box (80, 40, 4);
+%!   view (V, 30, 60, 'Target', [80, 40, 4]);
+%!   [~, ~, zoom, target] = view (V);
+%!   assert_equal ([zoom, target], [1, 80, 40, 4]);
 %! unwind_protect_cleanup
 %!   close (V);
 %! end_unwind_protect
@@ -2890,9 +2918,9 @@ endfunction
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
 %!   V.Model = solid.box (80, 40, 4);
-%!   view (V, 30, 60, 4, [80, 40, 4]);
+%!   view (V, 30, 60, 'Zoom', 4, 'Target', [80, 40, 4]);
 %!   [az, el, zoom, target] = view (V);
-%!   view (V, az, el, zoom, target);
+%!   view (V, az, el, 'Zoom', zoom, 'Target', target);
 %!   [az2, el2, zoom2, target2] = view (V);
 %!   assert_equal ([az2, el2, zoom2, target2], [az, el, zoom, target]);
 %! unwind_protect_cleanup
@@ -2906,10 +2934,10 @@ endfunction
 %! V = model.Viewer ('Hidden', true);
 %! unwind_protect
 %!   V.Model = solid.box (80, 40, 4);
-%!   view (V, 30, 60, 4, [80, 40, 4]);
+%!   view (V, 30, 60, 'Zoom', 4, 'Target', [80, 40, 4]);
 %!   I = capture (V);
 %!   [az, el, zoom, target] = view (V);
-%!   view (V, az, el, zoom, target);
+%!   view (V, az, el, 'Zoom', zoom, 'Target', target);
 %!   assert_equal (nnz (any (capture (V) != I, 3)) <= 20, true);
 %! unwind_protect_cleanup
 %!   close (V);
@@ -2929,22 +2957,30 @@ endfunction
 %! view (model.Viewer ('Hidden', true), 30, NaN)
 %!error<model.Viewer.view: EL must be a real scalar in the range \[-90, 90\] degrees.> ...
 %! view (model.Viewer ('Hidden', true), 30, 'a')
-%!error<model.Viewer.view: ZOOM must be a positive and finite real scalar.> ...
-%! view (model.Viewer ('Hidden', true), 30, 60, 0)
-%!error<model.Viewer.view: ZOOM must be a positive and finite real scalar.> ...
-%! view (model.Viewer ('Hidden', true), 30, 60, Inf)
-%!error<model.Viewer.view: ZOOM must be a positive and finite real scalar.> ...
-%! view (model.Viewer ('Hidden', true), 30, 60, [1, 2])
-%!error<model.Viewer.view: TARGET must be a real 3-element vector of finite values.> ...
-%! view (model.Viewer ('Hidden', true), 30, 60, 1, [1, 2])
-%!error<model.Viewer.view: TARGET must be a real 3-element vector of finite values.> ...
-%! view (model.Viewer ('Hidden', true), 30, 60, 1, [1, 2, NaN])
-%!error<model.Viewer.view: TARGET must be a real 3-element vector of finite values.> ...
-%! view (model.Viewer ('Hidden', true), 30, 60, 1, 'abc')
-%!error<model.Viewer.view: invalid number of input arguments.> ...
-%! view (model.Viewer ('Hidden', true), 30, 60, 1, [1, 2, 3], 2)
+%!error<model.Viewer.view: Name/Value arguments must come in pairs.> ...
+%! view (model.Viewer ('Hidden', true), 30, 60, 2)
+%!error<model.Viewer.view: option names must be character vectors.> ...
+%! view (model.Viewer ('Hidden', true), 30, 60, 2, [1, 2, 3])
+%!error<model.Viewer.view: unknown option 'Zom'.> ...
+%! view (model.Viewer ('Hidden', true), 30, 60, 'Zom', 2)
+%!error<model.Viewer.view: Zoom must be a positive and finite real scalar.> ...
+%! view (model.Viewer ('Hidden', true), 30, 60, 'Zoom', 0)
+%!error<model.Viewer.view: Zoom must be a positive and finite real scalar.> ...
+%! view (model.Viewer ('Hidden', true), 30, 60, 'Zoom', Inf)
+%!error<model.Viewer.view: Zoom must be a positive and finite real scalar.> ...
+%! view (model.Viewer ('Hidden', true), 30, 60, 'Zoom', [1, 2])
+%!error<model.Viewer.view: Zoom must be a positive and finite real scalar.> ...
+%! view (model.Viewer ('Hidden', true), 30, 60, 'Zoom', [])
+%!error<model.Viewer.view: Target must be a real 3-element vector of finite values.> ...
+%! view (model.Viewer ('Hidden', true), 30, 60, 'Target', [1, 2])
+%!error<model.Viewer.view: Target must be a real 3-element vector of finite values.> ...
+%! view (model.Viewer ('Hidden', true), 30, 60, 'Target', [1, 2, NaN])
+%!error<model.Viewer.view: Target must be a real 3-element vector of finite values.> ...
+%! view (model.Viewer ('Hidden', true), 30, 60, 'Target', 'abc')
+%!error<model.Viewer.view: Target must be a real 3-element vector of finite values.> ...
+%! view (model.Viewer ('Hidden', true), 30, 60, 'Target', [])
 %!error<model.Viewer.view: invalid number of output arguments.> ...
-%! A = view (model.Viewer ('Hidden', true), 30, 60, 2);
+%! A = view (model.Viewer ('Hidden', true), 30, 60, 'Zoom', 2);
 
 %!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## capture: the window's picture, the right way up
