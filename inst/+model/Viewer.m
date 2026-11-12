@@ -543,33 +543,37 @@ classdef Viewer < handle
     ## the shape S held in the variable NAME: one query by what they share
     ## where it finds them alone, which gives them in increasing order, else
     ## one query for each, joined in the order of IDX, and their indices only
-    ## where an item cannot be told apart by any query.  Faces with names are
-    ## found by their names first, as namedfaces writes it; a face without a
-    ## name among them by its kind, direction and position.
+    ## where an item cannot be told apart by any query.  Faces with names, and
+    ## edges of faces with names, are found by those names first, as
+    ## namedfaces and namededges write it; an item without names among them by
+    ## its kind, direction and position.
     function Q = __query__ (S, KIND, IDX, NAME)
 
       IDX = unique (IDX(:)', 'stable');
+      names = __occt__ ('names', 'model.Viewer.pick', S.Data);
       if (strcmp (KIND, 'edge'))
         info = __occt__ ('edges', 'model.Viewer.pick', S.Data);
-        names = {};
+        F = unique ([zeros(1, 0), info{5}{IDX}]);
+        named = @namededges;
       else
         info = __occt__ ('faces', 'model.Viewer.pick', S.Data);
-        names = __occt__ ('names', 'model.Viewer.pick', S.Data);
-        if (names{2} || ! any (cellfun (@(r) any (! cellfun ('isempty', r)), ...
-                                        names{1}(IDX))))
-          names = {};
-        endif
+        F = IDX;
+        named = @namedfaces;
+      endif
+      if (names{2} || ! any (cellfun (@(r) any (! cellfun ('isempty', r)), ...
+                                      names{1}(F))))
+        names = {};
       endif
       if (isempty (names))
         Q = itemquery (KIND, info, IDX, 1000, ' ');
       else
-        Q = namedfaces (S, IDX, info, names, ' ');
+        Q = named (S, IDX, info, names, ' ');
       endif
       if (isempty (Q) || ! isequal (sort (chosen (S, Q)), sort (IDX)))
         parts = cell (1, numel (IDX));
         for k = 1:numel (IDX)
           if (! isempty (names) && numel (IDX) > 1)
-            parts{k} = namedfaces (S, IDX(k), info, names, '');
+            parts{k} = named (S, IDX(k), info, names, '');
             if (! isempty (parts{k}))
               continue;
             endif
@@ -833,10 +837,20 @@ classdef Viewer < handle
     ## share, else by a list of their names, else one by one.  A face of
     ## several names is found by the one that gives the shortest code.
     ##
-    ## Edges, and faces without names, are found by kind, direction and
-    ## position: one query where what they share finds them alone, else one
-    ## query for each, joined, and their indices only where an item cannot be
-    ## told apart from the others by any query.  The code names the shape by
+    ## An edge is found by the names of the faces it bounds, as
+    ## @code{solid.Shape.edges} takes them: @qcode{'Between'} a name of each
+    ## of its two faces, or @qcode{'Face'} with the name of the one face that
+    ## has a name, narrowed where needed by @qcode{'Copy'}, @qcode{'Along'},
+    ## its kind, its direction and last the box round it.  Edges picked
+    ## together are found by @qcode{'Face'} with a name of the faces they
+    ## bound, or with the names of faces they go all round, else
+    ## @qcode{'Between'} a face they all bound and the others, else one by
+    ## one; the shortest code is kept.
+    ##
+    ## Items with no names are found by kind, direction and position: one
+    ## query where what they share finds them alone, else one query for each,
+    ## joined, and their indices only where an item cannot be told apart from
+    ## the others by any query.  The code names the shape by
     ## the variable the viewer shows, and @code{eval (@var{CODE})} gives the
     ## indices again: in the order picked where it names the items one by
     ## one, and in increasing order where one query names them all.  Put it
@@ -850,6 +864,9 @@ classdef Viewer < handle
     ## E = edges (part, 'Type', 'line', 'Direction', [0, 0, 1], ...
     ##            'Within', [0, 0, 0, 80, 40, 12]);
     ## part = fillet (part, E, 3);
+    ##
+    ## ## The same edges of a block made with 'Label', 'plate'
+    ## E = edges (part, 'Face', 'plate', 'Direction', [0, 0, 1]);
     ##
     ## ## The round of the third of six rounded blocks in a ring, on its front
     ## [F, CODE] = pick (V, 'face');
@@ -1776,23 +1793,13 @@ function Q = namedfaces (S, T, INFO, NAMES, SP)
   cand.Within = arrayfun (@(d) [floor(b(1:3) * d), ceil(b(4:6) * d)] / d, ...
                           [1000, 1e6], 'UniformOutput', false);
 
+  query = @(a) faces (S, a{:});
+  steps = {'Copy', 'Along', 'Adjacent', 'Adjacent', 'Normal', 'Type', ...
+           'Axis', 'Within'};
   if (isscalar (T))
-    best = '';
-    fewest = Inf;
-    for name = sort (own (T))
-      args = narrowed (S, T, {'Label', name{1}}, cand);
-      if (isempty (args))
-        continue;
-      endif
-      code = querytext ('face', args, SP);
-      count = numel (faces (S, 'Label', name{1}));
-      if (isempty (best) || numel (code) < numel (best)
-          || (numel (code) == numel (best) && count < fewest))
-        best = code;
-        fewest = count;
-      endif
-    endfor
-    Q = best;
+    Q = shortest (query, T, cellfun (@(c) {'Label', c}, own (T), ...
+                                     'UniformOutput', false), ...
+                  cand, steps, 'face', SP);
     return;
   endif
 
@@ -1815,7 +1822,7 @@ function Q = namedfaces (S, T, INFO, NAMES, SP)
   depth = cellfun (@(c) numel (strfind (c, '.')), common);
   [~, k] = sort (-depth);
   for name = common(k)
-    args = narrowed (S, T, {'Label', name{1}}, cand);
+    args = narrowed (query, T, {'Label', name{1}}, cand, steps);
     if (! isempty (args))
       Q = querytext ('face', args, SP);
       return;
@@ -1851,24 +1858,212 @@ function Q = namedfaces (S, T, INFO, NAMES, SP)
 
 endfunction
 
-## The Name/Value pairs that select exactly the faces T of S: BASE, then the
-## filters of CAND in the order 'Copy', 'Along', 'Adjacent' (one face, then
-## two), 'Normal', 'Type', 'Axis' and 'Within', each value among those CAND
-## gives for it.  A filter is added with the value that leaves the fewest
-## faces, when it leaves fewer than before and all of T, until only T is
-## left; then each filter added is dropped again when T is still all that is
-## left without it.  Empty when the filters cannot leave T alone.
-function args = narrowed (S, T, BASE, CAND)
+## The code that selects exactly the edges T of the shape S by the names of
+## their faces, INFO and NAMES what Open CASCADE reports of its edges and the
+## names of its faces, the shape named __shape__ and SP the space before the
+## call's parenthesis; empty when the names cannot select them.  One edge is
+## found 'Between' a name of each of its two faces, or where only one is
+## named by 'Face' with its name, with the filters NARROWED adds, the
+## shortest code winning, then the base that selects fewer edges alone, then
+## the first in alphabetical order.  Several edges are found by 'Face' with
+## a name or the beginning of one, or with a cell array of names whose faces
+## have only edges of T, else 'Between' a name of a face they all bound and
+## the names of their other faces, with the filters NARROWED adds, the
+## shortest code winning.
+function Q = namededges (S, T, INFO, NAMES, SP)
+
+  Q = '';
+  [labels, ~, copies, along] = NAMES{:};
+  [type, dir, box, seam, onfaces] = INFO{:};
+  T = sort (T(:)');
+  own = @(i) labels{i}(! cellfun ('isempty', labels{i}));
+  query = @(a) edges (S, a{:});
+  steps = {'Copy', 'Along', 'Type', 'Direction', 'Within'};
+
+  ## The faces each edge of T bounds, and what all the edges share, for the
+  ## filters: the copies and path labels of the names of those faces, and
+  ## their kind and direction where they share one
+  F = unique ([zeros(1, 0), onfaces{T}]);
+  cand.Copy = {};
+  cand.Along = {};
+  for i = F
+    for j = find (! cellfun ('isempty', labels{i}))
+      c = copies{i}{j};
+      if (isscalar (c))
+        cand.Copy{end+1} = c;
+      elseif (! isempty (c))
+        cand.Copy{end+1} = num2cell (c);
+      endif
+    endfor
+    cand.Along = [cand.Along, along{i}];
+  endfor
+  cand.Along = unique (cand.Along);
+  cand.Type = {};
+  if (all (strcmp (type(T), type{T(1)})))
+    cand.Type = type(T(1));
+  endif
+  cand.Direction = {};
+  if (alike (dir(T,:)))
+    cand.Direction = {dir(T(1),:)};
+  endif
+  b = [min(box(T,1:3), [], 1), max(box(T,4:6), [], 1)];
+  cand.Within = arrayfun (@(d) [floor(b(1:3) * d), ceil(b(4:6) * d)] / d, ...
+                          [1000, 1e6], 'UniformOutput', false);
+
+  if (isscalar (T))
+    f = unique (onfaces{T});
+    bases = {};
+    if (numel (f) == 2 && ! isempty (own (f(1))) && ! isempty (own (f(2))))
+      for a = own (f(1))
+        for z = own (f(2))
+          bases{end+1} = {'Between', sort([a, z])};
+        endfor
+      endfor
+      Q = shortest (query, T, bases, cand, steps, 'edge', SP);
+    endif
+    if (isempty (Q))
+      bases = {};
+      for i = f
+        for a = own (i)
+          bases{end+1} = {'Face', a{1}};
+        endfor
+      endfor
+      Q = shortest (query, T, bases, cand, steps, 'edge', SP);
+    endif
+    return;
+  endif
+
+  ## 'Face' with each name of the faces they bound and each beginning of one,
+  ## and with the names whose faces have only edges of T, taken while they
+  ## add edges until they select all of T
+  bases = {};
+  inside = {};
+  for i = F
+    for name = own (i)
+      parts = strsplit (name{1}, '.');
+      for k = 1:numel (parts)
+        bases{end+1} = {'Face', strjoin(parts(1:k), '.')};
+      endfor
+      if (all (ismember (query ({'Face', name{1}}), T)))
+        inside{end+1} = name{1};
+      endif
+    endfor
+  endfor
+  [~, k] = unique (cellfun (@(c) c{2}, bases, 'UniformOutput', false));
+  bases = bases(sort (k));
+  inside = unique (inside);
+  sel = cellfun (@(c) query ({'Face', c}), inside, 'UniformOutput', false);
+  got = zeros (1, 0);
+  given = {};
+  while (! isequal (got, T) && ! isempty (inside))
+    [m, k] = max (cellfun (@(e) numel (setdiff (e, got)), sel));
+    if (m == 0)
+      break;
+    endif
+    given{end+1} = inside{k};
+    got = union (got, sel{k});
+    inside(k) = [];
+    sel(k) = [];
+  endwhile
+  if (numel (given) > 1 && isequal (got, T))
+    bases{end+1} = {'Face', given};
+  endif
+  Q = shortest (query, T, bases, cand, steps, 'edge', SP);
+  if (! isempty (Q))
+    return;
+  endif
+
+  ## 'Between' a name of a face every edge bounds and the names of the other
+  ## faces, as their longest common beginning or as a cell array of them
+  shared = F;
+  for e = T
+    shared = intersect (shared, onfaces{e});
+  endfor
+  bases = {};
+  for s = shared
+    others = setdiff (F, s);
+    if (isempty (others) || any (cellfun (@(i) isempty (own (i)), ...
+                                          num2cell (others))))
+      continue;
+    endif
+    common = {};
+    for i = others
+      p = {};
+      for name = own (i)
+        parts = strsplit (name{1}, '.');
+        for k = 1:numel (parts)
+          p{end+1} = strjoin (parts(1:k), '.');
+        endfor
+      endfor
+      if (i == others(1))
+        common = unique (p);
+      else
+        common = intersect (common, p);
+      endif
+    endfor
+    firsts = cell (1, numel (others));
+    for k = 1:numel (others)
+      names = own (others(k));
+      firsts{k} = names{1};
+    endfor
+    for a = own (s)
+      for c = common
+        bases{end+1} = {'Between', {a{1}, c{1}}};
+      endfor
+      bases{end+1} = {'Between', {a{1}, unique(firsts)}};
+    endfor
+  endfor
+  Q = shortest (query, T, bases, cand, steps, 'edge', SP);
+
+endfunction
+
+## The shortest code that selects exactly the items T of KIND, edge or face,
+## by QUERY: each base of BASES narrowed by the filters STEPS with the values
+## CAND gives, as NARROWED does, ties going to the base that selects fewer
+## items alone, then to the first in alphabetical order.  SP is the space
+## before the call's parenthesis.  Empty when no base can select T.
+function code = shortest (QUERY, T, BASES, CAND, STEPS, KIND, SP)
+
+  code = '';
+  fewest = Inf;
+  [~, k] = sort (cellfun (@valuetext, BASES, 'UniformOutput', false));
+  for base = BASES(k)
+    args = narrowed (QUERY, T, base{1}, CAND, STEPS);
+    if (isempty (args))
+      continue;
+    endif
+    c = querytext (KIND, args, SP);
+    n = numel (QUERY (base{1}));
+    if (isempty (code) || numel (c) < numel (code)
+        || (numel (c) == numel (code) && n < fewest))
+      code = c;
+      fewest = n;
+    endif
+  endfor
+
+endfunction
+
+## The Name/Value pairs that select exactly the items T, faces or edges, by
+## QUERY, which takes Name/Value pairs in a cell array: BASE, then the
+## filters STEPS in order, each value among those CAND gives for it; an
+## 'Adjacent' that comes twice adds a second face to border, beside the
+## first.  A filter is added with the value that leaves the fewest items,
+## when it leaves fewer than before and all of T, until only T is left; then
+## each filter added is dropped again when T is still all that is left
+## without it.  Empty when the filters cannot leave T alone.
+function args = narrowed (QUERY, T, BASE, CAND, STEPS)
 
   args = BASE;
-  sel = faces (S, BASE{:});
-  steps = {'Copy', 'Along', 'Adjacent', 'Adjacent', 'Normal', 'Type', ...
-           'Axis', 'Within'};
-  for k = 1:numel (steps)
+  sel = QUERY (BASE);
+  if (! all (ismember (T, sel)))
+    args = {};
+    return;
+  endif
+  for k = 1:numel (STEPS)
     if (isequal (sel, T))
       break;
     endif
-    key = steps{k};
+    key = STEPS{k};
     values = CAND.(key);
     at = find (strcmp (args(1:2:end), key)) * 2;
     if (strcmp (key, 'Adjacent') && ! isempty (at))
@@ -1883,7 +2078,7 @@ function args = narrowed (S, T, BASE, CAND)
         trial = args;
         trial{at} = v{1};
       endif
-      f = faces (S, trial{:});
+      f = QUERY (trial);
       if (all (ismember (T, f)) && numel (f) < numel (sel)
           && (isempty (best) || numel (f) < numel (best.sel)))
         best = struct ('args', {trial}, 'sel', f);
@@ -1900,7 +2095,7 @@ function args = narrowed (S, T, BASE, CAND)
   endif
   for k = numel (args) - 1:-2:numel (BASE) + 1
     without = args([1:k-1, k+2:end]);
-    if (isequal (faces (S, without{:}), T))
+    if (isequal (QUERY (without), T))
       args = without;
     endif
   endfor
@@ -2614,6 +2809,44 @@ endfunction
 %! assert_equal (strncmp (Q, "[faces(S, 'Label', 'plate.xmin'), faces(S, ", ...
 %!                        43), true);
 %! assert_equal (eval (Q), F);
+%!test  # an edge between two named faces
+%! B = solid.box (60, 40, 10, 'Label', 'plate');
+%! E = edges (B, 'Between', {'plate.zmax', 'plate.ymin'});
+%! Q = model.Viewer.__query__ (B, 'edge', E, 'B');
+%! assert_equal (Q, "edges (B, 'Between', {'plate.ymin', 'plate.zmax'})");
+%!test  # the edges round a named face
+%! B = solid.box (60, 40, 10, 'Label', 'plate');
+%! Q = model.Viewer.__query__ (B, 'edge', edges (B, 'Face', 'plate.zmax'), ...
+%!                             'B');
+%! assert_equal (Q, "edges (B, 'Face', 'plate.zmax')");
+%!test  # the edges round two named faces
+%! B = solid.box (60, 40, 10, 'Label', 'plate');
+%! E = edges (B, 'Face', {'plate.zmax', 'plate.xmin'});
+%! Q = model.Viewer.__query__ (B, 'edge', E, 'B');
+%! assert_equal (Q, "edges (B, 'Face', {'plate.xmin', 'plate.zmax'})");
+%!test  # upright edges by the name of the faces they bound and a direction
+%! B = solid.box (60, 40, 10, 'Label', 'plate');
+%! E = edges (B, 'Direction', [0, 0, 1]);
+%! Q = model.Viewer.__query__ (B, 'edge', E, 'B');
+%! assert_equal (Q, "edges (B, 'Face', 'plate', 'Direction', [0, 0, 1])");
+%!test  # edges of one face to two others
+%! B = solid.box (60, 40, 10, 'Label', 'plate');
+%! E = edges (B, 'Between', {'plate.zmax', {'plate.ymin', 'plate.xmax'}});
+%! Q = model.Viewer.__query__ (B, 'edge', E, 'B');
+%! assert_equal (Q, ["edges (B, 'Between', {'plate.zmax',", ...
+%!                   " {'plate.xmax', 'plate.ymin'}})"]);
+%!test  # an edge of one copy of an array
+%! B = translate (solid.box (20, 10, 5, 'Label', 'plate'), [30, -5, 0]);
+%! S = polararray (B, 6, 360);
+%! E = edges (S, 'Between', {'plate.zmax', 'plate.ymin'}, 'Copy', 3);
+%! Q = model.Viewer.__query__ (S, 'edge', E, 'S');
+%! assert_equal (Q, ["edges (S, 'Between', {'plate.ymin', 'plate.zmax'},", ...
+%!                   " 'Copy', 3)"]);
+%!test  # an edge with one named face, by that face and its kind
+%! S = hole (solid.box (60, 40, 10, 'Label', 'plate'), [20, 20, 10], 8, Inf);
+%! E = edges (S, 'Type', 'circle', 'Within', [0, 0, 10, 60, 40, 10]);
+%! Q = model.Viewer.__query__ (S, 'edge', E, 'S');
+%! assert_equal (Q, "edges (S, 'Face', 'plate.zmax', 'Type', 'circle')");
 
 %!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
 %! ## The window is titled with the name, before it opens and after
@@ -2988,6 +3221,19 @@ endfunction
 %!   [F, CODE] = V.__pick__ ('face', [V.__project__([25, 2.5, 20]); NaN, NaN]);
 %!   assert_equal (F, faces (S, 'Label', 'plate.zmax'));
 %!   assert_equal (CODE, "faces (S, 'Label', 'plate.zmax')");
+%! unwind_protect_cleanup
+%!   close (V);
+%! end_unwind_protect
+
+%!testif ; ispc () || ismac () || ! isempty (getenv ('DISPLAY'))
+%! ## A picked edge of named faces comes back between their names
+%! V = model.Viewer ('Hidden', true);
+%! unwind_protect
+%!   S = solid.box (50, 5, 20, 'Label', 'plate');
+%!   V.Model = S;
+%!   [E, CODE] = V.__pick__ ('edge', [V.__project__([25, 0, 20]); NaN, NaN]);
+%!   assert_equal (E, edges (S, 'Between', {'plate.zmax', 'plate.ymin'}));
+%!   assert_equal (CODE, "edges (S, 'Between', {'plate.ymin', 'plate.zmax'})");
 %! unwind_protect_cleanup
 %!   close (V);
 %! end_unwind_protect
