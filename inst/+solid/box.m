@@ -18,8 +18,8 @@
 ## -*- texinfo -*-
 ## @deftypefn  {drafting} {@var{S} =} solid.box (@var{DX}, @var{DY}, @var{DZ})
 ## @deftypefnx {drafting} {@var{S} =} solid.box (@var{DX}, @var{DY}, @var{DZ}, @var{U})
-## @deftypefnx {drafting} {@var{S} =} solid.box (@dots{}, 'Anchor', @var{A})
-## @deftypefnx {drafting} {@var{S} =} solid.box (@dots{}, 'Label', @var{L})
+## @deftypefnx {drafting} {@var{S} =} solid.box (@dots{}, @qcode{'Anchor'}, @var{A})
+## @deftypefnx {drafting} {@var{S} =} solid.box (@dots{}, @qcode{'Label'}, @var{L})
 ##
 ## A rectangular block.
 ##

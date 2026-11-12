@@ -17,7 +17,7 @@
 
 ## -*- texinfo -*-
 ## @deftypefn  {drafting} {@var{S} =} solid.helix (@var{R}, @var{PITCH}, @var{TURNS})
-## @deftypefnx {drafting} {@var{S} =} solid.helix (@dots{}, 'Label', @var{L})
+## @deftypefnx {drafting} {@var{S} =} solid.helix (@dots{}, @qcode{'Label'}, @var{L})
 ##
 ## A coil, swept by a region turning about its own axis as it rises.
 ##

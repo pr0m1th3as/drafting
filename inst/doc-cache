@@ -2,7 +2,7 @@
 # name: cache
 # type: cell
 # rows: 3
-# columns: 242
+# columns: 246
 # name: <cell-element>
 # type: sq_string
 # elements: 1
@@ -6932,19 +6932,21 @@ model.Assembly.tessellate
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 618
+# length: 715
 model.Assembly: M = tessellate (A)
-model.Assembly: M = tessellate (A, TOL)
+model.Assembly: M = tessellate (A, 'Tolerance', TOL)
 Every part placed, as one triangle mesh.
 
-M = tessellate (A, TOL) returns a
-polymesh.Mesh of every part where the assembly places it,
-sub-assemblies included: each solid part as
-solid.Shape.tessellate makes it within TOL millimetres,
-0.01 by default, and each mesh part as it is. The parts keep their
+M = tessellate (A) returns a polymesh.Mesh
+of every part where the assembly places it, sub-assemblies included:
+each solid part as solid.Shape.tessellate makes it, within
+0.01 millimetres, and each mesh part as it is. The parts keep their
 own vertices, so parts that touch are not joined. A triangle keeps
 its part's colour, and is grey where its part has none, when any
 part has one. The empty assembly gives the empty mesh.
+
+The option 'Tolerance' sets that bound for the solid parts to
+TOL millimetres, a positive real scalar.
 
 See also:
 model.Assembly.shape,
@@ -8757,6 +8759,49 @@ Axis-aligned extents of a shape.
 # name: <cell-element>
 # type: sq_string
 # elements: 1
+# length: 18
+solid.Shape.centre
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 744
+solid.Shape: C = centre (S, E)
+The centre of a circular or elliptic edge.
+
+C = centre (S, E) returns the centre of the
+circle or ellipse that the edge of S indexed by E, as
+solid.Shape.edges returns it, lies on, as a row
+[x, y, z]. E must be one edge, a whole
+circle or an arc of one, or an ellipse or an arc of one: the rim of a
+hole, the foot of a boss, a rounded corner of a plate.
+
+## The centre of the circle where a boss meets a plate
+S = union (solid.box (60, 40, 10, 'Label', 'plate'), ...
+solid.cylinder (5, 20, geom.UCS ([0, 0, 1], [20, 20, 10]), ...
+'Label', 'boss'));
+centre (S, edges (S, 'Between', {'plate.zmax', 'boss.side'}))
+=> 20 20 10
+
+See also:
+solid.Shape.edges,
+solid.Shape.normal,
+solid.Shape.midpoint,
+solid.Shape.corner
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 42
+The centre of a circular or elliptic edge.
+
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
 # length: 20
 solid.Shape.centroid
 
@@ -8807,10 +8852,11 @@ solid.Shape.chamfer
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1507
+# length: 2104
 solid.Shape: S = chamfer (S, E, D)
 solid.Shape: S = chamfer (S, E, [D1, D2], F)
 solid.Shape: S = chamfer (S, E, D, F, 'Angle', A)
+solid.Shape: S = chamfer (..., 'Label', L)
 Bevel edges of a shape.
 
 S = chamfer (S, E, D) cuts the edges of
@@ -8844,6 +8890,16 @@ F = faces (S, 'Normal', [0, 0, 1]);
 A = chamfer (S, edges (S, 'Face', F), 1);
 B = chamfer (S, edges (S, 'Face', F), 2, F, 'Angle', 30);
 
+The option 'Label' names every face the chamfer makes L, a
+valid Octave identifier or keyword, so that a later step finds them by
+name with solid.Shape.faces: each bevel along an edge, and each
+patch where several meet at a corner. One of them is chosen from the
+rest with 'Adjacent': a bevel borders the two faces of the edge
+it replaced, which keep their names, and a corner patch borders only the
+bevels that meet there, so it is chosen with 'Adjacent' on them.
+The edge itself is gone, so edges with 'Between' on its
+two faces then chooses nothing.
+
 See also:
 solid.Shape.edges,
 solid.Shape.fillet
@@ -8867,7 +8923,7 @@ solid.Shape.copy
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 807
+# length: 922
 solid.Shape: C = copy (S, D)
 Copies of a shape, united.
 
@@ -8880,6 +8936,10 @@ kept side by side, separate solids of the one shape, with no boolean
 to compute; only copies that overlap or touch are fused, so a hundred
 pins standing apart cost little more than one. This is OpenSCAD's
 for loop of translate.
+
+The copy moved by row k of D is copy k, and
+solid.Shape.faces and solid.Shape.edges choose its faces
+with 'Copy'.
 
 ## Four pins on the corners of a square, one shape of four solids
 P = copy (solid.cylinder (2, 10), ...
@@ -8904,6 +8964,56 @@ Copies of a shape, united.
 # name: <cell-element>
 # type: sq_string
 # elements: 1
+# length: 18
+solid.Shape.corner
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 1080
+solid.Shape: P = corner (S, F)
+The corner that faces share.
+
+P = corner (S, F) returns the one corner that
+all the faces of S indexed by F, as
+solid.Shape.faces returns them, share, as a row [x,
+y, z]. Give as many faces as pick the corner out: three
+for the corner of a block, two for a corner that only two faces meet
+at, one where a face has a single corner. Faces that share no corner,
+or more than one, are an error.
+
+A corner is where the edges of a face meet. The point where a full
+circle starts and ends, and the ends of a seam, the line along which a
+curved face closes on itself, are not corners, so the side of a cone
+alone gives its tip, and the side of a cylinder gives none.
+
+## The top corner of a block above the origin, and the tip of a cone
+S = solid.box (60, 40, 10, 'Label', 'plate');
+corner (S, faces (S, 'Label', {'plate.zmax', 'plate.xmin', ...
+'plate.ymin'}))
+=> 0 0 10
+C = solid.cone (5, 0, 12);
+P = corner (C, faces (C, 'Type', 'cone')); # the tip, at [0, 0, 12]
+
+See also:
+solid.Shape.faces,
+solid.Shape.centre,
+solid.Shape.midpoint,
+solid.Shape.normal
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 28
+The corner that faces share.
+
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
 # length: 17
 solid.Shape.edges
 
@@ -8911,7 +9021,7 @@ solid.Shape.edges
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1641
+# length: 2746
 solid.Shape: E = edges (S)
 solid.Shape: E = edges (S, Name, Value, ...)
 Choose edges of a shape, to round, chamfer or inspect.
@@ -8943,10 +9053,31 @@ A box [xmin, ymin, zmin, xmax,
 ymax, zmax], as solid.Shape.bbox returns one. An
 edge is chosen when it lies wholly inside, to within 1e-6 millimetres.
 'Face'
-Face indices, as solid.Shape.faces returns them. An edge is
-chosen when it bounds any of these faces, so all the edges round a
-face can be rounded or chamfered in one step:
+Face indices, as solid.Shape.faces returns them, or a name or a
+cell array of names, as solid.Shape.faces takes them with
+'Label'. An edge is chosen when it bounds any of these faces,
+so all the edges round a face can be rounded or chamfered in one step:
 fillet (S, edges (S, 'Face', F), R).
+'Between'
+Two sides, each faces given as for 'Face', in a cell array, or
+two face indices in a vector. An edge is chosen when it lies between
+a face of one side and another face of the other: edges (S,
+'Between', {'plate.zmax', 'boss.side'}) is the circle where a boss
+meets the top of a plate. A side may name several faces, as
+{'shaft', {'lower.zmin', 'upper.zmax'}} chooses where a shaft
+leaves two plates and not where it crosses the gap between them. The
+edge a fillet or chamfer has replaced lies between its two faces no
+more, and is not chosen.
+'Copy'
+Copies of an array, as solid.Shape.faces takes them. An edge is
+chosen when a face it bounds is in one of them, whatever its other
+face: with a row of bosses standing on a plate, edges (S,
+'Between', {'plate.zmax', 'boss.side'}, 'Copy', 2) is the circle at
+the foot of the second boss.
+'Along'
+Labels of the segments of a sweep's path, as solid.Shape.faces
+takes them. An edge is chosen when a face it bounds was swept along
+one of them, whatever its other face.
 
 B = solid.box (10, 20, 30);
 E = edges (B, 'Direction', [0, 0, 1]); # the four upright edges
@@ -8978,9 +9109,10 @@ solid.Shape.facefillet
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1954
+# length: 2351
 solid.Shape: S = facefillet (S, F)
 solid.Shape: S = facefillet (S, F, R)
+solid.Shape: S = facefillet (..., 'Label', L)
 Round a shape between faces chosen by index.
 
 S = facefillet (S, F) makes a full round on
@@ -9023,6 +9155,13 @@ W = facefillet (W, [top, left, bottom; top, right, bottom]);
 numfaces (W)
 => 6
 
+The option 'Label' names every round the call makes L, a
+valid Octave identifier or keyword, so that a later step finds them by
+name with solid.Shape.faces. A full round stands where its middle
+face M was, so it takes the names of M as well: the end of a
+wall labelled wall stays wall.xmax when rounded. The faces
+beside the rounds keep their names.
+
 See also:
 solid.Shape.faces,
 solid.Shape.fillet
@@ -9046,7 +9185,7 @@ solid.Shape.faces
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1524
+# length: 4239
 solid.Shape: F = faces (S)
 solid.Shape: F = faces (S, Name, Value, ...)
 Choose faces of a shape, to open when hollowing it or to inspect.
@@ -9077,6 +9216,56 @@ it, either way.
 A box [xmin, ymin, zmin, xmax,
 ymax, zmax], as solid.Shape.bbox returns one. A
 face is chosen when it lies wholly inside, to within 1e-6 millimetres.
+'Label'
+A name, or a cell array of names chosen together, given to faces by
+the option 'Label' of the function that made them, as
+plate.zmax for the top of solid.box (60, 40, 10,
+'Label', 'plate'). A face is chosen when it has the name, or a name
+that begins with it followed by a dot: plate chooses all six
+faces of that block. A name that no face of S has is an error,
+so that a mistyped name, or one whose face is gone, is not taken for an
+empty choice.
+'Adjacent'
+Faces given as indices, as a name as for 'Label', or as a cell
+array whose each element is a name or a face index. A face is chosen
+when it shares an edge, not only a corner, with every face given: each
+index, or each name, however many pieces it has. After the edges
+round the top of a block are rounded, faces (S, 'Type',
+'cylinder', 'Adjacent', {'plate.zmax', 'plate.ymin'}) is the round
+along its front edge.
+'Copy'
+The copies of solid.Shape.copy, solid.Shape.rectarray
+or solid.Shape.polararray the faces come from, as each numbers
+them: copy numbers, or ':' for every copy. A face is chosen
+when it is in one of them, labelled or not: faces (S,
+'Copy', 2) is the second pin of a row. For arrays of arrays, a cell
+array gives the copies of each in turn, the first array applied first,
+and chooses every combination of them: {1:3, [2, 4]} is the
+first three pins of a row in its second and fourth copies. A face is
+chosen only when it went through as many arrays as the cell has
+elements. Copies that no face is in are an error.
+'Along'
+The label of a segment of the path a solid was swept along by
+solid.sweep, given by 'Label' where the
+geom.Path was made, or a cell array of such labels chosen
+together. A face is chosen when it was swept along a segment with the
+label. With a bar swept by solid.sweep (R, P,
+'Label', 'bracket') along P = geom.Path ([0, 0, 0; 0, 0,
+40; 30, 0, 40], 'Label', {'upright', 'arm'}), faces (S,
+'Label', 'bracket.side', 'Along', 'arm') is the four long faces of the
+arm. The walls of the section's holes run along the path as its sides
+do; the two ends of the sweep run along no segment. A label that no
+face runs along is an error.
+
+A face keeps its names through what is done to the shape later. Moved,
+turned, trimmed or cut into, it is the same face; split into pieces,
+every piece has its names; merged with a face it lies flush with, it
+has the names of both; and when it is cut away, its names go with it.
+A face that an operation makes, as the round of fillet, has no
+name until that operation takes a label. Names last while the shape
+is used and when it is saved and loaded with the same version of Open
+CASCADE; under another version they are refused, and the script that
+made the shape is run again.
 
 The empty shape has no faces.
 
@@ -9109,8 +9298,9 @@ solid.Shape.fillet
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1168
+# length: 1763
 solid.Shape: S = fillet (S, E, R)
+solid.Shape: S = fillet (..., 'Label', L)
 Round edges of a shape to a radius.
 
 S = fillet (S, E, R) rounds the edges
@@ -9137,6 +9327,16 @@ S = fillet (S, edges (S, 'Direction', [0, 0, 1]), 5);
 numfaces (S)
 => 10
 
+The option 'Label' names every face the fillet makes L, a
+valid Octave identifier or keyword, so that a later step finds them by
+name with solid.Shape.faces: each round along an edge, and each
+patch where several meet at a corner. One of them is chosen from the
+rest with 'Adjacent': a round borders the two faces of the edge
+it replaced, which keep their names, and a corner patch borders only the
+rounds that meet there, so it is chosen with 'Adjacent' on them.
+The edge itself is gone, so edges with 'Between' on its
+two faces then chooses nothing.
+
 See also:
 solid.Shape.edges,
 solid.Shape.facefillet,
@@ -9161,7 +9361,7 @@ solid.Shape.hole
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 8056
+# length: 8488
 solid.Shape: S = hole (S, P, D, DEPTH)
 solid.Shape: S = hole (..., Name, Value, ...)
 Drill holes into a shape.
@@ -9299,6 +9499,16 @@ drawing dimensions it. A blind tapping hole is drilled, so it takes
 the point of a 118 degree drill by default; false leaves it
 flat-bottomed, as an end mill or a flat-bottom drill leaves it. Every
 other blind hole is flat-bottomed by default, as an end mill leaves it.
+'Label'
+A valid Octave identifier or keyword L, that names the faces the
+holes make, so that a later step finds them by name with
+solid.Shape.faces: L.wall, the bore,
+L.bottom, the drill point or flat floor of a blind hole,
+L.counterbore, the wall of a counterbore, and
+L.step, its floor, and L.countersink, the cone
+of a countersink. A through hole has no bottom. The hole at row k
+of P, or of 'At', is copy k, chosen with
+'Copy'.
 
 A counterbore and a countersink cannot both be given, and a tip applies
 only to a blind hole. The standard ones need a named thread, and
@@ -9346,18 +9556,22 @@ solid.Shape.hull
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1270
-solid.Shape: H = hull (A, B, ...)
+# length: 1700
+solid.Shape: H = hull (A, ...)
 solid.Shape: H = hull (..., 'Tolerance', TOL)
+solid.Shape: H = hull (..., 'Label', L)
 The convex hull of shapes and points.
 
-H = hull (A, B, ...) returns the smallest
-convex solid that holds every shape and point given, the shape a sheet
-shrunk round them takes. Each argument is a solid.Shape or an
+H = hull (A, ...) returns the smallest convex
+solid that holds every shape and point given, the shape a sheet shrunk
+round them takes. Each argument is a solid.Shape or an
 N-by-3 matrix of points. This is OpenSCAD's hull of
 solids: a slot from two cylinders, a rounded block from eight spheres
 at its corners, a tapered arm from the bosses at its ends. Empty
 shapes add nothing, and the hull of nothing is the empty shape.
+Octave calls this method only when one argument is a
+solid.Shape, so the hull of points alone is written with the
+empty shape among them: hull (solid.Shape (), P).
 
 The hull has flat faces. The surface of each shape is taken as the
 points of a triangulation that strays no further than TOL from
@@ -9367,7 +9581,11 @@ and its triangles meet as whole faces. Open CASCADE has no exact hull
 of curved faces.
 
 The hull is a new solid, no one operand's material, so it takes no
-Colour and no Name from them.
+Colour and no Name from them, and its faces no names. The
+option 'Label' names every face of it L, a valid Octave
+identifier or keyword, so that a later step finds them by name with
+solid.Shape.faces; one of them is chosen from the rest by
+'Normal' or 'Within'.
 
 ## A slot 30 long and 10 wide, 4 deep, cut through a plate
 C = solid.cylinder (5, 4);
@@ -9399,14 +9617,14 @@ solid.Shape.intersect
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1277
-solid.Shape: C = intersect (A, B, ...)
+# length: 1271
+solid.Shape: C = intersect (A, ...)
 The intersection of shapes, the material common to all of them.
 
-C = intersect (A, B, ...) keeps only what
-lies inside every shape given. Shapes that do not all meet, and an
-empty shape among them, give the empty shape. The intersection of a
-single shape is that shape.
+C = intersect (A, ...) keeps only what lies
+inside every shape given. Shapes that do not all meet, and an empty
+shape among them, give the empty shape. The intersection of a single
+shape is that shape.
 
 Intersecting with a box trims a shape to the box, and intersecting two
 parts tells whether they collide: the volume of their intersection is
@@ -9526,9 +9744,8 @@ solid.Shape.knurl
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 4675
+# length: 5040
 solid.Shape: S = knurl (S, F, PITCH)
-solid.Shape: S = knurl (S, F, PITCH, DEPTH)
 solid.Shape: S = knurl (..., Name, Value, ...)
 Knurl a cylindrical face of a shape.
 
@@ -9552,14 +9769,6 @@ rounded, d the diameter of F and A the
 angle of the grooves from the axis. Rings, at 90 degrees, are counted
 along the length of F the same way.
 
-S = knurl (S, F, PITCH, DEPTH)
-cuts the grooves DEPTH millimetres deep, which leaves flat lands
-at the diameter of F between them. By default they are cut to
-full depth, where the flanks of neighbouring grooves meet in a point:
-P / (2 tan (PROFILE / 2)), half the pitch at 90
-degrees, P the pitch as fitted. A deeper DEPTH is an
-error.
-
 The knurl is built on the surfaces of its teeth directly rather than
 cut, which makes it many times faster than cutting its grooves: a
 knob 28 across knurled at 0.8 takes about two seconds.
@@ -9573,6 +9782,13 @@ stated, never its teeth.
 
 Name/Value pairs choose the knurl and finish its ends:
 
+'Depth'
+How deep the grooves are cut, in millimetres, a positive real scalar
+that leaves flat lands at the diameter of F between them. By
+default they are cut to full depth, where the flanks of neighbouring
+grooves meet in a point: P / (2 tan (PROFILE / 2)),
+half the pitch at 90 degrees, P the pitch as fitted. A deeper
+cut is an error.
 'Pattern'
 'crossed', the default, for two sets of grooves, or
 'single' for one.
@@ -9602,6 +9818,14 @@ fillet as it does on a blank whose edge was rounded before knurling.
 As 'Fillet', for a chamfer of 45 degrees set back D
 millimetres both ways: a distance D for every free end, or
 {E, D} with a row for each end.
+'Label'
+A valid Octave identifier or keyword L, that names every face of
+the knurl L, so that a later step finds them by name with
+solid.Shape.faces: its teeth, the lands between them and the
+fillets or chamfers it runs over. They take the names of F too,
+since they stand where it was, so a name that chose F chooses the
+knurl. The faces at the ends of F, reshaped to the knurl's
+outline, keep their names.
 
 An end of F takes one fillet or chamfer at most, and an end at a
 shoulder takes neither, so naming its edge is an error. The ends given
@@ -9647,6 +9871,46 @@ Knurl a cylindrical face of a shape.
 # name: <cell-element>
 # type: sq_string
 # elements: 1
+# length: 20
+solid.Shape.midpoint
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 581
+solid.Shape: P = midpoint (S, E)
+The point halfway along an edge.
+
+P = midpoint (S, E) returns the point that
+divides the edge of S indexed by E, as
+solid.Shape.edges returns it, into two halves of equal length,
+as a row [x, y, z]. E must be one edge,
+of any kind; the midpoint of an arc lies on the arc, not on its chord.
+
+## The middle of the front top edge of a block
+S = solid.box (60, 40, 10, 'Label', 'plate');
+midpoint (S, edges (S, 'Between', {'plate.zmax', 'plate.ymin'}))
+=> 30 0 10
+
+See also:
+solid.Shape.edges,
+solid.Shape.centre,
+solid.Shape.corner,
+solid.Shape.normal
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 32
+The point halfway along an edge.
+
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
 # length: 18
 solid.Shape.mirror
 
@@ -9684,6 +9948,55 @@ solid.Shape.scale
 # elements: 1
 # length: 27
 Reflect a shape in a plane.
+
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 18
+solid.Shape.normal
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 977
+solid.Shape: N = normal (S, F)
+The outward normal of a flat face.
+
+N = normal (S, F) returns the unit vector
+square to the face of S indexed by F, as
+solid.Shape.faces returns it, pointing out of the material, as
+a row [nx, ny, nz]. F must be one face,
+and flat: a curved face has no one normal. With the centre of a rim
+from solid.Shape.centre it gives the axis of a hole or a boss,
+and with the points of solid.Shape.corner and
+solid.Shape.midpoint it places a geom.UCS on a face that
+follows the face when the part changes:
+
+## A frame on the top of a block, its origin on a corner
+S = solid.box (60, 40, 10, 'Label', 'plate');
+top = faces (S, 'Label', 'plate.zmax');
+O = corner (S, faces (S, 'Label', {'plate.zmax', 'plate.xmin', ...
+'plate.ymin'}));
+X = corner (S, faces (S, 'Label', {'plate.zmax', 'plate.xmax', ...
+'plate.ymin'}));
+U = geom.UCS (normal (S, top), O, X);
+
+See also:
+solid.Shape.faces,
+solid.Shape.centre,
+solid.Shape.corner,
+solid.Shape.midpoint,
+geom.UCS
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 34
+The outward normal of a flat face.
 
 
 
@@ -9806,9 +10119,10 @@ solid.Shape.pocket
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1743
+# length: 2242
 solid.Shape: S = pocket (S, R, DEPTH)
 solid.Shape: S = pocket (..., 'Taper', A)
+solid.Shape: S = pocket (..., 'Label', L)
 Cut a pocket into a shape.
 
 S = pocket (S, R, DEPTH) cuts the
@@ -9837,6 +10151,15 @@ pocket's walls in by A degrees as they go deeper, the draft of a
 moulded recess, as solid.extrude tapers a wall; the islands
 widen to match. A is in the range (-90, 90). A region
 with splines takes no taper, as for solid.extrude.
+
+S = pocket (..., 'Label', L) names the
+faces the pocket makes, so that a later step finds them by name with
+solid.Shape.faces. L is a valid Octave identifier or
+keyword, and the faces are named L.floor, the bottom of the
+pocket, L.wall, the walls cut by the outline of the region,
+and L.island, the walls of the islands its holes leave
+standing. A pocket right through has no floor. The pocket of each
+region of a cell array is a copy, chosen with 'Copy'.
 
 Pocketing the empty shape leaves it empty.
 
@@ -9870,7 +10193,7 @@ solid.Shape.polararray
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1207
+# length: 1386
 solid.Shape: C = polararray (S, N, ANGLE)
 solid.Shape: C = polararray (S, N, ANGLE, AXIS)
 solid.Shape: C = polararray (S, N, ANGLE, AXIS, P)
@@ -9891,6 +10214,10 @@ Each copy is turned as it goes round, as the holes of a bolt circle,
 the teeth of a wheel or the blades of a fan are. With
 'Rotate' set to false each copy keeps the shape's own
 direction, moved as the centre of its bounding box moves.
+
+The copies are numbered from 1, where the shape is, in the order they
+go round, and solid.Shape.faces and solid.Shape.edges
+choose the faces of a copy by its number with 'Copy'.
 
 ## A flange of diameter 60 with six bolt holes of 6 on a circle of 40
 H = polararray (translate (solid.cylinder (3, 8), [20, 0, 0]), 6, 360);
@@ -9980,7 +10307,7 @@ solid.Shape.rectarray
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 730
+# length: 1049
 solid.Shape: C = rectarray (S, COUNT, SPACING)
 Copies of a shape in rows, columns and layers, united.
 
@@ -9992,6 +10319,13 @@ shape is; a negative spacing runs the other way. It returns them as one
 shape, as solid.Shape.copy does. This is a grid of holes cut
 into a plate in one subtraction, or of ribs, pins or bosses standing on
 it.
+
+The copies are numbered as Octave numbers the elements of an array of
+size COUNT, along x first, so that the copy in row
+i, column j and layer k is sub2ind (COUNT,
+i, j, k), a number that stays right when the counts
+change. solid.Shape.faces and solid.Shape.edges choose
+the faces of a copy by its number with 'Copy'.
 
 ## A plate 70 by 50 with four rows of six holes of diameter 4
 H = rectarray (translate (solid.cylinder (2, 5), [10, 10, 0]), ...
@@ -10215,10 +10549,11 @@ solid.Shape.shell
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1518
+# length: 2210
 solid.Shape: S = shell (S, F, T)
 solid.Shape: S = shell (..., 'Outward', TF)
 solid.Shape: S = shell (..., 'Thickness', {FACES, T2, ...})
+solid.Shape: S = shell (..., 'Label', L)
 Hollow a shape to a uniform wall thickness.
 
 S = shell (S, F, T) removes the faces of
@@ -10248,6 +10583,19 @@ B = shell (B, faces (B, 'Normal', [0, 0, 1]), 2, ...
 
 Walls too thick for the shape, which would meet in the middle, cannot
 be built and raise an error.
+
+S = shell (..., 'Label', L) names the
+faces the shell makes, so that a later step finds them by name with
+solid.Shape.faces. L is a valid Octave identifier or
+keyword. Each new face is named after the face of S it lies
+against, its full name following L and inner, or
+outer for walls grown outwards: the inside of the front wall of a
+block labelled plate is cup.inner.plate.ymin, and
+cup.inner is every inner face. The ring an opened face leaves is
+L.rim followed by that face's name, and keeps its own name
+too, being what is left of it. A face of S without a name gives
+its new face L and the role alone. The faces of S that stay
+keep their names.
 
 ## An open box of 1 mm walls
 B = solid.box (10, 20, 30);
@@ -10393,15 +10741,15 @@ solid.Shape.subtract
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1420
-solid.Shape: C = subtract (A, B, ...)
+# length: 1414
+solid.Shape: C = subtract (A, ...)
 The difference of shapes, the material of the first in none of the
 others.
 
-C = subtract (A, B, ...) removes from
-A the material of every later shape, all in one operation. This
-is how a hole, a pocket or a slot is cut: model the material to remove
-and subtract it. Drilling a plate with a hundred holes in one call is
+C = subtract (A, ...) removes from A the
+material of every later shape, all in one operation. This is how a
+hole, a pocket or a slot is cut: model the material to remove and
+subtract it. Drilling a plate with a hundred holes in one call is
 an order of magnitude faster than a hundred calls of one hole each.
 
 Removing empty shapes, or nothing, leaves A, and removing
@@ -10451,25 +10799,26 @@ solid.Shape.tessellate
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 880
+# length: 968
 solid.Shape: M = tessellate (S)
-solid.Shape: M = tessellate (S, TOL)
+solid.Shape: M = tessellate (S, 'Tolerance', TOL)
 A triangle mesh of a shape.
 
-M = tessellate (S, TOL) returns a
-polymesh.Mesh of the surface of S: flat triangles whose
-corners lie on it and which stray from it by at most TOL
-millimetres, 0.01 by default, nor span more than 20 degrees of a
-curved face. The triangles meet edge to edge, sharing their corners,
-and are turned outwards, so the mesh of a solid is closed. A coloured
-shape gives each triangle the colour of its solid as the mesh's
-FaceColour, and the grey [0.72, 0.74, 0.78] where its
-solid has none. The empty shape gives the empty mesh.
+M = tessellate (S) returns a polymesh.Mesh
+of the surface of S: flat triangles whose corners lie on it and
+which stray from it by at most 0.01 millimetres, nor span more than
+20 degrees of a curved face. The option 'Tolerance' sets that
+bound to TOL millimetres, a positive real scalar. The triangles
+meet edge to edge, sharing their corners, and are turned outwards, so
+the mesh of a solid is closed. A coloured shape gives each triangle
+the colour of its solid as the mesh's FaceColour, and the grey
+[0.72, 0.74, 0.78] where its solid has none. The empty shape
+gives the empty mesh.
 
 This is the mesh write writes to STL, OBJ, PLY and 3MF, and it
 can be shown, cut, measured, coloured and written as any other.
 
-M = tessellate (solid.cylinder (4, 12), 0.05);
+M = tessellate (solid.cylinder (4, 12), 'Tolerance', 0.05);
 write (M, 'pin.obj');
 
 See also:
@@ -10496,7 +10845,7 @@ solid.Shape.thread
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 4071
+# length: 4516
 solid.Shape: S = thread (S, P, NAME, DEPTH)
 solid.Shape: S = thread (..., Name, Value, ...)
 Cut screw threads into a shape.
@@ -10568,6 +10917,14 @@ alone by default. It applies only when P is a geom.UCS.
 'Custom'
 True to take a thread of any diameter and pitch, as for
 solid.Shape.hole, false by default.
+'Label'
+A valid Octave identifier or keyword L, that names every face the
+threads make L, so that a later step finds them by name with
+solid.Shape.faces: the flanks and root of the groove, where it
+runs out, and for an external thread the cylinder turned down for it.
+The crests of an internal thread are what is left of the bore, so they
+keep the bore's name and take L too. The thread at row k of
+P, or of 'At', is copy k, chosen with 'Copy'.
 
 Threading the empty shape leaves it empty.
 
@@ -10642,11 +10999,11 @@ solid.Shape.union
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 919
-solid.Shape: C = union (A, B, ...)
+# length: 913
+solid.Shape: C = union (A, ...)
 The union of shapes, the material of any of them.
 
-C = union (A, B, ...) takes any number of
+C = union (A, ...) takes any number of
 solid.Shape objects and combines them in one operation, which is
 several times faster than combining them a pair at a time. Faces that
 end up in one plane and edges that end up on one line are merged, so
@@ -10800,10 +11157,11 @@ solid.box
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 985
+# length: 1534
 drafting: S = solid.box (DX, DY, DZ)
 drafting: S = solid.box (DX, DY, DZ, U)
 drafting: S = solid.box (..., 'Anchor', A)
+drafting: S = solid.box (..., 'Label', L)
 A rectangular block.
 
 S = solid.box (DX, DY, DZ) returns a
@@ -10825,6 +11183,16 @@ the corner at the least x, y and z, the default.
 the centre of the bottom face.
 'centroid'
 the centre of the block, its centre of mass.
+
+The option 'Label' names the faces of the block, so that a later step
+finds a face by its name with solid.Shape.faces, whatever was done to
+the block in between. L is a valid Octave identifier or keyword, and
+each face is named by it and the side of the block it is on:
+L.xmin, L.xmax, L.ymin,
+L.ymax, L.zmin and L.zmax, along the
+axes of U, or of the world when U is left out. A face keeps its
+name when it is moved or turned, so that plate.xmin is the same face
+after a rotation, wherever it then faces.
 
 ## A block standing centred on the top of another
 U = geom.UCS ([0, 0, 1], [20, 10, 8]);
@@ -10857,9 +11225,10 @@ solid.cone
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 723
+# length: 1159
 drafting: S = solid.cone (R1, R2, H)
 drafting: S = solid.cone (R1, R2, H, U)
+drafting: S = solid.cone (..., 'Label', L)
 A right circular cone or truncated cone.
 
 S = solid.cone (R1, R2, H) returns a
@@ -10875,6 +11244,14 @@ solid.cylinder makes it.
 S = solid.cone (R1, R2, H, U) places
 the cone in the geom.UCS U, its axis along the normal of
 U and the centre of its base on the origin of U.
+
+The option 'Label' names the faces of the cone, so that a later step
+finds a face by its name with solid.Shape.faces. L is a valid
+Octave identifier or keyword, and the faces are named L.start,
+the end of radius R1, L.end, the end of radius R2,
+and L.side, its slanting side. An end of radius zero is a
+point, not a face, and has no name: the tip of a cone is
+solid.Shape.corner of its side.
 
 See also:
 solid.Shape,
@@ -10900,10 +11277,11 @@ solid.cylinder
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 829
+# length: 1156
 drafting: S = solid.cylinder (R, H)
 drafting: S = solid.cylinder (R, H, U)
 drafting: S = solid.cylinder (..., 'Anchor', A)
+drafting: S = solid.cylinder (..., 'Label', L)
 A right circular cylinder.
 
 S = solid.cylinder (R, H) returns a
@@ -10920,6 +11298,12 @@ The option 'Anchor' chooses the point of the cylinder that lands
 on the origin, of U or of the world when U is left out:
 'base', the centre of its base, the default, or
 'centroid', the point on its axis half way up, its centre of mass.
+
+The option 'Label' names the faces of the cylinder, so that a later
+step finds a face by its name with solid.Shape.faces. L is a
+valid Octave identifier or keyword, and the faces are named
+L.start, the end the cylinder stands on, L.end, the
+far end, and L.side, its curved side.
 
 See also:
 solid.Shape,
@@ -10946,9 +11330,10 @@ solid.ellipsoid
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 861
+# length: 1077
 drafting: S = solid.ellipsoid (A, B, C)
 drafting: S = solid.ellipsoid (A, B, C, U)
+drafting: S = solid.ellipsoid (..., 'Label', L)
 An ellipsoid.
 
 S = solid.ellipsoid (A, B, C) returns a
@@ -10963,6 +11348,10 @@ S = solid.ellipsoid (A, B, C, U)
 centres it on the origin of the geom.UCS U, A along its
 x axis, B along its y axis and C along its
 normal.
+
+The option 'Label' names the one face of the ellipsoid L, so
+that a later step finds it by its name with solid.Shape.faces.
+L is a valid Octave identifier or keyword.
 
 ## An egg-shaped knob 30 long, 20 across and 16 high, half sunk in a plate
 K = solid.ellipsoid (15, 10, 8, geom.UCS ([0, 0, 1], [40, 30, 5]));
@@ -11083,8 +11472,9 @@ solid.helix
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1857
+# length: 2858
 drafting: S = solid.helix (R, PITCH, TURNS)
+drafting: S = solid.helix (..., 'Label', L)
 A coil, swept by a region turning about its own axis as it rises.
 
 S = solid.helix (R, PITCH, TURNS) returns a
@@ -11116,6 +11506,24 @@ A coil's volume is its region's area times the distance the region's
 centroid travels round the axis, 2 \pi r on every turn; the rise
 adds nothing. The surfaces are splines fitted to the exact helix, so a
 volume or extent agrees with that to a few parts in a million.
+
+The option 'Label' names the faces of the coil, so that a later step
+finds a face by its name with solid.Shape.faces. L is a valid
+Octave identifier or keyword, and the faces are named L.start,
+the end in the region's plane where the coil begins, L.end, the
+end after TURNS, L.side, every face of the walls swept by
+the outline, and L.hole, every face of the walls swept by the
+holes. The solids of a cell array of regions are copies 1, 2 and so on of
+the label, chosen with 'Copy'.
+
+Where the segments of the region are labelled, as geom.Region
+describes, each wall also takes the label of the segment it is swept from,
+one level below its role: L.side.web for a wall of the outline's
+segment labelled web, L.hole.key_floor for a wall of a
+hole's segment labelled key_floor. L.side still names
+every wall of the outline, and a wall of a segment left unnamed is plain
+L.side or L.hole. Without 'Label' no face
+is named, whatever labels the region carries.
 
 ## A compression spring along z: wire of diameter 2 on a mean diameter of
 ## 20, five turns at a pitch of 4
@@ -11259,9 +11667,10 @@ solid.loft
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1607
+# length: 3020
 drafting: S = solid.loft (REGIONS)
 drafting: S = solid.loft (REGIONS, 'Ruled', TF)
+drafting: S = solid.loft (..., 'Label', L)
 A solid passing through regions.
 
 S = solid.loft (REGIONS) returns a solid.Shape
@@ -11286,6 +11695,32 @@ consecutive sections by straight lines when TF is true, so a
 loft between polygons has flat faces and a crease at every intermediate
 section. It is false by default, which passes one smooth surface
 through every section. With two sections both give the same solid.
+
+The option 'Label' names the faces of the loft, so that a later step
+finds a face by its name with solid.Shape.faces. L is a valid
+Octave identifier or keyword, and the faces are named L.start,
+the first section, L.end, the last, L.side, every
+face of the walls swept by the outlines, and L.hole, every face
+of the walls swept by the holes.
+
+Where the segments of the sections are labelled, as geom.Region
+describes, each wall also takes the labels of the segments it is lofted from,
+one level below its role: L.side.web for a wall of the outlines'
+segments labelled web, L.hole.key_floor for a wall of the
+holes' segments labelled key_floor. L.side still names
+every wall of the outlines, and a wall lofted only from segments left unnamed
+is plain L.side or L.hole. Without 'Label'
+no face is named, whatever labels the sections carry.
+
+The sections need not have the same number of segments, so a wall may come
+from a segment of one section and from part of a segment of another. It then
+takes the label of each, one name for each: a wall lofted from a segment
+labelled front on one section and from one labelled right on
+the next is named both L.side.front and
+L.side.right, and faces finds it by either. Which
+segments meet on a wall is decided by Open CASCADE as it pairs the edges of
+the sections, splitting some; a segment it splits names every wall it
+reaches.
 
 ## A square of 20 at the base becoming a circle of diameter 12 at 30
 base = geom.Region ([-10, -10; 10, -10; 10, 10; -10, 10]);
@@ -11317,9 +11752,10 @@ solid.polyhedron
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1504
+# length: 1843
 drafting: S = solid.polyhedron (M)
 drafting: S = solid.polyhedron (M, 'Merge', TF)
+drafting: S = solid.polyhedron (..., 'Label', L)
 A solid bounded by a closed triangle mesh.
 
 S = solid.polyhedron (M) returns the
@@ -11342,6 +11778,12 @@ shape, counted by solid.Shape.numsolids.
 By default, triangles that lie in one plane and meet are merged into one
 face, so a box meshed with twelve triangles has six faces. With
 'Merge' set to false every triangle stays a face.
+
+The option 'Label' names every face of the solid L, so that a
+later step finds them by their name with solid.Shape.faces. L
+is a valid Octave identifier or keyword. The faces of a mesh have no roles
+of their own, so one of them is chosen from the rest by 'Normal',
+'Within' or 'Adjacent'.
 
 ## A tetrahedron with a corner cut away
 V = [0, 0, 0; 10, 0, 0; 0, 10, 0; 0, 0, 10];
@@ -11428,9 +11870,10 @@ solid.revolve
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1664
+# length: 2752
 drafting: S = solid.revolve (R)
-drafting: S = solid.revolve (R, ANGLE)
+drafting: S = solid.revolve (R, 'Angle', ANGLE)
+drafting: S = solid.revolve (..., 'Label', L)
 A solid of revolution, turned from a region about its own axis.
 
 S = solid.revolve (R) returns a solid.Shape swept
@@ -11462,10 +11905,29 @@ arcs too, at a negative x. It may run along the axis, as the
 section of a solid shaft does. Arcs turn into true tori and spheres, so a
 radiused shoulder or a ball end is exact.
 
-S = solid.revolve (R, ANGLE) turns the region
-through ANGLE degrees only, anticlockwise seen from the tip of the
-axis, starting from the region's plane. ANGLE is in the range
-(0, 360], and 360 is the default.
+The option 'Angle' turns the region through ANGLE degrees
+only, anticlockwise seen from the tip of the axis, starting from the
+region's plane. ANGLE is in the range (0, 360], and 360 is
+the default.
+
+The option 'Label' names the faces of the solid, so that a later step
+finds a face by its name with solid.Shape.faces. L is a valid
+Octave identifier or keyword, and the faces are named L.side,
+every face turned from the outline of the region, and L.hole,
+every face turned from its holes. A part turn has two flat ends besides,
+L.start in the region's plane and L.end at
+ANGLE; a whole turn has none. Where the region runs along the axis it
+makes no face, and no name. The solids of a cell array of regions are copies
+1, 2 and so on of the label, chosen with 'Copy'.
+
+Where the segments of the region are labelled, as geom.Region
+describes, each wall also takes the label of the segment it is turned from,
+one level below its role: L.side.web for a wall of the outline's
+segment labelled web, L.hole.key_floor for a wall of a
+hole's segment labelled key_floor. L.side still names
+every wall of the outline, and a wall of a segment left unnamed is plain
+L.side or L.hole. Without 'Label' no face
+is named, whatever labels the region carries.
 
 See also:
 geom.Region,
@@ -11491,9 +11953,10 @@ solid.sphere
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 315
+# length: 525
 drafting: S = solid.sphere (R)
 drafting: S = solid.sphere (R, U)
+drafting: S = solid.sphere (..., 'Label', L)
 A sphere.
 
 S = solid.sphere (R) returns a solid.Shape of
@@ -11501,6 +11964,10 @@ radius R millimetres centred on the origin.
 
 S = solid.sphere (R, U) centres it on the origin
 of the geom.UCS U, with its poles on the normal of U.
+
+The option 'Label' names the one face of the sphere L, so that
+a later step finds it by its name with solid.Shape.faces. L is
+a valid Octave identifier or keyword.
 
 See also:
 solid.Shape,
@@ -11526,8 +11993,9 @@ solid.surface
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1992
+# length: 2589
 drafting: S = solid.surface (X, Y, Z, H)
+drafting: S = solid.surface (..., 'Label', L)
 A solid made of a smooth surface through a grid of points.
 
 S = solid.surface (X, Y, Z, H) fits an
@@ -11567,6 +12035,16 @@ sind (hypot (X, Y)) at the origin, is rounded off by the
 fit at a radius set by the spacing of the grid, and limits the thickness
 the same way. The edges of the solid run square to the surface.
 
+The option 'Label' names the faces of the solid, so that a later step
+finds a face by its name with solid.Shape.faces. L is a valid
+Octave identifier or keyword. The two large faces are L.start,
+on the side against the normal, and L.end, on the side along it,
+whichever way H goes. The narrow walls round the rim are named by the
+edge of the grid they stand on, as the grid is indexed X(i,
+j): L.imin along its first row, L.imax along
+its last, L.jmin along its first column and L.jmax
+along its last, however fine the grid and however it is turned.
+
 ## A ripple 20 across, made a skin 1 thick centred on it
 [x, y] = meshgrid (-10:0.5:10);
 S = solid.surface (x, y, cosd (72 * hypot (x, y)), [0.5, 0.5]);
@@ -11595,8 +12073,9 @@ solid.sweep
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1814
+# length: 3803
 drafting: S = solid.sweep (R, P)
+drafting: S = solid.sweep (..., 'Label', L)
 A solid swept by a region along a path.
 
 S = solid.sweep (R, P) returns a
@@ -11632,6 +12111,43 @@ mitred corner, so its volume is its area times the length of the path. A
 section far off the path, or a bend or corner too tight for it, makes a
 solid that intersects itself; check such a result with
 solid.Shape.isvalid.
+
+The option 'Label' names the faces of the solid, so that a later step
+finds a face by its name with solid.Shape.faces. L is a valid
+Octave identifier or keyword, and the faces are named L.start,
+the end at the first point of P, L.end, the end at its
+last, L.side, every face of the walls swept by the outline, and
+L.hole, every face of the walls swept by the holes. A ring
+swept along a closed path has no ends. The solids of a cell array of regions
+are copies 1, 2 and so on of the label, chosen with 'Copy'.
+
+Where the segments of the region are labelled, as geom.Region
+describes, each wall also takes the label of the segment it is swept from,
+one level below its role: L.side.web for a wall of the outline's
+segment labelled web, L.hole.key_floor for a wall of a
+hole's segment labelled key_floor. L.side still names
+every wall of the outline, and a wall of a segment left unnamed is plain
+L.side or L.hole. Without 'Label' no face
+is named, whatever labels the region carries.
+
+The segments of P can be labelled too, by 'Label' where the
+geom.Path is made, and the arcs geom.Path.fillet rounds its
+corners with by the fillet's own 'Label'. A path label names no
+face: each wall, of the outline or of a hole, records the labels of the
+path segments it was swept along, and solid.Shape.faces and
+solid.Shape.edges choose by them with 'Along'. The two ends
+run along no segment. Without 'Label' on the sweep the path labels
+are unused, as the region's are.
+
+## A bracket of 10 x 6 bar bent through a radius of 8, then the long faces
+## of its arm and the top face of the arm alone
+R = geom.Region ([-5, -3; 5, -3; 5, 3; -5, 3], ...
+'Label', {'', '', 'top', ''});
+P = geom.Path ([0, 0, 0; 0, 0, 40; 30, 0, 40], ...
+'Label', {'upright', 'arm'});
+S = solid.sweep (R, fillet (P, 8, 'Label', 'bend'), 'Label', 'bracket');
+arm = faces (S, 'Label', 'bracket.side', 'Along', 'arm');
+arm_top = faces (S, 'Label', 'bracket.side.top', 'Along', 'arm');
 
 See also:
 geom.Path,
@@ -11731,9 +12247,10 @@ solid.torus
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 606
+# length: 814
 drafting: S = solid.torus (R1, R2)
 drafting: S = solid.torus (R1, R2, U)
+drafting: S = solid.torus (..., 'Label', L)
 A torus, the solid of a ring.
 
 S = solid.torus (R1, R2) returns a
@@ -11747,6 +12264,10 @@ wider would pass through the axis and the solid would intersect itself.
 S = solid.torus (R1, R2, U) centres it on
 the origin of the geom.UCS U, its tube circling the normal of
 U in the plane of U.
+
+The option 'Label' names the one face of the torus L, so that a
+later step finds it by its name with solid.Shape.faces. L is a
+valid Octave identifier or keyword.
 
 See also:
 solid.Shape,
@@ -11772,11 +12293,12 @@ solid.wedge
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1275
+# length: 1660
 drafting: S = solid.wedge (DX, DY, DZ, TX)
 drafting: S = solid.wedge (DX, DY, DZ, TOP)
 drafting: S = solid.wedge (..., U)
 drafting: S = solid.wedge (..., 'Anchor', A)
+drafting: S = solid.wedge (..., 'Label', L)
 A wedge: a block whose top is smaller than its base.
 
 S = solid.wedge (DX, DY, DZ, TX)
@@ -11801,6 +12323,13 @@ The option 'Anchor' chooses the point of the wedge that lands on
 the origin, of U or of the world when U is left out:
 'corner', the corner of the base at the least x and
 y, the default, or 'base', the centre of the base.
+
+The option 'Label' names the faces of the wedge as
+solid.box names those of a block, so that a later step finds a
+face by its name with solid.Shape.faces: L.xmin to
+L.zmax, by the side of the base each stands on, a sloping
+face as much as a square one, and L.zmax the top. A top
+that comes to a ridge or a point is no face and has no name.
 
 ## A ramp 40 long, 20 wide and 10 high
 S = solid.wedge (40, 20, 10, 0);

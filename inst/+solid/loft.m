@@ -39,7 +39,7 @@
 ## section flows into hole @var{k} of the next, so a duct of uniform wall is a
 ## loft of regions with one hole each.
 ##
-## @code{@var{S} = solid.loft (@dots{}, @qcode{'Ruled'}, @var{TF})} joins
+## @code{@var{S} = solid.loft (@dots{}, 'Ruled', @var{TF})} joins
 ## consecutive sections by straight lines when @var{TF} is @code{true}, so a
 ## loft between polygons has flat faces and a crease at every intermediate
 ## section.  It is @code{false} by default, which passes one smooth surface

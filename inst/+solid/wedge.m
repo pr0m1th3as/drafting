@@ -19,8 +19,8 @@
 ## @deftypefn  {drafting} {@var{S} =} solid.wedge (@var{DX}, @var{DY}, @var{DZ}, @var{TX})
 ## @deftypefnx {drafting} {@var{S} =} solid.wedge (@var{DX}, @var{DY}, @var{DZ}, @var{TOP})
 ## @deftypefnx {drafting} {@var{S} =} solid.wedge (@dots{}, @var{U})
-## @deftypefnx {drafting} {@var{S} =} solid.wedge (@dots{}, 'Anchor', @var{A})
-## @deftypefnx {drafting} {@var{S} =} solid.wedge (@dots{}, 'Label', @var{L})
+## @deftypefnx {drafting} {@var{S} =} solid.wedge (@dots{}, @qcode{'Anchor'}, @var{A})
+## @deftypefnx {drafting} {@var{S} =} solid.wedge (@dots{}, @qcode{'Label'}, @var{L})
 ##
 ## A wedge: a block whose top is smaller than its base.
 ##

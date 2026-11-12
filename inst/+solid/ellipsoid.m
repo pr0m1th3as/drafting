@@ -18,7 +18,7 @@
 ## -*- texinfo -*-
 ## @deftypefn  {drafting} {@var{S} =} solid.ellipsoid (@var{A}, @var{B}, @var{C})
 ## @deftypefnx {drafting} {@var{S} =} solid.ellipsoid (@var{A}, @var{B}, @var{C}, @var{U})
-## @deftypefnx {drafting} {@var{S} =} solid.ellipsoid (@dots{}, 'Label', @var{L})
+## @deftypefnx {drafting} {@var{S} =} solid.ellipsoid (@dots{}, @qcode{'Label'}, @var{L})
 ##
 ## An ellipsoid.
 ##

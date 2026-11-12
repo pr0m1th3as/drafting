@@ -17,8 +17,8 @@
 
 ## -*- texinfo -*-
 ## @deftypefn  {drafting} {@var{S} =} solid.polyhedron (@var{M})
-## @deftypefnx {drafting} {@var{S} =} solid.polyhedron (@var{M}, 'Merge', @var{TF})
-## @deftypefnx {drafting} {@var{S} =} solid.polyhedron (@dots{}, 'Label', @var{L})
+## @deftypefnx {drafting} {@var{S} =} solid.polyhedron (@var{M}, @qcode{'Merge'}, @var{TF})
+## @deftypefnx {drafting} {@var{S} =} solid.polyhedron (@dots{}, @qcode{'Label'}, @var{L})
 ##
 ## A solid bounded by a closed triangle mesh.
 ##

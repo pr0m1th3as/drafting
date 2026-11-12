@@ -18,7 +18,7 @@
 ## -*- texinfo -*-
 ## @deftypefn  {drafting} {@var{S} =} solid.cone (@var{R1}, @var{R2}, @var{H})
 ## @deftypefnx {drafting} {@var{S} =} solid.cone (@var{R1}, @var{R2}, @var{H}, @var{U})
-## @deftypefnx {drafting} {@var{S} =} solid.cone (@dots{}, 'Label', @var{L})
+## @deftypefnx {drafting} {@var{S} =} solid.cone (@dots{}, @qcode{'Label'}, @var{L})
 ##
 ## A right circular cone or truncated cone.
 ##

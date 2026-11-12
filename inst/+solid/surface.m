@@ -17,7 +17,7 @@
 
 ## -*- texinfo -*-
 ## @deftypefn  {drafting} {@var{S} =} solid.surface (@var{X}, @var{Y}, @var{Z}, @var{H})
-## @deftypefnx {drafting} {@var{S} =} solid.surface (@dots{}, 'Label', @var{L})
+## @deftypefnx {drafting} {@var{S} =} solid.surface (@dots{}, @qcode{'Label'}, @var{L})
 ##
 ## A solid made of a smooth surface through a grid of points.
 ##

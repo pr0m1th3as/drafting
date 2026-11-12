@@ -18,7 +18,7 @@
 ## -*- texinfo -*-
 ## @deftypefn  {drafting} {@var{S} =} solid.torus (@var{R1}, @var{R2})
 ## @deftypefnx {drafting} {@var{S} =} solid.torus (@var{R1}, @var{R2}, @var{U})
-## @deftypefnx {drafting} {@var{S} =} solid.torus (@dots{}, 'Label', @var{L})
+## @deftypefnx {drafting} {@var{S} =} solid.torus (@dots{}, @qcode{'Label'}, @var{L})
 ##
 ## A torus, the solid of a ring.
 ##

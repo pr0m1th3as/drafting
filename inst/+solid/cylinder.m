@@ -18,8 +18,8 @@
 ## -*- texinfo -*-
 ## @deftypefn  {drafting} {@var{S} =} solid.cylinder (@var{R}, @var{H})
 ## @deftypefnx {drafting} {@var{S} =} solid.cylinder (@var{R}, @var{H}, @var{U})
-## @deftypefnx {drafting} {@var{S} =} solid.cylinder (@dots{}, 'Anchor', @var{A})
-## @deftypefnx {drafting} {@var{S} =} solid.cylinder (@dots{}, 'Label', @var{L})
+## @deftypefnx {drafting} {@var{S} =} solid.cylinder (@dots{}, @qcode{'Anchor'}, @var{A})
+## @deftypefnx {drafting} {@var{S} =} solid.cylinder (@dots{}, @qcode{'Label'}, @var{L})
 ##
 ## A right circular cylinder.
 ##

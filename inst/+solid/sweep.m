@@ -17,7 +17,7 @@
 
 ## -*- texinfo -*-
 ## @deftypefn  {drafting} {@var{S} =} solid.sweep (@var{R}, @var{P})
-## @deftypefnx {drafting} {@var{S} =} solid.sweep (@dots{}, 'Label', @var{L})
+## @deftypefnx {drafting} {@var{S} =} solid.sweep (@dots{}, @qcode{'Label'}, @var{L})
 ##
 ## A solid swept by a region along a path.
 ##

@@ -17,7 +17,7 @@
 
 ## -*- texinfo -*-
 ## @deftypefn  {drafting} {@var{T} =} solid.threadspec (@var{NAME})
-## @deftypefnx {drafting} {@var{T} =} solid.threadspec (@var{NAME}, 'Custom', @var{TF})
+## @deftypefnx {drafting} {@var{T} =} solid.threadspec (@var{NAME}, @qcode{'Custom'}, @var{TF})
 ##
 ## The dimensions of a metric screw thread, read from its name.
 ##

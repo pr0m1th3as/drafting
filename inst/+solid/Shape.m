@@ -251,11 +251,11 @@ classdef Shape
     endfunction
 
     ## -*- texinfo -*-
-    ## @deftypefn {solid.Shape} {@var{C} =} union (@var{A}, @var{B}, @dots{})
+    ## @deftypefn {solid.Shape} {@var{C} =} union (@var{A}, @dots{})
     ##
     ## The union of shapes, the material of any of them.
     ##
-    ## @code{@var{C} = union (@var{A}, @var{B}, @dots{})} takes any number of
+    ## @code{@var{C} = union (@var{A}, @dots{})} takes any number of
     ## @code{solid.Shape} objects and combines them in one operation, which is
     ## several times faster than combining them a pair at a time.  Faces that
     ## end up in one plane and edges that end up on one line are merged, so
@@ -302,15 +302,15 @@ classdef Shape
     endfunction
 
     ## -*- texinfo -*-
-    ## @deftypefn {solid.Shape} {@var{C} =} subtract (@var{A}, @var{B}, @dots{})
+    ## @deftypefn {solid.Shape} {@var{C} =} subtract (@var{A}, @dots{})
     ##
     ## The difference of shapes, the material of the first in none of the
     ## others.
     ##
-    ## @code{@var{C} = subtract (@var{A}, @var{B}, @dots{})} removes from
-    ## @var{A} the material of every later shape, all in one operation.  This
-    ## is how a hole, a pocket or a slot is cut: model the material to remove
-    ## and subtract it.  Drilling a plate with a hundred holes in one call is
+    ## @code{@var{C} = subtract (@var{A}, @dots{})} removes from @var{A} the
+    ## material of every later shape, all in one operation.  This is how a
+    ## hole, a pocket or a slot is cut: model the material to remove and
+    ## subtract it.  Drilling a plate with a hundred holes in one call is
     ## an order of magnitude faster than a hundred calls of one hole each.
     ##
     ## Removing empty shapes, or nothing, leaves @var{A}, and removing
@@ -366,14 +366,14 @@ classdef Shape
     endfunction
 
     ## -*- texinfo -*-
-    ## @deftypefn {solid.Shape} {@var{C} =} intersect (@var{A}, @var{B}, @dots{})
+    ## @deftypefn {solid.Shape} {@var{C} =} intersect (@var{A}, @dots{})
     ##
     ## The intersection of shapes, the material common to all of them.
     ##
-    ## @code{@var{C} = intersect (@var{A}, @var{B}, @dots{})} keeps only what
-    ## lies inside every shape given.  Shapes that do not all meet, and an
-    ## empty shape among them, give the empty shape.  The intersection of a
-    ## single shape is that shape.
+    ## @code{@var{C} = intersect (@var{A}, @dots{})} keeps only what lies
+    ## inside every shape given.  Shapes that do not all meet, and an empty
+    ## shape among them, give the empty shape.  The intersection of a single
+    ## shape is that shape.
     ##
     ## Intersecting with a box trims a shape to the box, and intersecting two
     ## parts tells whether they collide: the volume of their intersection is
@@ -445,11 +445,12 @@ classdef Shape
     ## of the surface of @var{S}: flat triangles whose corners lie on it and
     ## which stray from it by at most 0.01 millimetres, nor span more than
     ## 20 degrees of a curved face.  The option @qcode{'Tolerance'} sets that
-    ## bound to @var{TOL} millimetres, a positive real scalar.  The triangles meet edge to edge, sharing their corners,
-    ## and are turned outwards, so the mesh of a solid is closed.  A coloured
-    ## shape gives each triangle the colour of its solid as the mesh's
-    ## @code{FaceColour}, and the grey @code{[0.72, 0.74, 0.78]} where its
-    ## solid has none.  The empty shape gives the empty mesh.
+    ## bound to @var{TOL} millimetres, a positive real scalar.  The triangles
+    ## meet edge to edge, sharing their corners, and are turned outwards, so
+    ## the mesh of a solid is closed.  A coloured shape gives each triangle
+    ## the colour of its solid as the mesh's @code{FaceColour}, and the grey
+    ## @code{[0.72, 0.74, 0.78]} where its solid has none.  The empty shape
+    ## gives the empty mesh.
     ##
     ## This is the mesh @code{write} writes to STL, OBJ, PLY and 3MF, and it
     ## can be shown, cut, measured, coloured and written as any other.
@@ -574,7 +575,7 @@ classdef Shape
     ## @var{FILE} when there are several.
     ## @end table
     ##
-    ## @code{write (@dots{}, @qcode{'Tolerance'}, @var{TOL})} sets, for a
+    ## @code{write (@dots{}, 'Tolerance', @var{TOL})} sets, for a
     ## mesh, the largest distance in millimetres between a facet and the true
     ## surface.  It is 0.01 by default, well below what a printer resolves; a
     ## larger value gives a smaller file.  No facet spans more than 20 degrees
@@ -2068,7 +2069,7 @@ classdef Shape
     ## round a face do: @code{edges (@var{S}, 'Face', @var{F})}.
     ##
     ## @code{@var{S} = chamfer (@var{S}, @var{E}, @var{D}, @var{F},
-    ## @qcode{'Angle'}, @var{A})} cuts each edge back by @var{D} along the face
+    ## 'Angle', @var{A})} cuts each edge back by @var{D} along the face
     ## @var{F}, with the chamfer face meeting @var{F} at @var{A} degrees, in
     ## the range @math{(0, 90)}: the chamfer a drawing calls @code{@var{D} x
     ## @var{A}}.  Along the other face it reaches @code{@var{D} * tand
@@ -2193,12 +2194,12 @@ classdef Shape
     ## @var{F} empty no face is removed and the result is a closed shell
     ## around a sealed cavity.
     ##
-    ## @code{@var{S} = shell (@dots{}, @qcode{'Outward'}, true)} grows the
+    ## @code{@var{S} = shell (@dots{}, 'Outward', true)} grows the
     ## walls outwards instead, so the inside keeps the size and shape of
     ## @var{S} and the outside grows by @var{T}: the way to make a box that a
     ## part of the shape of @var{S} fits into.  It is @code{false} by default.
     ##
-    ## @code{@var{S} = shell (@dots{}, @qcode{'Thickness'}, @{@var{FACES},
+    ## @code{@var{S} = shell (@dots{}, 'Thickness', @{@var{FACES},
     ## @var{T2}, @dots{}@})} gives the faces indexed by @var{FACES} walls
     ## @var{T2} thick instead of @var{T}, and so on for every pair in the cell
     ## array: a thicker floor, a thinner lid.  The faces come from
@@ -2217,7 +2218,7 @@ classdef Shape
     ## Walls too thick for the shape, which would meet in the middle, cannot
     ## be built and raise an error.
     ##
-    ## @code{@var{S} = shell (@dots{}, @qcode{'Label'}, @var{L})} names the
+    ## @code{@var{S} = shell (@dots{}, 'Label', @var{L})} names the
     ## faces the shell makes, so that a later step finds them by name with
     ## @code{solid.Shape.faces}.  @var{L} is a valid Octave identifier or
     ## keyword.  Each new face is named after the face of @var{S} it lies
@@ -3046,13 +3047,13 @@ classdef Shape
     ## uneven face is clean all round.  A pocket drawn under material that its
     ## outline passes through first cuts that material as well.
     ##
-    ## @code{@var{S} = pocket (@dots{}, @qcode{'Taper'}, @var{A})} leans the
+    ## @code{@var{S} = pocket (@dots{}, 'Taper', @var{A})} leans the
     ## pocket's walls in by @var{A} degrees as they go deeper, the draft of a
     ## moulded recess, as @code{solid.extrude} tapers a wall; the islands
     ## widen to match.  @var{A} is in the range @math{(-90, 90)}.  A region
     ## with splines takes no taper, as for @code{solid.extrude}.
     ##
-    ## @code{@var{S} = pocket (@dots{}, @qcode{'Label'}, @var{L})} names the
+    ## @code{@var{S} = pocket (@dots{}, 'Label', @var{L})} names the
     ## faces the pocket makes, so that a later step finds them by name with
     ## @code{solid.Shape.faces}.  @var{L} is a valid Octave identifier or
     ## keyword, and the faces are named @var{L}@code{.floor}, the bottom of the
@@ -3551,19 +3552,22 @@ classdef Shape
   methods (Access = public)
 
     ## -*- texinfo -*-
-    ## @deftypefn  {solid.Shape} {@var{H} =} hull (@var{A}, @var{B}, @dots{})
+    ## @deftypefn  {solid.Shape} {@var{H} =} hull (@var{A}, @dots{})
     ## @deftypefnx {solid.Shape} {@var{H} =} hull (@dots{}, @qcode{'Tolerance'}, @var{TOL})
     ## @deftypefnx {solid.Shape} {@var{H} =} hull (@dots{}, @qcode{'Label'}, @var{L})
     ##
     ## The convex hull of shapes and points.
     ##
-    ## @code{@var{H} = hull (@var{A}, @var{B}, @dots{})} returns the smallest
-    ## convex solid that holds every shape and point given, the shape a sheet
-    ## shrunk round them takes.  Each argument is a @code{solid.Shape} or an
+    ## @code{@var{H} = hull (@var{A}, @dots{})} returns the smallest convex
+    ## solid that holds every shape and point given, the shape a sheet shrunk
+    ## round them takes.  Each argument is a @code{solid.Shape} or an
     ## @math{N}-by-3 matrix of points.  This is OpenSCAD's @code{hull} of
     ## solids: a slot from two cylinders, a rounded block from eight spheres
     ## at its corners, a tapered arm from the bosses at its ends.  Empty
     ## shapes add nothing, and the hull of nothing is the empty shape.
+    ## Octave calls this method only when one argument is a
+    ## @code{solid.Shape}, so the hull of points alone is written with the
+    ## empty shape among them: @code{hull (solid.Shape (), @var{P})}.
     ##
     ## The hull has flat faces.  The surface of each shape is taken as the
     ## points of a triangulation that strays no further than @var{TOL} from

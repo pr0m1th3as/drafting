@@ -18,7 +18,7 @@
 ## -*- texinfo -*-
 ## @deftypefn  {drafting} {@var{S} =} solid.sphere (@var{R})
 ## @deftypefnx {drafting} {@var{S} =} solid.sphere (@var{R}, @var{U})
-## @deftypefnx {drafting} {@var{S} =} solid.sphere (@dots{}, 'Label', @var{L})
+## @deftypefnx {drafting} {@var{S} =} solid.sphere (@dots{}, @qcode{'Label'}, @var{L})
 ##
 ## A sphere.
 ##

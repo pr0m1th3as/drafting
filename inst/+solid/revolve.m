@@ -17,8 +17,8 @@
 
 ## -*- texinfo -*-
 ## @deftypefn  {drafting} {@var{S} =} solid.revolve (@var{R})
-## @deftypefnx {drafting} {@var{S} =} solid.revolve (@var{R}, 'Angle', @var{ANGLE})
-## @deftypefnx {drafting} {@var{S} =} solid.revolve (@dots{}, 'Label', @var{L})
+## @deftypefnx {drafting} {@var{S} =} solid.revolve (@var{R}, @qcode{'Angle'}, @var{ANGLE})
+## @deftypefnx {drafting} {@var{S} =} solid.revolve (@dots{}, @qcode{'Label'}, @var{L})
 ##
 ## A solid of revolution, turned from a region about its own axis.
 ##
