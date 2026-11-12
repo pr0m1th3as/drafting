@@ -18,6 +18,7 @@
 ## -*- texinfo -*-
 ## @deftypefn  {drafting} {@var{S} =} solid.revolve (@var{R})
 ## @deftypefnx {drafting} {@var{S} =} solid.revolve (@var{R}, @var{ANGLE})
+## @deftypefnx {drafting} {@var{S} =} solid.revolve (@dots{}, 'Label', @var{L})
 ##
 ## A solid of revolution, turned from a region about its own axis.
 ##
@@ -59,23 +60,68 @@
 ## axis, starting from the region's plane.  @var{ANGLE} is in the range
 ## @math{(0, 360]}, and 360 is the default.
 ##
+## The option @qcode{'Label'} names the faces of the solid, so that a later
+## step finds a face by its name with @code{solid.Shape.faces}.  @var{L} is
+## an identifier, a letter followed by letters, digits or underscores, and
+## the faces are named @var{L}@code{.side}, every face turned from the
+## outline of the region, and @var{L}@code{.hole}, every face turned from
+## its holes.  A part turn has two flat ends besides, @var{L}@code{.start} in
+## the region's plane and @var{L}@code{.end} at @var{ANGLE}; a whole turn has
+## none.  Where the region runs along the axis it makes no face, and no
+## name.  The solids of a cell array of regions are copies 1, 2 and so on of
+## the label, chosen with @qcode{'Copy'}.
+##
 ## @seealso{geom.Region, solid.extrude, solid.helix}
 ## @end deftypefn
 
-function S = revolve (R, ANGLE = 360)
+function S = revolve (R, varargin)
 
   ## Input validation
-  if (nargin < 1 || nargin > 2)
+  if (nargin < 1 || nargin > 4)
     error ("solid.revolve: invalid number of input arguments.");
   endif
   if (iscell (R))
     if (isempty (R))
       error ("solid.revolve: R must not be an empty cell array.");
     endif
-    S = cellfun (@(r) solid.revolve (r, ANGLE), R, 'UniformOutput', false);
+    S = cellfun (@(r) solid.revolve (r, varargin{:}), R, ...
+                 'UniformOutput', false);
+    ## The solid of region K is copy K, for 'Copy' to choose it
+    for k = 1:numel (S)
+      S{k} = solid.Shape (__occt__ ('copyindex', 'solid.revolve', ...
+                                    S{k}.Data, k));
+    endfor
     S = union (S{:});
     return;
   endif
+  ANGLE = 360;
+  if (! isempty (varargin) && ! ischar (varargin{1}))
+    ANGLE = varargin{1};
+    varargin(1) = [];
+  endif
+  if (mod (numel (varargin), 2) != 0)
+    error ("solid.revolve: Name/Value arguments must come in pairs.");
+  endif
+  label = '';
+  for ii = 1:2:numel (varargin)
+    name = varargin{ii};
+    val = varargin{ii+1};
+    if (! ischar (name) || ! isrow (name))
+      error ("solid.revolve: option names must be character vectors.");
+    endif
+    switch (lower (name))
+      case 'label'
+        label = val;
+        if (! (ischar (val) && isrow (val)
+               && ! isempty (regexp (val, '^[A-Za-z]\w*$', 'once'))))
+          error (strcat ("solid.revolve: Label must be an identifier: a", ...
+                         " letter followed by letters, digits or", ...
+                         " underscores."));
+        endif
+      otherwise
+        error ("solid.revolve: unknown option '%s'.", name);
+    endswitch
+  endfor
   [errmsg, D] = solid.__region__ (R, 'R');
   if (isempty (errmsg))
     Q = __sample__ (R.Outline);
@@ -93,7 +139,8 @@ function S = revolve (R, ANGLE = 360)
     error ("solid.revolve: %s", errmsg);
   endif
 
-  S = solid.Shape (__occt__ ('revolve', 'solid.revolve', D, double (ANGLE)));
+  S = solid.Shape (__occt__ ('revolve', 'solid.revolve', D, double (ANGLE), ...
+                             label));
 
 endfunction
 
@@ -155,6 +202,28 @@ endfunction
 %! assert_equal (numsolids (S), 2);
 %! assert_equal (volume (S), 300 * pi, 1e-9);
 
+%!test  # a whole turn has walls only, named side
+%! R = geom.Region ([0, 0; 10, 0; 10, 30; 6, 30; 6, 49; 5, 50; 0, 50]);
+%! S = solid.revolve (R, 'Label', 'shaft');
+%! assert_equal (numel (faces (S, 'Label', 'shaft.side')), numfaces (S));
+%!test  # a part turn has a start in the region's plane and an end
+%! S = solid.revolve (geom.Region ([0, 0; 4, 0; 4, 12; 0, 12]), 90, ...
+%!                    'Label', 'segment');
+%! assert_equal (faces (S, 'Label', 'segment.start'), ...
+%!               faces (S, 'Normal', [0, 0, 1]));
+%! assert_equal (faces (S, 'Label', 'segment.end'), ...
+%!               faces (S, 'Normal', [-1, 0, 0]));
+%!test  # the faces turned from a hole are named hole
+%! R = geom.Region ([8, -2; 12, -2; 12, 2; 8, 2], {[9, 0, 1; 11, 0, 1]});
+%! S = solid.revolve (R, 'Label', 'ring');
+%! assert_equal (faces (S, 'Label', 'ring.hole'), faces (S, 'Type', 'torus'));
+%! assert_equal (numel (faces (S, 'Label', 'ring.side')), 4);
+%!test  # the solids of a cell of regions are copies of the label
+%! R = {geom.Region([5, 0; 10, 0; 10, 2; 5, 2]), ...
+%!      geom.Region([5, 5; 10, 5; 10, 7; 5, 7])};
+%! S = solid.revolve (R, 'Label', 'washer');
+%! assert_equal (numel (faces (S, 'Label', 'washer', 'Copy', 2)), 4);
+
 %!error<solid.revolve: R must be a geom.Region object.> ...
 %! solid.revolve ([0, 0; 1, 0; 1, 1])
 %!error<solid.revolve: R must not be an empty cell array.> ...
@@ -174,3 +243,13 @@ endfunction
 %! solid.revolve (geom.Region ([0, 0; 1, 0; 1, 1]), NaN)
 %!error<solid.revolve: ANGLE must be a real scalar in the range \(0, 360\].> ...
 %! solid.revolve (geom.Region ([0, 0; 1, 0; 1, 1]), [90, 180])
+%!error<solid.revolve: invalid number of input arguments.> ...
+%! solid.revolve (geom.Region ([0, 0; 1, 0; 1, 1]), 90, 'Label', 'a', 1)
+%!error<solid.revolve: Name/Value arguments must come in pairs.> ...
+%! solid.revolve (geom.Region ([0, 0; 1, 0; 1, 1]), 'Label')
+%!error<solid.revolve: unknown option 'Angle'.> ...
+%! solid.revolve (geom.Region ([0, 0; 1, 0; 1, 1]), 'Angle', 90)
+%!error<solid.revolve: option names must be character vectors.> ...
+%! solid.revolve (geom.Region ([0, 0; 1, 0; 1, 1]), 90, 1, 2)
+%!error<solid.revolve: Label must be an identifier: a letter followed by letters, digits or underscores.> ...
+%! solid.revolve (geom.Region ([0, 0; 1, 0; 1, 1]), 'Label', 'a.b')

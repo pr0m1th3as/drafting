@@ -6183,20 +6183,41 @@ function directly. \n\
         }
       }
     }
+    // Named side for the faces turned from the outline and hole for those
+    // turned from the holes; a part turn adds start, in the region's plane,
+    // and end, at the angle
     else if (cmd == "revolve")
     {
       const region r = toregion (args(2));
       const gp_Ax1 axis (r.origin, r.y);
       const double angle = args(3).double_value ();
-      if (angle >= 360)
+      const string label = (args.length () > 4 ? args(4).string_value ()
+                                               : string ());
+      const TopoDS_Face f = planarface (r);
+      const bool whole = (angle >= 360);
+      BRepPrimAPI_MakeRevol op = whole
+        ? BRepPrimAPI_MakeRevol (f, axis)
+        : BRepPrimAPI_MakeRevol (f, axis, angle * M_PI / 180);
+      const TopoDS_Shape s = op.Shape ();
+      // The faces the outline's edges turn into, as the sweep itself keeps
+      // them: Open CASCADE 7.8's Generated leaves out those of edges square
+      // to the axis, which turn into flat faces.  An edge on the axis turns
+      // into no face.
+      BRepSweep_Revol sweep = op.Revol ();
+      ShapeMap walls;
+      for (TopExp_Explorer x (BRepTools::OuterWire (f), TopAbs_EDGE);
+           x.More (); x.Next ())
       {
-        out = todata (BRepPrimAPI_MakeRevol (planarface (r), axis).Shape ());
+        const TopoDS_Shape g = sweep.Shape (x.Current ());
+        if (! g.IsNull ())
+        {
+          TopExp::MapShapes (g, TopAbs_FACE, walls);
+        }
       }
-      else
-      {
-        out = todata (BRepPrimAPI_MakeRevol (planarface (r), axis,
-                                             angle * M_PI / 180).Shape ());
-      }
+      out = todata (s, sweptnames (s, label,
+                                   whole ? TopoDS_Shape () : op.FirstShape (),
+                                   whole ? TopoDS_Shape () : op.LastShape (),
+                                   walls, true));
     }
     else if (cmd == "loft")
     {
