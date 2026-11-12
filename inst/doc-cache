@@ -753,7 +753,7 @@ draw.Drawing.hatch
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1158
+# length: 1333
 draw.Drawing: D = hatch (D, R)
 draw.Drawing: D = hatch (D, R, Name, Value, ...)
 Append a hatched region.
@@ -778,7 +778,11 @@ that means cut material; geom.hatchlines () lists the names.
 The angle in degrees by which the pattern is rotated, zero by default.
 'Spacing'
 The perpendicular distance between lines, in millimetres, the
-pattern's own by default, as geom.hatchlines draws it.
+pattern's own by default, as geom.hatchlines draws it. It is a
+distance on paper: draw.Drawing.print and
+draw.Drawing.tikz keep it whatever the scale, and
+'HatchScale' of draw.Drawing.entities and
+draw.Drawing.plot multiplies it.
 
 A drawing is flat, so R must lie in its xy plane. Its
 geom.UCS may have its own origin and x axis there and may
@@ -1207,7 +1211,7 @@ draw.Drawing.plot
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 4636
+# length: 4764
 draw.Drawing: plot (D)
 draw.Drawing: plot (HAX, D)
 draw.Drawing: plot (..., Name, Value)
@@ -1249,6 +1253,9 @@ thinnest pen of ISO 128
 curves
 'Hatch' 'lines' 'lines' to fill a
 hatch, 'boundary' for its outline alone
+'HatchScale' 1 multiplies the spacing of a
+hatch's fill lines, which is a size on paper: a drawing meant for
+1:50 wants 50 here
 'Linetypes' 'true' 'true' to draw
 the
 real dash patterns, 'approximate' for the figure's own four
@@ -1429,7 +1436,7 @@ draw.Drawing.print
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 3693
+# length: 3731
 draw.Drawing: print (D, FILE)
 draw.Drawing: print (D, FILE, Name, Value, ...)
 draw.Drawing: [PAPER, SCALE] = print (...)
@@ -1508,10 +1515,11 @@ particular plot.
 
 'LineWidth' is the opposite: a width on the paper, held there at
 every scale, because a 0.35 mm pen is 0.35 mm whatever the sheet shows.
-So are the dashes of a line type and the ticks and labels of a
-dimension: they arrive at their nominal size on the sheet whatever the
-scale, as draw.Drawing.plot draws them with 'LTScale' and
-'DimScale' set to the scale denominator.
+So are the dashes of a line type, the ticks and labels of a dimension
+and the spacing of a hatch: they arrive at their nominal size on the
+sheet whatever the scale, as draw.Drawing.plot draws them with
+'LTScale', 'DimScale' and 'HatchScale' set to
+the scale denominator.
 
 See also:
 draw.Drawing.plot,
@@ -1702,7 +1710,7 @@ draw.Drawing.tikz
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 2679
+# length: 3059
 draw.Drawing: S = tikz (D)
 draw.Drawing: S = tikz (D, Name, Value, ...)
 Render a drawing as a TikZ picture for inclusion in the LaTeX report.
@@ -1723,7 +1731,9 @@ readable against the drawing it came from.
 Radii, text sizes and dimension ornament cannot follow that convention,
 since they must come out at a fixed size on paper regardless of scale.
 Those are emitted in absolute millimetres and points, already divided by
-the scale.
+the scale. The fill lines of a hatch are model coordinates like the
+rest, generated at its spacing times 'HatchScale', so they too
+reach the page at a fixed spacing.
 
 Options
 
@@ -1743,6 +1753,9 @@ Defaults to the drawing scale, which cancels the reduction so dashes
 reach the page at their nominal size, and a centre line reads as a
 centre line whether the view is at 1:1 or 1:50, while leaving the factor
 visible and adjustable.
+'HatchScale' Multiplies the spacing of a hatch's
+fill lines, as in draw.Drawing.plot. Defaults to the drawing
+scale, so the lines reach the page at the spacing the hatch gives.
 
 Dimensions and hatches
 
@@ -1753,7 +1766,7 @@ draw.Drawing.plot draws them: labels unidirectional, ticks the
 the scale. A label is a node anchored at the
 start of its baseline, where draw.Drawing.entities places it
 from an estimate of its width. A hatch is drawn as its outline and its
-fill lines.
+fill lines, their spacing on paper the one the hatch gives.
 
 What the document needs
 

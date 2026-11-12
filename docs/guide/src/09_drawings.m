@@ -110,7 +110,9 @@ plot (O);
 ##
 ## `hatch` fills a `geom.Region`, its holes left clear. ANSI31, 45 degree
 ## lines, is the default and means cut material; `geom.hatchlines` lists the
-## other patterns. An angle and a spacing turn and space the pattern.
+## other patterns. An angle and a spacing turn and space the pattern. The
+## spacing is a distance on paper, so `print` and `tikz` keep it whatever
+## the scale.
 
 geom.hatchlines ()
 sq = [0, 0; 30, 0; 30, 20; 0, 20];

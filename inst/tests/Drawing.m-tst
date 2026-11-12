@@ -2249,6 +2249,11 @@
 %!                   'dimensions', 'explode');
 %! assert_equal (numel (Efine) > numel (Ewide), true);
 
+%!test  # HatchScale multiplies the spacing
+%! R = geom.Region ([0, 0; 20, 0; 20, 20; 0, 20]);
+%! E = entities (draw.Drawing ().hatch (R, 'Spacing', 1), 'HatchScale', 4);
+%! assert_equal (E, entities (draw.Drawing ().hatch (R, 'Spacing', 4)));
+
 %!test  # the fill lines of a hatch stay clear of its holes
 %! R = geom.Region ([0, 0; 60, 0; 60, 40; 0, 40], {[20, 20, 1; 40, 20, 1]});
 %! E = entities (draw.Drawing ().hatch (R));
@@ -2491,7 +2496,8 @@
 %!       # generates, the same ones the DXF file carries.  The native TikZ
 %!       # pattern this replaced stroked no boundary at all and ignored the
 %!       # angle and spacing the hatch was given.
-%! S = tikz (draw.Drawing ().hatch (geom.Region ([1, 0; 11, 0; 11, 10])));
+%! S = tikz (draw.Drawing ().hatch (geom.Region ([1, 0; 11, 0; 11, 10])), ...
+%!           'Scale', 1);
 %! assert_equal (! isempty (strfind (S, '-- cycle;')), true);
 %! assert_equal (numel (strfind (S, '\draw')) > 1, true);
 %! assert_equal (isempty (strfind (S, 'pattern=')), true);
@@ -2623,11 +2629,26 @@
 %!error<draw.Drawing.tikz: LTScale must be a real positive finite scalar.> ...
 %! tikz (draw.Drawing (), 'ltscale', 0)
 
+%!test  # HatchScale defaults to the drawing scale
+%! D = draw.Drawing ().hatch (geom.Region ([0, 0; 40, 0; 40, 40; 0, 40]));
+%! assert_equal (tikz (D, 'Scale', 2), tikz (D, 'Scale', 2, 'HatchScale', 2));
+
+%!test  # so the spacing on the page stays the hatch's own whatever the scale
+%! D = draw.Drawing ().hatch (geom.Region ([0, 0; 40, 0; 40, 40; 0, 40]));
+%! S = tikz (D, 'Scale', 2, 'HatchScale', 1);
+%! assert_equal (numel (strfind (S, '\draw'))
+%!               > numel (strfind (tikz (D, 'Scale', 2), '\draw')), true);
+
+%!error<draw.Drawing.tikz: HatchScale must be a real positive finite scalar.> ...
+%! tikz (draw.Drawing (), 'HatchScale', 0)
+
 %!test  # the spacing given to a hatch reaches the page, which the native
 %!       # pattern it replaced could not carry
 %! P = [0, 0; 40, 0; 40, 40; 0, 40];
-%! Swide = tikz (draw.Drawing ().hatch (geom.Region (P), 'Spacing', 8));
-%! Sfine = tikz (draw.Drawing ().hatch (geom.Region (P), 'Spacing', 2));
+%! Swide = tikz (draw.Drawing ().hatch (geom.Region (P), 'Spacing', 8), ...
+%!               'Scale', 1);
+%! Sfine = tikz (draw.Drawing ().hatch (geom.Region (P), 'Spacing', 2), ...
+%!               'Scale', 1);
 %! assert_equal (numel (strfind (Sfine, '\draw')) ...
 %!               > numel (strfind (Swide, '\draw')), true);
 
@@ -2679,6 +2700,8 @@
 
 %!error<draw.Drawing.entities: Dimensions must be 'associative' or 'explode'.> ...
 %! entities (draw.Drawing ().circle ([0, 0], 5), 'dimensions', 'sometimes')
+%!error<draw.Drawing.entities: HatchScale must be a real positive finite scalar.> ...
+%! entities (draw.Drawing (), 'HatchScale', 0)
 
 %!test  # plot passes DimScale through, so ornament can be sized for the plot
 %! f = figure ('visible', 'off');
@@ -2697,6 +2720,28 @@
 
 %!error<draw.Drawing.plot: DimScale must be a positive real finite scalar.> ...
 %! plot (draw.Drawing ().circle ([0, 0], 5), 'DimScale', 0)
+
+%!test  # plot passes HatchScale through, so fill lines can be spaced for
+%!       # the plot
+%! f = figure ('visible', 'off');
+%! unwind_protect
+%!   R = geom.Region ([0, 0; 20, 0; 20, 20; 0, 20]);
+%!   D = draw.Drawing ().hatch (R, 'Pattern', 'HORIZONTAL', 'Spacing', 1);
+%!   ax = axes ('parent', f);
+%!   H = plot (D, 'Axes', ax);
+%!   L = H(strcmp (get (H, 'type'), 'line'));
+%!   n1 = sum (arrayfun (@(h) nnz (isnan (get (h, 'xdata'))), L));
+%!   cla (ax);
+%!   H = plot (D, 'Axes', ax, 'HatchScale', 4);
+%!   L = H(strcmp (get (H, 'type'), 'line'));
+%!   n4 = sum (arrayfun (@(h) nnz (isnan (get (h, 'xdata'))), L));
+%!   assert_equal (n1 > n4, true);
+%! unwind_protect_cleanup
+%!   close (f);
+%! end_unwind_protect
+
+%!error<draw.Drawing.plot: HatchScale must be a positive real finite scalar.> ...
+%! plot (draw.Drawing ().circle ([0, 0], 5), 'HatchScale', 0)
 
 
 ## Rendered output.  The suite below asserts the artefact -- the page written,

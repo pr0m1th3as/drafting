@@ -411,6 +411,11 @@ classdef Drawing
     ## @qcode{'lines'}, the default, for a hatch's loops and fill lines, or
     ## @qcode{'boundary'} for its loops alone.
     ##
+    ## @item @qcode{'HatchScale'}
+    ## Multiplies the spacing of a hatch's fill lines, 1 by default.  Like
+    ## the dimension ornament, the spacing is a size on paper: a drawing to be
+    ## plotted at @math{1:50} wants @code{@qcode{'HatchScale'}, 50}.
+    ##
     ## @item @qcode{'Blocks'}
     ## @qcode{'expand'}, the default, to draw each insert as the entities of
     ## its block, or @qcode{'reference'} for an @code{INSERT} record and the
@@ -438,6 +443,7 @@ classdef Drawing
       endif
 
       dimScale = 1;
+      hatchScale = 1;
       hatchMode = 'lines';
       blockMode = 'expand';
       chordTol = 0.01;
@@ -462,6 +468,15 @@ classdef Drawing
                              " finite scalar."));
             endif
             dimScale = double (dimScale);
+          case 'hatchscale'
+            hatchScale = val;
+            if (! isfloat (hatchScale) || ! isreal (hatchScale)
+                || ! isscalar (hatchScale) || ! isfinite (hatchScale)
+                || hatchScale <= 0)
+              error (strcat ("draw.Drawing.entities: HatchScale must be a", ...
+                             " real positive finite scalar."));
+            endif
+            hatchScale = double (hatchScale);
           case 'chordtol'
             chordTol = val;
             if (! isfloat (chordTol) || ! isreal (chordTol)
@@ -525,8 +540,8 @@ classdef Drawing
         D = D.expand ();
       endif
       opt = struct ('dimScale', dimScale, 'hatchMode', hatchMode, ...
-                    'chordTol', chordTol, 'bulgeMode', bulgeMode, ...
-                    'dimMode', dimMode);
+                    'hatchScale', hatchScale, 'chordTol', chordTol, ...
+                    'bulgeMode', bulgeMode, 'dimMode', dimMode);
       resolve = strcmp (layerMode, 'resolve');
       [E, LOST, DIMS] = breakdown (D.Entities, opt, 0);
       E = resolvelayers (E, D.Layers, resolve, false);
@@ -1468,7 +1483,11 @@ classdef Drawing
     ##
     ## @item @qcode{'Spacing'}
     ## The perpendicular distance between lines, in millimetres, the
-    ## pattern's own by default, as @code{geom.hatchlines} draws it.
+    ## pattern's own by default, as @code{geom.hatchlines} draws it.  It is a
+    ## distance on paper: @code{draw.Drawing.print} and
+    ## @code{draw.Drawing.tikz} keep it whatever the scale, and
+    ## @qcode{'HatchScale'} of @code{draw.Drawing.entities} and
+    ## @code{draw.Drawing.plot} multiplies it.
     ## @end table
     ##
     ## A drawing is flat, so @var{R} must lie in its @math{xy} plane.  Its
@@ -2592,6 +2611,9 @@ classdef Drawing
     ## curves
     ## @item @qcode{'Hatch'} @tab @qcode{'lines'} @tab @qcode{'lines'} to fill a
     ## hatch, @qcode{'boundary'} for its outline alone
+    ## @item @qcode{'HatchScale'} @tab 1 @tab multiplies the spacing of a
+    ## hatch's fill lines, which is a size on paper: a drawing meant for
+    ## @math{1:50} wants 50 here
     ## @item @qcode{'Linetypes'} @tab @qcode{'true'} @tab @qcode{'true'} to draw
     ## the
     ## real dash patterns, @qcode{'approximate'} for the figure's own four
@@ -2706,7 +2728,7 @@ classdef Drawing
       opt = struct ('Axes', hax, 'LineWidth', 0.5, 'FontSize', 8, ...
                     'Layers', {{}}, 'Arc', 64, 'Hatch', 'lines', ...
                     'Linetypes', 'true', 'LTScale', 1, 'Margin', 0.05, ...
-                    'FontScale', [], 'DimScale', 1);
+                    'FontScale', [], 'DimScale', 1, 'HatchScale', 1);
       for ii = 1:2:numel (varargin)
         name = varargin{ii};
         val = varargin{ii+1};
@@ -2745,6 +2767,8 @@ classdef Drawing
             opt.FontScale = val;
           case 'dimscale'
             opt.DimScale = val;
+          case 'hatchscale'
+            opt.HatchScale = val;
           otherwise
             error ("draw.Drawing.plot: unknown option '%s'.", name);
         endswitch
@@ -2764,7 +2788,8 @@ classdef Drawing
       if (! any (strcmpi (opt.Linetypes, {'true', 'approximate'})))
         error ("draw.Drawing.plot: Linetypes must be 'true' or 'approximate'.");
       endif
-      for f = {'LineWidth', 'FontSize', 'Arc', 'LTScale', 'DimScale'}
+      for f = {'LineWidth', 'FontSize', 'Arc', 'LTScale', 'DimScale', ...
+               'HatchScale'}
         v = opt.(f{1});
         if (! isfloat (v) || ! isreal (v) || ! isscalar (v)
             || ! isfinite (v) || v <= 0)
@@ -2808,7 +2833,8 @@ classdef Drawing
       ## exists for a file, where a reader can re-measure it.  What it reports
       ## lost is no loss on screen: a fill dropped only when asked for
       [E, ~] = entities (D, 'hatch', lower (opt.Hatch), 'bulges', 'flatten', ...
-                         'dimensions', 'explode', 'DimScale', opt.DimScale);
+                         'dimensions', 'explode', 'DimScale', opt.DimScale, ...
+                         'HatchScale', opt.HatchScale);
       if (! isempty (opt.Layers) && ! isempty (E))
         E = E(ismember ({E.layer}, opt.Layers));
       endif
@@ -3084,10 +3110,11 @@ classdef Drawing
     ##
     ## @qcode{'LineWidth'} is the opposite: a width on the paper, held there at
     ## every scale, because a 0.35 mm pen is 0.35 mm whatever the sheet shows.
-    ## So are the dashes of a line type and the ticks and labels of a
-    ## dimension: they arrive at their nominal size on the sheet whatever the
-    ## scale, as @code{draw.Drawing.plot} draws them with @qcode{'LTScale'} and
-    ## @qcode{'DimScale'} set to the scale denominator.
+    ## So are the dashes of a line type, the ticks and labels of a dimension
+    ## and the spacing of a hatch: they arrive at their nominal size on the
+    ## sheet whatever the scale, as @code{draw.Drawing.plot} draws them with
+    ## @qcode{'LTScale'}, @qcode{'DimScale'} and @qcode{'HatchScale'} set to
+    ## the scale denominator.
     ##
     ## @seealso{draw.Drawing.plot, draw.Drawing.tikz, draw.titleblock,
     ## draw.Drawing.write}
@@ -3222,7 +3249,8 @@ classdef Drawing
           plot (D, 'Axes', ax, 'Margin', 0, ...
                      'FontScale', 72 / (25.4 * SCALE), ...
                      'LineWidth', opt.LineWidth * 72 / 25.4, ...
-                     'LTScale', SCALE, 'DimScale', SCALE);
+                     'LTScale', SCALE, 'DimScale', SCALE, ...
+                     'HatchScale', SCALE);
           span = [diff(xlim(ax)), diff(ylim(ax))];
           if (all (span / SCALE <= usable + 1e-9) || ! isempty (opt.Scale))
             break;
@@ -3248,7 +3276,8 @@ classdef Drawing
           plot (P, 'Axes', ax, 'Margin', 0, ...
                      'FontScale', 72 / (25.4 * SCALE), ...
                      'LineWidth', opt.LineWidth * 72 / 25.4, ...
-                     'LTScale', SCALE, 'DimScale', SCALE);
+                     'LTScale', SCALE, 'DimScale', SCALE, ...
+                     'HatchScale', SCALE);
         endif
         xlim (ax, xl);
         ylim (ax, yl);
@@ -3309,7 +3338,9 @@ classdef Drawing
     ## Radii, text sizes and dimension ornament cannot follow that convention,
     ## since they must come out at a fixed size on paper regardless of scale.
     ## Those are emitted in absolute millimetres and points, already divided by
-    ## the scale.
+    ## the scale.  The fill lines of a hatch are model coordinates like the
+    ## rest, generated at its spacing times @qcode{'HatchScale'}, so they too
+    ## reach the page at a fixed spacing.
     ##
     ## @subheading Options
     ##
@@ -3330,6 +3361,9 @@ classdef Drawing
     ## reach the page at their nominal size, and a centre line reads as a
     ## centre line whether the view is at 1:1 or 1:50, while leaving the factor
     ## visible and adjustable.
+    ## @item @qcode{'HatchScale'} @tab Multiplies the spacing of a hatch's
+    ## fill lines, as in @code{draw.Drawing.plot}.  Defaults to the drawing
+    ## scale, so the lines reach the page at the spacing the hatch gives.
     ## @end multitable
     ##
     ## @subheading Dimensions and hatches
@@ -3341,7 +3375,7 @@ classdef Drawing
     ## the scale.  A label is a node anchored at the
     ## start of its baseline, where @code{draw.Drawing.entities} places it
     ## from an estimate of its width.  A hatch is drawn as its outline and its
-    ## fill lines.
+    ## fill lines, their spacing on paper the one the hatch gives.
     ##
     ## @subheading What the document needs
     ##
@@ -3370,6 +3404,7 @@ classdef Drawing
       fname = '';
       styles = true;
       ltscale = [];
+      hatchscale = [];
       for ii = 1:2:numel (varargin)
         name = varargin{ii};
         val = varargin{ii+1};
@@ -3405,6 +3440,13 @@ classdef Drawing
                              " finite scalar."));
             endif
             ltscale = double (val);
+          case 'hatchscale'
+            if (! isfloat (val) || ! isreal (val) || ! isscalar (val)
+                || ! isfinite (val) || val <= 0)
+              error (strcat ("draw.Drawing.tikz: HatchScale must be a real", ...
+                             " positive finite scalar."));
+            endif
+            hatchscale = double (val);
           otherwise
             error ("draw.Drawing.tikz: unknown option '%s'.", name);
         endswitch
@@ -3419,6 +3461,9 @@ classdef Drawing
       if (isempty (ltscale))
         ltscale = scale;
       endif
+      if (isempty (hatchscale))
+        hatchscale = scale;
+      endif
 
       ## One model millimetre, in millimetres on the page
       u = 1 / scale;
@@ -3431,7 +3476,8 @@ classdef Drawing
       ## arrived and only this backend still rendered from the drawing model.
       ## What an entity takes from its layer is left to the layer's style
       [E, ~] = entities (D, 'bulges', 'flatten', 'dimensions', 'explode', ...
-                         'layers', 'keep', 'DimScale', scale);
+                         'layers', 'keep', 'DimScale', scale, ...
+                         'HatchScale', hatchscale);
 
       if (isempty (E))
         L = {};
@@ -3683,6 +3729,7 @@ function [E, LOST, DIMS] = breakdown (src, opt, nDim)
 
   dimScale = opt.dimScale;
   hatchMode = opt.hatchMode;
+  hatchScale = opt.hatchScale;
   chordTol = opt.chordTol;
   bulgeMode = opt.bulgeMode;
   dimMode = opt.dimMode;
@@ -3827,7 +3874,7 @@ function [E, LOST, DIMS] = breakdown (src, opt, nDim)
                        'UniformOutput', false);
           S = geom.hatchlines (__sample__ (L{1})(:,1:2), ...
                                'Pattern', e.pattern, 'Angle', e.angle, ...
-                               'Spacing', e.spacing);
+                               'Spacing', e.spacing * hatchScale);
           S = clipholes (S, H);
           for jj = 1:rows (S)
             E(end+1) = mkent ('LINE', e, [S(jj,1:2); S(jj,3:4)]);
