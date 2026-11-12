@@ -437,15 +437,15 @@ classdef Shape
 
     ## -*- texinfo -*-
     ## @deftypefn  {solid.Shape} {@var{M} =} tessellate (@var{S})
-    ## @deftypefnx {solid.Shape} {@var{M} =} tessellate (@var{S}, @var{TOL})
+    ## @deftypefnx {solid.Shape} {@var{M} =} tessellate (@var{S}, @qcode{'Tolerance'}, @var{TOL})
     ##
     ## A triangle mesh of a shape.
     ##
-    ## @code{@var{M} = tessellate (@var{S}, @var{TOL})} returns a
-    ## @code{polymesh.Mesh} of the surface of @var{S}: flat triangles whose
-    ## corners lie on it and which stray from it by at most @var{TOL}
-    ## millimetres, 0.01 by default, nor span more than 20 degrees of a
-    ## curved face.  The triangles meet edge to edge, sharing their corners,
+    ## @code{@var{M} = tessellate (@var{S})} returns a @code{polymesh.Mesh}
+    ## of the surface of @var{S}: flat triangles whose corners lie on it and
+    ## which stray from it by at most 0.01 millimetres, nor span more than
+    ## 20 degrees of a curved face.  The option @qcode{'Tolerance'} sets that
+    ## bound to @var{TOL} millimetres, a positive real scalar.  The triangles meet edge to edge, sharing their corners,
     ## and are turned outwards, so the mesh of a solid is closed.  A coloured
     ## shape gives each triangle the colour of its solid as the mesh's
     ## @code{FaceColour}, and the grey @code{[0.72, 0.74, 0.78]} where its
@@ -456,20 +456,26 @@ classdef Shape
     ##
     ## @example
     ## @group
-    ## M = tessellate (solid.cylinder (4, 12), 0.05);
+    ## M = tessellate (solid.cylinder (4, 12), 'Tolerance', 0.05);
     ## write (M, 'pin.obj');
     ## @end group
     ## @end example
     ##
     ## @seealso{polymesh.Mesh, solid.Shape.write, solid.polyhedron}
     ## @end deftypefn
-    function M = tessellate (this, TOL = 0.01)
+    function M = tessellate (this, varargin)
 
       ## Input validation
-      if (! (isfloat (TOL) && isreal (TOL) && isscalar (TOL) &&
-             isfinite (TOL) && TOL > 0))
-        error (strcat ("solid.Shape.tessellate: TOL must be a positive", ...
-                       " and finite real scalar."));
+      [errmsg, opt] = options (varargin, struct ('Tolerance', 0.01));
+      TOL = opt.Tolerance;
+      if (isempty (errmsg) && ! (isfloat (TOL) && isreal (TOL) &&
+                                 isscalar (TOL) && isfinite (TOL) &&
+                                 TOL > 0))
+        errmsg = strcat ("Tolerance must be a positive and finite real", ...
+                         " scalar.");
+      endif
+      if (! isempty (errmsg))
+        error ("solid.Shape.tessellate: %s", errmsg);
       endif
 
       if (isempty (this.Data))
@@ -653,7 +659,7 @@ classdef Shape
       elseif (strcmpi (ext, '.3mf') && ! isempty (this.Name))
         write3mf (this, FILE, base, opt.Tolerance);
       else
-        write (tessellate (this, opt.Tolerance), FILE);
+        write (tessellate (this, 'Tolerance', opt.Tolerance), FILE);
       endif
 
     endfunction
@@ -3151,7 +3157,6 @@ classdef Shape
 
     ## -*- texinfo -*-
     ## @deftypefn  {solid.Shape} {@var{S} =} knurl (@var{S}, @var{F}, @var{PITCH})
-    ## @deftypefnx {solid.Shape} {@var{S} =} knurl (@var{S}, @var{F}, @var{PITCH}, @var{DEPTH})
     ## @deftypefnx {solid.Shape} {@var{S} =} knurl (@dots{}, @var{Name}, @var{Value}, @dots{})
     ##
     ## Knurl a cylindrical face of a shape.
@@ -3176,14 +3181,6 @@ classdef Shape
     ## angle of the grooves from the axis.  Rings, at 90 degrees, are counted
     ## along the length of @var{F} the same way.
     ##
-    ## @code{@var{S} = knurl (@var{S}, @var{F}, @var{PITCH}, @var{DEPTH})}
-    ## cuts the grooves @var{DEPTH} millimetres deep, which leaves flat lands
-    ## at the diameter of @var{F} between them.  By default they are cut to
-    ## full depth, where the flanks of neighbouring grooves meet in a point:
-    ## @math{@var{P} / (2 tan (@var{PROFILE} / 2))}, half the pitch at 90
-    ## degrees, @var{P} the pitch as fitted.  A deeper @var{DEPTH} is an
-    ## error.
-    ##
     ## The knurl is built on the surfaces of its teeth directly rather than
     ## cut, which makes it many times faster than cutting its grooves: a
     ## knob 28 across knurled at 0.8 takes about two seconds.
@@ -3198,6 +3195,14 @@ classdef Shape
     ## Name/Value pairs choose the knurl and finish its ends:
     ##
     ## @table @asis
+    ## @item @qcode{'Depth'}
+    ## How deep the grooves are cut, in millimetres, a positive real scalar
+    ## that leaves flat lands at the diameter of @var{F} between them.  By
+    ## default they are cut to full depth, where the flanks of neighbouring
+    ## grooves meet in a point: @math{@var{P} / (2 tan (@var{PROFILE} / 2))},
+    ## half the pitch at 90 degrees, @var{P} the pitch as fitted.  A deeper
+    ## cut is an error.
+    ##
     ## @item @qcode{'Pattern'}
     ## @qcode{'crossed'}, the default, for two sets of grooves, or
     ## @qcode{'single'} for one.
@@ -3290,18 +3295,8 @@ classdef Shape
       if (nargin < 3)
         error ("solid.Shape.knurl: invalid number of input arguments.");
       endif
-      ## The depth, if given, then Name/Value pairs
-      DEPTH = 0;
-      if (mod (numel (varargin), 2) == 1)
-        DEPTH = varargin{1};
-        varargin(1) = [];
-        if (! (isfloat (DEPTH) && isreal (DEPTH) && isscalar (DEPTH) &&
-               isfinite (DEPTH) && DEPTH > 0))
-          error (strcat ("solid.Shape.knurl: DEPTH must be a positive", ...
-                         " and finite real scalar."));
-        endif
-      endif
-      [errmsg, opt] = options (varargin, struct ('Pattern', 'crossed', ...
+      [errmsg, opt] = options (varargin, struct ('Depth', [], ...
+                                                 'Pattern', 'crossed', ...
                                                  'Angle', 30, ...
                                                  'Points', [], ...
                                                  'Profile', 90, ...
@@ -3320,6 +3315,14 @@ classdef Shape
       if (! (isfloat (PITCH) && isreal (PITCH) && isscalar (PITCH) &&
              isfinite (PITCH) && PITCH > 0))
         error (strcat ("solid.Shape.knurl: PITCH must be a positive", ...
+                       " and finite real scalar."));
+      endif
+      DEPTH = opt.Depth;
+      if (isempty (DEPTH))
+        DEPTH = 0;
+      elseif (! (isfloat (DEPTH) && isreal (DEPTH) && isscalar (DEPTH) &&
+                 isfinite (DEPTH) && DEPTH > 0))
+        error (strcat ("solid.Shape.knurl: Depth must be a positive", ...
                        " and finite real scalar."));
       endif
       if (! any (strcmp (opt.Pattern, {'single', 'crossed'})))

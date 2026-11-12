@@ -17,7 +17,7 @@
 
 ## -*- texinfo -*-
 ## @deftypefn  {drafting} {@var{S} =} solid.revolve (@var{R})
-## @deftypefnx {drafting} {@var{S} =} solid.revolve (@var{R}, @var{ANGLE})
+## @deftypefnx {drafting} {@var{S} =} solid.revolve (@var{R}, 'Angle', @var{ANGLE})
 ## @deftypefnx {drafting} {@var{S} =} solid.revolve (@dots{}, 'Label', @var{L})
 ##
 ## A solid of revolution, turned from a region about its own axis.
@@ -55,10 +55,10 @@
 ## section of a solid shaft does.  Arcs turn into true tori and spheres, so a
 ## radiused shoulder or a ball end is exact.
 ##
-## @code{@var{S} = solid.revolve (@var{R}, @var{ANGLE})} turns the region
-## through @var{ANGLE} degrees only, anticlockwise seen from the tip of the
-## axis, starting from the region's plane.  @var{ANGLE} is in the range
-## @math{(0, 360]}, and 360 is the default.
+## The option @qcode{'Angle'} turns the region through @var{ANGLE} degrees
+## only, anticlockwise seen from the tip of the axis, starting from the
+## region's plane.  @var{ANGLE} is in the range @math{(0, 360]}, and 360 is
+## the default.
 ##
 ## The option @qcode{'Label'} names the faces of the solid, so that a later step
 ## finds a face by its name with @code{solid.Shape.faces}.  @var{L} is a valid
@@ -85,7 +85,7 @@
 function S = revolve (R, varargin)
 
   ## Input validation
-  if (nargin < 1 || nargin > 4)
+  if (nargin < 1 || nargin > 5)
     error ("solid.revolve: invalid number of input arguments.");
   endif
   if (iscell (R))
@@ -103,10 +103,6 @@ function S = revolve (R, varargin)
     return;
   endif
   ANGLE = 360;
-  if (! isempty (varargin) && ! ischar (varargin{1}))
-    ANGLE = varargin{1};
-    varargin(1) = [];
-  endif
   if (mod (numel (varargin), 2) != 0)
     error ("solid.revolve: Name/Value arguments must come in pairs.");
   endif
@@ -118,6 +114,8 @@ function S = revolve (R, varargin)
       error ("solid.revolve: option names must be character vectors.");
     endif
     switch (lower (name))
+      case 'angle'
+        ANGLE = val;
       case 'label'
         label = val;
         if (! (ischar (val) && isrow (val)
@@ -140,7 +138,7 @@ function S = revolve (R, varargin)
   if (isempty (errmsg) && (! isfloat (ANGLE) || ! isreal (ANGLE)
                            || ! isscalar (ANGLE) || ! (ANGLE > 0)
                            || ! (ANGLE <= 360)))
-    errmsg = "ANGLE must be a real scalar in the range (0, 360].";
+    errmsg = "Angle must be a real scalar in the range (0, 360].";
   endif
   if (! isempty (errmsg))
     error ("solid.revolve: %s", errmsg);
@@ -176,7 +174,7 @@ endfunction
 %! assert_equal (numfaces (S), 4);
 
 %!test  # a quarter turn, anticlockwise about y
-%! S = solid.revolve (geom.Region ([0, 0; 4, 0; 4, 12; 0, 12]), 90);
+%! S = solid.revolve (geom.Region ([0, 0; 4, 0; 4, 12; 0, 12]), 'Angle', 90);
 %! assert_equal (volume (S), 48 * pi, 1e-9);
 %! assert_equal (bbox (S), [0, 0, -4, 4, 12, 0], 1e-9);
 %! assert_equal (isvalid (S), true);
@@ -197,7 +195,7 @@ endfunction
 %! Q = points (O, 100001);
 %! c = Q(1:end-1,1) .* Q(2:end,2) - Q(2:end,1) .* Q(1:end-1,2);
 %! cx = sum ((Q(1:end-1,1) + Q(2:end,1)) .* c) / (3 * sum (c));
-%! S = solid.revolve (geom.Region (O), 360);
+%! S = solid.revolve (geom.Region (O), 'Angle', 360);
 %! assert_equal (volume (S), 2 * pi * cx * abs (sum (c)) / 2, -1e-8);
 %! assert_equal (isvalid (S), true);
 
@@ -206,7 +204,7 @@ endfunction
 %!                      'Label', {'key_floor', '', 'key_top', ''});
 %! R = geom.Region ([0, 0; 40, 0; 40, 5; 5, 5; 5, 30; 0, 30], {key}, ...
 %!                  'Label', {'base', '', '', 'inside', '', ''});
-%! S = solid.revolve (R, 90, 'Label', 'ring');
+%! S = solid.revolve (R, 'Angle', 90, 'Label', 'ring');
 %! assert_equal (faces (S, 'Label', 'ring.side.base'), ...
 %!               faces (S, 'Within', [-40, 0, -40, 40, 0, 40]));
 %! assert_equal (faces (S, 'Label', 'ring.side.inside'), ...
@@ -229,7 +227,7 @@ endfunction
 %! S = solid.revolve (R, 'Label', 'shaft');
 %! assert_equal (numel (faces (S, 'Label', 'shaft.side')), numfaces (S));
 %!test  # a part turn has a start in the region's plane and an end
-%! S = solid.revolve (geom.Region ([0, 0; 4, 0; 4, 12; 0, 12]), 90, ...
+%! S = solid.revolve (geom.Region ([0, 0; 4, 0; 4, 12; 0, 12]), 'Angle', 90, ...
 %!                    'Label', 'segment');
 %! assert_equal (faces (S, 'Label', 'segment.start'), ...
 %!               faces (S, 'Normal', [0, 0, 1]));
@@ -257,21 +255,24 @@ endfunction
 %! solid.revolve (geom.Region ([-1, 0; 1, 0; 1, 1; -1, 1]))
 %!error<solid.revolve: R must lie on one side of its axis: no point of it may have a negative x.> ...
 %! solid.revolve (geom.Region ([1, 0, -1; 1, 10, 0]))
-%!error<solid.revolve: ANGLE must be a real scalar in the range \(0, 360\].> ...
-%! solid.revolve (geom.Region ([0, 0; 1, 0; 1, 1]), 0)
-%!error<solid.revolve: ANGLE must be a real scalar in the range \(0, 360\].> ...
-%! solid.revolve (geom.Region ([0, 0; 1, 0; 1, 1]), 361)
-%!error<solid.revolve: ANGLE must be a real scalar in the range \(0, 360\].> ...
-%! solid.revolve (geom.Region ([0, 0; 1, 0; 1, 1]), NaN)
-%!error<solid.revolve: ANGLE must be a real scalar in the range \(0, 360\].> ...
-%! solid.revolve (geom.Region ([0, 0; 1, 0; 1, 1]), [90, 180])
+%!error<solid.revolve: Angle must be a real scalar in the range \(0, 360\].> ...
+%! solid.revolve (geom.Region ([0, 0; 1, 0; 1, 1]), 'Angle', 0)
+%!error<solid.revolve: Angle must be a real scalar in the range \(0, 360\].> ...
+%! solid.revolve (geom.Region ([0, 0; 1, 0; 1, 1]), 'Angle', 361)
+%!error<solid.revolve: Angle must be a real scalar in the range \(0, 360\].> ...
+%! solid.revolve (geom.Region ([0, 0; 1, 0; 1, 1]), 'Angle', NaN)
+%!error<solid.revolve: Angle must be a real scalar in the range \(0, 360\].> ...
+%! solid.revolve (geom.Region ([0, 0; 1, 0; 1, 1]), 'Angle', [90, 180])
 %!error<solid.revolve: invalid number of input arguments.> ...
-%! solid.revolve (geom.Region ([0, 0; 1, 0; 1, 1]), 90, 'Label', 'a', 1)
+%! solid.revolve (geom.Region ([0, 0; 1, 0; 1, 1]), 'Angle', 90, 'Label', ...
+%!                'a', 1)
 %!error<solid.revolve: Name/Value arguments must come in pairs.> ...
 %! solid.revolve (geom.Region ([0, 0; 1, 0; 1, 1]), 'Label')
-%!error<solid.revolve: unknown option 'Angle'.> ...
-%! solid.revolve (geom.Region ([0, 0; 1, 0; 1, 1]), 'Angle', 90)
+%!error<solid.revolve: unknown option 'Degrees'.> ...
+%! solid.revolve (geom.Region ([0, 0; 1, 0; 1, 1]), 'Degrees', 90)
+%!error<solid.revolve: Name/Value arguments must come in pairs.> ...
+%! solid.revolve (geom.Region ([0, 0; 1, 0; 1, 1]), 90)
 %!error<solid.revolve: option names must be character vectors.> ...
-%! solid.revolve (geom.Region ([0, 0; 1, 0; 1, 1]), 90, 1, 2)
+%! solid.revolve (geom.Region ([0, 0; 1, 0; 1, 1]), 1, 2)
 %!error<solid.revolve: Label must be a valid Octave identifier or keyword.> ...
 %! solid.revolve (geom.Region ([0, 0; 1, 0; 1, 1]), 'Label', 'a.b')

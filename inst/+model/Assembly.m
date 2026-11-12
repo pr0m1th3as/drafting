@@ -388,29 +388,50 @@ classdef Assembly
 
     ## -*- texinfo -*-
     ## @deftypefn  {model.Assembly} {@var{M} =} tessellate (@var{A})
-    ## @deftypefnx {model.Assembly} {@var{M} =} tessellate (@var{A}, @var{TOL})
+    ## @deftypefnx {model.Assembly} {@var{M} =} tessellate (@var{A}, @qcode{'Tolerance'}, @var{TOL})
     ##
     ## Every part placed, as one triangle mesh.
     ##
-    ## @code{@var{M} = tessellate (@var{A}, @var{TOL})} returns a
-    ## @code{polymesh.Mesh} of every part where the assembly places it,
-    ## sub-assemblies included: each solid part as
-    ## @code{solid.Shape.tessellate} makes it within @var{TOL} millimetres,
-    ## 0.01 by default, and each mesh part as it is.  The parts keep their
+    ## @code{@var{M} = tessellate (@var{A})} returns a @code{polymesh.Mesh}
+    ## of every part where the assembly places it, sub-assemblies included:
+    ## each solid part as @code{solid.Shape.tessellate} makes it, within
+    ## 0.01 millimetres, and each mesh part as it is.  The parts keep their
     ## own vertices, so parts that touch are not joined.  A triangle keeps
     ## its part's colour, and is grey where its part has none, when any
     ## part has one.  The empty assembly gives the empty mesh.
     ##
+    ## The option @qcode{'Tolerance'} sets that bound for the solid parts to
+    ## @var{TOL} millimetres, a positive real scalar.
+    ##
     ## @seealso{model.Assembly.shape, solid.Shape.tessellate}
     ## @end deftypefn
-    function M = tessellate (this, TOL = 0.01)
+    function M = tessellate (this, varargin)
 
       ## Input validation
-      if (! (isfloat (TOL) && isreal (TOL) && isscalar (TOL) &&
-             isfinite (TOL) && TOL > 0))
-        error (strcat ("model.Assembly.tessellate: TOL must be a positive", ...
-                       " and finite real scalar."));
+      if (mod (numel (varargin), 2) != 0)
+        error (strcat ("model.Assembly.tessellate: Name/Value arguments", ...
+                       " must come in pairs."));
       endif
+      TOL = 0.01;
+      for ii = 1:2:numel (varargin)
+        name = varargin{ii};
+        val = varargin{ii+1};
+        if (! ischar (name) || ! isrow (name))
+          error (strcat ("model.Assembly.tessellate: option names must be", ...
+                         " character vectors."));
+        endif
+        switch (lower (name))
+          case 'tolerance'
+            TOL = val;
+            if (! (isfloat (TOL) && isreal (TOL) && isscalar (TOL) &&
+                   isfinite (TOL) && TOL > 0))
+              error (strcat ("model.Assembly.tessellate: Tolerance must be", ...
+                             " a positive and finite real scalar."));
+            endif
+          otherwise
+            error ("model.Assembly.tessellate: unknown option '%s'.", name);
+        endswitch
+      endfor
 
       M = polymesh.Mesh ();
       n = numel (this.Instances);
@@ -423,7 +444,7 @@ classdef Assembly
         p = strcmp (this.Instances(k).part, {this.Parts.name});
         X = this.Parts(p).item;
         if (! isa (X, 'polymesh.Mesh'))
-          X = tessellate (X, TOL);
+          X = tessellate (X, 'Tolerance', TOL);
         endif
         U = this.Instances(k).placement;
         V{k} = X.Vertices * [U.XAxis; U.YAxis; U.Normal] + U.Origin;
@@ -559,7 +580,7 @@ classdef Assembly
         error ("model.Assembly.write: the assembly places nothing.");
       endif
       if (any (strcmpi (fmt, {'.stl', '.obj', '.ply'})))
-        write (tessellate (this, TOL), FILE);
+        write (tessellate (this, 'Tolerance', TOL), FILE);
         return;
       endif
       if (isstep)
@@ -580,7 +601,7 @@ classdef Assembly
         for k = find (ispart)
           M = T.parts{k};
           if (! isa (M, 'polymesh.Mesh'))
-            M = tessellate (M, TOL);
+            M = tessellate (M, 'Tolerance', TOL);
           endif
           [V{k}, F{k}, FC{k}] = deal (M.Vertices, M.Faces, M.FaceColour);
         endfor
@@ -1083,6 +1104,11 @@ endfunction
 %!test  # tessellate: the empty assembly
 %! assert_equal (isempty (tessellate (model.Assembly ())), true);
 
+%!test  # tessellate: a coarser Tolerance, fewer triangles
+%! A = add (model.Assembly (), 'ball', solid.sphere (20), geom.UCS ());
+%! assert_equal (numfaces (tessellate (A, 'Tolerance', 0.5)) < ...
+%!               numfaces (tessellate (A)), true);
+
 %!error<model.Assembly: NAME must be a non-empty character vector.> ...
 %! model.Assembly ('')
 %!error<model.Assembly.add: invalid number of input arguments.> ...
@@ -1162,8 +1188,14 @@ endfunction
 %! shape (add (model.Assembly (), 'tet', tetrapart (), geom.UCS ()))
 %!error<model.Assembly.write: STEP cannot hold the mesh part 'tet'.>
 %! write (add (model.Assembly (), 'tet', tetrapart (), geom.UCS ()), 'a.step')
-%!error<model.Assembly.tessellate: TOL must be a positive and finite real scalar.> ...
-%! tessellate (model.Assembly (), 0)
+%!error<model.Assembly.tessellate: Tolerance must be a positive and finite real scalar.> ...
+%! tessellate (model.Assembly (), 'Tolerance', 0)
+%!error<model.Assembly.tessellate: Name/Value arguments must come in pairs.> ...
+%! tessellate (model.Assembly (), 0.05)
+%!error<model.Assembly.tessellate: option names must be character vectors.> ...
+%! tessellate (model.Assembly (), 1, 0.05)
+%!error<model.Assembly.tessellate: unknown option 'Tol'.> ...
+%! tessellate (model.Assembly (), 'Tol', 0.05)
 %!error<model.Assembly.area: not defined for an assembly; use `shape \(B\)` to retrieve it as a solid.Shape.> ...
 %! B = model.Assembly ();
 %! area (B)

@@ -56,11 +56,11 @@ H.UCS = xz;
 K = solid.revolve (H);
 show (K);
 
-## An angle turns it part of the way round, from the region's own plane.
-## Three quarters of a turn opens the part to show its section, and leaves
-## three quarters of the material.
+## The option `'Angle'` turns it part of the way round, from the region's
+## own plane. Three quarters of a turn opens the part to show its section,
+## and leaves three quarters of the material.
 
-K2 = solid.revolve (H, 270);
+K2 = solid.revolve (H, 'Angle', 270);
 volume (K2) / volume (K)
 show (K2);
 

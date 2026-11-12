@@ -52,13 +52,13 @@ p = pi * 28 * cosd (30) / n
 
 full = p / 2
 
-## A shallower `DEPTH` leaves flat lands at the diameter of the knob
+## A shallower `'Depth'` leaves flat lands at the diameter of the knob
 ## between the grooves. A deeper one is refused, since the teeth would have
 ## to overlap.
 
-lands = knurl (solid.cylinder (14, 10), F, 0.8, 0.2);
+lands = knurl (solid.cylinder (14, 10), F, 0.8, 'Depth', 0.2);
 show (lands);
-knurl (solid.cylinder (14, 10), F, 0.8, 0.5);  #: error
+knurl (solid.cylinder (14, 10), F, 0.8, 'Depth', 0.5);  #: error
 
 ## ## The seven types
 ##

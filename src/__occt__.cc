@@ -5006,7 +5006,7 @@ groovesets (double R, double H, const knurlspec& spec, double& D,
   D = spec.depth > 0 ? spec.depth : full;
   if (D > full * (1 + 1e-12))
   {
-    error ("%s: DEPTH must be no more than %.4g, the full depth of the"
+    error ("%s: Depth must be no more than %.4g, the full depth of the"
            " teeth at the pitch fitted round F.", caller.c_str (), full);
   }
   return sets;

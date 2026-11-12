@@ -1431,24 +1431,24 @@
 %! assert_equal (volume (M), 6000, -1e-12);
 
 %!test  # tessellate: corners on the surface
-%! M = tessellate (solid.cylinder (4, 12), 0.05);
+%! M = tessellate (solid.cylinder (4, 12), 'Tolerance', 0.05);
 %! r = hypot (M.Vertices(:,1), M.Vertices(:,2));
 %! z = M.Vertices(:,3);
 %! assert_equal (all (abs (r - 4) < 1e-9 | ((z == 0 | z == 12) & r < 4)), ...
 %!               true);
 
-%!test  # tessellate: side facets within TOL
-%! M = tessellate (solid.cylinder (4, 12), 0.05);
+%!test  # tessellate: side facets within Tolerance
+%! M = tessellate (solid.cylinder (4, 12), 'Tolerance', 0.05);
 %! z = M.Vertices(:,3);
 %! F = M.Faces(any (z(M.Faces) != z(M.Faces(:,1)), 2),:);
 %! E = [F(:,[1, 2]); F(:,[2, 3]); F(:,[3, 1])];
 %! m = (M.Vertices(E(:,1),:) + M.Vertices(E(:,2),:)) / 2;
 %! assert_equal (min (hypot (m(:,1), m(:,2))) >= 4 - 0.05 - 1e-9, true);
 
-%!test  # tessellate: a finer TOL, more triangles
+%!test  # tessellate: a finer Tolerance, more triangles
 %! S = solid.sphere (20);
-%! assert_equal (numfaces (tessellate (S, 0.5)) < ...
-%!               numfaces (tessellate (S, 0.05)), true);
+%! assert_equal (numfaces (tessellate (S, 'Tolerance', 0.5)) < ...
+%!               numfaces (tessellate (S, 'Tolerance', 0.05)), true);
 
 %!test  # tessellate: a mirrored part turned out
 %! M = tessellate (mirror (solid.cone (5, 2, 8), [1, 0, 0]));
@@ -2013,8 +2013,8 @@
 %! assert_equal (volume (S), 410.2803679, 1e-5);
 %! assert_equal (isvalid (S), true);
 
-%!test  # DEPTH short of full depth leaves lands
-%! S = knurl (solid.cylinder (5, 6), 1, 1, 0.2);
+%!test  # a Depth short of full depth leaves lands
+%! S = knurl (solid.cylinder (5, 6), 1, 1, 'Depth', 0.2);
 %! assert_equal (volume (S), 458.3985091, 1e-5);
 %! assert_equal (isvalid (S), true);
 
@@ -2055,7 +2055,7 @@
 %! R = geom.Region (13 / sqrt (3) * [cosd(0:60:300)', sind(0:60:300)']);
 %! R.UCS = geom.UCS ([0, 0, -1], [0, 0, -42.2]);
 %! K = pocket (K, R, 5.5);
-%! S = knurl (K, 1, 2.0733, 0.8, 'Angle', 45, 'Fillet', {3, 2});
+%! S = knurl (K, 1, 2.0733, 'Depth', 0.8, 'Angle', 45, 'Fillet', {3, 2});
 %! assert_equal (volume (S), 4638.466155, 1e-5);
 %! assert_equal (isvalid (S), true);
 
@@ -2072,7 +2072,7 @@
 
 %!test  # a tube knurled over a wall just thicker than the teeth are deep
 %! S = subtract (solid.cylinder (5, 6), solid.cylinder (4.45, 6));
-%! S = knurl (S, 1, 1, 0.5);
+%! S = knurl (S, 1, 1, 'Depth', 0.5);
 %! assert_equal (volume (S), 37.62373148, 1e-5);
 %! assert_equal (isvalid (S), true);
 
@@ -2602,8 +2602,12 @@
 %! pocket (solid.box (1, 1, 1), {geom.Region([0, 0; 1, 0; 1, 1]), 2}, 1)
 %!error<solid.Shape.knurl: invalid number of input arguments.> ...
 %! knurl (solid.cylinder (5, 6), 1)
-%!error<solid.Shape.knurl: DEPTH must be a positive and finite real scalar.> ...
-%! knurl (solid.cylinder (5, 6), 1, 1, -1)
+%!error<solid.Shape.knurl: Depth must be a positive and finite real scalar.> ...
+%! knurl (solid.cylinder (5, 6), 1, 1, 'Depth', -1)
+%!error<solid.Shape.knurl: Depth must not be empty.> ...
+%! knurl (solid.cylinder (5, 6), 1, 1, 'Depth', [])
+%!error<solid.Shape.knurl: Name/Value arguments must come in pairs.> ...
+%! knurl (solid.cylinder (5, 6), 1, 1, 0.2)
 %!error<solid.Shape.knurl: PITCH must be a positive and finite real scalar.> ...
 %! knurl (solid.cylinder (5, 6), 1, 0)
 %!error<solid.Shape.knurl: option names must be character vectors.> ...
@@ -2684,17 +2688,18 @@
 %!            solid.cylinder (5, 6));
 %! S = union (S, solid.cylinder (7, 2, geom.UCS ([0, 0, 1], [0, 0, 6])));
 %! knurl (S, 4, 1, 'Chamfer', 0.5)
-%!error<solid.Shape.knurl: DEPTH must be no more than 0.5038, the full depth of the teeth at the pitch fitted round F.> ...
-%! knurl (solid.cylinder (5, 6), 1, 1, 0.6)
+%!error<solid.Shape.knurl: Depth must be no more than 0.5038, the full depth of the teeth at the pitch fitted round F.> ...
+%! knurl (solid.cylinder (5, 6), 1, 1, 'Depth', 0.6)
 %!error<solid.Shape.knurl: a fillet or chamfer must be smaller than the radius of F.> ...
 %! knurl (solid.cylinder (5, 6), 1, 1, 'Fillet', {1, 5})
 %!error<solid.Shape.knurl: the fillets or chamfers at the two ends of F overlap.> ...
 %! knurl (solid.cylinder (5, 6), 1, 1, 'Fillet', 3.5)
 %!error<solid.Shape.knurl: the teeth, 0.5 deep, would cut into a bore of S.> ...
-%! knurl (subtract (solid.cylinder (5, 6), solid.cylinder (4.5, 6)), 1, 1, 0.5)
+%! knurl (subtract (solid.cylinder (5, 6), solid.cylinder (4.5, 6)), 1, 1, ...
+%!        'Depth', 0.5)
 %!error<solid.Shape.knurl: the chamfer of 1 at an end of F would cut into a bore of S.> ...
 %! knurl (subtract (solid.cylinder (5, 6), solid.cylinder (4.2, 6)), 1, 1, ...
-%!        0.5, 'Chamfer', 1)
+%!        'Depth', 0.5, 'Chamfer', 1)
 %!error<solid.Shape.knurl: Label must be a valid Octave identifier or keyword.> ...
 %! knurl (solid.cylinder (5, 6), 1, 1, 'Label', 'a.b')
 
@@ -3045,8 +3050,16 @@
 %! polararray (solid.Shape (), 3, 90, 'Turn', true)
 %!error<solid.Shape.polararray: option names must be character vectors.> ...
 %! polararray (solid.Shape (), 3, 90, [0, 0, 1], [0, 0, 0], 1, true)
-%!error<solid.Shape.tessellate: TOL must be a positive and finite real scalar.> ...
-%! tessellate (solid.Shape (), 0)
+%!error<solid.Shape.tessellate: Tolerance must be a positive and finite real scalar.> ...
+%! tessellate (solid.Shape (), 'Tolerance', 0)
+%!error<solid.Shape.tessellate: Name/Value arguments must come in pairs.> ...
+%! tessellate (solid.Shape (), 0.05)
+%!error<solid.Shape.tessellate: option names must be character vectors.> ...
+%! tessellate (solid.Shape (), 1, 0.05)
+%!error<solid.Shape.tessellate: unknown option 'Tol'.> ...
+%! tessellate (solid.Shape (), 'Tol', 0.05)
+%!error<solid.Shape.tessellate: Tolerance must not be empty.> ...
+%! tessellate (solid.Shape (), 'Tolerance', [])
 %!error<solid.Shape: Colour must be empty or a 1-by-3 or N-by-3 matrix of values from 0 to 1, N the number of solids, a row of NaN for no colour.>
 %! S = solid.Shape ();
 %! S.Colour = [1, 0, 0];

@@ -73,7 +73,7 @@ B2 = scale (rotate (B, 90, [0, 0, 1]), 2);
 
 S = solid.extrude (geom.Region ([0, 0; 60, 0; 60, 30; 0, 30], ...
                                 {[22, 15, 1; 38, 15, 1]}), 8);
-T = tessellate (S, 0.05);
+T = tessellate (S, 'Tolerance', 0.05);
 files = {'plate.stl', 'plate.obj', 'plate.ply', 'plate.3mf'};
 for k = 1:numel (files)
   write (T, files{k});
@@ -189,11 +189,12 @@ show (H);
 
 ## ## How fine a tessellation is
 ##
-## The second argument of `tessellate` is how far, in millimetres, a triangle
-## may stray from the true surface, 0.01 by default. No triangle spans more
-## than 20 degrees of a curve either, which is why the two coarser
-## tolerances give the same mesh of this plate.
+## The option `'Tolerance'` of `tessellate` is how far, in millimetres, a
+## triangle may stray from the true surface, 0.01 by default. No triangle
+## spans more than 20 degrees of a curve either, which is why the two
+## coarser tolerances give the same mesh of this plate.
 
 for tol = [1, 0.1, 0.01, 0.001]
-  printf ("%6.3f mm: %d triangles\n", tol, numfaces (tessellate (S, tol)));
+  printf ("%6.3f mm: %d triangles\n", tol, ...
+          numfaces (tessellate (S, 'Tolerance', tol)));
 endfor
