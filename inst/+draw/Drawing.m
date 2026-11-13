@@ -244,7 +244,7 @@ classdef Drawing
                        'height', {}, 'offset', {}, 'direction', {}, ...
                        'pattern', {}, 'spacing', {}, 'block', {}, ...
                        'scale', {}, 'bulge', {}, 'shape', {}, ...
-                       'decimals', {});
+                       'decimals', {}, 'tolerance', {}, 'form', {});
 
   endproperties
 
@@ -659,13 +659,13 @@ classdef Drawing
       REC = [];
       switch (e.type)
         case 'dim'
-          parts = explodedim (e, DIMSCALE, DECIMALS);
+          [parts, v] = explodedim (e, DIMSCALE, DECIMALS);
         case {'diam', 'radius'}
-          parts = explodecirc (e, DIMSCALE, DECIMALS);
+          [parts, v] = explodecirc (e, DIMSCALE, DECIMALS);
         case 'angdim'
-          parts = explodeang (e, DIMSCALE, DECIMALS);
+          [parts, v] = explodeang (e, DIMSCALE, DECIMALS);
         case 'ordinate'
-          parts = explodeord (e, DIMSCALE, DECIMALS);
+          [parts, v] = explodeord (e, DIMSCALE, DECIMALS);
         case 'centremark'
           parts = explodemark (e, DIMSCALE);
         case 'leader'
@@ -679,8 +679,50 @@ classdef Drawing
       B.Entities = partsentities (parts);
       if (! any (strcmp (e.type, {'centremark', 'leader'})))
         d = dimrecord (e, '', e.type, DECIMALS);
+        ## The text R12 writes, with the tolerance on its one line, and the
+        ## overrides of the dimension style: group code and value
+        pre = '';
+        suf = '';
+        if (strcmp (e.type, 'diam'))
+          pre = '%%c';
+        elseif (strcmp (e.type, 'angdim'))
+          suf = '%%d';
+        endif
+        line = d.text;
+        dstyle = zeros (0, 2);
+        if (! isempty (e.decimals))
+          dstyle = [271, e.decimals];
+          if (strcmp (e.type, 'angdim'))
+            dstyle(end+1,:) = [179, e.decimals];
+          endif
+        endif
+        T = e.tolerance;
+        if (isnumeric (T) && ! isempty (T))
+          [main, R, A] = tolerancetext (e, d.text, v, DECIMALS, pre, suf, 1);
+          if (isscalar (T))
+            T = [-T, T];
+          endif
+          if (strcmp (e.form, 'limits'))
+            line = [A, '/', main];
+            p = max (places (round (v * 10 ^ DECIMALS) / 10 ^ DECIMALS), ...
+                     places (T));
+            dstyle = [71, 0; 72, 1; 47, T(2); 48, -T(1); 271, p];
+            if (strcmp (e.type, 'angdim'))
+              dstyle(end+1,:) = [179, p];
+            endif
+          else
+            if (! isempty (R))
+              line = [main, ' ', R{1}, '/', R{2}];
+            else
+              line = main;
+            endif
+            dstyle = [dstyle; 71, 1; 72, 0; 47, T(2); 48, -T(1); ...
+                      272, places(T); 284, 0; 146, 1; 283, 0];
+          endif
+        endif
         REC = struct ('pts', d.pts, 'angles', d.angles, 'text', d.text, ...
-                      'rotation', d.rotation);
+                      'rotation', d.rotation, 'line', line, ...
+                      'dstyle', dstyle);
       endif
 
     endfunction
@@ -1642,6 +1684,8 @@ classdef Drawing
     ## @deftypefnx {draw.Drawing} {@var{D} =} dim (@dots{}, @qcode{'Direction'}, @var{DIR})
     ## @deftypefnx {draw.Drawing} {@var{D} =} dim (@dots{}, @qcode{'Text'}, @var{S})
     ## @deftypefnx {draw.Drawing} {@var{D} =} dim (@dots{}, @qcode{'Decimals'}, @var{N})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} dim (@dots{}, @qcode{'Tolerance'}, @var{T})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} dim (@dots{}, @qcode{'Form'}, @var{FORM})
     ##
     ## Append a dimension measuring between @var{P1} and @var{P2}.
     ##
@@ -1674,6 +1718,32 @@ classdef Drawing
     ## shows, an integer from 0 to 8, in place of the drawing's
     ## @code{Decimals}.
     ##
+    ## The option @qcode{'Tolerance'} gives the dimension a tolerance @var{T},
+    ## written as ISO 406 writes it:
+    ##
+    ## @itemize
+    ## @item a positive number, a tolerance symmetric about the size:
+    ## @code{25 ±0.1};
+    ## @item a row @code{[@var{LOWER}, @var{UPPER}]}, the lower and the upper
+    ## deviation, @var{LOWER} below @var{UPPER}, written to the right of the
+    ## size, the upper above the lower, both to the same places and a zero as
+    ## a bare 0; equal and opposite deviations are written as a symmetric
+    ## tolerance;
+    ## @item @qcode{'min'} or @qcode{'max'}, a size limited in one direction
+    ## only: @code{30.5 min.}
+    ## @end itemize
+    ##
+    ## A tolerance shows the places it needs, whatever @code{Decimals} says,
+    ## at the height of the size, and follows the text given with
+    ## @qcode{'Text'}.  The option @qcode{'Form'} set to @qcode{'limits'}
+    ## writes a numeric tolerance as the limits of size instead, the upper
+    ## above the lower, computed from the size as it is shown and both to the
+    ## same places; @qcode{'deviations'}, the default, writes the deviations.
+    ## Limits need the measured size, so they cannot go with @qcode{'Text'}.
+    ## A DXF file states a numeric tolerance as an override of the dimension
+    ## style, so a CAD program that measures the dimension again shows it;
+    ## @code{min.} and @code{max.} are text.
+    ##
     ## @end deftypefn
     function this = dim (this, P1, P2, OFFSET, varargin)
 
@@ -1698,6 +1768,10 @@ classdef Drawing
       DIRECTION = 'aligned';
       LABEL = '';
       DECIMALS = [];
+      TOL = [];
+      HASTOL = false;
+      FORM = '';
+      HASFORM = false;
       if (mod (numel (varargin), 2) != 0)
         error ("draw.Drawing.dim: Name/Value arguments must come in pairs.");
       endif
@@ -1725,6 +1799,12 @@ classdef Drawing
                              " integer from 0 to 8."));
             endif
             DECIMALS = double (DECIMALS);
+          case 'tolerance'
+            TOL = varargin{ii+1};
+            HASTOL = true;
+          case 'form'
+            FORM = varargin{ii+1};
+            HASFORM = true;
           otherwise
             error ("draw.Drawing.dim: unknown option '%s'.", name);
         endswitch
@@ -1733,6 +1813,12 @@ classdef Drawing
           || ! any (strcmpi (DIRECTION, {'aligned', 'horizontal', 'vertical'})))
         error (strcat ("draw.Drawing.dim: Direction must be 'aligned',", ...
                        " 'horizontal' or 'vertical'."));
+      endif
+
+      [TOL, FORM, errmsg] = checktolerance (TOL, HASTOL, FORM, HASFORM, ...
+                                           'dim', ! isempty (LABEL));
+      if (! isempty (errmsg))
+        error ("draw.Drawing.dim: %s", errmsg);
       endif
 
       DIRECTION = lower (DIRECTION);
@@ -1751,6 +1837,8 @@ classdef Drawing
       e.direction = DIRECTION;
       e.text = LABEL;
       e.decimals = DECIMALS;
+      e.tolerance = TOL;
+      e.form = FORM;
       this.Entities(end+1) = e;
 
     endfunction
@@ -1760,6 +1848,8 @@ classdef Drawing
     ## @deftypefnx {draw.Drawing} {@var{D} =} diam (@dots{}, @qcode{'Angle'}, @var{ANG})
     ## @deftypefnx {draw.Drawing} {@var{D} =} diam (@dots{}, @qcode{'Text'}, @var{S})
     ## @deftypefnx {draw.Drawing} {@var{D} =} diam (@dots{}, @qcode{'Decimals'}, @var{N})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} diam (@dots{}, @qcode{'Tolerance'}, @var{T})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} diam (@dots{}, @qcode{'Form'}, @var{FORM})
     ##
     ## Append a diameter dimension across a circle.
     ##
@@ -1769,7 +1859,9 @@ classdef Drawing
     ## lines.  The option @qcode{'Text'} gives the text @var{S}, which is
     ## otherwise the diameter symbol and the measured figure, and the option
     ## @qcode{'Decimals'} the places @var{N} the figure shows, an integer from
-    ## 0 to 8, in place of the drawing's @code{Decimals}.
+    ## 0 to 8, in place of the drawing's @code{Decimals}.  The options
+    ## @qcode{'Tolerance'} and @qcode{'Form'} are those of @code{dim}; each
+    ## limit carries the diameter sign.
     ##
     ## A round feature is dimensioned by its diameter and never by its radius,
     ## because a diameter is what a bore gauge and a micrometer measure.  A
@@ -1794,12 +1886,14 @@ classdef Drawing
     ## @deftypefnx {draw.Drawing} {@var{D} =} radius (@dots{}, @qcode{'Angle'}, @var{ANG})
     ## @deftypefnx {draw.Drawing} {@var{D} =} radius (@dots{}, @qcode{'Text'}, @var{S})
     ## @deftypefnx {draw.Drawing} {@var{D} =} radius (@dots{}, @qcode{'Decimals'}, @var{N})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} radius (@dots{}, @qcode{'Tolerance'}, @var{T})
     ##
     ## Append a radius dimension from a centre out to an arc.
     ##
     ## The arguments and options are those of @code{diam}, and @var{ANG} is the
     ## direction the leader runs in.  The text is otherwise the letter R and
-    ## the figure.
+    ## the figure.  A radius takes a symmetric tolerance, deviations, or
+    ## @qcode{'min'} and @qcode{'max'} (@code{R0.5 max.}), but no limits.
     ##
     ## Use it for a fillet or any arc that is less than a full circle, where
     ## there is no diameter to measure across.
@@ -1820,6 +1914,8 @@ classdef Drawing
     ## @deftypefn  {draw.Drawing} {@var{D} =} angdim (@var{D}, @var{V}, @var{P1}, @var{P2}, @var{RAD})
     ## @deftypefnx {draw.Drawing} {@var{D} =} angdim (@dots{}, @qcode{'Text'}, @var{S})
     ## @deftypefnx {draw.Drawing} {@var{D} =} angdim (@dots{}, @qcode{'Decimals'}, @var{N})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} angdim (@dots{}, @qcode{'Tolerance'}, @var{T})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} angdim (@dots{}, @qcode{'Form'}, @var{FORM})
     ##
     ## Append an angular dimension at a vertex.
     ##
@@ -1828,7 +1924,10 @@ classdef Drawing
     ## option @qcode{'Text'} gives the text @var{S}, which is otherwise the
     ## measured angle and the degree symbol, and the option
     ## @qcode{'Decimals'} the places @var{N} the angle shows, an integer from
-    ## 0 to 8, in place of the drawing's @code{Decimals}.
+    ## 0 to 8, in place of the drawing's @code{Decimals}.  The options
+    ## @qcode{'Tolerance'} and @qcode{'Form'} are those of @code{dim}, in
+    ## degrees, every number carrying the degree sign:
+    ## @code{15.5@textdegree{} ±0.25@textdegree{}}.
     ##
     ## The angle measured is the one from the first arm to the second going
     ## counter-clockwise, so giving the arms the other way round dimensions the
@@ -1855,6 +1954,10 @@ classdef Drawing
       endif
       LABEL = '';
       DECIMALS = [];
+      TOL = [];
+      HASTOL = false;
+      FORM = '';
+      HASFORM = false;
       if (mod (numel (varargin), 2) != 0)
         error ("draw.Drawing.angdim: Name/Value arguments must come in pairs.");
       endif
@@ -1881,6 +1984,12 @@ classdef Drawing
                              " integer from 0 to 8."));
             endif
             DECIMALS = double (DECIMALS);
+          case 'tolerance'
+            TOL = varargin{ii+1};
+            HASTOL = true;
+          case 'form'
+            FORM = varargin{ii+1};
+            HASFORM = true;
           otherwise
             error ("draw.Drawing.angdim: unknown option '%s'.", name);
         endswitch
@@ -1896,11 +2005,18 @@ classdef Drawing
                        " V, so they make no angle."));
       endif
 
+      [TOL, FORM, errmsg] = checktolerance (TOL, HASTOL, FORM, HASFORM, ...
+                                           'angdim', ! isempty (LABEL));
+      if (! isempty (errmsg))
+        error ("draw.Drawing.angdim: %s", errmsg);
+      endif
       e = makeentity ('angdim', pen (this));
       e.pts = [V(:)'; P1(:)'; P2(:)'];
       e.radius = RAD;
       e.text = LABEL;
       e.decimals = DECIMALS;
+      e.tolerance = TOL;
+      e.form = FORM;
       this.Entities(end+1) = e;
 
     endfunction
@@ -1909,6 +2025,7 @@ classdef Drawing
     ## @deftypefn  {draw.Drawing} {@var{D} =} ordinate (@var{D}, @var{O}, @var{P}, @var{AXIS}, @var{L})
     ## @deftypefnx {draw.Drawing} {@var{D} =} ordinate (@dots{}, @qcode{'Text'}, @var{S})
     ## @deftypefnx {draw.Drawing} {@var{D} =} ordinate (@dots{}, @qcode{'Decimals'}, @var{N})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} ordinate (@dots{}, @qcode{'Tolerance'}, @var{T})
     ##
     ## Append an ordinate dimension, the distance of a point from a datum.
     ##
@@ -1931,7 +2048,8 @@ classdef Drawing
     ## written, so it follows the geometry; the option @qcode{'Text'} gives the
     ## literal text @var{S} instead, and the option @qcode{'Decimals'} the
     ## places @var{N} the value shows, an integer from 0 to 8, in place of the
-    ## drawing's @code{Decimals}.
+    ## drawing's @code{Decimals}.  The option @qcode{'Tolerance'} is that of
+    ## @code{dim}, a symmetric tolerance or deviations only.
     ##
     ## @example
     ## @group
@@ -1972,6 +2090,10 @@ classdef Drawing
       endif
       LABEL = '';
       DECIMALS = [];
+      TOL = [];
+      HASTOL = false;
+      FORM = '';
+      HASFORM = false;
       if (mod (numel (varargin), 2) != 0)
         error (strcat ("draw.Drawing.ordinate: Name/Value arguments must", ...
                        " come in pairs."));
@@ -1999,6 +2121,12 @@ classdef Drawing
                              " integer from 0 to 8."));
             endif
             DECIMALS = double (DECIMALS);
+          case 'tolerance'
+            TOL = varargin{ii+1};
+            HASTOL = true;
+          case 'form'
+            FORM = varargin{ii+1};
+            HASFORM = true;
           otherwise
             error ("draw.Drawing.ordinate: unknown option '%s'.", name);
         endswitch
@@ -2013,11 +2141,18 @@ classdef Drawing
                        " differ from P in x."));
       endif
 
+      [TOL, FORM, errmsg] = checktolerance (TOL, HASTOL, FORM, HASFORM, ...
+                                           'ordinate', ! isempty (LABEL));
+      if (! isempty (errmsg))
+        error ("draw.Drawing.ordinate: %s", errmsg);
+      endif
       e = makeentity ('ordinate', pen (this));
       e.pts = [O; P; L];
       e.direction = AXIS;
       e.text = LABEL;
       e.decimals = DECIMALS;
+      e.tolerance = TOL;
+      e.form = FORM;
       this.Entities(end+1) = e;
 
     endfunction
@@ -4087,7 +4222,7 @@ function e = makeentity (type, p)
               'radius', [], 'angles', [], 'angle', [], 'text', '', ...
               'height', [], 'offset', [], 'direction', '', 'pattern', '', ...
               'spacing', [], 'block', '', 'scale', [], 'bulge', [], ...
-              'shape', [], 'decimals', []);
+              'shape', [], 'decimals', [], 'tolerance', [], 'form', '');
 
 endfunction
 
@@ -4126,6 +4261,10 @@ function e = dimcircle (this, kind, C, R, opts)
   ANG = 45;
   LABEL = '';
   DECIMALS = [];
+  TOL = [];
+  HASTOL = false;
+  FORM = '';
+  HASFORM = false;
   for ii = 1:2:numel (opts)
     name = opts{ii};
     if (! ischar (name) || ! isrow (name))
@@ -4149,6 +4288,12 @@ function e = dimcircle (this, kind, C, R, opts)
                  kind);
         endif
         DECIMALS = double (DECIMALS);
+      case 'tolerance'
+        TOL = opts{ii+1};
+        HASTOL = true;
+      case 'form'
+        FORM = opts{ii+1};
+        HASFORM = true;
       otherwise
         error ("draw.Drawing.%s: unknown option '%s'.", kind, name);
     endswitch
@@ -4157,6 +4302,11 @@ function e = dimcircle (this, kind, C, R, opts)
       || ! isfinite (ANG))
     error ("draw.Drawing.%s: Angle must be a real finite scalar.", kind);
   endif
+  [TOL, FORM, errmsg] = checktolerance (TOL, HASTOL, FORM, HASFORM, ...
+                                       kind, ! isempty (LABEL));
+  if (! isempty (errmsg))
+    error ("draw.Drawing.%s: %s", kind, errmsg);
+  endif
 
   e = makeentity (kind, pen (this));
   e.pts = C(:)';
@@ -4164,6 +4314,8 @@ function e = dimcircle (this, kind, C, R, opts)
   e.angle = ANG;
   e.text = LABEL;
   e.decimals = DECIMALS;
+  e.tolerance = TOL;
+  e.form = FORM;
 
 endfunction
 
@@ -4742,6 +4894,10 @@ function d = dimrecord (e, blockname, kind, n)
       && ! strcmp (e.text, autolabel (e, kind, n)))
     d.text = e.text;
   endif
+  ## A limit in one direction has no dimension style variable, so it is text
+  if (isfield (e, 'tolerance') && ischar (e.tolerance))
+    d.text = [d.text, ' ', e.tolerance, '.'];
+  endif
 
   switch (kind)
     case 'dim'
@@ -4832,6 +4988,150 @@ function s = decfmt (v, n)
 
 endfunction
 
+## Validate the tolerance options of a dimension of KIND, returning an error
+## message body for the caller to raise.  HASTOL and HASFORM say whether each
+## option was given, HASTEXT whether 'Text' was.  T comes back as a symmetric
+## tolerance, a row [LOWER, UPPER], 'min' or 'max', or empty; FORM as
+## 'limits' or ''.
+function [T, FORM, errmsg] = checktolerance (T, HASTOL, FORM, HASFORM, kind,
+                                             HASTEXT)
+
+  errmsg = '';
+  if (strcmp (kind, 'radius'))
+    noun = 'a radius';
+  else
+    noun = 'an ordinate dimension';
+  endif
+  if (! HASTOL)
+    T = [];
+  elseif (ischar (T) && isrow (T) && any (strcmpi (T, {'min', 'max'})))
+    T = lower (T);
+    if (strcmp (kind, 'ordinate'))
+      errmsg = sprintf ("Tolerance '%s' is not available for %s.", T, noun);
+      return;
+    endif
+  elseif (isnumeric (T) && isreal (T) && all (isfinite (T(:)))
+          && ((isscalar (T) && T > 0) || isequal (size (T), [1, 2])))
+    T = double (T);
+    if (numel (T) == 2 && T(1) >= T(2))
+      errmsg = "Tolerance must be [LOWER, UPPER] with LOWER below UPPER.";
+      return;
+    endif
+  else
+    errmsg = strcat ("Tolerance must be a positive scalar, a pair", ...
+                     " [LOWER, UPPER], 'min' or 'max'.");
+    return;
+  endif
+  if (! HASFORM)
+    FORM = '';
+    return;
+  endif
+  if (! (ischar (FORM) && isrow (FORM)
+         && any (strcmpi (FORM, {'deviations', 'limits'}))))
+    errmsg = "Form must be 'deviations' or 'limits'.";
+    return;
+  endif
+  FORM = lower (FORM);
+  if (! HASTOL)
+    errmsg = "Form needs a Tolerance.";
+  elseif (strcmp (FORM, 'limits'))
+    if (ischar (T))
+      errmsg = "Form 'limits' needs a numeric Tolerance.";
+    elseif (any (strcmp (kind, {'radius', 'ordinate'})))
+      errmsg = sprintf ("Form 'limits' is not available for %s.", noun);
+    elseif (HASTEXT)
+      errmsg = "Form 'limits' needs the measured value, which Text replaces.";
+    endif
+  else
+    FORM = '';
+  endif
+
+endfunction
+
+## The text of a dimension with its tolerance.  LABEL is the text without
+## one, V the value it measures, N the places that value shows, PRE and SUF
+## what each limit is written between (the diameter sign, the degree sign)
+## and HGT the text height.  MAIN stands where the label stands; R, the upper
+## and the lower deviation, stands to its right, the lower on its baseline,
+## as ISO 406 writes them; A, the upper limit, stands above it.  W is the
+## width of the whole and X how far it rises above one line, measured as the
+## label is, at six tenths of the height a character.
+function [main, R, A, W, X] = tolerancetext (e, label, v, n, pre, suf, hgt)
+
+  main = label;
+  R = {};
+  A = '';
+  T = e.tolerance;
+  if (ischar (T))
+    main = [label, ' ', T, '.'];
+  elseif (! isempty (T))
+    if (isscalar (T))
+      T = [-T, T];
+    endif
+    if (strcmp (e.form, 'limits'))
+      ## The limits of the size as shown, both at the places of the finer of
+      ## it and the deviations
+      shown = round (v * 10 ^ n) / 10 ^ n;
+      p = max (places (shown), places (T));
+      main = [pre, sprintf('%.*f', p, shown + T(1)), suf];
+      A = [pre, sprintf('%.*f', p, shown + T(2)), suf];
+    elseif (T(1) == -T(2))
+      main = [label, ' %%p', sprintf('%.*f', places (T(2)), T(2)), suf];
+    else
+      ## Both at the same places, a zero bare
+      p = places (T);
+      R = {sprintf('%+.*f', p, T(2)), sprintf('%+.*f', p, T(1))};
+      R(T([2, 1]) == 0) = {'0'};
+      R = strcat (R, suf);
+    endif
+  endif
+  cw = 0.6 * hgt;
+  W = cw * numel (main);
+  X = 0;
+  if (! isempty (R))
+    W += cw * (1 + max (numel (R{1}), numel (R{2})));
+    X = 1.5 * hgt;
+  elseif (! isempty (A))
+    W = cw * max (numel (main), numel (A));
+    X = 1.5 * hgt;
+  endif
+
+endfunction
+
+## The fewest decimal places, at most 8, that show every value of V exactly
+function p = places (V)
+
+  p = 0;
+  while (p < 8 && any (abs (round (V * 10 ^ p) / 10 ^ p - V) > 1e-9))
+    p++;
+  endwhile
+
+endfunction
+
+## The text set beside a dimension's label, whose baseline starts at P and
+## which is WM wide: the deviations R to its right, upper above lower, or the
+## upper limit A above it, one line of 1.5 heights up
+function parts = stackparts (e, R, A, P, wm, hgt)
+
+  parts = repmat (mkent ('TEXT', e, P), 1, 0);
+  if (! isempty (R))
+    x = P(1) + wm + 0.6 * hgt;
+    up = mkent ('TEXT', e, [x, P(2) + 1.5 * hgt]);
+    up.text = R{1};
+    up.height = hgt;
+    lo = mkent ('TEXT', e, [x, P(2)]);
+    lo.text = R{2};
+    lo.height = hgt;
+    parts = [up, lo];
+  elseif (! isempty (A))
+    up = mkent ('TEXT', e, [P(1), P(2) + 1.5 * hgt]);
+    up.text = A;
+    up.height = hgt;
+    parts = up;
+  endif
+
+endfunction
+
 ## The empty array of lowered entities.  Field order is fixed so
 ## that the array grows by assignment.
 function E = emptyentity ()
@@ -4864,7 +5164,7 @@ endfunction
 ## A diameter or radius dimension: the measuring line, a tick where it meets
 ## the feature, and the text.  A diameter runs right across; a radius runs from
 ## the centre out, which is why the two share everything but their first point.
-function parts = explodecirc (e, scale, ndec)
+function [parts, v] = explodecirc (e, scale, ndec)
 
   tick = 1.25 * scale;
   hgt = 2.5 * scale;
@@ -4885,20 +5185,31 @@ function parts = explodecirc (e, scale, ndec)
                                       inner + tick * (u + n) / sqrt(2)]);
   endif
 
-  t = mkent ('TEXT', e, outer + 0.5 * hgt * (u + n));
-  t.text = e.text;
-  if (isempty (t.text))
-    t.text = autolabel (e, e.type, ndec);
+  label = e.text;
+  if (isempty (label))
+    label = autolabel (e, e.type, ndec);
   endif
+  if (strcmp (e.type, 'diam'))
+    v = 2 * e.radius;
+    pre = '%%c';
+  else
+    v = e.radius;
+    pre = '';
+  endif
+  [main, R, A] = tolerancetext (e, label, v, ndec, pre, '', hgt);
+  P = outer + 0.5 * hgt * (u + n);
+  t = mkent ('TEXT', e, P);
+  t.text = main;
   t.height = hgt;
   t.rotation = 0;
   parts(end+1) = t;
+  parts = [parts, stackparts(e, R, A, P, 0.6 * hgt * numel (main), hgt)];
 
 endfunction
 
 ## An angular dimension: the arc between the arms, a tick at each end, and the
 ## text outside the arc at its middle
-function parts = explodeang (e, scale, ndec)
+function [parts, v] = explodeang (e, scale, ndec)
 
   tick = 1.25 * scale;
   hgt = 2.5 * scale;
@@ -4919,21 +5230,26 @@ function parts = explodeang (e, scale, ndec)
   endfor
 
   am = a1 + mod (a2 - a1, 360) / 2;
-  t = mkent ('TEXT', e, V + (e.radius + 0.5 * hgt) * [cosd(am), sind(am)]);
-  t.text = e.text;
-  if (isempty (t.text))
-    t.text = autolabel (e, e.type, ndec);
+  label = e.text;
+  if (isempty (label))
+    label = autolabel (e, e.type, ndec);
   endif
+  v = mod (a2 - a1, 360);
+  [main, R, A] = tolerancetext (e, label, v, ndec, '', '%%d', hgt);
+  P = V + (e.radius + 0.5 * hgt) * [cosd(am), sind(am)];
+  t = mkent ('TEXT', e, P);
+  t.text = main;
   t.height = hgt;
   t.rotation = 0;
   parts(end+1) = t;
+  parts = [parts, stackparts(e, R, A, P, 0.6 * hgt * numel (main), hgt)];
 
 endfunction
 
 ## An ordinate dimension: the leader from the feature, clear of it by a gap,
 ## jogging across its middle third where its end is off the line through the
 ## feature, and the distance past its end
-function parts = explodeord (e, scale, ndec)
+function [parts, v] = explodeord (e, scale, ndec)
 
   gap = 1.0 * scale;
   hgt = 2.5 * scale;
@@ -4957,24 +5273,24 @@ function parts = explodeord (e, scale, ndec)
   endif
   parts = mkent ('POLYLINE', e, Q);
 
+  v = abs (P(3-k) - O(3-k));
   if (isempty (e.text))
-    v = abs (P(3-k) - O(3-k));
     label = decfmt (v, ndec);
   else
     label = e.text;
   endif
-  wid = 0.6 * hgt * numel (label);
+  [main, R, A, wid, rise] = tolerancetext (e, label, v, ndec, '', '', hgt);
   if (k == 2)
     ## Up or down the sheet: the label centred past the end
     ix = L(1) - wid / 2;
     if (s > 0)
       iy = L(2) + tgap;
     else
-      iy = L(2) - tgap - hgt;
+      iy = L(2) - tgap - hgt - rise;
     endif
   else
     ## Across the sheet: the label beside the end
-    iy = L(2) - hgt / 2;
+    iy = L(2) - (hgt + rise) / 2;
     if (s > 0)
       ix = L(1) + tgap;
     else
@@ -4982,10 +5298,12 @@ function parts = explodeord (e, scale, ndec)
     endif
   endif
   t = mkent ('TEXT', e, [ix, iy]);
-  t.text = label;
+  t.text = main;
   t.height = hgt;
   t.rotation = 0;
   parts(end+1) = t;
+  parts = [parts, stackparts(e, R, A, [ix, iy], 0.6 * hgt * numel (main), ...
+                             hgt)];
 
 endfunction
 
@@ -5096,7 +5414,7 @@ endfunction
 ## each measured point is carried onto the dimension line along N.  A
 ## horizontal dimension between points at different heights therefore gets
 ## extension lines of different lengths, which is exactly right.
-function parts = explodedim (e, scale, ndec)
+function [parts, v] = explodedim (e, scale, ndec)
 
   P1 = e.pts(1,:);
   P2 = e.pts(2,:);
@@ -5138,8 +5456,9 @@ function parts = explodedim (e, scale, ndec)
   parts(end+1) = mkent ('LINE', e, [A2 - tick * T; A2 + tick * T]);
 
   ## The label, horizontal whatever the dimension measures
+  v = abs (dot (d, U));
   if (isempty (e.text))
-    label = decfmt (abs (dot (d, U)), ndec);
+    label = decfmt (v, ndec);
   else
     label = e.text;
   endif
@@ -5159,7 +5478,7 @@ function parts = explodedim (e, scale, ndec)
   ## application substitutes here, and being slightly out matters far less than
   ## a label sitting nowhere near the middle.
   mid = (A1 + A2) / 2;
-  wid = 0.6 * hgt * numel (label);
+  [main, R, A, wid, rise] = tolerancetext (e, label, v, ndec, '', '', hgt);
   side = sign0 (e.offset) * N;
 
   if (abs (side(2)) >= abs (side(1)))
@@ -5168,12 +5487,12 @@ function parts = explodedim (e, scale, ndec)
     if (side(2) >= 0)
       iy = mid(2) + tgap;
     else
-      iy = mid(2) - tgap - hgt;
+      iy = mid(2) - tgap - hgt - rise;
     endif
   else
     ## Dimension line lies up the sheet: the label goes beside it, and the
     ## text stays horizontal, so it is the width that must clear the line
-    iy = mid(2) - hgt / 2;
+    iy = mid(2) - (hgt + rise) / 2;
     if (side(1) >= 0)
       ix = mid(1) + tgap;
     else
@@ -5182,9 +5501,11 @@ function parts = explodedim (e, scale, ndec)
   endif
 
   t = mkent ('TEXT', e, [ix, iy]);
-  t.text = label;
+  t.text = main;
   t.height = hgt;
   parts(end+1) = t;
+  parts = [parts, stackparts(e, R, A, [ix, iy], 0.6 * hgt * numel (main), ...
+                             hgt)];
 
 endfunction
 

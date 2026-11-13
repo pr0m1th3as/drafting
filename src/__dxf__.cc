@@ -836,27 +836,38 @@ public:
   }
 
   // A dimension from its six definition points, rows in the order of group
-  // codes 10, 11, 13, 14, 15 and 16.  PLACES, the dimension's own, from 0,
-  // is an override of the style in ACAD's DSTYLE data: DIMDEC, and DIMADEC
-  // for an angle.  R12 programs ignore it; our reader takes it from any
-  // version.
+  // codes 10, 11, 13, 14, 15 and 16.  DSTYLE, rows of a group code and a
+  // value, overrides the style in ACAD's DSTYLE data: the dimension's own
+  // places, and its tolerance, which R12 carries in its text instead, so
+  // only the places go into an R12 file, where R12 programs ignore them and
+  // our reader takes them.  OWN is the DRAFTING data our reader restores the
+  // dimension from.
   void dimension (vector<Item>& dest, const Attr& a, const Matrix& P,
                   int type, const string& txt, double rot,
-                  const string& block, int places)
+                  const string& block, const Matrix& dstyle,
+                  const vector<Tag>& own)
   {
     Item it = start ("DIMENSION", a);
-    if (places >= 0)
+    vector<Tag> ds;
+    for (octave_idx_type k = 0; k < dstyle.rows (); k++)
     {
-      string n = to_string (places);
-      it.xdata = {Tag (1001, "ACAD"), Tag (1000, "DSTYLE"), Tag (1002, "{"),
-                  Tag (1070, "271"), Tag (1070, n)};
-      if (type == 2 || type == 5)
-      {
-        it.xdata.push_back (Tag (1070, "179"));
-        it.xdata.push_back (Tag (1070, n));
-      }
+      int code = static_cast<int> (dstyle(k,0));
+      bool real = code == 47 || code == 48 || code == 146;
+      if (opt.r12 && code != 271 && code != 179)
+        continue;
+      ds.push_back (Tag (1070, to_string (code)));
+      if (real)
+        ds.push_back (Tag (1040, fmtnum (dstyle(k,1))));
+      else
+        ds.push_back (Tag (1070, to_string (static_cast<int> (dstyle(k,1)))));
+    }
+    if (! ds.empty ())
+    {
+      it.xdata = {Tag (1001, "ACAD"), Tag (1000, "DSTYLE"), Tag (1002, "{")};
+      it.xdata.insert (it.xdata.end (), ds.begin (), ds.end ());
       it.xdata.push_back (Tag (1002, "}"));
     }
+    it.xdata.insert (it.xdata.end (), own.begin (), own.end ());
     Body b (it.data, opt.r12);
     auto p = [&] (int r) { return v3 (P(r,0), P(r,1), 0); };
     b.marker ("AcDbDimension");
@@ -2311,13 +2322,44 @@ drawingitems (Writer& w, vector<Item>& dest, const octave_value& D,
         blk.items = pic;
         w.blocks.push_back (blk);
         octave_map m = rec.map_value ();
-        int places = E.isfield ("decimals")
-                     ? static_cast<int> (mapnum (E, "decimals", i, -1)) : -1;
+        // A tolerance as given, with the text and places it was drawn
+        // with, for our reader: 'dimension', then each item by name
+        vector<Tag> own;
+        if (E.isfield ("tolerance"))
+        {
+          octave_value T = E.contents ("tolerance")(i);
+          if (! T.isempty ())
+          {
+            own = {Tag (1001, "DRAFTING"), Tag (1000, "dimension"),
+                   Tag (1000, "tolerance")};
+            if (T.is_string ())
+              own.push_back (Tag (1000, T.string_value ()));
+            else
+            {
+              Matrix t = T.matrix_value ();
+              for (octave_idx_type k = 0; k < t.numel (); k++)
+                own.push_back (Tag (1040, fmtnum (t(k))));
+            }
+            string form = mapstr (E, "form", i);
+            own.push_back (Tag (1000, "form"));
+            own.push_back (Tag (1000, form.empty () ? "deviations" : form));
+            string text = mapstr (E, "text", i);
+            if (! text.empty ())
+            {
+              own.push_back (Tag (1000, "text"));
+              own.push_back (Tag (1000, encodetext (text)));
+            }
+            own.push_back (Tag (1000, "decimals"));
+            own.push_back (Tag (1070, to_string (static_cast<int> (
+                                  mapnum (E, "decimals", i, -1)))));
+          }
+        }
         w.dimension (dest, a, m.contents ("pts")(0).matrix_value (),
                      m.contents ("angles")(0).int_value (),
-                     m.contents ("text")(0).string_value (),
+                     m.contents (w.opt.r12 ? "line" : "text")(0)
+                       .string_value (),
                      m.contents ("rotation")(0).double_value (), name,
-                     places);
+                     m.contents ("dstyle")(0).matrix_value (), own);
       }
   }
 }
@@ -2637,6 +2679,12 @@ struct Rec
   // given; for the angle places, -2 for none and -1 for those of DIMDEC
   int dimdec = -1;
   int dimadec = -2;
+  // Its tolerance from the same data: DIMTOL and DIMLIM, -1 for none
+  // given, and DIMTP and DIMTM, NaN for none
+  int dimtol = -1;
+  int dimlim = -1;
+  double dimtp = NAN;
+  double dimtm = NAN;
 
   bool has (int c) const
   {
@@ -2826,6 +2874,10 @@ public:
     string name;
     int dec = -1;
     int adec = -2;
+    int tol = 0;
+    int lim = 0;
+    double tp = 0;
+    double tm = 0;
   };
   vector<Dst> dimstyles;
   string dimstyle;
@@ -2953,6 +3005,14 @@ Reader::records (size_t a, size_t b) const
               r.dimdec = atoi (v.c_str ());
             else if (var == 179)
               r.dimadec = atoi (v.c_str ());
+            else if (var == 71)
+              r.dimtol = atoi (v.c_str ());
+            else if (var == 72)
+              r.dimlim = atoi (v.c_str ());
+            else if (var == 47)
+              r.dimtp = strtod (v.c_str (), nullptr);
+            else if (var == 48)
+              r.dimtm = strtod (v.c_str (), nullptr);
             var = -1;
           }
         }
@@ -3126,6 +3186,10 @@ Reader::load (const string& f)
             d.dec = static_cast<int> (r.num (271));
           if (r.has (179))
             d.adec = static_cast<int> (r.num (179));
+          d.tol = static_cast<int> (r.num (71));
+          d.lim = static_cast<int> (r.num (72));
+          d.tp = r.num (47);
+          d.tm = r.num (48);
           dimstyles.push_back (d);
         }
     }
@@ -4354,11 +4418,11 @@ shownplaces (const Reader& rd, const Rec& r)
   return p >= 0 && p <= 8 ? p : -1;
 }
 
-// A dimension raised from its definition points; PLACES, from 0, its own
-// precision, passed as 'Decimals'
+// A dimension raised from its definition points, TXT its text, EXTRA the
+// options it takes besides: its own places and its tolerance
 static octave_value
 raisedim (const octave_value& D, const Rec& r, double sc, const string& txt,
-          int places)
+          const octave_value_list& extra)
 {
   V3 L = r.pt (10) * sc, P1 = r.pt (13) * sc, P2 = r.pt (14) * sc;
   V3 Q = r.pt (15) * sc, A = r.pt (16) * sc;
@@ -4366,12 +4430,11 @@ raisedim (const octave_value& D, const Rec& r, double sc, const string& txt,
   string lbl = txt == "<>" ? "" : txt;
   // The measured text is the default, so a label is passed only when the
   // dimension overrides it
-  auto withlbl = [&lbl, places] (octave_value_list a)
+  auto withlbl = [&lbl, &extra] (octave_value_list a)
   {
     if (! lbl.empty ())
       a.append (ovl ("Text", lbl));
-    if (places >= 0)
-      a.append (ovl ("Decimals", static_cast<double> (places)));
+    a.append (extra);
     return a;
   };
   int t = static_cast<int> (r.num (70));
@@ -4599,6 +4662,78 @@ private:
   string m_layer, m_ltype;
   int m_colour, m_lw;
 
+  // A dimension: from the DRAFTING data we wrote, its tolerance as given
+  // with the text and places it was drawn with; otherwise from the file,
+  // its places where they differ from the drawing's, and a tolerance its
+  // style or its own override turns on
+  octave_value dimension (const octave_value& D, const Rec& r, double sc)
+  {
+    octave_value_list extra;
+    string txt = "<>";
+    int places = -1;
+    size_t k = 0;
+    while (k < r.xdata.size () && ! (r.xdata[k].first == 1000
+                                     && r.xdata[k].second == "dimension"))
+      k++;
+    if (k < r.xdata.size ())
+    {
+      for (k++; k < r.xdata.size (); k++)
+      {
+        const string& item = r.xdata[k].second;
+        if (r.xdata[k].first != 1000 || k + 1 >= r.xdata.size ())
+          continue;
+        if (item == "tolerance")
+        {
+          if (r.xdata[k+1].first == 1000)
+            extra.append (ovl ("Tolerance", r.xdata[++k].second));
+          else
+          {
+            vector<double> t;
+            while (k + 1 < r.xdata.size () && r.xdata[k+1].first == 1040)
+              t.push_back (tonum (r.xdata[++k].second));
+            extra.append (ovl ("Tolerance", rowvec (t)));
+          }
+        }
+        else if (item == "form")
+          extra.append (ovl ("Form", r.xdata[++k].second));
+        else if (item == "text")
+          txt = m_rd.decode (r.xdata[++k].second);
+        else if (item == "decimals")
+          places = atoi (r.xdata[++k].second.c_str ());
+      }
+    }
+    else
+    {
+      txt = m_rd.decode (r.str (1, "<>"));
+      places = shownplaces (m_rd, r);
+      if (places == m_dec)
+        places = -1;
+      string name = trim (r.str (3));
+      const Reader::Dst *d = dimstyleof (m_rd, name.empty () ? "STANDARD"
+                                                             : name);
+      int tol = r.dimtol >= 0 ? r.dimtol : (d ? d->tol : 0);
+      int lim = r.dimlim >= 0 ? r.dimlim : (d ? d->lim : 0);
+      double tp = ! std::isnan (r.dimtp) ? r.dimtp : (d ? d->tp : 0);
+      double tm = ! std::isnan (r.dimtm) ? r.dimtm : (d ? d->tm : 0);
+      if ((tol == 1 || lim == 1) && -tm < tp)
+      {
+        if (tp == tm)
+          extra.append (ovl ("Tolerance", tp));
+        else
+          extra.append (ovl ("Tolerance", rowvec ({-tm, tp})));
+        // Limits need the measured value, and are drawn only where the
+        // package draws them; elsewhere the deviations stand
+        int type = static_cast<int> (r.num (70)) & 7;
+        if (lim == 1 && type != 4 && type != 6 && (txt == "<>"
+                                                   || txt.empty ()))
+          extra.append (ovl ("Form", "limits"));
+      }
+    }
+    if (places >= 0)
+      extra.append (ovl ("Decimals", static_cast<double> (places)));
+    return raisedim (D, r, sc, txt, extra);
+  }
+
   // The records D holds moved to PARTS, and D left with NONE
   octave_value aside (const octave_value& D, vector<octave_value>& parts,
                       const octave_map& none)
@@ -4778,11 +4913,7 @@ private:
       return D;
     }
     if (T == "DIMENSION")
-    {
-      int p = shownplaces (m_rd, r);
-      return raisedim (D, r, sc, m_rd.decode (r.str (1, "<>")),
-                       p != m_dec ? p : -1);
-    }
+      return dimension (D, r, sc);
     if (T == "HATCH")
     {
       HatchIn h = hatchtags (r, sc);

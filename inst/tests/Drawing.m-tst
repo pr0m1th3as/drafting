@@ -33,7 +33,7 @@
 %!               'angles'; 'angle'; ...
 %!               'text'; 'height'; 'offset'; 'direction'; 'pattern'; ...
 %!               'spacing'; 'block'; 'scale'; 'bulge'; 'shape'; ...
-%!               'decimals'});
+%!               'decimals'; 'tolerance'; 'form'});
 %!error<draw.Drawing: NAME must be a non-empty character vector.> ...
 %! draw.Drawing (42)
 %!error<draw.Drawing: NAME must be a non-empty character vector.> ...
@@ -497,7 +497,7 @@
 %! D = D.arc ([0, 0], 1, 0, 90).circle ([0, 0], 2).text ([0, 0], 'A');
 %! D = D.hatch (geom.Region ([0, 0; 1, 0; 1, 1])).dim ([0, 0], [1, 0], 5);
 %! assert_equal (numel (D.Entities), 7);
-%! assert_equal (numel (fieldnames (D.Entities)), 21);
+%! assert_equal (numel (fieldnames (D.Entities)), 23);
 %! assert_equal ({D.Entities.type}, {'line', 'polyline', 'arc', 'circle', ...
 %!                                   'text', 'hatch', 'dim'});
 
@@ -553,6 +553,36 @@
 %! draw.Drawing ().angdim ([0, 0], [1, 0], [0, 1], 5, 'Decimals', '2')
 %!error<draw.Drawing.ordinate: Decimals must be an integer from 0 to 8.> ...
 %! draw.Drawing ().ordinate ([0, 0], [1, 1], 'x', [1, -1], 'Decimals', [])
+%!error<draw.Drawing.dim: Tolerance must be a positive scalar, a pair \[LOWER, UPPER\], 'min' or 'max'.> ...
+%! draw.Drawing ().dim ([0, 0], [1, 0], 5, 'Tolerance', 0)
+%!error<draw.Drawing.dim: Tolerance must be a positive scalar, a pair \[LOWER, UPPER\], 'min' or 'max'.> ...
+%! draw.Drawing ().dim ([0, 0], [1, 0], 5, 'Tolerance', [0.1, 0.2, 0.3])
+%!error<draw.Drawing.dim: Tolerance must be a positive scalar, a pair \[LOWER, UPPER\], 'min' or 'max'.> ...
+%! draw.Drawing ().dim ([0, 0], [1, 0], 5, 'Tolerance', NaN)
+%!error<draw.Drawing.dim: Tolerance must be a positive scalar, a pair \[LOWER, UPPER\], 'min' or 'max'.> ...
+%! draw.Drawing ().dim ([0, 0], [1, 0], 5, 'Tolerance', 'least')
+%!error<draw.Drawing.diam: Tolerance must be a positive scalar, a pair \[LOWER, UPPER\], 'min' or 'max'.> ...
+%! draw.Drawing ().diam ([0, 0], 5, 'Tolerance', {0.1})
+%!error<draw.Drawing.angdim: Tolerance must be \[LOWER, UPPER\] with LOWER below UPPER.> ...
+%! draw.Drawing ().angdim ([0, 0], [1, 0], [0, 1], 5, 'Tolerance', [0.1, -0.1])
+%!error<draw.Drawing.dim: Tolerance must be \[LOWER, UPPER\] with LOWER below UPPER.> ...
+%! draw.Drawing ().dim ([0, 0], [1, 0], 5, 'Tolerance', [0.1, 0.1])
+%!error<draw.Drawing.ordinate: Tolerance 'max' is not available for an ordinate dimension.> ...
+%! draw.Drawing ().ordinate ([0, 0], [1, 1], 'x', [1, -1], 'Tolerance', 'max')
+%!error<draw.Drawing.dim: Form must be 'deviations' or 'limits'.> ...
+%! draw.Drawing ().dim ([0, 0], [1, 0], 5, 'Tolerance', 0.1, 'Form', 'class')
+%!error<draw.Drawing.dim: Form needs a Tolerance.> ...
+%! draw.Drawing ().dim ([0, 0], [1, 0], 5, 'Form', 'limits')
+%!error<draw.Drawing.diam: Form 'limits' needs a numeric Tolerance.> ...
+%! draw.Drawing ().diam ([0, 0], 5, 'Tolerance', 'max', 'Form', 'limits')
+%!error<draw.Drawing.radius: Form 'limits' is not available for a radius.> ...
+%! draw.Drawing ().radius ([0, 0], 5, 'Tolerance', 0.1, 'Form', 'limits')
+%!error<draw.Drawing.ordinate: Form 'limits' is not available for an ordinate dimension.> ...
+%! draw.Drawing ().ordinate ([0, 0], [1, 1], 'x', [1, -1], 'Tolerance', 0.1, ...
+%!                           'Form', 'limits')
+%!error<draw.Drawing.dim: Form 'limits' needs the measured value, which Text replaces.> ...
+%! draw.Drawing ().dim ([0, 0], [1, 0], 5, 'Text', 'A', 'Tolerance', 0.1, ...
+%!                      'Form', 'limits')
 %!error<draw.colour: 'puce' is not a named colour> ...
 %! D = draw.Drawing (); D.Colour = 'puce';
 
@@ -2259,6 +2289,101 @@
 %! E = entities (D);
 %! assert_equal (E.text, '<>');
 
+%!function T = tolerancetexts (D)
+%!  E = entities (D, 'dimensions', 'explode');
+%!  T = {E(strcmp ({E.type}, 'TEXT')).text};
+%!endfunction
+
+%!test  # a symmetric tolerance follows the size on its line
+%! D = draw.Drawing ().dim ([0, 0], [25, 0], 5, 'Tolerance', 0.1);
+%! assert_equal (tolerancetexts (D), {'25 %%p0.1'});
+
+%!test  # deviations stand to the right, the upper above the lower
+%! D = draw.Drawing ().dim ([0, 0], [25, 0], 5, 'Tolerance', [-0.1, 0.05]);
+%! assert_equal (tolerancetexts (D), {'25', '+0.05', '-0.10'});
+
+%!test  # the lower deviation on the size's baseline, the upper a line above
+%! D = draw.Drawing ().dim ([0, 0], [25, 0], 5, 'Tolerance', [-0.1, 0.05]);
+%! E = entities (D, 'dimensions', 'explode');
+%! T = E(strcmp ({E.type}, 'TEXT'));
+%! assert_equal (T(3).pts(2), T(1).pts(2), 1e-12);
+%! assert_equal (T(2).pts(2) - T(1).pts(2), 1.5 * T(1).height, 1e-12);
+%! assert_equal (T(2).pts(1) > T(1).pts(1) + 0.6 * T(1).height * 2, true);
+
+%!test  # a zero deviation is a bare 0
+%! D = draw.Drawing ().dim ([0, 0], [25, 0], 5, 'Tolerance', [0, 0.021]);
+%! assert_equal (tolerancetexts (D), {'25', '+0.021', '0'});
+
+%!test  # equal and opposite deviations are written as a symmetric tolerance
+%! D = draw.Drawing ().dim ([0, 0], [25, 0], 5, 'Tolerance', [-0.2, 0.2]);
+%! assert_equal (tolerancetexts (D), {'25 %%p0.2'});
+
+%!test  # deviations show their places, whatever Decimals says
+%! D = draw.Drawing ().dim ([0, 0], [25, 0], 5, 'Tolerance', [-0.005, 0.01]);
+%! D.Decimals = 0;
+%! assert_equal (tolerancetexts (D), {'25', '+0.010', '-0.005'});
+
+%!test  # limits replace the size, the upper above the lower
+%! D = draw.Drawing ().dim ([0, 0], [25, 0], 5, 'Tolerance', [-0.1, 0.05], ...
+%!                          'Form', 'limits');
+%! assert_equal (tolerancetexts (D), {'24.90', '25.05'});
+
+%!test  # limits come from the size as shown
+%! D = draw.Drawing ().dim ([0, 0], [25.004, 0], 5, 'Tolerance', [0, 0.021], ...
+%!                          'Form', 'limits');
+%! assert_equal (tolerancetexts (D), {'25.000', '25.021'});
+
+%!test  # a size limited in one direction
+%! D = draw.Drawing ().dim ([0, 0], [30.5, 0], 5, 'Tolerance', 'min');
+%! assert_equal (tolerancetexts (D), {'30.5 min.'});
+
+%!test  # or the other
+%! D = draw.Drawing ().dim ([0, 0], [30.5, 0], 5, 'Tolerance', 'MAX');
+%! assert_equal (tolerancetexts (D), {'30.5 max.'});
+
+%!test  # a tolerance follows the text given
+%! D = draw.Drawing ().dim ([0, 0], [25, 0], 5, 'Text', 'A', ...
+%!                          'Tolerance', 0.1);
+%! assert_equal (tolerancetexts (D), {'A %%p0.1'});
+
+%!test  # each limit of a diameter carries the diameter sign
+%! D = draw.Drawing ().diam ([0, 0], 12.5, 'Tolerance', [0, 0.021], ...
+%!                           'Form', 'limits');
+%! assert_equal (tolerancetexts (D), {'%%c25.000', '%%c25.021'});
+
+%!test  # an angle's tolerance carries the degree sign
+%! D = draw.Drawing ().angdim ([0, 0], [10, 0], [10, 7], 5, 'Tolerance', 0.25);
+%! assert_equal (tolerancetexts (D), {'34.99%%d %%p0.25%%d'});
+
+%!test  # and so do its limits
+%! D = draw.Drawing ().angdim ([0, 0], [10, 0], [10, 7], 5, ...
+%!                             'Tolerance', [-0.25, 0.25], 'Form', 'limits');
+%! assert_equal (tolerancetexts (D), {'34.74%%d', '35.24%%d'});
+
+%!test  # a radius takes deviations
+%! D = draw.Drawing ().radius ([0, 0], 5, 'Tolerance', [-0.1, 0]);
+%! assert_equal (tolerancetexts (D), {'R5', '0', '-0.1'});
+
+%!test  # a radius limited in one direction
+%! D = draw.Drawing ().radius ([0, 0], 0.5, 'Tolerance', 'max');
+%! assert_equal (tolerancetexts (D), {'R0.5 max.'});
+
+%!test  # an ordinate dimension takes deviations
+%! D = draw.Drawing ().ordinate ([0, 0], [20, 15], 'x', [20, -10], ...
+%!                               'Tolerance', [-0.02, 0.01]);
+%! assert_equal (tolerancetexts (D), {'20', '+0.01', '-0.02'});
+
+%!test  # a label with deviations below the dimension line clears it
+%! D = draw.Drawing ().dim ([0, 0], [100, 0], -20, 'Direction', ...
+%!                          'horizontal', 'Tolerance', [-0.1, 0.05]);
+%! E = entities (D, 'dimensions', 'explode');
+%! T = E(strcmp ({E.type}, 'TEXT'));
+%! assert_equal (T(2).pts(2) + T(2).height < E(3).pts(1,2), true);
+
+%!test  # a limit in one direction is text in the dimension record
+%! D = draw.Drawing ().dim ([0, 0], [30.5, 0], 5, 'Tolerance', 'min');
+%! assert_equal (entities (D).text, '<> min.');
+
 %!test  # DimScale multiplies the ornament without moving the dimension line
 %! D = draw.Drawing ().dim ([0, 0], [100, 0], -20, 'Direction', 'horizontal');
 %! E1 = entities (D, 'dimensions', 'explode');
@@ -3315,6 +3440,50 @@
 %!   D = draw.Drawing ().dim ([0, 0], [10, 10], -5, 'Decimals', 4);
 %!   write (D, fn, 'Dimensions', 'explode');
 %!   assert_equal (numel (strfind (fileread (fn), "14.1421")), 1);
+%! unwind_protect_cleanup
+%!   [~] = unlink (fn);
+%! end_unwind_protect
+%!test  # write: deviations override the style
+%! fn = [tempname(), '.dxf'];
+%! unwind_protect
+%!   write (draw.Drawing ().dim ([0, 0], [25, 0], -5, ...
+%!                               'Tolerance', [-0.1, 0.05]), fn);
+%!   txt = fileread (fn);
+%!   assert_equal (numel (strfind (txt, sprintf ("1070\n71\n1070\n1\n"))), 1);
+%!   assert_equal (numel (strfind (txt, sprintf ("1070\n47\n1040\n0.05\n"))), 1);
+%!   assert_equal (numel (strfind (txt, sprintf ("1070\n48\n1040\n0.1\n"))), 1);
+%! unwind_protect_cleanup
+%!   [~] = unlink (fn);
+%! end_unwind_protect
+%!test  # write: limits turn on DIMLIM
+%! fn = [tempname(), '.dxf'];
+%! unwind_protect
+%!   write (draw.Drawing ().dim ([0, 0], [25, 0], -5, 'Tolerance', 0.1, ...
+%!                               'Form', 'limits'), fn);
+%!   assert_equal (numel (strfind (fileread (fn), ...
+%!                 sprintf ("1070\n72\n1070\n1\n"))), 1);
+%! unwind_protect_cleanup
+%!   [~] = unlink (fn);
+%! end_unwind_protect
+%!test  # write: R12 writes the tolerance on the dimension's line of text
+%! fn = [tempname(), '.dxf'];
+%! unwind_protect
+%!   write (draw.Drawing ().dim ([0, 0], [25, 0], -5, ...
+%!                               'Tolerance', [-0.1, 0.05]), fn, ...
+%!          'Version', 'R12');
+%!   txt = fileread (fn);
+%!   assert_equal (numel (strfind (txt, sprintf ("<> +0.05/-0.10\n"))), 1);
+%!   assert_equal (isempty (strfind (txt, sprintf ("1070\n71\n"))), true);
+%! unwind_protect_cleanup
+%!   [~] = unlink (fn);
+%! end_unwind_protect
+%!test  # write: and the limits as their text
+%! fn = [tempname(), '.dxf'];
+%! unwind_protect
+%!   write (draw.Drawing ().dim ([0, 0], [25, 0], -5, 'Tolerance', 0.1, ...
+%!                               'Form', 'limits'), fn, 'Version', 'R12');
+%!   assert_equal (numel (strfind (fileread (fn), ...
+%!                 sprintf ("25.1/24.9\n"))), 1);
 %! unwind_protect_cleanup
 %!   [~] = unlink (fn);
 %! end_unwind_protect

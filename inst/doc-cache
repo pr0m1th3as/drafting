@@ -374,10 +374,12 @@ draw.Drawing.angdim
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 862
+# length: 1071
 draw.Drawing: D = angdim (D, V, P1, P2, RAD)
 draw.Drawing: D = angdim (..., 'Text', S)
 draw.Drawing: D = angdim (..., 'Decimals', N)
+draw.Drawing: D = angdim (..., 'Tolerance', T)
+draw.Drawing: D = angdim (..., 'Form', FORM)
 Append an angular dimension at a vertex.
 
 V is the vertex, P1 and P2 points along the two arms,
@@ -385,7 +387,10 @@ and RAD the radius at which the dimension arc is struck. The
 option 'Text' gives the text S, which is otherwise the
 measured angle and the degree symbol, and the option
 'Decimals' the places N the angle shows, an integer from
-0 to 8, in place of the drawing's Decimals.
+0 to 8, in place of the drawing's Decimals. The options
+'Tolerance' and 'Form' are those of dim, in
+degrees, every number carrying the degree sign:
+15.5 ±0.25.
 
 The angle measured is the one from the first arm to the second going
 counter-clockwise, so giving the arms the other way round dimensions the
@@ -611,11 +616,13 @@ draw.Drawing.diam
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 929
+# length: 1108
 draw.Drawing: D = diam (D, C, R)
 draw.Drawing: D = diam (..., 'Angle', ANG)
 draw.Drawing: D = diam (..., 'Text', S)
 draw.Drawing: D = diam (..., 'Decimals', N)
+draw.Drawing: D = diam (..., 'Tolerance', T)
+draw.Drawing: D = diam (..., 'Form', FORM)
 Append a diameter dimension across a circle.
 
 C is the centre and R the radius. The option
@@ -624,7 +631,9 @@ along, in degrees, 45 by default, which keeps it clear of the centre
 lines. The option 'Text' gives the text S, which is
 otherwise the diameter symbol and the measured figure, and the option
 'Decimals' the places N the figure shows, an integer from
-0 to 8, in place of the drawing's Decimals.
+0 to 8, in place of the drawing's Decimals. The options
+'Tolerance' and 'Form' are those of dim; each
+limit carries the diameter sign.
 
 A round feature is dimensioned by its diameter and never by its radius,
 because a diameter is what a bore gauge and a micrometer measure. A
@@ -656,11 +665,13 @@ draw.Drawing.dim
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1352
+# length: 2503
 draw.Drawing: D = dim (D, P1, P2, OFFSET)
 draw.Drawing: D = dim (..., 'Direction', DIR)
 draw.Drawing: D = dim (..., 'Text', S)
 draw.Drawing: D = dim (..., 'Decimals', N)
+draw.Drawing: D = dim (..., 'Tolerance', T)
+draw.Drawing: D = dim (..., 'Form', FORM)
 Append a dimension measuring between P1 and P2.
 
 OFFSET is the perpendicular distance in millimetres from the
@@ -689,6 +700,30 @@ which is precisely what keeps it truthful when the geometry changes.
 The option 'Decimals' gives the places N this dimension
 shows, an integer from 0 to 8, in place of the drawing's
 Decimals.
+
+The option 'Tolerance' gives the dimension a tolerance T,
+written as ISO 406 writes it:
+
+a positive number, a tolerance symmetric about the size:
+25 ±0.1;
+a row [LOWER, UPPER], the lower and the upper
+deviation, LOWER below UPPER, written to the right of the
+size, the upper above the lower, both to the same places and a zero as
+a bare 0; equal and opposite deviations are written as a symmetric
+tolerance;
+'min' or 'max', a size limited in one direction
+only: 30.5 min.
+
+A tolerance shows the places it needs, whatever Decimals says,
+at the height of the size, and follows the text given with
+'Text'. The option 'Form' set to 'limits'
+writes a numeric tolerance as the limits of size instead, the upper
+above the lower, computed from the size as it is shown and both to the
+same places; 'deviations', the default, writes the deviations.
+Limits need the measured size, so they cannot go with 'Text'.
+A DXF file states a numeric tolerance as an override of the dimension
+style, so a CAD program that measures the dimension again shows it;
+min. and max. are text.
 
 
 # name: <cell-element>
@@ -1163,10 +1198,11 @@ draw.Drawing.ordinate
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1712
+# length: 1842
 draw.Drawing: D = ordinate (D, O, P, AXIS, L)
 draw.Drawing: D = ordinate (..., 'Text', S)
 draw.Drawing: D = ordinate (..., 'Decimals', N)
+draw.Drawing: D = ordinate (..., 'Tolerance', T)
 Append an ordinate dimension, the distance of a point from a datum.
 
 O is the datum, P the feature dimensioned and AXIS
@@ -1188,7 +1224,8 @@ Decimals places, measured each time the drawing is plotted or
 written, so it follows the geometry; the option 'Text' gives the
 literal text S instead, and the option 'Decimals' the
 places N the value shows, an integer from 0 to 8, in place of the
-drawing's Decimals.
+drawing's Decimals. The option 'Tolerance' is that of
+dim, a symmetric tolerance or deviations only.
 
 ## A plate with two holes, dimensioned from its lower left corner
 D = draw.Drawing ();
@@ -1599,16 +1636,18 @@ draw.Drawing.radius
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 550
+# length: 694
 draw.Drawing: D = radius (D, C, R)
 draw.Drawing: D = radius (..., 'Angle', ANG)
 draw.Drawing: D = radius (..., 'Text', S)
 draw.Drawing: D = radius (..., 'Decimals', N)
+draw.Drawing: D = radius (..., 'Tolerance', T)
 Append a radius dimension from a centre out to an arc.
 
 The arguments and options are those of diam, and ANG is the
 direction the leader runs in. The text is otherwise the letter R and
-the figure.
+the figure. A radius takes a symmetric tolerance, deviations, or
+'min' and 'max' (R0.5 max.), but no limits.
 
 Use it for a fillet or any arc that is less than a full circle, where
 there is no diameter to measure across.
@@ -2314,7 +2353,7 @@ draw.read
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 3311
+# length: 3597
 drafting: D = draw.read (FILE)
 Read a drawing from an ASCII DXF file.
 
@@ -2352,6 +2391,12 @@ $DIMSTYLE, else the R12 header's $LUPREC, else 2. A
 dimension the file shows at other places, by another style or by its own
 override, and an angle at the places its style gives angles
 (DIMADEC), keeps those places as its own 'Decimals'.
+
+A dimension's tolerance comes back with it: one the package wrote exactly,
+from the data it keeps with the dimension, and one another program wrote,
+from DIMTOL or DIMLIM of its style or of its own override,
+as a numeric tolerance, written as limits only where the package draws
+them.
 
 A drawing lies in the plane z = 0. An entity whose normal points
 down the z axis is mirrored into the plane facing up, as 2-D CAD
