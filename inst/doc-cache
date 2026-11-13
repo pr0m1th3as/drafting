@@ -2560,9 +2560,10 @@ draw.titleblock
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 2153
+# length: 2749
 drafting: D = draw.titleblock (SIZE, FIELDS)
 drafting: D = draw.titleblock (SIZE)
+drafting: D = draw.titleblock (..., 'Orientation', ORIENT)
 drafting: SIZES = draw.titleblock ()
 A sheet frame with a title block in its corner.
 
@@ -2575,10 +2576,20 @@ SIZES = draw.titleblock () lists the sheet sizes.
 
 Sheet sizes
 
-The ISO A series from A4 to A0, by name, in landscape. Every one is in
-millimetres, and the border is inset 10 mm from the trimmed edge except at
-the left, where it is inset 20 mm to leave a filing margin, which is what
-ISO 5457 asks for and what a drawing loses if it is punched without.
+The ISO A series from A4 to A0, by name, in landscape unless the option
+'Orientation' is 'portrait', which stands the sheet
+upright, as A4 usually is; or any sheet as a row [W,
+H] in millimetres, used as given, with room for the frame and the
+title block, at least 210 by 76 mm. The border is inset 10 mm from the
+trimmed edge except at the left, where it is inset 20 mm to leave a filing
+margin, which is what ISO 5457 asks for and what a drawing loses if it is
+punched without. The title block stands in the bottom right corner of the
+frame either way.
+
+The four centring marks of ISO 5457 position the sheet when it is
+reproduced: one at each end of the sheet's two axes of symmetry, from the
+trimmed edge to 5 mm inside the frame, at the weight of the frame. A mark
+that would run into the title block stops at the frame.
 
 Fields
 

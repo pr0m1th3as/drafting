@@ -18,6 +18,7 @@
 ## -*- texinfo -*-
 ## @deftypefn  {drafting} {@var{D} =} draw.titleblock (@var{SIZE}, @var{FIELDS})
 ## @deftypefnx {drafting} {@var{D} =} draw.titleblock (@var{SIZE})
+## @deftypefnx {drafting} {@var{D} =} draw.titleblock (@dots{}, @qcode{'Orientation'}, @var{ORIENT})
 ## @deftypefnx {drafting} {@var{SIZES} =} draw.titleblock ()
 ##
 ## A sheet frame with a title block in its corner.
@@ -31,10 +32,20 @@
 ##
 ## @subheading Sheet sizes
 ##
-## The ISO A series from A4 to A0, by name, in landscape.  Every one is in
-## millimetres, and the border is inset 10 mm from the trimmed edge except at
-## the left, where it is inset 20 mm to leave a filing margin, which is what
-## ISO 5457 asks for and what a drawing loses if it is punched without.
+## The ISO A series from A4 to A0, by name, in landscape unless the option
+## @qcode{'Orientation'} is @qcode{'portrait'}, which stands the sheet
+## upright, as A4 usually is; or any sheet as a row @code{[@var{W},
+## @var{H}]} in millimetres, used as given, with room for the frame and the
+## title block, at least 210 by 76 mm.  The border is inset 10 mm from the
+## trimmed edge except at the left, where it is inset 20 mm to leave a filing
+## margin, which is what ISO 5457 asks for and what a drawing loses if it is
+## punched without.  The title block stands in the bottom right corner of the
+## frame either way.
+##
+## The four centring marks of ISO 5457 position the sheet when it is
+## reproduced: one at each end of the sheet's two axes of symmetry, from the
+## trimmed edge to 5 mm inside the frame, at the weight of the frame.  A mark
+## that would run into the title block stops at the frame.
 ##
 ## @subheading Fields
 ##
@@ -79,11 +90,6 @@
 
 function D = titleblock (varargin)
 
-  ## Input validation
-  if (numel (varargin) > 2)
-    error ("draw.titleblock: invalid number of input arguments.");
-  endif
-
   T = {'A4', 297, 210; 'A3', 420, 297; 'A2', 594, 420; ...
        'A1', 841, 594; 'A0', 1189, 841};
 
@@ -93,27 +99,69 @@ function D = titleblock (varargin)
   endif
 
   SIZE = varargin{1};
-  if (! ischar (SIZE) || ! isrow (SIZE))
-    error ("draw.titleblock: SIZE must be a character vector.");
-  endif
-  k = find (strcmpi (SIZE, T(:,1)), 1);
-  if (isempty (k))
-    error (strcat ("draw.titleblock: '%s' is not a known sheet size; use", ...
-                   " draw.titleblock () for the list."), SIZE);
-  endif
-
   F = struct ();
-  if (numel (varargin) > 1)
-    F = varargin{2};
+  opts = varargin(2:end);
+  if (! isempty (opts) && ! ischar (opts{1}))
+    F = opts{1};
+    opts = opts(2:end);
     if (! isstruct (F) || ! isscalar (F))
       error ("draw.titleblock: FIELDS must be a scalar struct.");
     endif
   endif
+  if (mod (numel (opts), 2) != 0)
+    error ("draw.titleblock: Name/Value arguments must come in pairs.");
+  endif
+  ORIENT = '';
+  for ii = 1:2:numel (opts)
+    name = opts{ii};
+    if (! ischar (name) || ! isrow (name))
+      error ("draw.titleblock: option names must be character vectors.");
+    endif
+    switch (lower (name))
+      case 'orientation'
+        ORIENT = opts{ii+1};
+        if (! (ischar (ORIENT) && isrow (ORIENT)
+               && any (strcmpi (ORIENT, {'landscape', 'portrait'}))))
+          error (strcat ("draw.titleblock: Orientation must be", ...
+                         " 'landscape' or 'portrait'."));
+        endif
+        ORIENT = lower (ORIENT);
+      otherwise
+        error ("draw.titleblock: unknown option '%s'.", name);
+    endswitch
+  endfor
 
-  W = T{k,2};
-  H = T{k,3};
+  if (ischar (SIZE) && isrow (SIZE))
+    k = find (strcmpi (SIZE, T(:,1)), 1);
+    if (isempty (k))
+      error (strcat ("draw.titleblock: '%s' is not a known sheet size;", ...
+                     " use draw.titleblock () for the list."), SIZE);
+    endif
+    W = T{k,2};
+    H = T{k,3};
+    if (strcmp (ORIENT, 'portrait'))
+      [W, H] = deal (H, W);
+    endif
+    sname = T{k,1};
+  elseif (isnumeric (SIZE) && isreal (SIZE) && isequal (size (SIZE), [1, 2])
+          && all (isfinite (SIZE)) && all (SIZE > 0))
+    if (! isempty (ORIENT))
+      error (strcat ("draw.titleblock: Orientation is for a named size;", ...
+                     " a sheet [W, H] is used as given."));
+    endif
+    W = double (SIZE(1));
+    H = double (SIZE(2));
+    if (W < 210 || H < 76)
+      error (strcat ("draw.titleblock: SIZE must leave room for the", ...
+                     " frame and the title block, at least 210 by 76 mm."));
+    endif
+    sname = sprintf ('%g x %g', W, H);
+  else
+    error (strcat ("draw.titleblock: SIZE must be a sheet name or a row", ...
+                   " [W, H] in millimetres."));
+  endif
 
-  D = draw.Drawing (sprintf ('%s sheet', T{k,1}));
+  D = draw.Drawing (sprintf ('%s sheet', sname));
   D = D.layer ('SHEET', 'Plot', false);
   D = D.layer ('FRAME', 'LineWeight', 0.7);
   D = D.layer ('TITLE', 'LineWeight', 0.25);
@@ -131,6 +179,20 @@ function D = titleblock (varargin)
   bh = 56;
   x0 = W - 10 - bw;
   y0 = 10;
+
+  ## The centring marks, at the ends of the sheet's axes of symmetry, from
+  ## the trimmed edge to 5 mm inside the frame, short of the title block
+  reach = [15, 15, 25, 15];
+  if (W / 2 > x0)
+    reach(1) = 10;
+  endif
+  if (H / 2 < y0 + bh)
+    reach(4) = 10;
+  endif
+  D = D.line ([W / 2, 0], [W / 2, reach(1)]);
+  D = D.line ([W / 2, H], [W / 2, H - reach(2)]);
+  D = D.line ([0, H / 2], [reach(3), H / 2]);
+  D = D.line ([W, H / 2], [W - reach(4), H / 2]);
   PL = geom.Polyline ([x0, y0; x0 + bw, y0; x0 + bw, y0 + bh; x0, y0 + bh], ...
                       'Closed', true);
   D = D.polyline (PL);
@@ -215,6 +277,36 @@ endfunction
 %! [~, W, H] = bbox (draw.titleblock ('A0'));
 %! assert_equal (W > H, true);
 
+%!test  # a portrait A4 stands upright
+%! [~, W, H] = bbox (draw.titleblock ('A4', 'Orientation', 'portrait'));
+%! assert_equal ([W, H], [210, 297], 1e-12);
+
+%!test  # with the title block in the bottom right corner of its frame
+%! D = draw.titleblock ('A4', struct ('title', 'X'), 'Orientation', 'Portrait');
+%! E = entities (D);
+%! P = E(strcmp ({E.type}, 'POLYLINE'));
+%! assert_equal ([min(P(3).pts); max(P(3).pts)], [20, 10; 200, 66], 1e-12);
+
+%!test  # a sheet of any size, used as given
+%! D = draw.titleblock ([500, 350]);
+%! [~, W, H] = bbox (D);
+%! assert_equal ([W, H], [500, 350], 1e-12);
+%! assert_equal (D.Name, '500 x 350 sheet');
+
+%!test  # four centring marks, from the trimmed edge to 5 mm inside the frame
+%! E = entities (draw.titleblock ('A3'));
+%! L = E(strcmp ({E.type}, 'LINE') & strcmp ({E.layer}, 'FRAME'));
+%! assert_equal (numel (L), 4);
+%! assert_equal (L(1).pts, [210, 0; 210, 15], 1e-12);
+%! assert_equal (L(2).pts, [210, 297; 210, 282], 1e-12);
+%! assert_equal (L(3).pts, [0, 148.5; 25, 148.5], 1e-12);
+%! assert_equal (L(4).pts, [420, 148.5; 405, 148.5], 1e-12);
+
+%!test  # a centring mark over the title block stops at the frame
+%! E = entities (draw.titleblock ('A4'));
+%! L = E(strcmp ({E.type}, 'LINE') & strcmp ({E.layer}, 'FRAME'));
+%! assert_equal (L(1).pts, [148.5, 0; 148.5, 10], 1e-12);
+
 %!test  # the sheet is drawn on three layers of its own
 %! D = draw.titleblock ('A4', struct ('title', 'BRACKET'));
 %! assert_equal (D.layers (), {'0', 'FRAME', 'SHEET', 'TITLE'});
@@ -270,8 +362,24 @@ endfunction
 %! assert_equal (min (B(:,1)), 20, 1e-12);
 %! assert_equal (min (B(:,2)), 10, 1e-12);
 
-%!error<draw.titleblock: invalid number of input arguments.> ...
+%!error<draw.titleblock: Name/Value arguments must come in pairs.> ...
 %! draw.titleblock ('A4', struct (), 1)
+%!error<draw.titleblock: option names must be character vectors.> ...
+%! draw.titleblock ('A4', struct (), 1, 2)
+%!error<draw.titleblock: unknown option 'Scale'.> ...
+%! draw.titleblock ('A4', 'Scale', 2)
+%!error<draw.titleblock: Orientation must be 'landscape' or 'portrait'.> ...
+%! draw.titleblock ('A4', 'Orientation', 'upright')
+%!error<draw.titleblock: Orientation is for a named size; a sheet \[W, H\] is used as given.> ...
+%! draw.titleblock ([500, 350], 'Orientation', 'portrait')
+%!error<draw.titleblock: SIZE must leave room for the frame and the title block, at least 210 by 76 mm.> ...
+%! draw.titleblock ([200, 300])
+%!error<draw.titleblock: SIZE must leave room for the frame and the title block, at least 210 by 76 mm.> ...
+%! draw.titleblock ([300, 70])
+%!error<draw.titleblock: SIZE must be a sheet name or a row \[W, H\] in millimetres.> ...
+%! draw.titleblock ([500; 350])
+%!error<draw.titleblock: SIZE must be a sheet name or a row \[W, H\] in millimetres.> ...
+%! draw.titleblock ([500, -350])
 %!error<draw.titleblock: 'A9' is not a known sheet size; use draw.titleblock \(\) for the list.> ...
 %! draw.titleblock ('A9')
 %!error<draw.titleblock: FIELDS must be a scalar struct.> ...
