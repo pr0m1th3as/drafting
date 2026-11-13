@@ -2,7 +2,7 @@
 # name: cache
 # type: cell
 # rows: 3
-# columns: 252
+# columns: 253
 # name: <cell-element>
 # type: sq_string
 # elements: 1
@@ -643,6 +643,55 @@ D = draw.Drawing ().circle ([10, 10; 30, 10; 50, 10], 4);
 # elements: 1
 # length: 59
 Append full circles centred on C with radius R millimetres.
+
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 18
+draw.Drawing.datum
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 1278
+draw.Drawing: D = datum (D, P, LETTER)
+Append a datum feature symbol: the letter that names a datum, standing
+on the feature that establishes it.
+
+The letter, one capital, as ISO 5459 asks, is written in a square frame,
+joined by a stem to a triangle whose base stands on the feature, as ISO
+1101 and ISO 7083 draw it. The same letter in a tolerance frame's
+datums, through tolframe, refers to this feature.
+
+P is two points, one per row: where the base of the triangle
+stands, centred, on the outline of the feature or on the extension of a
+dimension line, and where the stem meets the letter's frame. The
+triangle faces from the first point towards the second, so it stands
+square on a face at any angle; the frame stays upright, the stem meeting
+the middle of the side nearest the triangle. The triangle is drawn
+blank, which ISO 1101 allows as it allows a solid one.
+
+The frame is as tall as a tolerance frame, twice the height of
+dimension text, and the triangle's sides two fifths of that, as ISO 7083
+draws them; the stem is as long as the two points make it. Like a
+dimension's ornament the symbol keeps its size on paper whatever the
+drawing is scaled by.
+
+D = draw.Drawing ().line ([0, 0], [40, 0]);
+D = D.datum ([20, 0; 20, -8], 'A');
+
+See also:
+draw.Drawing.tolframe
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 106
+Append a datum feature symbol: the letter that names a datum, standing on the feature that establishes it.
 
 
 

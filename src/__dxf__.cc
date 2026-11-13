@@ -2300,7 +2300,7 @@ drawingitems (Writer& w, vector<Item>& dest, const octave_value& D,
     else if (type == "dim" || type == "diam" || type == "radius"
              || type == "angdim" || type == "ordinate"
              || type == "centremark" || type == "leader"
-             || type == "tolframe")
+             || type == "tolframe" || type == "datum")
       {
         if (i >= orn.numel () || ! orn(i).iscell ())
           error ("__dxf__: no picture is given for entity %d.",

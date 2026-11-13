@@ -2649,6 +2649,66 @@
 %! E = frameparts (D);
 %! assert_equal ({E(strcmp ({E.type}, 'TEXT')).text}, {'%%c0.02', '0.1', 'M'});
 
+%!test  # a datum's letter stands in a square frame twice the text height
+%! E = frameparts (draw.Drawing ().datum ([20, 0; 20, -10], 'A'));
+%! P = E(strcmp ({E.type}, 'POLYLINE'));
+%! F = P(2).pts;
+%! assert_equal ([min(F); max(F)], [17.5, -15; 22.5, -10], 1e-12);
+%! T = E(strcmp ({E.type}, 'TEXT'));
+%! assert_equal (T.text, 'A');
+
+%!test  # its triangle's base is centred on the feature, two fifths of the frame
+%! E = frameparts (draw.Drawing ().datum ([20, 0; 20, -10], 'A'));
+%! P = E(strcmp ({E.type}, 'POLYLINE'));
+%! assert_equal (P(1).pts, [21, 0; 20, -sqrt(3); 19, 0], 1e-12);
+
+%!test  # a stem joins the triangle's apex to the frame
+%! E = frameparts (draw.Drawing ().datum ([20, 0; 20, -10], 'A'));
+%! L = E(strcmp ({E.type}, 'LINE'));
+%! assert_equal (L.pts, [20, -sqrt(3); 20, -10], 1e-12);
+
+%!test  # the frame meets the stem by its side facing the triangle
+%! E = frameparts (draw.Drawing ().datum ([60, 15; 70, 15], 'B'));
+%! P = E(strcmp ({E.type}, 'POLYLINE'));
+%! assert_equal ([min(P(2).pts); max(P(2).pts)], [70, 12.5; 75, 17.5], 1e-12);
+
+%!test  # the triangle stands square on a slanted face
+%! E = frameparts (draw.Drawing ().datum ([0, 0; 6, 8], 'C'));
+%! T = E(strcmp ({E.type}, 'POLYLINE'))(1).pts;
+%! assert_equal (dot (T(3,:) - T(1,:), [0.6, 0.8]), 0, 1e-12);
+
+%!test  # the symbol keeps its size on paper when the drawing is scaled
+%! D = draw.Drawing ().datum ([20, 0; 20, -10], 'A');
+%! E = frameparts (D.transform ('scale', 2));
+%! P = E(strcmp ({E.type}, 'POLYLINE'));
+%! assert_equal (max (P(2).pts(:,1)) - min (P(2).pts(:,1)), 5, 1e-12);
+
+%!test  # a datum is written to DXF as its lines and text
+%! fn = [tempname(), '.dxf'];
+%! unwind_protect
+%!   D = draw.Drawing ().datum ([20, 0; 20, -10], 'A');
+%!   write (D, fn);
+%!   R = draw.read (fn);
+%!   assert_equal (R.numentities (), 4);
+%! unwind_protect_cleanup
+%!   [~] = unlink (fn);
+%! end_unwind_protect
+
+%!error<draw.Drawing.datum: invalid number of input arguments.> ...
+%! draw.Drawing ().datum ([0, 0; 0, 5])
+%!error<draw.Drawing.datum: P must be an N-by-2 matrix of point coordinates.> ...
+%! draw.Drawing ().datum ([0, 0, 0], 'A')
+%!error<draw.Drawing.datum: P must be two distinct points.> ...
+%! draw.Drawing ().datum ([0, 0], 'A')
+%!error<draw.Drawing.datum: P must be two distinct points.> ...
+%! draw.Drawing ().datum ([1, 1; 1, 1], 'A')
+%!error<draw.Drawing.datum: LETTER must be one capital letter.> ...
+%! draw.Drawing ().datum ([0, 0; 0, 5], 'a')
+%!error<draw.Drawing.datum: LETTER must be one capital letter.> ...
+%! draw.Drawing ().datum ([0, 0; 0, 5], 'AB')
+%!error<draw.Drawing.datum: LETTER must be one capital letter.> ...
+%! draw.Drawing ().datum ([0, 0; 0, 5], 1)
+
 %!test  # a frame is written to DXF as its lines, arcs and text
 %! fn = [tempname(), '.dxf'];
 %! unwind_protect
@@ -3475,7 +3535,7 @@
 %! __ornament__ (draw.Drawing ().diam ([0, 0], 5), 1, 1, 9, 'deviations')
 %!error<draw.Drawing.__ornament__: FITFORM must be 'class', 'deviations' or 'limits'.> ...
 %! __ornament__ (draw.Drawing ().diam ([0, 0], 5), 1, 1, 2, 'fit')
-%!error<draw.Drawing.__ornament__: entity 1 is a line, not a dimension, centre mark, leader or tolerance frame.> ...
+%!error<draw.Drawing.__ornament__: entity 1 is a line, not a dimension, centre mark, leader, tolerance frame or datum.> ...
 %! __ornament__ (draw.Drawing ().line ([0, 0], [1, 0]), 1, 1, 2, 'deviations')
 
 %!test  # the records of one drawing put into another

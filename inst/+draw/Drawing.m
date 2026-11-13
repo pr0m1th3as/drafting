@@ -381,7 +381,7 @@ classdef Drawing
         known = {'line', 'point', 'polyline', 'spline', 'path', 'region', ...
                  'arc', 'circle', 'ellipse', 'text', 'hatch', 'insert', ...
                  'dim', 'diam', 'radius', 'angdim', 'ordinate', ...
-                 'centremark', 'leader', 'tolframe'};
+                 'centremark', 'leader', 'tolframe', 'datum'};
         kinds = [known, setdiff(unique (types(:)'), known)];
         for ii = 1:numel (kinds)
           n = sum (strcmp (types, kinds{ii}));
@@ -721,14 +721,17 @@ classdef Drawing
           parts = explodeleader (e, DIMSCALE);
         case 'tolframe'
           parts = explodetolframe (e, DIMSCALE);
+        case 'datum'
+          parts = explodedatum (e, DIMSCALE);
         otherwise
           error (strcat ("draw.Drawing.__ornament__: entity %d is a %s,", ...
-                         " not a dimension, centre mark, leader or", ...
-                         " tolerance frame."), IDX, e.type);
+                         " not a dimension, centre mark, leader, tolerance", ...
+                         " frame or datum."), IDX, e.type);
       endswitch
       B = draw.Drawing ();
       B.Entities = partsentities (parts);
-      if (! any (strcmp (e.type, {'centremark', 'leader', 'tolframe'})))
+      if (! any (strcmp (e.type, {'centremark', 'leader', 'tolframe', ...
+                                  'datum'})))
         d = dimrecord (e, '', e.type, DECIMALS, v);
         ## The text R12 writes, with the tolerance on its one line, and the
         ## overrides of the dimension style: group code and value
@@ -2530,6 +2533,64 @@ classdef Drawing
       e = makeentity ('tolframe', pen (this));
       e.pts = P;
       e.frame = struct ('rows', R, 'note', NOTE, 'allaround', ALLAROUND);
+      this.Entities(end+1) = e;
+
+    endfunction
+
+    ## -*- texinfo -*-
+    ## @deftypefn {draw.Drawing} {@var{D} =} datum (@var{D}, @var{P}, @var{LETTER})
+    ##
+    ## Append a datum feature symbol: the letter that names a datum, standing
+    ## on the feature that establishes it.
+    ##
+    ## The letter, one capital, as ISO 5459 asks, is written in a square frame,
+    ## joined by a stem to a triangle whose base stands on the feature, as ISO
+    ## 1101 and ISO 7083 draw it.  The same letter in a tolerance frame's
+    ## datums, through @code{tolframe}, refers to this feature.
+    ##
+    ## @var{P} is two points, one per row: where the base of the triangle
+    ## stands, centred, on the outline of the feature or on the extension of a
+    ## dimension line, and where the stem meets the letter's frame.  The
+    ## triangle faces from the first point towards the second, so it stands
+    ## square on a face at any angle; the frame stays upright, the stem meeting
+    ## the middle of the side nearest the triangle.  The triangle is drawn
+    ## blank, which ISO 1101 allows as it allows a solid one.
+    ##
+    ## The frame is as tall as a tolerance frame, twice the height of
+    ## dimension text, and the triangle's sides two fifths of that, as ISO 7083
+    ## draws them; the stem is as long as the two points make it.  Like a
+    ## dimension's ornament the symbol keeps its size on paper whatever the
+    ## drawing is scaled by.
+    ##
+    ## @example
+    ## @group
+    ## D = draw.Drawing ().line ([0, 0], [40, 0]);
+    ## D = D.datum ([20, 0; 20, -8], 'A');
+    ## @end group
+    ## @end example
+    ##
+    ## @seealso{draw.Drawing.tolframe}
+    ## @end deftypefn
+    function this = datum (this, P, LETTER)
+
+      if (nargin != 3)
+        error ("draw.Drawing.datum: invalid number of input arguments.");
+      endif
+      errmsg = checkpts (P);
+      if (! isempty (errmsg))
+        error ("draw.Drawing.datum: P %s", errmsg);
+      endif
+      if (rows (P) != 2 || isequal (P(1,:), P(2,:)))
+        error ("draw.Drawing.datum: P must be two distinct points.");
+      endif
+      if (! (ischar (LETTER) && isscalar (LETTER) && LETTER >= 'A'
+             && LETTER <= 'Z'))
+        error ("draw.Drawing.datum: LETTER must be one capital letter.");
+      endif
+
+      e = makeentity ('datum', pen (this));
+      e.pts = P;
+      e.text = LETTER;
       this.Entities(end+1) = e;
 
     endfunction
@@ -4474,6 +4535,12 @@ function [E, LOST, DIMS] = breakdown (src, opt, nDim)
           E(end+1) = parts(kk);
         endfor
 
+      case 'datum'
+        parts = explodedatum (e, dimScale);
+        for kk = 1:numel (parts)
+          E(end+1) = parts(kk);
+        endfor
+
       case 'insert'
         s = mkent ('INSERT', e, e.pts);
         s.block = e.block;
@@ -5401,7 +5468,7 @@ function O = ornaments (D, dimscale, decimals, fitform)
     if (any (strcmp (D.Entities(ii).type, {'dim', 'diam', 'radius', ...
                                             'angdim', 'ordinate', ...
                                             'centremark', 'leader', ...
-                                            'tolframe'})))
+                                            'tolframe', 'datum'})))
       [P, REC] = __ornament__ (D, ii, dimscale, decimals, fitform);
       O{ii} = {P, REC};
     endif
@@ -5980,6 +6047,41 @@ function [row, errmsg] = framerow (CHAR, VALUE, ZONE, MODS, DATUMS)
                   'zone', lower (ZONE), 'modifiers', {MODS}, ...
                   'datums', {DATUMS(:)'});
   endif
+
+endfunction
+
+## A datum feature symbol, as ISO 7083 draws it on its grid, the thickness of
+## line a unit and the frame twenty: the triangle, eight units a side, its
+## base centred on the first point and its apex towards the second; the stem
+## from the apex to the second point; and the letter's square frame, upright,
+## the middle of its side nearest the triangle at the second point
+function parts = explodedatum (e, scale)
+
+  h = 2.5 * scale;
+  H = 2 * h;
+  u = H / 20;
+  P = e.pts;
+  v = (P(2,:) - P(1,:)) / norm (P(2,:) - P(1,:));
+  n = [-v(2), v(1)];
+  apex = P(1,:) + 4 * sqrt (3) * u * v;
+  parts = mkent ('POLYLINE', e, [P(1,:) + 4 * u * n; apex; P(1,:) - 4 * u * n]);
+  parts.closed = true;
+  if (dot (P(2,:) - apex, v) > 0)
+    parts(end+1) = mkent ('LINE', e, [apex; P(2,:)]);
+  endif
+  ## The side of the frame the stem meets: the one facing the triangle
+  w = P(1,:) - P(2,:);
+  if (abs (w(2)) >= abs (w(1)))
+    c = P(2,:) + [0, -sign(w(2)) * h];
+  else
+    c = P(2,:) + [-sign(w(1)) * h, 0];
+  endif
+  parts(end+1) = mkent ('POLYLINE', e, c + h * [-1, -1; 1, -1; 1, 1; -1, 1]);
+  parts(end).closed = true;
+  t = mkent ('TEXT', e, c + [-0.3 * h, -0.5 * h]);
+  t.text = e.text;
+  t.height = h;
+  parts(end+1) = t;
 
 endfunction
 
