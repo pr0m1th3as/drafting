@@ -2813,6 +2813,45 @@
 %! T = E(strcmp ({E.type}, 'TEXT'));
 %! assert_equal (T.pts, P + [1.875, 1.25], 1e-12);
 
+%!test  # by a leader pointing left the text ends short of the line's end
+%! E = frameparts (draw.Drawing ().diam ([0, 0], 5, 'Angle', 180));
+%! T = E(strcmp ({E.type}, 'TEXT'));
+%! assert_equal (T.pts, [-10.75, 1.25], 1e-12);
+
+%!test  # and clear of the circle, ending where the leader ends
+%! E = frameparts (draw.Drawing ().diam ([0, 0], 5, 'Angle', 135));
+%! T = E(strcmp ({E.type}, 'TEXT'));
+%! P = 5 * [cosd(135), sind(135)];
+%! assert_equal (T.pts, P + [-4.5, 1.25 * sqrt(2)], 1e-12);
+
+%!test  # a radius's text is mirrored too
+%! E = frameparts (draw.Drawing ().radius ([0, 0], 5, 'Angle', 225));
+%! T = E(strcmp ({E.type}, 'TEXT'));
+%! P = 5 * [cosd(225), sind(225)];
+%! assert_equal (T.pts, P - [1.25 * sqrt(2) + 3, 0], 1e-12);
+
+%!test  # the deviations come along, ending by the leader
+%! D = draw.Drawing ().diam ([0, 0], 8, 'Angle', 180, 'Tolerance', [0, 0.05]);
+%! E = frameparts (D);
+%! T = E(strcmp ({E.type}, 'TEXT'));
+%! right = arrayfun (@(t) t.pts(1) + 0.6 * t.height ...
+%!                   * numel (regexprep (t.text, '%%[cdpCDP]', '.')), T);
+%! assert_equal (max (right), -8 - 1.25, 1e-12);
+
+%!test  # so does an exact value's box
+%! E = frameparts (draw.Drawing ().diam ([0, 0], 5, 'Angle', 180, ...
+%!                                       'Exact', true));
+%! B = E(strcmp ({E.type}, 'POLYLINE'));
+%! assert_equal ([min(B.pts(:,1)), max(B.pts(:,1))], [-14.5, -6.25], 1e-12);
+
+%!test  # and a frame, which ends where the label ends
+%! D = draw.Drawing ().diam ([0, 0], 5, 'Angle', 135, 'Frame', ...
+%!                           {'position', 0.05, 'Zone', 'diameter', ...
+%!                            'Datums', {'A'}});
+%! E = frameparts (D);
+%! F = E(strcmp ({E.type}, 'POLYLINE')).pts;
+%! assert_equal (max (F(:,1)), 5 * cosd (135), 1e-12);
+
 %!test  # an exact radius is boxed where its text stood
 %! D = draw.Drawing ().radius ([0, 0], 5, 'Exact', true);
 %! assert_equal (D.Entities.exact, true);

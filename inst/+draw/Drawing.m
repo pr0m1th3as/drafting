@@ -5865,24 +5865,38 @@ function [parts, v] = explodecirc (e, scale, ndec)
     v = e.radius;
     pre = '';
   endif
-  [main, R, A, ~, rise, B] = tolerancetext (e, label, v, ndec, pre, '', hgt);
-  P = outer + 0.5 * hgt * (u + n);
-  ## A theoretically exact value in its box, the box where the text stood
-  Q = P;
+  [main, R, A, wid, rise, B] = tolerancetext (e, label, v, ndec, pre, '', ...
+                                              hgt);
+  ## The label as a block, its text inside: a theoretically exact value's
+  ## box, or the text with what rises above it and stands to its right
   blockh = hgt + rise;
+  pad = [0, 0];
   if (e.exact)
+    wid += 1.5 * hgt;
     blockh = 2 * hgt;
-    parts(end+1) = exactbox (e, P, textwidth (main, hgt) + 1.5 * hgt, hgt);
-    Q = P + [0.75, 0.5] * hgt;
+    pad = [0.75, 0.5] * hgt;
   endif
-  t = mkent ('TEXT', e, Q);
+  if (u(1) < 0)
+    ## A leader pointing left: the label mirrored, ending by the leader where
+    ## it would otherwise start, so it never runs back over the line or the
+    ## circle
+    P = outer + 0.5 * hgt * [u(1) + u(2), u(2) - u(1)] - [wid, 0];
+  else
+    P = outer + 0.5 * hgt * (u + n);
+  endif
+  if (e.exact)
+    parts(end+1) = exactbox (e, P, wid, hgt);
+  endif
+  t = mkent ('TEXT', e, P + pad);
   t.text = main;
   t.height = hgt;
   t.rotation = 0;
   parts(end+1) = t;
-  parts = [parts, stackparts(e, R, A, Q, textwidth (main, hgt), hgt, B)];
+  parts = [parts, stackparts(e, R, A, P + pad, textwidth (main, hgt), ...
+                             hgt, B)];
   ## A frame by the text, on the side away from the line as on a linear
-  ## dimension: over the text when the line comes up to it, under it else
+  ## dimension: over the text when the line comes up to it, under it else;
+  ## by a leader pointing left it ends where the label ends
   if (! isempty (e.frame))
     tgap = 0.8 * scale;
     if (u(2) > 0)
@@ -5890,7 +5904,14 @@ function [parts, v] = explodecirc (e, scale, ndec)
     else
       TL = P - [0, tgap];
     endif
-    parts = [parts, frameat(e, e.frame, scale, TL)];
+    fp = frameat (e, e.frame, scale, TL);
+    if (u(1) < 0)
+      xr = max (arrayfun (@(f) max (f.pts(:,1)), fp));
+      for m = 1:numel (fp)
+        fp(m).pts(:,1) += P(1) + wid - xr;
+      endfor
+    endif
+    parts = [parts, fp];
   endif
 
 endfunction
