@@ -90,6 +90,7 @@
               <li><a href="18_looking_inside.html">Looking inside a model</a></li>
               <li><a href="19_knurling.html" class="active">Knurling</a></li>
               <li><a href="20_naming_faces.html">Naming faces</a></li>
+              <li><a href="21_tolerances.html">Tolerances and fits</a></li>
             </ul>
 <!-- /guide-nav -->
           </nav>
@@ -114,11 +115,11 @@ p = 0.8019</code></pre>
 <p>By default the grooves are cut to full depth, where the flanks of two grooves meet in a point: half the pitch as fitted, for teeth of 90 degrees.</p>
 <pre class="code-in"><code>full = p / 2</code></pre>
 <pre class="code-out"><code>full = 0.4009</code></pre>
-<p>A shallower <code>DEPTH</code> leaves flat lands at the diameter of the knob between the grooves. A deeper one is refused, since the teeth would have to overlap.</p>
-<pre class="code-in"><code>lands = knurl (solid.cylinder (14, 10), F, 0.8, 0.2);
+<p>A shallower <code>'Depth'</code> leaves flat lands at the diameter of the knob between the grooves. A deeper one is refused, since the teeth would have to overlap.</p>
+<pre class="code-in"><code>lands = knurl (solid.cylinder (14, 10), F, 0.8, 'Depth', 0.2);
 show (lands);
-knurl (solid.cylinder (14, 10), F, 0.8, 0.5);</code></pre>
-<pre class="code-out"><code>solid.Shape.knurl: DEPTH must be no more than 0.4009, the full depth of the teeth at the pitch fitted round F.</code></pre>
+knurl (solid.cylinder (14, 10), F, 0.8, 'Depth', 0.5);</code></pre>
+<pre class="code-out"><code>solid.Shape.knurl: Depth must be no more than 0.4009, the full depth of the teeth at the pitch fitted round F.</code></pre>
 <figure class="shot"><img src="img/19_knurling-2.png" alt="Knurling, picture 2"></figure>
 <h2>The seven types</h2>
 <p>DIN 82 names seven knurls, each made by options of <code>knurl</code>:</p>

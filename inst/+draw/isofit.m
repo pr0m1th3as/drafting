@@ -324,6 +324,16 @@ function S = deviationtable ()
 
 endfunction
 
+%!demo
+%! ## A 25 mm shaft running in a bore: H7 for the hole, g6 for the shaft,
+%! ## in micrometres, as the tables of ISO 286-2 give them.  The clearance
+%! ## runs from the smallest hole on the largest shaft to the largest hole on
+%! ## the smallest shaft; it never closes, so the shaft runs freely.
+%!
+%! hole = 1000 * draw.isofit (25, 'H7')
+%! shaft = 1000 * draw.isofit (25, 'g6')
+%! clearance = [hole(1) - shaft(2), hole(2) - shaft(1)]
+
 ## Expected values from the tables of ISO 286-2 (IS 919-2:1993)
 %!test  # H7 at 25 mm, the hole of the hole-basis system
 %! assert_equal (draw.isofit (25, 'H7'), [0, 0.021], 1e-12);

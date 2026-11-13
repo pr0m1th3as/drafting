@@ -90,6 +90,7 @@
               <li><a href="18_looking_inside.html">Looking inside a model</a></li>
               <li><a href="19_knurling.html">Knurling</a></li>
               <li><a href="20_naming_faces.html">Naming faces</a></li>
+              <li><a href="21_tolerances.html">Tolerances and fits</a></li>
             </ul>
 <!-- /guide-nav -->
           </nav>
@@ -144,11 +145,12 @@ D = D.line ([0, 10], [100, 10]);</code></pre>
 <h2>Dimensions</h2>
 <p>A dimension is stored by what it measures, not by the number on it, so it measures again whenever the drawing is drawn. <code>dim</code> measures between two points, <code>'horizontal'</code>, <code>'vertical'</code> or, by default, along the line joining them; the sign of the offset picks the side. <code>diam</code> dimensions a circle across and <code>radius</code> an arc. A label replaces the measured figure, and the codes of <a href="../draw.symbol.html"><code>draw.symbol</code></a> put a diameter or degree sign in it. <code>leader</code> points a note at a feature.</p>
 <pre class="code-in"><code>D.Layer = 'DIMENSIONS';
-D = D.dim ([0, 0], [100, 0], -12, 'horizontal');
-D = D.dim ([100, 0], [100, 60], -12, 'vertical');
+D = D.dim ([0, 0], [100, 0], -12, 'Direction', 'horizontal');
+D = D.dim ([100, 0], [100, 60], -12, 'Direction', 'vertical');
 D = D.diam ([35, 30], 10);
-D = D.diam ([75, 45], 4, 45, ['2x ', draw.symbol('diameter'), '8']);
-D = D.radius ([94, 54], 6, 45);
+D = D.diam ([75, 45], 4, 'Angle', 45, ...
+            'Text', ['2x ', draw.symbol('diameter'), '8']);
+D = D.radius ([94, 54], 6, 'Angle', 45);
 D = D.leader ([50, 60; 60, 72; 75, 72], 'PLATE 6 THICK');
 D
 plot (D);</code></pre>
@@ -179,13 +181,14 @@ O = O.dim ([80, 30], [60, 50], -6);
 plot (O);</code></pre>
 <figure class="shot"><img src="img/09_drawings-2.png" alt="Technical drawings, picture 2"></figure>
 <h2>Hatches</h2>
-<p><code>hatch</code> fills a <a href="../geom.Region.html"><code>geom.Region</code></a>, its holes left clear. ANSI31, 45 degree lines, is the default and means cut material; <a href="../geom.hatchlines.html"><code>geom.hatchlines</code></a> lists the other patterns. An angle and a spacing turn and space the pattern.</p>
+<p><code>hatch</code> fills a <a href="../geom.Region.html"><code>geom.Region</code></a>, its holes left clear. ANSI31, 45 degree lines, is the default and means cut material; <a href="../geom.hatchlines.html"><code>geom.hatchlines</code></a> lists the other patterns. An angle and a spacing turn and space the pattern. The spacing is a distance on paper, so <code>print</code> and <code>tikz</code> keep it whatever the scale.</p>
 <pre class="code-in"><code>geom.hatchlines ()
 sq = [0, 0; 30, 0; 30, 20; 0, 20];
 H = draw.Drawing ('hatches');
 H = H.hatch (geom.Region (sq));
-H = H.hatch (geom.Region (sq + [40, 0]), 'ANSI37');
-H = H.hatch (geom.Region (sq + [80, 0]), 'CROSS', 0, 4);
+H = H.hatch (geom.Region (sq + [40, 0]), 'Pattern', 'ANSI37');
+H = H.hatch (geom.Region (sq + [80, 0]), 'Pattern', 'CROSS', ...
+             'Spacing', 4);
 H = H.text ([0, -6], 'ANSI31').text ([40, -6], 'ANSI37');
 H = H.text ([80, -6], 'CROSS');
 plot (H);</code></pre>
@@ -208,7 +211,7 @@ F = draw.Drawing ('flange');
 F = F.circle ([0, 0], 40).circle ([0, 0], 15);
 F = F.block ('bolt', B);
 for a = 0:60:300
-  F = F.insert ('bolt', 28 * [cosd(a), sind(a)], a);
+  F = F.insert ('bolt', 28 * [cosd(a), sind(a)], 'Rotation', a);
 endfor
 F
 plot (F);</code></pre>
@@ -265,8 +268,8 @@ printf ("%s\n", L{1:5});</code></pre>
 E = draw.read ('sheet.dxf')</code></pre>
 <pre class="code-out"><code>E =
 
-  draw.Drawing 'imported' with 60 entities on 9 layers
-    line        20
+  draw.Drawing 'imported' with 65 entities on 9 layers
+    line        25
     polyline    6
     circle      3
     text        26

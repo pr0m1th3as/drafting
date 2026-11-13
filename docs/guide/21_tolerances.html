@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Tolerances and fits - drafting guide</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" integrity="sha512-1ycn6IcaQQ40/MKBW2W4Rhis/DbILU74C1vSrLJxCq57o941Ym01SwNsOMqvEBFlcgUa6xLiPY/NS5R+E6ztJQ==" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/css/bootstrap.min.css" integrity="sha384-KyZXEAg3QhqLMpG8r+8fhAXLRk2vvoC2f3B09zVXn8CA5QIVfZOJ3BCsw2P0p/We" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-U1DAWAznBHeqEIlVSCgzq+c9gqGAJn5c/t99JyeKa9xxaYpSvHU5awsuZVVFIhvj" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="guide.css">
+  </head>
+  <body>
+    <div class="bg-dark">
+      <div class="container-xl">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+          <div class="container-fluid">
+            <a class="navbar-brand" href="index.html">
+              <img src="../assets/drafting.png" alt="drafting" class="d-inline-block align-top" width="25" height="25">
+              drafting guide
+            </a>
+            <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+              <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+              <ul class="navbar-nav">
+                <li class="nav-item">
+                  <a class="nav-link" href="https://pr0m1th3as.github.io/drafting-models/">
+                    <i class="fas fa-cubes"></i>
+                    Models
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="../index.html">
+                    <i class="fas fa-book"></i>
+                    Function reference
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="https://github.com/pr0m1th3as/drafting">
+                    <i class="fab fa-github"></i>
+                    Source
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </nav>
+      </div>
+    </div>
+    <div class="container-xl my-4">
+      <div class="row">
+        <div class="col-md-3 col-lg-2 mb-4">
+          <nav class="guide-nav">
+<!-- guide-nav -->
+            <h6>Guide</h6>
+            <ul>
+              <li><a href="index.html">Overview</a></li>
+              <li><a href="layout.html">Package layout</a></li>
+              <li><a href="dxf.html">DXF and the classes</a></li>
+            </ul>
+            <h6>Octave</h6>
+            <ul>
+              <li><a href="primer.html">A brief Octave primer</a></li>
+            </ul>
+            <h6>Standards</h6>
+            <ul>
+              <li><a href="standards_threads.html">Threads and tapped holes</a></li>
+              <li><a href="standards_holes.html">Clearance holes, counterbores and countersinks</a></li>
+              <li><a href="standards_knurling.html">Knurls</a></li>
+            </ul>
+            <h6>Tutorials</h6>
+            <ul>
+              <li><a href="01_first_part.html">A first part</a></li>
+              <li><a href="02_outlines.html">Outlines: polylines, splines, paths and regions</a></li>
+              <li><a href="03_regions.html">Working with regions</a></li>
+              <li><a href="04_coordinate_systems.html">Coordinate systems</a></li>
+              <li><a href="05_solids_from_regions.html">Solids from regions</a></li>
+              <li><a href="06_primitives_and_booleans.html">Primitives, booleans and transforms</a></li>
+              <li><a href="07_features.html">Features: holes, pockets, fillets, chamfers and shells</a></li>
+              <li><a href="08_sections_and_projections.html">Sections and projections</a></li>
+              <li><a href="09_drawings.html">Technical drawings</a></li>
+              <li><a href="10_meshes.html">Meshes</a></li>
+              <li><a href="11_assemblies.html">Assemblies</a></li>
+              <li><a href="12_from_openscad.html">For OpenSCAD users</a></li>
+              <li><a href="13_surfaces.html">Surfaces through a grid</a></li>
+              <li><a href="14_parts_as_functions.html">Parts as functions</a></li>
+              <li><a href="15_testing_parts.html">Testing parts</a></li>
+              <li><a href="16_holes_and_threads.html">Holes and threads</a></li>
+              <li><a href="17_clearance_holes.html">Clearance holes, counterbores and countersinks</a></li>
+              <li><a href="18_looking_inside.html">Looking inside a model</a></li>
+              <li><a href="19_knurling.html">Knurling</a></li>
+              <li><a href="20_naming_faces.html">Naming faces</a></li>
+              <li><a href="21_tolerances.html" class="active">Tolerances and fits</a></li>
+            </ul>
+<!-- /guide-nav -->
+          </nav>
+        </div>
+        <main class="col-md-9 col-lg-10">
+<h1>Tolerances and fits</h1>
+<p>A dimension states a size; a tolerance states how far the part as made may stray from it. This page sets the places a dimension is shown to, gives dimensions their tolerances as ISO 406 writes them, takes classes and fits from the ISO 286 system, and states the general tolerance in the title block.</p>
+<h2>How many places</h2>
+<p><code>Decimals</code>, a property of the drawing, is the number of places every dimension shows its measurement to, 2 by default, trailing zeros dropped. A dimension given its own <code>'Decimals'</code> shows those instead.</p>
+<pre class="code-in"><code>D = draw.Drawing ('pin');
+D = D.polyline (geom.Polyline ([0, 0; 40.125, 0; 40.125, 12; 0, 12], ...
+                               'Closed', true));
+D = D.dim ([0, 0], [40.125, 0], -8, 'Direction', 'horizontal');
+D = D.dim ([0, 12], [40.125, 12], 8, 'Direction', 'horizontal', ...
+           'Decimals', 3);
+D.Decimals
+plot (D);</code></pre>
+<pre class="code-out"><code>ans = 2</code></pre>
+<figure class="shot"><img src="img/21_tolerances-1.png" alt="Tolerances and fits, picture 1"></figure>
+<h2>Tolerances</h2>
+<p><code>'Tolerance'</code> gives a dimension its tolerance:</p>
+<ul>
+<li>a number, a tolerance symmetric about the size: <code>60 ±0.1</code>;</li>
+<li>a pair <code>[LOWER, UPPER]</code>, the lower and the upper deviation, written to the right of the size, the upper above the lower, and a zero as a bare 0;</li>
+<li><code>'min'</code> or <code>'max'</code>, a size limited one way only: <code>R3 max.</code></li>
+</ul>
+<p><code>'Form', 'limits'</code> writes a numeric tolerance as the largest size over the smallest instead, worked out from the size as it is shown. A tolerance shows the places it needs, whatever <code>Decimals</code> says.</p>
+<p>A plot draws text at a size on the screen, not in the drawing, so the lines of a tolerance stand where <code>print</code> and a CAD program put them only when the text is sized to the drawing. <code>'FontScale'</code> does that: the points of type for each millimetre of the drawing, which for these pictures is about 5.</p>
+<pre class="code-in"><code>T = draw.Drawing ('plate');
+T = T.polyline (fillet (geom.Polyline ([0, 0; 60, 0; 60, 30; 0, 30], ...
+                                       'Closed', true), 3));
+T = T.dim ([0, 0], [60, 0], -8, 'Direction', 'horizontal', ...
+           'Tolerance', 0.1);
+T = T.dim ([0, 0], [60, 0], -20, 'Direction', 'horizontal', ...
+           'Tolerance', [-0.1, 0.05]);
+T = T.dim ([0, 30], [60, 30], 10, 'Direction', 'horizontal', ...
+           'Tolerance', [0.1, 0.3], 'Form', 'limits');
+T = T.dim ([60, 0], [60, 30], -10, 'Direction', 'vertical', ...
+           'Tolerance', [0, 0.05]);
+T = T.radius ([57, 27], 3, 'Angle', 45, 'Tolerance', 'max');
+plot (T, 'FontScale', 5);</code></pre>
+<figure class="shot"><img src="img/21_tolerances-2.png" alt="Tolerances and fits, picture 2"></figure>
+<h2>Classes and fits of ISO 286</h2>
+<p>A hole and a shaft meant to fit together are toleranced by classes of the ISO 286 system: a letter for where the tolerance lies, a capital for a hole and a small letter for a shaft, and a grade for how wide it is. <a href="../draw.isofit.html"><code>draw.isofit</code></a> gives the deviations of a class at a size, in millimetres, as <code>[LOWER, UPPER]</code>; here in micrometres, as the tables of ISO 286-2 give them.</p>
+<pre class="code-in"><code>hole = 1000 * draw.isofit (25, 'H7')
+shaft = 1000 * draw.isofit (25, 'g6')</code></pre>
+<pre class="code-out"><code>hole =
+
+    0   21
+
+shaft =
+
+  -20   -7</code></pre>
+<p>Together they are a fit. Its clearance runs from the smallest hole on the largest shaft to the largest hole on the smallest shaft, and here it never closes, so the shaft runs freely.</p>
+<pre class="code-in"><code>clearance = [hole(1) - shaft(2), hole(2) - shaft(1)]</code></pre>
+<pre class="code-out"><code>clearance =
+
+    7   41</code></pre>
+<p>Given to <code>dim</code> or <code>diam</code>, a class is looked up at the size the dimension shows and written as the drawing's <code>FitForm</code> says: by default with its deviations in brackets; with the limits in brackets; or as the class alone. A dimension's own <code>'Form'</code> takes the place of <code>FitForm</code>. A fit pair, the hole's class over the shaft's, is written as the two classes, as an assembly drawing states it.</p>
+<pre class="code-in"><code>F = draw.Drawing ('fits');
+F = F.circle ([0, 0], 12.5).circle ([70, 0], 12.5);
+F = F.circle ([0, -50], 12.5).circle ([70, -50], 12.5);
+F = F.diam ([0, 0], 12.5, 'Tolerance', 'H7');
+F = F.diam ([70, 0], 12.5, 'Tolerance', 'H7', 'Form', 'limits');
+F = F.diam ([0, -50], 12.5, 'Tolerance', 'g6', 'Form', 'class');
+F = F.diam ([70, -50], 12.5, 'Tolerance', 'H7/g6');
+plot (F, 'FontScale', 4);</code></pre>
+<figure class="shot"><img src="img/21_tolerances-3.png" alt="Tolerances and fits, picture 3"></figure>
+<p><code>FitForm</code> set to <code>'class'</code> writes the first as its class alone; the second keeps the limits it was given.</p>
+<pre class="code-in"><code>F.FitForm = 'class';
+plot (F, 'FontScale', 4);</code></pre>
+<figure class="shot"><img src="img/21_tolerances-4.png" alt="Tolerances and fits, picture 4"></figure>
+<p>A class needs the size as measured, so it cannot follow a <code>'Text'</code>, and it must be one the standard defines at the size shown.</p>
+<pre class="code-in"><code>F.diam ([0, 0], 0.4, 'Tolerance', 'a9');</code></pre>
+<pre class="code-out"><code>draw.Drawing.diam: ISO 286 defines no a9 for a size of 0.8 mm.</code></pre>
+<h2>The general tolerance</h2>
+<p>A dimension with no tolerance of its own takes the general tolerance, which the title block states once for the whole sheet, such as ISO 2768-mK. <a href="../draw.titleblock.html"><code>draw.titleblock</code></a> writes it beside the units. Here it frames the plate on an A4 sheet stood upright, as ISO 5457 usually has A4; the short strokes at the middle of each side are the centring marks that place the sheet when it is copied. On the whole sheet the text is small, as it is on paper.</p>
+<pre class="code-in"><code>f = struct ('title', 'PLATE', 'drawing', 'PL-021', 'material', 'S235', ...
+            'scale', '1:1', 'units', 'mm', 'tolerance', 'ISO 2768-mK', ...
+            'date', '2026-11-13', 'drawnby', 'AB', 'revision', 'A');
+S = draw.titleblock ('A4', f, 'Orientation', 'portrait');
+S = S.merge (T.transform ('translate', [75, 160]));
+plot (S, 'FontScale', 1.25);</code></pre>
+<figure class="shot"><img src="img/21_tolerances-5.png" alt="Tolerances and fits, picture 5"></figure>
+<p><code>print</code> places a framed sheet by its trimmed edge and on paper standing the same way, so the upright sheet comes out on upright A4 at 1:1.</p>
+<pre class="code-in"><code>[paper, scale] = print (S, 'plate.pdf', 'Margin', 0)</code></pre>
+<pre class="code-out"><code>paper =
+
+   210   297
+
+scale = 1</code></pre>
+<h2>In a DXF file</h2>
+<p>A numeric tolerance is written as an override of the dimension style, so a CAD program that measures the dimension again shows the tolerance with it. A class, and <code>min.</code> or <code>max.</code>, are written as the dimension's text, the deviations of a class as figures that stay as they were if the size is changed in another program. <a href="../draw.read.html"><code>draw.read</code></a> brings every tolerance back as it was given, with <code>Decimals</code> and <code>FitForm</code>.</p>
+<pre class="code-in"><code>write (F, 'fits.dxf');
+R = draw.read ('fits.dxf');
+R.FitForm
+plot (R, 'FontScale', 4);</code></pre>
+<pre class="code-out"><code>ans = class</code></pre>
+<figure class="shot"><img src="img/21_tolerances-6.png" alt="Tolerances and fits, picture 6"></figure>
+<nav class="d-flex justify-content-between my-5">
+<a href="20_naming_faces.html">&larr; Naming faces</a>
+</nav>
+
+        </main>
+      </div>
+    </div>
+  </body>
+</html>

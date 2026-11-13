@@ -90,6 +90,7 @@
               <li><a href="18_looking_inside.html">Looking inside a model</a></li>
               <li><a href="19_knurling.html">Knurling</a></li>
               <li><a href="20_naming_faces.html">Naming faces</a></li>
+              <li><a href="21_tolerances.html">Tolerances and fits</a></li>
             </ul>
 <!-- /guide-nav -->
           </nav>
@@ -138,7 +139,7 @@ show (B);</code></pre>
 <p>A part from a CAD program reaches a slicer as a mesh. <code>tessellate</code> makes one of a solid, here a plate with a bore, and <code>write</code> saves it in the format its extension names: STL, OBJ, PLY or 3MF. <a href="../polymesh.read.html"><code>polymesh.read</code></a> reads all four back, and every one keeps the mesh whole.</p>
 <pre class="code-in"><code>S = solid.extrude (geom.Region ([0, 0; 60, 0; 60, 30; 0, 30], ...
                                 {[22, 15, 1; 38, 15, 1]}), 8);
-T = tessellate (S, 0.05);
+T = tessellate (S, 'Tolerance', 0.05);
 files = {'plate.stl', 'plate.obj', 'plate.ply', 'plate.3mf'};
 for k = 1:numel (files)
   write (T, files{k});
@@ -239,9 +240,10 @@ H = subtract (P, solid.cylinder (3, 50, geom.UCS ([0, 1, 0], [8, -25, 0])));
 show (H);</code></pre>
 <figure class="shot"><img src="img/10_meshes-5.png" alt="Meshes, picture 5"></figure>
 <h2>How fine a tessellation is</h2>
-<p>The second argument of <code>tessellate</code> is how far, in millimetres, a triangle may stray from the true surface, 0.01 by default. No triangle spans more than 20 degrees of a curve either, which is why the two coarser tolerances give the same mesh of this plate.</p>
+<p>The option <code>'Tolerance'</code> of <code>tessellate</code> is how far, in millimetres, a triangle may stray from the true surface, 0.01 by default. No triangle spans more than 20 degrees of a curve either, which is why the two coarser tolerances give the same mesh of this plate.</p>
 <pre class="code-in"><code>for tol = [1, 0.1, 0.01, 0.001]
-  printf ("%6.3f mm: %d triangles\n", tol, numfaces (tessellate (S, tol)));
+  printf ("%6.3f mm: %d triangles\n", tol, ...
+          numfaces (tessellate (S, 'Tolerance', tol)));
 endfor</code></pre>
 <pre class="code-out"><code> 1.000 mm: 160 triangles
  0.100 mm: 160 triangles

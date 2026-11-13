@@ -90,6 +90,7 @@
               <li><a href="18_looking_inside.html">Looking inside a model</a></li>
               <li><a href="19_knurling.html">Knurling</a></li>
               <li><a href="20_naming_faces.html">Naming faces</a></li>
+              <li><a href="21_tolerances.html">Tolerances and fits</a></li>
             </ul>
 <!-- /guide-nav -->
           </nav>
@@ -117,8 +118,8 @@ H.UCS = xz;
 K = solid.revolve (H);
 show (K);</code></pre>
 <figure class="shot"><img src="img/05_solids_from_regions-3.png" alt="Solids from regions, picture 3"></figure>
-<p>An angle turns it part of the way round, from the region's own plane. Three quarters of a turn opens the part to show its section, and leaves three quarters of the material.</p>
-<pre class="code-in"><code>K2 = solid.revolve (H, 270);
+<p>The option <code>'Angle'</code> turns it part of the way round, from the region's own plane. Three quarters of a turn opens the part to show its section, and leaves three quarters of the material.</p>
+<pre class="code-in"><code>K2 = solid.revolve (H, 'Angle', 270);
 volume (K2) / volume (K)
 show (K2);</code></pre>
 <pre class="code-out"><code>ans = 0.7500</code></pre>
