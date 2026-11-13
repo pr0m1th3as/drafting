@@ -45,6 +45,8 @@ Line types and colours
  draw.colour
 Drawing model
  draw.Drawing
+Limits and fits
+ draw.isofit
 Solid modelling
  solid.Shape
  solid.box

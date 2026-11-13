@@ -2,7 +2,7 @@
 # name: cache
 # type: cell
 # rows: 3
-# columns: 249
+# columns: 250
 # name: <cell-element>
 # type: sq_string
 # elements: 1
@@ -2135,6 +2135,74 @@ A table of point coordinates, for a shape that cannot be dimensioned.
 # name: <cell-element>
 # type: sq_string
 # elements: 1
+# length: 11
+draw.isofit
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 1981
+drafting: DEV = draw.isofit (SIZE, CLASS)
+Limit deviations of an ISO 286 tolerance class.
+
+DEV = draw.isofit (SIZE, CLASS) returns the lower
+and upper limit deviations, in millimetres, of the tolerance class
+CLASS at the basic size SIZE, as the row
+[LOWER, UPPER]. SIZE + DEV is then
+the smallest and the largest size the feature may have.
+
+CLASS is a fundamental deviation followed by a standard tolerance
+grade, as written on a drawing: capital letters for a hole, small letters
+for a shaft, such as 'H7', 'g6', 'JS9' or
+'zc11'. The letters are A to ZC (without I,
+L, O, Q and W, and with CD, EF,
+FG, JS, ZA and ZB), and the grades
+01, 0 and 1 to 18. SIZE is in
+millimetres, above 0 and at most 3150. A size on the boundary of two size
+steps belongs to the lower one, as the standard counts them ("above 18 up
+to and including 30").
+
+The values are those of ISO 286-1: the standard tolerances of its table 1
+and annex A, and the fundamental deviations of its tables 2 and 3, with the
+delta values for K, M and N up to grade 8 and for
+P to ZC up to grade 7, and the special case of
+M6 from 250 to 315 mm. ISO 286-2 tabulates a selection of these
+classes; every class ISO 286-1 defines is returned. JS and
+js are exactly half the tolerance either side of the basic size, so
+an odd tolerance in micrometres gives a deviation ending in 0.5.
+
+A class the standard does not define at SIZE is an error: a
+fundamental deviation outside the sizes its table covers, J and
+j beyond the grades their tables give, K above grade 8 for
+sizes above 3 mm, the grades 01 and 0 above 500 mm, and a
+class needing a delta value below grade 3, for which the standard gives
+none. Sizes of 1 mm and less refuse A, B, a,
+b, the grades 14 to 18, and N above grade 8, as the standard
+asks. The grades 1 to 5 above 500 mm are given, which ISO 286-1 includes
+for experimental use.
+
+draw.isofit (25, 'H7')
+=> [0, 0.021]
+draw.isofit (25, 'g6')
+=> [-0.020, -0.007]
+
+See also:
+draw.Drawing.dim,
+draw.Drawing.diam
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 47
+Limit deviations of an ISO 286 tolerance class.
+
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
 # length: 13
 draw.linetype
 
@@ -2229,7 +2297,7 @@ draw.read
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 2879
+# length: 3435
 drafting: D = draw.read (FILE)
 Read a drawing from an ASCII DXF file.
 
@@ -2259,6 +2327,16 @@ dimension is rebuilt as the method that would have made it, and it
 measures the geometry again rather than repeating a number. The picture
 of a dimension lives in a block nothing places, and that block is dropped,
 as are the layout blocks a file defines; a block that is placed is kept.
+
+The drawing's Decimals, the places every dimension shows, come from
+the file: the places (DIMDEC) of the dimension style most of its
+dimensions use, else those of the style the header names in
+$DIMSTYLE, else the R12 header's $LUPREC, else 2. A file
+may show some dimensions at other places, by another style or by a
+dimension's own override, and an angle at the places its style gives
+angles (DIMADEC); since one drawing shows every dimension alike,
+those dimensions are counted in a warning. A dimension whose text hides
+its measurement is not counted.
 
 A drawing lies in the plane z = 0. An entity whose normal points
 down the z axis is mirrored into the plane facing up, as 2-D CAD
