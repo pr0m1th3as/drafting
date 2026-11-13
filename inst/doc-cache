@@ -2233,7 +2233,7 @@ draw.Drawing.write
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 2862
+# length: 3570
 draw.Drawing: write (D, FILE)
 draw.Drawing: write (D, FILE, Name, Value, ...)
 Write a drawing to a DXF file.
@@ -2262,6 +2262,18 @@ the dimension's own layer and properties govern it. A centre mark and a
 leader are written as the lines and text they are drawn with. The
 blocks the drawing defines are written once each and placed by
 INSERT.
+
+A tolerance frame and a datum feature symbol are written as the lines,
+arcs and text they are drawn with, bound by a group that records what
+they state, so draw.read gives them back as they were given,
+where they were moved to if a CAD program moved them whole; one changed
+in any other way comes back as its lines and text. A dimension's
+tolerance frame is written in the same way, outside the dimension's
+picture, which a CAD program draws again, and its group names the
+dimension: draw.read gives the dimension its frame while that
+group is there. A theoretically exact dimension is recorded as one.
+Where there are no groups, in R12 and inside a block, frames and datums
+are their lines and text alone.
 
 Name/Value pairs:
 
@@ -2609,7 +2621,7 @@ draw.read
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 3661
+# length: 4026
 drafting: D = draw.read (FILE)
 Read a drawing from an ASCII DXF file.
 
@@ -2654,6 +2666,12 @@ from DIMTOL or DIMLIM of its style or of its own override,
 as a numeric tolerance, written as limits only where the package draws
 them. The drawing's FitForm comes back from a file the package
 wrote.
+
+A tolerance frame and a datum feature symbol the package wrote return as
+they were given, where they now stand if a CAD program moved them whole;
+one changed in any other way, or written to R12 or inside a block, returns
+as its lines and text. A dimension returns with its tolerance frame while
+the frame's group is in the file, and theoretically exact if it was.
 
 A drawing lies in the plane z = 0. An entity whose normal points
 down the z axis is mirrored into the plane facing up, as 2-D CAD

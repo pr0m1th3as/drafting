@@ -660,17 +660,22 @@ classdef Drawing
 
     endfunction
 
-    ## The picture of the ornament IDX of D, a dimension, centre mark or
-    ## leader, as a drawing of its lines and text at DIMSCALE, its measurement
-    ## to DECIMALS places and its classes in the form FITFORM, and for a
-    ## dimension the record a file states it by: the definition points in the
-    ## order of DXF group codes 10, 11, 13, 14, 15 and 16, the DXF dimension
-    ## type, the text, the rotation, the text R12 writes and the overrides of
-    ## the dimension style.  One implementation of the ornament serves every
-    ## backend; write gives the DXF writer what it makes.  DECIMALS and
-    ## FITFORM are the caller's, since a block's dimensions take those of the
-    ## drawing it is placed in.
-    function [B, REC] = __ornament__ (D, IDX, DIMSCALE, DECIMALS, FITFORM)
+    ## The picture of the ornament IDX of D, a dimension, centre mark,
+    ## leader, tolerance frame or datum, as a drawing of its lines and text at
+    ## DIMSCALE, its measurement to DECIMALS places and its classes in the
+    ## form FITFORM.  For a dimension, REC is the record a file states it by:
+    ## the definition points in the order of DXF group codes 10, 11, 13, 14,
+    ## 15 and 16, the DXF dimension type, the text, the rotation, the text R12
+    ## writes and the overrides of the dimension style.  For a tolerance frame
+    ## or a datum, REC is the record of the group its picture is written as,
+    ## rows of a DXF extended data code and its value.  A dimension's
+    ## tolerance frame is not in B but in FRAME, its picture and the record
+    ## of its own group, a cell of the two, empty for a dimension with none.
+    ## One implementation of the ornament serves every backend; write gives
+    ## the DXF writer what it makes.  DECIMALS and FITFORM are the caller's,
+    ## since a block's dimensions take those of the drawing it is placed in.
+    function [B, REC, FRAME] = __ornament__ (D, IDX, DIMSCALE, DECIMALS, ...
+                                             FITFORM)
 
       if (nargin != 5)
         error ("draw.Drawing.__ornament__: invalid number of input arguments.");
@@ -706,11 +711,13 @@ classdef Drawing
         e.form = FITFORM;
       endif
       REC = [];
+      FRAME = {};
+      nframe = 0;
       switch (e.type)
         case 'dim'
-          [parts, v] = explodedim (e, DIMSCALE, DECIMALS);
+          [parts, v, nframe] = explodedim (e, DIMSCALE, DECIMALS);
         case {'diam', 'radius'}
-          [parts, v] = explodecirc (e, DIMSCALE, DECIMALS);
+          [parts, v, nframe] = explodecirc (e, DIMSCALE, DECIMALS);
         case 'angdim'
           [parts, v] = explodeang (e, DIMSCALE, DECIMALS);
         case 'ordinate'
@@ -728,8 +735,25 @@ classdef Drawing
                          " not a dimension, centre mark, leader, tolerance", ...
                          " frame or datum."), IDX, e.type);
       endswitch
+      if (nframe > 0)
+        F = draw.Drawing ();
+        F.Entities = partsentities (parts(end-nframe+1:end));
+        FRAME = {F, [{1000, 'dimframe'; 1005, ''}; framerecord(e.frame)]};
+        parts = parts(1:end-nframe);
+      endif
       B = draw.Drawing ();
       B.Entities = partsentities (parts);
+      switch (e.type)
+        case 'tolframe'
+          ## The leader's points, which a reader moves with the picture
+          path = [num2cell(repmat (1010, rows (e.pts), 1)), ...
+                  num2cell(e.pts, 2)];
+          REC = [{1000, 'tolframe'; 1000, 'path'}; path; ...
+                 framerecord(e.frame)];
+        case 'datum'
+          REC = {1000, 'datum'; 1000, 'letter'; 1000, e.text; ...
+                 1000, 'path'; 1010, e.pts(1,:); 1010, e.pts(2,:)};
+      endswitch
       if (! any (strcmp (e.type, {'centremark', 'leader', 'tolframe', ...
                                   'datum'})))
         d = dimrecord (e, '', e.type, DECIMALS, v);
@@ -4192,6 +4216,18 @@ classdef Drawing
     ## blocks the drawing defines are written once each and placed by
     ## @code{INSERT}.
     ##
+    ## A tolerance frame and a datum feature symbol are written as the lines,
+    ## arcs and text they are drawn with, bound by a group that records what
+    ## they state, so @code{draw.read} gives them back as they were given,
+    ## where they were moved to if a CAD program moved them whole; one changed
+    ## in any other way comes back as its lines and text.  A dimension's
+    ## tolerance frame is written in the same way, outside the dimension's
+    ## picture, which a CAD program draws again, and its group names the
+    ## dimension: @code{draw.read} gives the dimension its frame while that
+    ## group is there.  A theoretically exact dimension is recorded as one.
+    ## Where there are no groups, in R12 and inside a block, frames and datums
+    ## are their lines and text alone.
+    ##
     ## Name/Value pairs:
     ##
     ## @table @asis
@@ -5505,8 +5541,8 @@ function O = ornaments (D, dimscale, decimals, fitform)
                                             'angdim', 'ordinate', ...
                                             'centremark', 'leader', ...
                                             'tolframe', 'datum'})))
-      [P, REC] = __ornament__ (D, ii, dimscale, decimals, fitform);
-      O{ii} = {P, REC};
+      [P, REC, F] = __ornament__ (D, ii, dimscale, decimals, fitform);
+      O{ii} = [{P, REC}, F];
     endif
   endfor
 
@@ -5833,8 +5869,10 @@ endfunction
 ## A diameter or radius dimension: the measuring line, a tick where it meets
 ## the feature, and the text.  A diameter runs right across; a radius runs from
 ## the centre out, which is why the two share everything but their first point.
-function [parts, v] = explodecirc (e, scale, ndec)
+## NFRAME parts at the end are the tolerance frame, if the dimension has one.
+function [parts, v, nframe] = explodecirc (e, scale, ndec)
 
+  nframe = 0;
   tick = 1.25 * scale;
   hgt = 2.5 * scale;
   u = [cosd(e.angle), sind(e.angle)];
@@ -5912,6 +5950,7 @@ function [parts, v] = explodecirc (e, scale, ndec)
       endfor
     endif
     parts = [parts, fp];
+    nframe = numel (fp);
   endif
 
 endfunction
@@ -6342,6 +6381,41 @@ function parts = explodetolframe (e, scale)
 
 endfunction
 
+## The tolerance frame F as rows of a DXF extended data code and its value,
+## for the record of the group its picture is written as: each row of the
+## frame, its characteristic and value, then its zone, modifiers and datums
+## each by name; the note and all-around by name
+function T = framerecord (F)
+
+  T = cell (0, 2);
+  for k = 1:numel (F.rows)
+    r = F.rows(k);
+    T(end+1,:) = {1000, 'row'};
+    T(end+1,:) = {1000, r.char};
+    T(end+1,:) = {1040, r.value};
+    if (! isempty (r.zone))
+      T(end+1,:) = {1000, 'zone'};
+      T(end+1,:) = {1000, r.zone};
+    endif
+    for m = 1:numel (r.modifiers)
+      T(end+1,:) = {1000, 'modifier'};
+      T(end+1,:) = {1000, r.modifiers{m}};
+    endfor
+    for m = 1:numel (r.datums)
+      T(end+1,:) = {1000, 'datum'};
+      T(end+1,:) = {1000, r.datums{m}};
+    endfor
+  endfor
+  if (! isempty (F.note))
+    T(end+1,:) = {1000, 'note'};
+    T(end+1,:) = {1000, F.note};
+  endif
+  if (F.allaround)
+    T(end+1,:) = {1000, 'allaround'};
+  endif
+
+endfunction
+
 ## The rows of the tolerance frame F, the second under the first and aligned
 ## with it at the left, the top left corner of the first at TL; W is the
 ## width of the first and H the height of them all
@@ -6603,9 +6677,11 @@ endfunction
 ## direction U is chosen: N is U turned a quarter-turn counter-clockwise, and
 ## each measured point is carried onto the dimension line along N.  A
 ## horizontal dimension between points at different heights therefore gets
-## extension lines of different lengths, which is exactly right.
-function [parts, v] = explodedim (e, scale, ndec)
+## extension lines of different lengths, which is exactly right.  NFRAME
+## parts at the end are the tolerance frame, if the dimension has one.
+function [parts, v, nframe] = explodedim (e, scale, ndec)
 
+  nframe = 0;
   P1 = e.pts(1,:);
   P2 = e.pts(2,:);
   d = P2 - P1;
@@ -6720,7 +6796,9 @@ function [parts, v] = explodedim (e, scale, ndec)
     else
       TL = [ix, iy - tgap];
     endif
-    parts = [parts, frameat(e, e.frame, scale, TL)];
+    fp = frameat (e, e.frame, scale, TL);
+    parts = [parts, fp];
+    nframe = numel (fp);
   endif
 
 endfunction

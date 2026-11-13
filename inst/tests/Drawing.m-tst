@@ -2687,7 +2687,7 @@
 %! fn = [tempname(), '.dxf'];
 %! unwind_protect
 %!   D = draw.Drawing ().datum ([20, 0; 20, -10], 'A');
-%!   write (D, fn);
+%!   write (D, fn, 'Dimensions', 'explode');
 %!   R = draw.read (fn);
 %!   assert_equal (R.numentities (), 4);
 %! unwind_protect_cleanup
@@ -2714,12 +2714,273 @@
 %! unwind_protect
 %!   D = draw.Drawing ().tolframe ([0, 0], 'coaxiality', 0.03, ...
 %!                                 'Zone', 'diameter', 'Datums', {'A-B'});
-%!   write (D, fn);
+%!   write (D, fn, 'Dimensions', 'explode');
 %!   R = draw.read (fn);
 %!   assert_equal (R.numentities (), numel (frameparts (D)));
 %! unwind_protect_cleanup
 %!   [~] = unlink (fn);
 %! end_unwind_protect
+
+%!function [L, c] = __dxflines__ (FILE)
+%!  L = regexp (fileread (FILE), '\n', 'split');
+%!  if (isempty (L{end}))
+%!    L(end) = [];
+%!  endif
+%!  c = str2double (L(1:2:end));
+%!endfunction
+
+%!function R = __dxfrecords__ (L, c)
+%!  ## each record of a DXF file by its first and last pair of lines
+%!  R = struct ('first', {}, 'last', {}, 'type', {}, 'section', {}, ...
+%!              'handle', {});
+%!  sec = '';
+%!  z = find (c == 0);
+%!  for k = 1:numel (z)
+%!    p = z(k);
+%!    q = numel (c);
+%!    if (k < numel (z))
+%!      q = z(k+1) - 1;
+%!    endif
+%!    t = strtrim (L{2*p});
+%!    if (strcmp (t, 'SECTION'))
+%!      sec = strtrim (L{2*p+2});
+%!    endif
+%!    h = find (c(p:q) == 5, 1);
+%!    hd = '';
+%!    if (! isempty (h))
+%!      hd = strtrim (L{2*(p+h-1)});
+%!    endif
+%!    R(end+1) = struct ('first', p, 'last', q, 'type', t, ...
+%!                       'section', sec, 'handle', hd);
+%!  endfor
+%!endfunction
+
+%!function __dxfput__ (FILE, L)
+%!  fid = fopen (FILE, 'w');
+%!  fputs (fid, strjoin (L, "\n"));
+%!  fclose (fid);
+%!endfunction
+
+%!function __dxfmove__ (FILE, D, TYPE)
+%!  ## move every entity of FILE by D, as a CAD program does, or the first
+%!  ## of type TYPE alone
+%!  [L, c] = __dxflines__ (FILE);
+%!  R = __dxfrecords__ (L, c);
+%!  R = R(strcmp ({R.section}, 'ENTITIES'));
+%!  if (nargin > 2)
+%!    R = R(find (strcmp ({R.type}, TYPE), 1));
+%!  endif
+%!  for r = R
+%!    for p = r.first:r.last
+%!      if (any (c(p) == [10, 11]))
+%!        L{2*p} = sprintf ('%.17g', str2double (L{2*p}) + D(1));
+%!      elseif (any (c(p) == [20, 21]))
+%!        L{2*p} = sprintf ('%.17g', str2double (L{2*p}) + D(2));
+%!      endif
+%!    endfor
+%!  endfor
+%!  __dxfput__ (FILE, L);
+%!endfunction
+
+%!function __dxfdelete__ (FILE, TYPE)
+%!  ## delete the first entity of type TYPE from FILE and from its group
+%!  [L, c] = __dxflines__ (FILE);
+%!  R = __dxfrecords__ (L, c);
+%!  r = R(find (strcmp ({R.section}, 'ENTITIES') ...
+%!              & strcmp ({R.type}, TYPE), 1));
+%!  drop = [r.first:r.last, ...
+%!          find(c == 340 & strcmp (strtrim (L(2:2:end)), r.handle))];
+%!  keep = setdiff (1:numel (c), drop);
+%!  __dxfput__ (FILE, L(sort ([2*keep-1, 2*keep])));
+%!endfunction
+
+%!function __dxfungroup__ (FILE, CLS)
+%!  ## delete from FILE the group whose record names CLS
+%!  [L, c] = __dxflines__ (FILE);
+%!  R = __dxfrecords__ (L, c);
+%!  for r = R(strcmp ({R.type}, 'GROUP'))
+%!    k = r.first:r.last;
+%!    if (any (c(k) == 1000 & strcmp (strtrim (L(2*k)), CLS)))
+%!      keep = setdiff (1:numel (c), k);
+%!      __dxfput__ (FILE, L(sort ([2*keep-1, 2*keep])));
+%!      return;
+%!    endif
+%!  endfor
+%!endfunction
+
+%!function R = __roundtrip__ (D, varargin)
+%!  fn = [tempname(), '.dxf'];
+%!  unwind_protect
+%!    write (D, fn, varargin{:});
+%!    R = draw.read (fn);
+%!  unwind_protect_cleanup
+%!    [~] = unlink (fn);
+%!  end_unwind_protect
+%!endfunction
+
+%!test  # a tolerance frame comes back from DXF as it was given
+%! D = draw.Drawing ();
+%! D.Layer = 'GDT';
+%! D = D.tolframe ([0, 0; 10, 10; 20, 10], {'position', 'flatness'}, ...
+%!                 [0.1, 0.02], 'Zone', {'diameter', ''}, ...
+%!                 'Modifiers', {{'M'}, {}}, ...
+%!                 'Datums', {{'A', 'B(M)'}, {}}, 'Note', '2x', ...
+%!                 'AllAround', true);
+%! R = __roundtrip__ (D);
+%! assert_equal ({R.Entities.type}, {'tolframe'});
+%! assert_equal (R.Entities.pts, D.Entities.pts);
+%! assert_equal (R.Entities.frame, D.Entities.frame);
+%! assert_equal (R.Entities.layer, 'GDT');
+
+%!test  # so does a free one
+%! D = draw.Drawing ().tolframe ([50, 0], 'straightness', 0.01);
+%! R = __roundtrip__ (D);
+%! assert_equal ({R.Entities.pts, R.Entities.frame.rows.value}, ...
+%!               {[50, 0], 0.01});
+
+%!test  # and a datum
+%! D = draw.Drawing ().datum ([0, -20; 0, -30], 'A');
+%! R = __roundtrip__ (D);
+%! assert_equal ({R.Entities.type, R.Entities.text}, {'datum', 'A'});
+%! assert_equal (R.Entities.pts, D.Entities.pts);
+
+%!test  # a dimension's frame comes back with it
+%! D = draw.Drawing ().dim ([0, 0], [40, 0], -10, 'Frame', ...
+%!                          {'parallelism', 0.05, 'Datums', {'A'}});
+%! R = __roundtrip__ (D);
+%! assert_equal ({R.Entities.type}, {'dim'});
+%! assert_equal (R.Entities.frame, D.Entities.frame);
+
+%!test  # so do a diameter's frames stacked
+%! D = draw.Drawing ().diam ([80, 0], 5, 'Frame', ...
+%!                           {{'straightness', 'circularity'}, ...
+%!                            [0.01, 0.02], 'Zone', {'diameter', ''}});
+%! R = __roundtrip__ (D);
+%! assert_equal (R.Entities.frame, D.Entities.frame);
+
+%!test  # an exact dimension comes back exact, with its places
+%! D = draw.Drawing ().dim ([0, 0], [40.125, 0], -10, 'Exact', true, ...
+%!                          'Decimals', 3);
+%! R = __roundtrip__ (D);
+%! assert_equal ([R.Entities.exact, R.Entities.decimals], [true, 3]);
+
+%!test  # so does an exact angle
+%! D = draw.Drawing ().angdim ([0, 0], [10, 0], [0, 10], 8, 'Exact', true);
+%! R = __roundtrip__ (D);
+%! assert_equal (R.Entities.exact, true);
+
+%!test  # and an exact radius
+%! R = __roundtrip__ (draw.Drawing ().radius ([0, 0], 5, 'Exact', true));
+%! assert_equal (R.Entities.exact, true);
+
+%!test  # a dimension's frame is not in the picture a CAD program draws again
+%! D = draw.Drawing ().dim ([0, 0], [40, 0], -10, 'Frame', ...
+%!                          {'flatness', 0.02});
+%! [B, ~, F] = __ornament__ (D, 1, 1, 2, 'deviations');
+%! B0 = __ornament__ (draw.Drawing ().dim ([0, 0], [40, 0], -10), 1, 1, ...
+%!                    2, 'deviations');
+%! assert_equal (numel (B.Entities), numel (B0.Entities));
+%! assert_equal (numel (F{1}.Entities) + numel (B.Entities), ...
+%!               numel (frameparts (D)));
+%! assert_equal (F{2}(1:2,:), {1000, 'dimframe'; 1005, ''});
+
+%!test  # a tolerance frame's record names it and its leader
+%! D = draw.Drawing ().tolframe ([0, 0; 10, 10], 'flatness', 0.02);
+%! [~, REC, F] = __ornament__ (D, 1, 1, 2, 'deviations');
+%! assert_equal (REC(1:4,:), {1000, 'tolframe'; 1000, 'path'; ...
+%!                            1010, [0, 0]; 1010, [10, 10]});
+%! assert_equal (F, {});
+
+%!test  # a frame moved in a CAD program comes back where it was moved
+%! fn = [tempname(), '.dxf'];
+%! unwind_protect
+%!   write (draw.Drawing ().tolframe ([0, 0; 10, 10], 'flatness', 0.02), fn);
+%!   __dxfmove__ (fn, [5, -3]);
+%!   R = draw.read (fn);
+%!   assert_equal (R.Entities.pts, [5, -3; 15, 7], 1e-12);
+%! unwind_protect_cleanup
+%!   [~] = unlink (fn);
+%! end_unwind_protect
+
+%!test  # one changed otherwise comes back as its lines and text
+%! fn = [tempname(), '.dxf'];
+%! unwind_protect
+%!   write (draw.Drawing ().datum ([0, -20; 0, -30], 'A'), fn);
+%!   __dxfmove__ (fn, [5, 0], 'TEXT');
+%!   R = draw.read (fn);
+%!   assert_equal ({R.Entities.type}, {'polyline', 'line', 'polyline', ...
+%!                                     'text'});
+%! unwind_protect_cleanup
+%!   [~] = unlink (fn);
+%! end_unwind_protect
+
+%!test  # as does one with a member deleted
+%! fn = [tempname(), '.dxf'];
+%! unwind_protect
+%!   write (draw.Drawing ().datum ([0, -20; 0, -30], 'A'), fn);
+%!   __dxfdelete__ (fn, 'TEXT');
+%!   R = draw.read (fn);
+%!   assert_equal ({R.Entities.type}, {'polyline', 'line', 'polyline'});
+%! unwind_protect_cleanup
+%!   [~] = unlink (fn);
+%! end_unwind_protect
+
+%!test  # a dimension whose frame was deleted comes back without it
+%! fn = [tempname(), '.dxf'];
+%! unwind_protect
+%!   D = draw.Drawing ().dim ([0, 0], [40, 0], -10, 'Frame', ...
+%!                            {'flatness', 0.02});
+%!   write (D, fn);
+%!   __dxfungroup__ (fn, 'dimframe');
+%!   R = draw.read (fn);
+%!   assert_equal (R.Entities(1).frame, []);
+%! unwind_protect_cleanup
+%!   [~] = unlink (fn);
+%! end_unwind_protect
+
+%!test  # a frame whose dimension was deleted stays as its lines and text
+%! fn = [tempname(), '.dxf'];
+%! unwind_protect
+%!   D = draw.Drawing ().dim ([0, 0], [40, 0], -10, 'Frame', ...
+%!                            {'flatness', 0.02});
+%!   write (D, fn);
+%!   __dxfdelete__ (fn, 'DIMENSION');
+%!   R = draw.read (fn);
+%!   [~, ~, F] = __ornament__ (D, 1, 1, 2, 'deviations');
+%!   assert_equal ({R.Entities.type}, {F{1}.Entities.type});
+%! unwind_protect_cleanup
+%!   [~] = unlink (fn);
+%! end_unwind_protect
+
+%!test  # R12 has no groups, so a frame is its lines and text there
+%! D = draw.Drawing ().datum ([0, -20; 0, -30], 'A');
+%! R = __roundtrip__ (D, 'Version', 'R12');
+%! assert_equal (R.numentities (), 4);
+
+%!test  # but an exact dimension comes back exact
+%! D = draw.Drawing ().dim ([0, 0], [40, 0], -10, 'Exact', true);
+%! R = __roundtrip__ (D, 'Version', 'R12');
+%! assert_equal (R.Entities.exact, true);
+
+%!test  # dimensions written exploded take their frames with them
+%! D = draw.Drawing ().dim ([0, 0], [40, 0], -10, 'Frame', ...
+%!                          {'flatness', 0.02});
+%! R = __roundtrip__ (D, 'Dimensions', 'explode');
+%! assert_equal (R.numentities (), numel (frameparts (D)));
+
+%!function C = __georead__ (D)
+%!  fn = [tempname(), '.dxf'];
+%!  unwind_protect
+%!    write (D, fn);
+%!    C = geom.read (fn);
+%!  unwind_protect_cleanup
+%!    [~] = unlink (fn);
+%!  end_unwind_protect
+%!endfunction
+
+## geom.read reads a datum's group as its geometry, skipping its text alone
+%!warning <geom.read: skipped 1 TEXT.> ...
+%! __georead__ (draw.Drawing ().datum ([0, -20; 0, -30], 'A'));
 
 %!error<draw.Drawing.tolframe: invalid number of input arguments.> ...
 %! draw.Drawing ().tolframe ([0, 0], 'flatness')

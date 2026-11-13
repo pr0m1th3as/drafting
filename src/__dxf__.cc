@@ -562,11 +562,14 @@ public:
     string rec, beg, end;
   };
   vector<Block> blocks;
+  // A group of entities of the model; OWNER, an entity of the model too,
+  // is the one its extended data names by handle, at an empty 1005
   struct Group
   {
     vector<int> members;
     vector<Tag> xdata;
     string handle, name;
+    int owner = -1;
   };
   vector<Group> groups;
   vector<string> layers;
@@ -1744,7 +1747,10 @@ Writer::emitr2000 (ostringstream& s)
     for (int m : G.members)
       put (s, 340, model[m].handle);
     for (const auto& t : G.xdata)
-      put (s, t.first, t.second);
+      if (t.first == 1005 && t.second.empty () && G.owner >= 0)
+        put (s, 1005, model[G.owner].handle);
+      else
+        put (s, t.first, t.second);
   }
   put (s, 0, "ENDSEC");
   put (s, 0, "EOF");
@@ -2104,11 +2110,13 @@ pathitems (Writer& w, vector<Item>& dest, const octave_value& P,
 }
 
 static void
-groupof (Writer& w, const vector<int>& members, const vector<Tag>& xdata)
+groupof (Writer& w, const vector<int>& members, const vector<Tag>& xdata,
+         int owner = -1)
 {
   Writer::Group G;
   G.members = members;
   G.xdata = xdata;
+  G.owner = owner;
   w.groups.push_back (G);
   for (int m : members)
     w.model[m].group = w.groups.size () - 1;
@@ -2188,6 +2196,57 @@ lwcode (const octave_value& v)
     if (std::abs (x - want) < std::abs (best - want))
       best = x;
   return best;
+}
+
+// The DRAFTING extended data of a group of an ornament's picture: REC, the
+// rows of a code and a value the drawing gives, a point as a row; then the
+// first point of each member as written, by which a reader tells that the
+// picture was moved as a whole and by how much, or changed otherwise
+static vector<Tag>
+ornamentxdata (const Cell& rec, const vector<Item>& dest, size_t n0)
+{
+  vector<Tag> x;
+  Body b (x, false);
+  b.str (1001, "DRAFTING");
+  for (octave_idx_type k = 0; k < rec.rows (); k++)
+  {
+    int code = rec(k,0).int_value ();
+    octave_value v = rec(k,1);
+    if (code == 1010)
+    {
+      Matrix p = v.matrix_value ();
+      b.pt (1010, v3 (p(0), p(1), 0));
+    }
+    else if (code == 1040)
+      b.num (1040, v.double_value ());
+    else if (code == 1070)
+      b.integ (1070, v.int_value ());
+    else if (code == 1005)
+      b.str (1005, "");
+    else
+      b.str (code, encodetext (v.string_value ()));
+  }
+  b.str (1000, "ref");
+  for (size_t k = n0; k < dest.size (); k++)
+  {
+    string px = "0", py = "0";
+    bool hx = false, hy = false;
+    for (const auto& t : dest[k].data)
+      if (t.first == 10 && ! hx)
+      {
+        px = t.second;
+        hx = true;
+      }
+      else if (t.first == 20 && ! hy)
+      {
+        py = t.second;
+        hy = true;
+      }
+    b.str (1010, px);
+    b.str (1020, py);
+    b.str (1030, "0");
+  }
+  return x;
 }
 
 // The entities of a drawing; INBLOCK leaves paths and regions ungrouped,
@@ -2308,9 +2367,29 @@ drawingitems (Writer& w, vector<Item>& dest, const octave_value& D,
         Cell r = orn(i).cell_value ();
         octave_value B = r(0);
         octave_value rec = r(1);
+        // A group holds entities of the model, and R12 has none
+        bool grouped = ! w.opt.explode && ! w.opt.r12 && ! inblock
+                       && &dest == &w.model;
+        // A tolerance frame or datum: its picture, grouped with the record
+        // our reader rebuilds it from
+        if (type == "tolframe" || type == "datum")
+        {
+          size_t n0 = dest.size ();
+          drawingitems (w, dest, B, true, Cell ());
+          if (grouped && rec.iscell () && dest.size () > n0)
+          {
+            vector<int> m;
+            for (size_t k = n0; k < dest.size (); k++)
+              m.push_back (k);
+            groupof (w, m, ornamentxdata (rec.cell_value (), dest, n0));
+          }
+          continue;
+        }
         if (rec.isempty () || w.opt.explode)
         {
           drawingitems (w, dest, B, true, Cell ());
+          if (r.numel () > 2)
+            drawingitems (w, dest, r(2), true, Cell ());
           continue;
         }
         vector<Item> pic;
@@ -2339,14 +2418,18 @@ drawingitems (Writer& w, vector<Item>& dest, const octave_value& D,
         octave_map m = rec.map_value ();
         // A tolerance as given, with the text and places it was drawn
         // with, for our reader: 'dimension', then each item by name
+        // and whether it is theoretically exact
         vector<Tag> own;
+        octave_value T;
         if (E.isfield ("tolerance"))
+          T = E.contents ("tolerance")(i);
+        bool exact = E.isfield ("exact") && mapnum (E, "exact", i, 0) != 0;
+        if ((T.is_defined () && ! T.isempty ()) || exact)
         {
-          octave_value T = E.contents ("tolerance")(i);
-          if (! T.isempty ())
+          own = {Tag (1001, "DRAFTING"), Tag (1000, "dimension")};
+          if (T.is_defined () && ! T.isempty ())
           {
-            own = {Tag (1001, "DRAFTING"), Tag (1000, "dimension"),
-                   Tag (1000, "tolerance")};
+            own.push_back (Tag (1000, "tolerance"));
             if (T.is_string ())
               own.push_back (Tag (1000, T.string_value ()));
             else
@@ -2361,15 +2444,20 @@ drawingitems (Writer& w, vector<Item>& dest, const octave_value& D,
               own.push_back (Tag (1000, "form"));
               own.push_back (Tag (1000, form));
             }
-            string text = mapstr (E, "text", i);
-            if (! text.empty ())
-            {
-              own.push_back (Tag (1000, "text"));
-              own.push_back (Tag (1000, encodetext (text)));
-            }
-            own.push_back (Tag (1000, "decimals"));
-            own.push_back (Tag (1070, to_string (static_cast<int> (
-                                  mapnum (E, "decimals", i, -1)))));
+          }
+          string text = mapstr (E, "text", i);
+          if (! text.empty ())
+          {
+            own.push_back (Tag (1000, "text"));
+            own.push_back (Tag (1000, encodetext (text)));
+          }
+          own.push_back (Tag (1000, "decimals"));
+          own.push_back (Tag (1070, to_string (static_cast<int> (
+                                mapnum (E, "decimals", i, -1)))));
+          if (exact)
+          {
+            own.push_back (Tag (1000, "exact"));
+            own.push_back (Tag (1070, "1"));
           }
         }
         w.dimension (dest, a, m.contents ("pts")(0).matrix_value (),
@@ -2378,6 +2466,22 @@ drawingitems (Writer& w, vector<Item>& dest, const octave_value& D,
                        .string_value (),
                      m.contents ("rotation")(0).double_value (), name,
                      m.contents ("dstyle")(0).matrix_value (), own);
+        // Its tolerance frame, outside the picture a CAD program draws
+        // again, grouped with a record naming the dimension
+        if (r.numel () > 3)
+        {
+          int owner = dest.size () - 1;
+          size_t n0 = dest.size ();
+          drawingitems (w, dest, r(2), true, Cell ());
+          if (grouped && dest.size () > n0)
+          {
+            vector<int> mm;
+            for (size_t k = n0; k < dest.size (); k++)
+              mm.push_back (k);
+            groupof (w, mm, ornamentxdata (r(3).cell_value (), dest, n0),
+                     owner);
+          }
+        }
       }
   }
 }
@@ -4203,22 +4307,263 @@ groupobject (const Reader& rd, const Reader::Grp& g, const vector<size_t>& m,
   return reg;
 }
 
-// Members of our groups that rebuild, by the record that leads each
+// Members of our groups that rebuild, by the record that leads each; a
+// lead is an object, or a cell of the method that draws the entity and its
+// arguments.  DIMFRAME holds the 'Frame' of a dimension, by its handle.
 struct GroupHit
 {
   map<size_t, octave_value> lead;
   set<size_t> taken;
+  map<string, octave_value> dimframe;
 };
 
+// The class our extended data names first
+static string
+groupclass (const vector<Tag>& x)
+{
+  for (size_t k = 0; k + 1 < x.size (); k++)
+    if (x[k].first == 1001 && x[k].second == "DRAFTING")
+      return x[k+1].first == 1000 ? x[k+1].second : "";
+  return "";
+}
+
+// The record of a group of a tolerance frame, a datum or a dimension's
+// frame: the leader's points, the members' first points as written, the
+// rows of the frame, the note, all-around, the datum's letter and the
+// handle of the dimension
+struct FrameRec
+{
+  struct Row
+  {
+    string ch, zone;
+    double value = 0;
+    vector<string> mods, datums;
+  };
+  vector<V3> path, ref;
+  vector<Row> rows;
+  string note, letter, owner;
+  bool allaround = false;
+};
+
+static FrameRec
+framerec (const Reader& rd, const vector<Tag>& x)
+{
+  FrameRec f;
+  size_t n = x.size (), k = 0;
+  while (k < n && ! (x[k].first == 1001 && x[k].second == "DRAFTING"))
+    k++;
+  vector<V3> *pts = nullptr;
+  for (k += 2; k < n; k++)
+  {
+    int c = x[k].first;
+    const string& v = x[k].second;
+    if (c == 1010)
+    {
+      V3 p = v3 (tonum (v), 0, 0);
+      if (k + 1 < n && x[k+1].first == 1020)
+        p.y = tonum (x[++k].second);
+      if (k + 1 < n && x[k+1].first == 1030)
+        p.z = tonum (x[++k].second);
+      if (pts)
+        pts->push_back (p);
+      continue;
+    }
+    pts = nullptr;
+    if (c == 1005)
+      f.owner = upper (trim (v));
+    if (c != 1000)
+      continue;
+    bool next = k + 1 < n && x[k+1].first == 1000;
+    if (v == "path")
+      pts = &f.path;
+    else if (v == "ref")
+      pts = &f.ref;
+    else if (v == "row" && next && k + 2 < n && x[k+2].first == 1040)
+    {
+      FrameRec::Row r;
+      r.ch = x[k+1].second;
+      r.value = tonum (x[k+2].second);
+      f.rows.push_back (r);
+      k += 2;
+    }
+    else if (v == "zone" && next && ! f.rows.empty ())
+      f.rows.back ().zone = x[++k].second;
+    else if (v == "modifier" && next && ! f.rows.empty ())
+      f.rows.back ().mods.push_back (x[++k].second);
+    else if (v == "datum" && next && ! f.rows.empty ())
+      f.rows.back ().datums.push_back (x[++k].second);
+    else if (v == "note" && next)
+      f.note = rd.decode (x[++k].second);
+    else if (v == "letter" && next)
+      f.letter = rd.decode (x[++k].second);
+    else if (v == "allaround")
+      f.allaround = true;
+  }
+  return f;
+}
+
+// A row cell of strings
+static Cell
+cellstrs (const vector<string>& v)
+{
+  Cell c (1, v.size ());
+  for (size_t k = 0; k < v.size (); k++)
+    c(k) = v[k];
+  return c;
+}
+
+// The arguments of tolframe after the path for the frame F records
+static octave_value_list
+frameargs (const FrameRec& f)
+{
+  octave_value_list a;
+  size_t nr = f.rows.size ();
+  if (nr == 1)
+  {
+    const FrameRec::Row& r = f.rows[0];
+    a.append (ovl (r.ch, r.value));
+    if (! r.zone.empty ())
+      a.append (ovl ("Zone", r.zone));
+    if (! r.mods.empty ())
+      a.append (ovl ("Modifiers", cellstrs (r.mods)));
+    if (! r.datums.empty ())
+      a.append (ovl ("Datums", cellstrs (r.datums)));
+  }
+  else
+  {
+    Cell ch (1, nr), z (1, nr), md (1, nr), dt (1, nr);
+    RowVector v (nr);
+    for (size_t k = 0; k < nr; k++)
+    {
+      ch(k) = f.rows[k].ch;
+      v(k) = f.rows[k].value;
+      z(k) = f.rows[k].zone;
+      md(k) = cellstrs (f.rows[k].mods);
+      dt(k) = cellstrs (f.rows[k].datums);
+    }
+    a.append (ovl (ch, v, "Zone", z, "Modifiers", md, "Datums", dt));
+  }
+  if (! f.note.empty ())
+    a.append (ovl ("Note", f.note));
+  if (f.allaround)
+    a.append (ovl ("AllAround", true));
+  return a;
+}
+
+// A tolerance frame or datum our group records, as the lead of its members,
+// where every member is still there and the picture was at most moved as a
+// whole; otherwise empty, and the members stay as they are
+static octave_value
+ornamentlead (const Reader& rd, const Reader::Grp& g, const vector<size_t>& m,
+              const string& cls, const octave_value& blank)
+{
+  FrameRec f = framerec (rd, g.xdata);
+  if (f.ref.size () != m.size () || f.path.empty ()
+      || (cls == "tolframe" && f.rows.empty ()))
+    return octave_value ();
+  // Every member moved by the same amount as the first
+  V3 d0;
+  for (size_t k = 0; k < m.size (); k++)
+  {
+    const Rec& r = rd.ents[m[k]];
+    V3 d = v3 (r.num (10) - f.ref[k].x, r.num (20) - f.ref[k].y, 0);
+    if (k == 0)
+      d0 = d;
+    else if (norm (d - d0) > 1e-5 * (1 + norm (f.ref[k])))
+      return octave_value ();
+  }
+  Matrix P (f.path.size (), 2);
+  for (size_t k = 0; k < f.path.size (); k++)
+  {
+    P(k,0) = (f.path[k].x + d0.x) * rd.scale;
+    P(k,1) = (f.path[k].y + d0.y) * rd.scale;
+  }
+  octave_value_list a = ovl (P);
+  if (cls == "tolframe")
+    a.append (frameargs (f));
+  else
+    a.append (ovl (f.letter));
+  // What the drawing would refuse leaves the members as they are
+  octave_value_list t = ovl (blank);
+  t.append (a);
+  try
+  {
+    call (cls, t);
+  }
+  catch (const octave::execution_exception&)
+  {
+    recover ();
+    return octave_value ();
+  }
+  Cell lead (1, a.length () + 1);
+  lead(0) = cls;
+  for (octave_idx_type k = 0; k < a.length (); k++)
+    lead(k+1) = a(k);
+  return lead;
+}
+
+// The 'Frame' of a dimension our group records, if the frame is one the
+// drawing takes; empty otherwise
+static octave_value
+dimframearg (const Reader& rd, const Reader::Grp& g, const octave_value& blank)
+{
+  FrameRec f = framerec (rd, g.xdata);
+  if (f.rows.empty ())
+    return octave_value ();
+  octave_value_list a = frameargs (f);
+  octave_value_list t = ovl (blank, RowVector (2, 0.0));
+  t.append (a);
+  try
+  {
+    call ("tolframe", t);
+  }
+  catch (const octave::execution_exception&)
+  {
+    recover ();
+    return octave_value ();
+  }
+  Cell c (1, a.length ());
+  for (octave_idx_type k = 0; k < a.length (); k++)
+    c(k) = a(k);
+  return c;
+}
+
+// DRAW reads groups as a drawing does: tolerance frames, datums and the
+// frames of dimensions besides paths and regions
 static GroupHit
-restoregroups (const Reader& rd, bool useframe, Skips& sk)
+restoregroups (const Reader& rd, bool useframe, Skips& sk, bool draw = false)
 {
   GroupHit gh;
   map<string, size_t> h = handles (rd.ents);
+  octave_value blank;
   for (const auto& g : rd.groups)
   {
-    XFrame xf = xframe (g.xdata);
-    if (xf.cls != "geom.Path" && xf.cls != "geom.Region")
+    string cls = groupclass (g.xdata);
+    bool orn = draw && (cls == "tolframe" || cls == "datum");
+    if (draw && cls == "dimframe")
+    {
+      // The frame goes with its dimension while both are there; its
+      // members are drawn again beside the dimension
+      FrameRec f = framerec (rd, g.xdata);
+      auto o = h.find (f.owner);
+      if (o == h.end () || rd.ents[o->second].type != "DIMENSION"
+          || rd.ents[o->second].paper)
+        continue;
+      if (blank.is_undefined ())
+        blank = call ("draw.Drawing", ovl ());
+      octave_value fa = dimframearg (rd, g, blank);
+      if (fa.is_undefined ())
+        continue;
+      gh.dimframe[f.owner] = fa;
+      for (const auto& hd : g.members)
+      {
+        auto it = h.find (hd);
+        if (it != h.end ())
+          gh.taken.insert (it->second);
+      }
+      continue;
+    }
+    if (! orn && cls != "geom.Path" && cls != "geom.Region")
       continue;
     vector<size_t> m;
     bool ok = true;
@@ -4233,6 +4578,18 @@ restoregroups (const Reader& rd, bool useframe, Skips& sk)
     }
     if (! ok || m.empty ())
       continue;
+    if (orn)
+    {
+      if (blank.is_undefined ())
+        blank = call ("draw.Drawing", ovl ());
+      octave_value o = ornamentlead (rd, g, m, cls, blank);
+      if (o.is_undefined ())
+        continue;
+      gh.lead[*min_element (m.begin (), m.end ())] = o;
+      for (size_t k : m)
+        gh.taken.insert (k);
+      continue;
+    }
     try
     {
       octave_value o = groupobject (rd, g, m, useframe);
@@ -4586,6 +4943,7 @@ public:
   octave_value run (octave_value D, const vector<Rec>& recs,
                     const set<string>& defined, const GroupHit *gh)
   {
+    m_gh = gh;
     m_layer = "0";
     m_ltype = "byLayer";
     m_colour = 256;
@@ -4613,9 +4971,18 @@ public:
           D = attrs (D, r);
           try
           {
-            D = call (isclass (lead->second, "geom.Path") ? "path"
-                                                         : "region",
-                      ovl (D, lead->second));
+            if (lead->second.iscell ())
+            {
+              Cell c = lead->second.cell_value ();
+              octave_value_list a = ovl (D);
+              for (octave_idx_type j = 1; j < c.numel (); j++)
+                a.append (c(j));
+              D = call (c(0).string_value (), a);
+            }
+            else
+              D = call (isclass (lead->second, "geom.Path") ? "path"
+                                                           : "region",
+                        ovl (D, lead->second));
             D = aside (D, parts, none);
           }
           catch (const octave::execution_exception&)
@@ -4677,6 +5044,8 @@ private:
   int m_dec;
   string m_layer, m_ltype;
   int m_colour, m_lw;
+  // Our groups, for the frames of the dimensions being read
+  const GroupHit *m_gh = nullptr;
 
   // A dimension: from the DRAFTING data we wrote, its tolerance as given
   // with the text and places it was drawn with; otherwise from the file,
@@ -4716,6 +5085,11 @@ private:
           txt = m_rd.decode (r.xdata[++k].second);
         else if (item == "decimals")
           places = atoi (r.xdata[++k].second.c_str ());
+        else if (item == "exact")
+        {
+          extra.append (ovl ("Exact", true));
+          k++;
+        }
       }
     }
     else
@@ -4747,6 +5121,12 @@ private:
     }
     if (places >= 0)
       extra.append (ovl ("Decimals", static_cast<double> (places)));
+    if (m_gh)
+    {
+      auto f = m_gh->dimframe.find (r.handle);
+      if (f != m_gh->dimframe.end ())
+        extra.append (ovl ("Frame", f->second));
+    }
     return raisedim (D, r, sc, txt, extra);
   }
 
@@ -5143,7 +5523,7 @@ cmdreaddraw (const octave_value_list& args, octave_value_list& out)
       defined.insert (u);
     }
   }
-  GroupHit gh = restoregroups (rd, false, sk);
+  GroupHit gh = restoregroups (rd, false, sk, true);
   D = rp.run (D, rd.ents, defined, &gh);
   out = ovl (D, sk.labels (), sk.counts ());
 }

@@ -62,6 +62,12 @@
 ## them.  The drawing's @code{FitForm} comes back from a file the package
 ## wrote.
 ##
+## A tolerance frame and a datum feature symbol the package wrote return as
+## they were given, where they now stand if a CAD program moved them whole;
+## one changed in any other way, or written to R12 or inside a block, returns
+## as its lines and text.  A dimension returns with its tolerance frame while
+## the frame's group is in the file, and theoretically exact if it was.
+##
 ## A drawing lies in the plane @math{z = 0}.  An entity whose normal points
 ## down the @math{z} axis is mirrored into the plane facing up, as 2-D CAD
 ## programs treat it; heights are dropped.  An entity on any other plane, a
