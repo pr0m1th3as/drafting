@@ -2560,7 +2560,7 @@ draw.titleblock
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1890
+# length: 2153
 drafting: D = draw.titleblock (SIZE, FIELDS)
 drafting: D = draw.titleblock (SIZE)
 drafting: SIZES = draw.titleblock ()
@@ -2583,9 +2583,15 @@ ISO 5457 asks for and what a drawing loses if it is punched without.
 Fields
 
 FIELDS is a struct whose fields fill the block. Any of title,
-drawing, material, scale, units, date,
-drawnby and revision is used; anything else is ignored, and
-anything absent is left blank rather than invented.
+drawing, material, scale, units,
+tolerance, date, drawnby and revision is used;
+anything else is ignored, and anything absent is left blank rather than
+invented.
+
+The field tolerance is the general tolerance, the one every
+dimension without its own takes, such as 'ISO 2768-mK'. It stands
+beside the units, since both say how every dimension on the sheet is
+read, in a cell with room for about fifteen characters.
 
 The values are text and are written as given. A scale of '1:2' is
 a claim about the drawing it frames, and nothing here checks it: the frame

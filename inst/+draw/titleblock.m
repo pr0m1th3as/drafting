@@ -39,9 +39,15 @@
 ## @subheading Fields
 ##
 ## @var{FIELDS} is a struct whose fields fill the block.  Any of @code{title},
-## @code{drawing}, @code{material}, @code{scale}, @code{units}, @code{date},
-## @code{drawnby} and @code{revision} is used; anything else is ignored, and
-## anything absent is left blank rather than invented.
+## @code{drawing}, @code{material}, @code{scale}, @code{units},
+## @code{tolerance}, @code{date}, @code{drawnby} and @code{revision} is used;
+## anything else is ignored, and anything absent is left blank rather than
+## invented.
+##
+## The field @code{tolerance} is the general tolerance, the one every
+## dimension without its own takes, such as @qcode{'ISO 2768-mK'}.  It stands
+## beside the units, since both say how every dimension on the sheet is
+## read, in a cell with room for about fifteen characters.
 ##
 ## The values are text and are written as given.  A scale of @qcode{'1:2'} is
 ## a claim about the drawing it frames, and nothing here checks it: the frame
@@ -135,15 +141,18 @@ function D = titleblock (varargin)
     D = D.line ([x0, y0 + r], [x0 + bw, y0 + r]);
   endfor
   D = D.line ([x0 + 110, y0], [x0 + 110, y0 + 42]);
+  ## The units share their cell with the general tolerance
+  D = D.line ([x0 + 135, y0 + 14], [x0 + 135, y0 + 28]);
 
-  cells = {  4, 46, 'title',    '';
-             4, 30, 'drawing',  'DRG No ';
-             4, 16, 'material', 'MATL ';
-             4,  4, 'drawnby',  'BY ';
-           114, 30, 'scale',    'SCALE ';
-           114, 16, 'units',    'UNITS ';
-           114,  4, 'date',     'DATE ';
-           114, 46, 'revision', 'REV '};
+  cells = {  4, 46, 'title',     '';
+             4, 30, 'drawing',   'DRG No ';
+             4, 16, 'material',  'MATL ';
+             4,  4, 'drawnby',   'BY ';
+           114, 30, 'scale',     'SCALE ';
+           114, 16, 'units',     'UNITS ';
+           139, 16, 'tolerance', 'TOL ';
+           114,  4, 'date',      'DATE ';
+           114, 46, 'revision',  'REV '};
 
   for c = 1:rows (cells)
     name = cells{c,3};
@@ -170,7 +179,8 @@ endfunction
 %!
 %! F = struct ('title', 'BEARING BRACKET', 'drawing', 'BRK-014', ...
 %!             'material', 'EN8', 'scale', '1:1', 'units', 'mm', ...
-%!             'date', '2026-08-17', 'drawnby', 'AB', 'revision', 'B');
+%!             'tolerance', 'ISO 2768-mK', 'date', '2026-08-17', ...
+%!             'drawnby', 'AB', 'revision', 'B');
 %! sheet = draw.titleblock ('A4', F);
 %!
 %! part = draw.Drawing ().circle ([0, 0], 30).circle ([0, 0], 12);
@@ -223,6 +233,17 @@ endfunction
 %! E = entities (D);
 %! txt = {E(strcmp ({E.type}, 'TEXT')).text};
 %! assert_equal (any (strcmp (txt, 'DRG No ABC-123')), true);
+
+%!test  # the general tolerance stands beside the units, in a cell of its own
+%! D = draw.titleblock ('A4', struct ('units', 'mm', ...
+%!                                    'tolerance', 'ISO 2768-mK'));
+%! E = entities (D);
+%! T = E(strcmp ({E.type}, 'TEXT'));
+%! assert_equal ({T.text}, {'UNITS mm', 'TOL ISO 2768-mK'});
+%! assert_equal (T(2).pts(2), T(1).pts(2), 1e-12);
+%! rule = E(strcmp ({E.type}, 'LINE'))(end).pts;
+%! assert_equal (T(1).pts(1) < rule(1,1) && rule(1,1) < T(2).pts(1), true);
+%! assert_equal (sort (rule(:,2))', T(1).pts(2) + [-2, 12], 1e-12);
 
 %!test  # a field not given is left blank rather than invented
 %! D = draw.titleblock ('A4', struct ('title', 'X'));
