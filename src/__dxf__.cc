@@ -836,12 +836,27 @@ public:
   }
 
   // A dimension from its six definition points, rows in the order of group
-  // codes 10, 11, 13, 14, 15 and 16
+  // codes 10, 11, 13, 14, 15 and 16.  PLACES, the dimension's own, from 0,
+  // is an override of the style in ACAD's DSTYLE data: DIMDEC, and DIMADEC
+  // for an angle.  R12 programs ignore it; our reader takes it from any
+  // version.
   void dimension (vector<Item>& dest, const Attr& a, const Matrix& P,
                   int type, const string& txt, double rot,
-                  const string& block)
+                  const string& block, int places)
   {
     Item it = start ("DIMENSION", a);
+    if (places >= 0)
+    {
+      string n = to_string (places);
+      it.xdata = {Tag (1001, "ACAD"), Tag (1000, "DSTYLE"), Tag (1002, "{"),
+                  Tag (1070, "271"), Tag (1070, n)};
+      if (type == 2 || type == 5)
+      {
+        it.xdata.push_back (Tag (1070, "179"));
+        it.xdata.push_back (Tag (1070, n));
+      }
+      it.xdata.push_back (Tag (1002, "}"));
+    }
     Body b (it.data, opt.r12);
     auto p = [&] (int r) { return v3 (P(r,0), P(r,1), 0); };
     b.marker ("AcDbDimension");
@@ -2296,10 +2311,13 @@ drawingitems (Writer& w, vector<Item>& dest, const octave_value& D,
         blk.items = pic;
         w.blocks.push_back (blk);
         octave_map m = rec.map_value ();
+        int places = E.isfield ("decimals")
+                     ? static_cast<int> (mapnum (E, "decimals", i, -1)) : -1;
         w.dimension (dest, a, m.contents ("pts")(0).matrix_value (),
                      m.contents ("angles")(0).int_value (),
                      m.contents ("text")(0).string_value (),
-                     m.contents ("rotation")(0).double_value (), name);
+                     m.contents ("rotation")(0).double_value (), name,
+                     places);
       }
   }
 }
@@ -4303,8 +4321,44 @@ xy (const V3& p)
 // Rebuild the dimension its definition points describe.  Which method made
 // it is recoverable from the DXF type alone: the six points mean different
 // things for each.
+// The dimension style NAME, compared without case, or none
+static const Reader::Dst *
+dimstyleof (const Reader& rd, const string& name)
+{
+  for (const auto& d : rd.dimstyles)
+    if (upper (d.name) == upper (name))
+      return &d;
+  return nullptr;
+}
+
+// The places a dimension shows its measurement at in the file, by its own
+// override or else its style (STANDARD when it names none), its angle by
+// DIMADEC unless that says DIMDEC; -1 when unknown, or when its text hides
+// the measurement
+static int
+shownplaces (const Reader& rd, const Rec& r)
+{
+  string txt = r.str (1, "<>");
+  if (! txt.empty () && txt.find ("<>") == string::npos)
+    return -1;
+  string name = trim (r.str (3));
+  const Reader::Dst *d = dimstyleof (rd, name.empty () ? "STANDARD" : name);
+  int p = r.dimdec >= 0 ? r.dimdec : (d ? d->dec : -1);
+  int t = static_cast<int> (r.num (70)) & 7;
+  if (t == 2 || t == 5)
+  {
+    int a = r.dimadec != -2 ? r.dimadec : (d ? d->adec : -2);
+    if (a >= 0)
+      p = a;
+  }
+  return p >= 0 && p <= 8 ? p : -1;
+}
+
+// A dimension raised from its definition points; PLACES, from 0, its own
+// precision, passed as 'Decimals'
 static octave_value
-raisedim (const octave_value& D, const Rec& r, double sc, const string& txt)
+raisedim (const octave_value& D, const Rec& r, double sc, const string& txt,
+          int places)
 {
   V3 L = r.pt (10) * sc, P1 = r.pt (13) * sc, P2 = r.pt (14) * sc;
   V3 Q = r.pt (15) * sc, A = r.pt (16) * sc;
@@ -4312,10 +4366,12 @@ raisedim (const octave_value& D, const Rec& r, double sc, const string& txt)
   string lbl = txt == "<>" ? "" : txt;
   // The measured text is the default, so a label is passed only when the
   // dimension overrides it
-  auto withlbl = [&lbl] (octave_value_list a)
+  auto withlbl = [&lbl, places] (octave_value_list a)
   {
     if (! lbl.empty ())
       a.append (ovl ("Text", lbl));
+    if (places >= 0)
+      a.append (ovl ("Decimals", static_cast<double> (places)));
     return a;
   };
   int t = static_cast<int> (r.num (70));
@@ -4445,7 +4501,8 @@ penlw (int code)
 class Replay
 {
 public:
-  Replay (const Reader& rd, Skips& sk) : m_rd (rd), m_sk (sk) { }
+  Replay (const Reader& rd, Skips& sk, int dec)
+    : m_rd (rd), m_sk (sk), m_dec (dec) { }
 
   octave_value run (octave_value D, const vector<Rec>& recs,
                     const set<string>& defined, const GroupHit *gh)
@@ -4536,6 +4593,9 @@ public:
 private:
   const Reader& m_rd;
   Skips& m_sk;
+  // The drawing's Decimals, which a dimension shown at other places differs
+  // from
+  int m_dec;
   string m_layer, m_ltype;
   int m_colour, m_lw;
 
@@ -4718,7 +4778,11 @@ private:
       return D;
     }
     if (T == "DIMENSION")
-      return raisedim (D, r, sc, m_rd.decode (r.str (1, "<>")));
+    {
+      int p = shownplaces (m_rd, r);
+      return raisedim (D, r, sc, m_rd.decode (r.str (1, "<>")),
+                       p != m_dec ? p : -1);
+    }
     if (T == "HATCH")
     {
       HatchIn h = hatchtags (r, sc);
@@ -4750,20 +4814,11 @@ insertnames (const vector<Rec>& recs)
 }
 
 // The drawing's Decimals: the places of the style most dimensions use, else
-// of the style the header names, else R12's $LUPREC, else 2.  NOTED counts
-// the dimensions showing their measurement at other places, by their style
-// or their own override; their angles by DIMADEC, unless it says DIMDEC.
+// of the style the header names, else R12's $LUPREC, else 2
 static int
-dimplaces (const Reader& rd, const vector<size_t>& keep, int& noted)
+dimplaces (const Reader& rd, const vector<size_t>& keep)
 {
   auto valid = [] (int p) { return p >= 0 && p <= 8; };
-  auto style = [&rd] (const string& name) -> const Reader::Dst *
-  {
-    for (const auto& d : rd.dimstyles)
-      if (upper (d.name) == upper (name))
-        return &d;
-    return nullptr;
-  };
   vector<const Rec *> dims;
   for (const auto& r : rd.ents)
     if (r.type == "DIMENSION" && ! r.paper)
@@ -4801,13 +4856,13 @@ dimplaces (const Reader& rd, const vector<size_t>& keep, int& noted)
     for (size_t k = 1; k < used.size (); k++)
       if (count[k] > count[best])
         best = k;
-    const Reader::Dst *d = style (used[best]);
+    const Reader::Dst *d = dimstyleof (rd, used[best]);
     if (d && valid (d->dec))
       dec = d->dec;
   }
   if (dec < 0 && ! rd.dimstyle.empty ())
   {
-    const Reader::Dst *d = style (rd.dimstyle);
+    const Reader::Dst *d = dimstyleof (rd, rd.dimstyle);
     if (d && valid (d->dec))
       dec = d->dec;
   }
@@ -4815,26 +4870,6 @@ dimplaces (const Reader& rd, const vector<size_t>& keep, int& noted)
     dec = rd.luprec;
   if (dec < 0)
     dec = 2;
-
-  noted = 0;
-  for (const Rec *r : dims)
-  {
-    // A text without <> hides the measurement, so its places show nowhere
-    string txt = r->str (1, "<>");
-    if (! txt.empty () && txt.find ("<>") == string::npos)
-      continue;
-    const Reader::Dst *d = style (styleof (r));
-    int p = r->dimdec >= 0 ? r->dimdec : (d ? d->dec : -1);
-    int t = static_cast<int> (r->num (70)) & 7;
-    if (t == 2 || t == 5)
-    {
-      int a = r->dimadec != -2 ? r->dimadec : (d ? d->adec : -2);
-      if (a >= 0)
-        p = a;
-    }
-    if (valid (p) && p != dec)
-      noted++;
-  }
   return dec;
 }
 
@@ -4904,7 +4939,10 @@ cmdreaddraw (const octave_value_list& args, octave_value_list& out)
     pending = rest;
   }
 
-  Replay rp (rd, sk);
+  // The drawing's precision first, so that each dimension shown at other
+  // places is given its own as it is raised
+  int dec = dimplaces (rd, keep);
+  Replay rp (rd, sk, dec);
   map<string, octave_value> built;
   map<string, string> spelt;
   for (size_t k : order)
@@ -4952,10 +4990,7 @@ cmdreaddraw (const octave_value_list& args, octave_value_list& out)
   }
   GroupHit gh = restoregroups (rd, false, sk);
   D = rp.run (D, rd.ents, defined, &gh);
-  int noted = 0;
-  int dec = dimplaces (rd, keep, noted);
-  out = ovl (D, sk.labels (), sk.counts (), static_cast<double> (dec),
-             static_cast<double> (noted));
+  out = ovl (D, sk.labels (), sk.counts (), static_cast<double> (dec));
 }
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -172,10 +172,12 @@ classdef Drawing
     ##
     ## Unlike @code{Layer} or @code{Colour}, it is a setting of the whole
     ## drawing and governs every dimension, those drawn before it was set
-    ## included.  The dimensions in a block show the precision of the drawing
-    ## the block is placed in, not the block's own.  A DXF file states it in
-    ## its dimension style, so a CAD program that measures the dimensions
-    ## again shows them the same way.
+    ## included, except a dimension given its own @qcode{'Decimals'}, which
+    ## shows its own places.  The dimensions in a block show the precision of
+    ## the drawing the block is placed in, not the block's own, unless given
+    ## their own.  A DXF file states it in its dimension style, and a
+    ## dimension's own places as an override of that style, so a CAD program
+    ## that measures the dimensions again shows them the same way.
     ##
     ## @end deftp
     Decimals = 2;
@@ -241,7 +243,8 @@ classdef Drawing
                        'radius', {}, 'angles', {}, 'angle', {}, 'text', {}, ...
                        'height', {}, 'offset', {}, 'direction', {}, ...
                        'pattern', {}, 'spacing', {}, 'block', {}, ...
-                       'scale', {}, 'bulge', {}, 'shape', {});
+                       'scale', {}, 'bulge', {}, 'shape', {}, ...
+                       'decimals', {});
 
   endproperties
 
@@ -650,6 +653,9 @@ classdef Drawing
       endif
 
       e = D.Entities(IDX);
+      if (! isempty (e.decimals))
+        DECIMALS = e.decimals;
+      endif
       REC = [];
       switch (e.type)
         case 'dim'
@@ -1635,6 +1641,7 @@ classdef Drawing
     ## @deftypefn  {draw.Drawing} {@var{D} =} dim (@var{D}, @var{P1}, @var{P2}, @var{OFFSET})
     ## @deftypefnx {draw.Drawing} {@var{D} =} dim (@dots{}, @qcode{'Direction'}, @var{DIR})
     ## @deftypefnx {draw.Drawing} {@var{D} =} dim (@dots{}, @qcode{'Text'}, @var{S})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} dim (@dots{}, @qcode{'Decimals'}, @var{N})
     ##
     ## Append a dimension measuring between @var{P1} and @var{P2}.
     ##
@@ -1663,6 +1670,10 @@ classdef Drawing
     ## places.  A dimension therefore carries no text of its own by default,
     ## which is precisely what keeps it truthful when the geometry changes.
     ##
+    ## The option @qcode{'Decimals'} gives the places @var{N} this dimension
+    ## shows, an integer from 0 to 8, in place of the drawing's
+    ## @code{Decimals}.
+    ##
     ## @end deftypefn
     function this = dim (this, P1, P2, OFFSET, varargin)
 
@@ -1686,6 +1697,7 @@ classdef Drawing
       endif
       DIRECTION = 'aligned';
       LABEL = '';
+      DECIMALS = [];
       if (mod (numel (varargin), 2) != 0)
         error ("draw.Drawing.dim: Name/Value arguments must come in pairs.");
       endif
@@ -1703,6 +1715,16 @@ classdef Drawing
               error (strcat ("draw.Drawing.dim: Text must be a non-empty", ...
                              " character vector."));
             endif
+          case 'decimals'
+            DECIMALS = varargin{ii+1};
+            if (! isnumeric (DECIMALS) || ! isreal (DECIMALS)
+                || ! isscalar (DECIMALS) || ! isfinite (DECIMALS)
+                || DECIMALS != fix (DECIMALS) || DECIMALS < 0
+                || DECIMALS > 8)
+              error (strcat ("draw.Drawing.dim: Decimals must be an", ...
+                             " integer from 0 to 8."));
+            endif
+            DECIMALS = double (DECIMALS);
           otherwise
             error ("draw.Drawing.dim: unknown option '%s'.", name);
         endswitch
@@ -1728,6 +1750,7 @@ classdef Drawing
       e.offset = double (OFFSET);
       e.direction = DIRECTION;
       e.text = LABEL;
+      e.decimals = DECIMALS;
       this.Entities(end+1) = e;
 
     endfunction
@@ -1736,6 +1759,7 @@ classdef Drawing
     ## @deftypefn  {draw.Drawing} {@var{D} =} diam (@var{D}, @var{C}, @var{R})
     ## @deftypefnx {draw.Drawing} {@var{D} =} diam (@dots{}, @qcode{'Angle'}, @var{ANG})
     ## @deftypefnx {draw.Drawing} {@var{D} =} diam (@dots{}, @qcode{'Text'}, @var{S})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} diam (@dots{}, @qcode{'Decimals'}, @var{N})
     ##
     ## Append a diameter dimension across a circle.
     ##
@@ -1743,7 +1767,9 @@ classdef Drawing
     ## @qcode{'Angle'} sets @var{ANG}, the direction the dimension line lies
     ## along, in degrees, 45 by default, which keeps it clear of the centre
     ## lines.  The option @qcode{'Text'} gives the text @var{S}, which is
-    ## otherwise the diameter symbol and the measured figure.
+    ## otherwise the diameter symbol and the measured figure, and the option
+    ## @qcode{'Decimals'} the places @var{N} the figure shows, an integer from
+    ## 0 to 8, in place of the drawing's @code{Decimals}.
     ##
     ## A round feature is dimensioned by its diameter and never by its radius,
     ## because a diameter is what a bore gauge and a micrometer measure.  A
@@ -1767,6 +1793,7 @@ classdef Drawing
     ## @deftypefn  {draw.Drawing} {@var{D} =} radius (@var{D}, @var{C}, @var{R})
     ## @deftypefnx {draw.Drawing} {@var{D} =} radius (@dots{}, @qcode{'Angle'}, @var{ANG})
     ## @deftypefnx {draw.Drawing} {@var{D} =} radius (@dots{}, @qcode{'Text'}, @var{S})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} radius (@dots{}, @qcode{'Decimals'}, @var{N})
     ##
     ## Append a radius dimension from a centre out to an arc.
     ##
@@ -1792,13 +1819,16 @@ classdef Drawing
     ## -*- texinfo -*-
     ## @deftypefn  {draw.Drawing} {@var{D} =} angdim (@var{D}, @var{V}, @var{P1}, @var{P2}, @var{RAD})
     ## @deftypefnx {draw.Drawing} {@var{D} =} angdim (@dots{}, @qcode{'Text'}, @var{S})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} angdim (@dots{}, @qcode{'Decimals'}, @var{N})
     ##
     ## Append an angular dimension at a vertex.
     ##
     ## @var{V} is the vertex, @var{P1} and @var{P2} points along the two arms,
     ## and @var{RAD} the radius at which the dimension arc is struck.  The
     ## option @qcode{'Text'} gives the text @var{S}, which is otherwise the
-    ## measured angle and the degree symbol.
+    ## measured angle and the degree symbol, and the option
+    ## @qcode{'Decimals'} the places @var{N} the angle shows, an integer from
+    ## 0 to 8, in place of the drawing's @code{Decimals}.
     ##
     ## The angle measured is the one from the first arm to the second going
     ## counter-clockwise, so giving the arms the other way round dimensions the
@@ -1824,6 +1854,7 @@ classdef Drawing
         error ("draw.Drawing.angdim: RAD %s", errmsg);
       endif
       LABEL = '';
+      DECIMALS = [];
       if (mod (numel (varargin), 2) != 0)
         error ("draw.Drawing.angdim: Name/Value arguments must come in pairs.");
       endif
@@ -1840,6 +1871,16 @@ classdef Drawing
               error (strcat ("draw.Drawing.angdim: Text must be a", ...
                              " non-empty character vector."));
             endif
+          case 'decimals'
+            DECIMALS = varargin{ii+1};
+            if (! isnumeric (DECIMALS) || ! isreal (DECIMALS)
+                || ! isscalar (DECIMALS) || ! isfinite (DECIMALS)
+                || DECIMALS != fix (DECIMALS) || DECIMALS < 0
+                || DECIMALS > 8)
+              error (strcat ("draw.Drawing.angdim: Decimals must be an", ...
+                             " integer from 0 to 8."));
+            endif
+            DECIMALS = double (DECIMALS);
           otherwise
             error ("draw.Drawing.angdim: unknown option '%s'.", name);
         endswitch
@@ -1859,6 +1900,7 @@ classdef Drawing
       e.pts = [V(:)'; P1(:)'; P2(:)'];
       e.radius = RAD;
       e.text = LABEL;
+      e.decimals = DECIMALS;
       this.Entities(end+1) = e;
 
     endfunction
@@ -1866,6 +1908,7 @@ classdef Drawing
     ## -*- texinfo -*-
     ## @deftypefn  {draw.Drawing} {@var{D} =} ordinate (@var{D}, @var{O}, @var{P}, @var{AXIS}, @var{L})
     ## @deftypefnx {draw.Drawing} {@var{D} =} ordinate (@dots{}, @qcode{'Text'}, @var{S})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} ordinate (@dots{}, @qcode{'Decimals'}, @var{N})
     ##
     ## Append an ordinate dimension, the distance of a point from a datum.
     ##
@@ -1886,7 +1929,9 @@ classdef Drawing
     ## The label is the distance, without sign, to the drawing's
     ## @code{Decimals} places, measured each time the drawing is plotted or
     ## written, so it follows the geometry; the option @qcode{'Text'} gives the
-    ## literal text @var{S} instead.
+    ## literal text @var{S} instead, and the option @qcode{'Decimals'} the
+    ## places @var{N} the value shows, an integer from 0 to 8, in place of the
+    ## drawing's @code{Decimals}.
     ##
     ## @example
     ## @group
@@ -1926,6 +1971,7 @@ classdef Drawing
         error ("draw.Drawing.ordinate: L %s", errmsg);
       endif
       LABEL = '';
+      DECIMALS = [];
       if (mod (numel (varargin), 2) != 0)
         error (strcat ("draw.Drawing.ordinate: Name/Value arguments must", ...
                        " come in pairs."));
@@ -1943,6 +1989,16 @@ classdef Drawing
               error (strcat ("draw.Drawing.ordinate: Text must be a", ...
                              " non-empty character vector."));
             endif
+          case 'decimals'
+            DECIMALS = varargin{ii+1};
+            if (! isnumeric (DECIMALS) || ! isreal (DECIMALS)
+                || ! isscalar (DECIMALS) || ! isfinite (DECIMALS)
+                || DECIMALS != fix (DECIMALS) || DECIMALS < 0
+                || DECIMALS > 8)
+              error (strcat ("draw.Drawing.ordinate: Decimals must be an", ...
+                             " integer from 0 to 8."));
+            endif
+            DECIMALS = double (DECIMALS);
           otherwise
             error ("draw.Drawing.ordinate: unknown option '%s'.", name);
         endswitch
@@ -1961,6 +2017,7 @@ classdef Drawing
       e.pts = [O; P; L];
       e.direction = AXIS;
       e.text = LABEL;
+      e.decimals = DECIMALS;
       this.Entities(end+1) = e;
 
     endfunction
@@ -3780,6 +3837,11 @@ function [E, LOST, DIMS] = breakdown (src, opt, nDim)
   for ii = 1:numel (src)
 
     e = src(ii);
+    ## A dimension's own places, where it was given them
+    n = decimals;
+    if (! isempty (e.decimals))
+      n = e.decimals;
+    endif
 
     switch (e.type)
 
@@ -3845,12 +3907,12 @@ function [E, LOST, DIMS] = breakdown (src, opt, nDim)
         endfor
 
       case {'diam', 'radius'}
-        parts = explodecirc (e, dimScale, decimals);
+        parts = explodecirc (e, dimScale, n);
         if (strcmp (dimMode, 'associative'))
           nDim++;
           bn = sprintf ('*D%d', nDim);
           DIMS(end+1) = struct ('name', bn, 'entities', {parts});
-          E(end+1) = dimrecord (e, bn, e.type, decimals);
+          E(end+1) = dimrecord (e, bn, e.type, n);
         else
           for kk = 1:numel (parts)
             E(end+1) = parts(kk);
@@ -3858,12 +3920,12 @@ function [E, LOST, DIMS] = breakdown (src, opt, nDim)
         endif
 
       case 'angdim'
-        parts = explodeang (e, dimScale, decimals);
+        parts = explodeang (e, dimScale, n);
         if (strcmp (dimMode, 'associative'))
           nDim++;
           bn = sprintf ('*D%d', nDim);
           DIMS(end+1) = struct ('name', bn, 'entities', {parts});
-          E(end+1) = dimrecord (e, bn, 'angdim', decimals);
+          E(end+1) = dimrecord (e, bn, 'angdim', n);
           continue;
         endif
         for kk = 1:numel (parts)
@@ -3871,12 +3933,12 @@ function [E, LOST, DIMS] = breakdown (src, opt, nDim)
         endfor
 
       case 'ordinate'
-        parts = explodeord (e, dimScale, decimals);
+        parts = explodeord (e, dimScale, n);
         if (strcmp (dimMode, 'associative'))
           nDim++;
           bn = sprintf ('*D%d', nDim);
           DIMS(end+1) = struct ('name', bn, 'entities', {parts});
-          E(end+1) = dimrecord (e, bn, 'ordinate', decimals);
+          E(end+1) = dimrecord (e, bn, 'ordinate', n);
         else
           for kk = 1:numel (parts)
             E(end+1) = parts(kk);
@@ -3926,12 +3988,12 @@ function [E, LOST, DIMS] = breakdown (src, opt, nDim)
         endif
 
       case 'dim'
-        parts = explodedim (e, dimScale, decimals);
+        parts = explodedim (e, dimScale, n);
         if (strcmp (dimMode, 'associative'))
           nDim++;
           bn = sprintf ('*D%d', nDim);
           DIMS(end+1) = struct ('name', bn, 'entities', {parts});
-          E(end+1) = dimrecord (e, bn, 'dim', decimals);
+          E(end+1) = dimrecord (e, bn, 'dim', n);
         else
           for jj = 1:numel (parts)
             E(end+1) = parts(jj);
@@ -4025,7 +4087,7 @@ function e = makeentity (type, p)
               'radius', [], 'angles', [], 'angle', [], 'text', '', ...
               'height', [], 'offset', [], 'direction', '', 'pattern', '', ...
               'spacing', [], 'block', '', 'scale', [], 'bulge', [], ...
-              'shape', []);
+              'shape', [], 'decimals', []);
 
 endfunction
 
@@ -4063,6 +4125,7 @@ function e = dimcircle (this, kind, C, R, opts)
   endif
   ANG = 45;
   LABEL = '';
+  DECIMALS = [];
   for ii = 1:2:numel (opts)
     name = opts{ii};
     if (! ischar (name) || ! isrow (name))
@@ -4077,6 +4140,15 @@ function e = dimcircle (this, kind, C, R, opts)
           error (strcat ("draw.Drawing.%s: Text must be a non-empty", ...
                          " character vector."), kind);
         endif
+      case 'decimals'
+        DECIMALS = opts{ii+1};
+        if (! isnumeric (DECIMALS) || ! isreal (DECIMALS)
+            || ! isscalar (DECIMALS) || ! isfinite (DECIMALS)
+            || DECIMALS != fix (DECIMALS) || DECIMALS < 0 || DECIMALS > 8)
+          error ("draw.Drawing.%s: Decimals must be an integer from 0 to 8.",
+                 kind);
+        endif
+        DECIMALS = double (DECIMALS);
       otherwise
         error ("draw.Drawing.%s: unknown option '%s'.", kind, name);
     endswitch
@@ -4091,6 +4163,7 @@ function e = dimcircle (this, kind, C, R, opts)
   e.radius = R;
   e.angle = ANG;
   e.text = LABEL;
+  e.decimals = DECIMALS;
 
 endfunction
 

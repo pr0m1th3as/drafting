@@ -118,7 +118,7 @@ draw.Drawing.Decimals
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 729
+# length: 885
 draw.Drawing: property Decimals
 The precision of measured dimensions
 
@@ -130,10 +130,12 @@ a length of 25 reads 25, one of 25.5 reads 25.5 and one of 25.256 reads
 
 Unlike Layer or Colour, it is a setting of the whole
 drawing and governs every dimension, those drawn before it was set
-included. The dimensions in a block show the precision of the drawing
-the block is placed in, not the block's own. A DXF file states it in
-its dimension style, so a CAD program that measures the dimensions
-again shows them the same way.
+included, except a dimension given its own 'Decimals', which
+shows its own places. The dimensions in a block show the precision of
+the drawing the block is placed in, not the block's own, unless given
+their own. A DXF file states it in its dimension style, and a
+dimension's own places as an override of that style, so a CAD program
+that measures the dimensions again shows them the same way.
 
 
 # name: <cell-element>
@@ -372,15 +374,18 @@ draw.Drawing.angdim
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 700
+# length: 862
 draw.Drawing: D = angdim (D, V, P1, P2, RAD)
 draw.Drawing: D = angdim (..., 'Text', S)
+draw.Drawing: D = angdim (..., 'Decimals', N)
 Append an angular dimension at a vertex.
 
 V is the vertex, P1 and P2 points along the two arms,
 and RAD the radius at which the dimension arc is struck. The
 option 'Text' gives the text S, which is otherwise the
-measured angle and the degree symbol.
+measured angle and the degree symbol, and the option
+'Decimals' the places N the angle shows, an integer from
+0 to 8, in place of the drawing's Decimals.
 
 The angle measured is the one from the first arm to the second going
 counter-clockwise, so giving the arms the other way round dimensions the
@@ -606,17 +611,20 @@ draw.Drawing.diam
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 768
+# length: 929
 draw.Drawing: D = diam (D, C, R)
 draw.Drawing: D = diam (..., 'Angle', ANG)
 draw.Drawing: D = diam (..., 'Text', S)
+draw.Drawing: D = diam (..., 'Decimals', N)
 Append a diameter dimension across a circle.
 
 C is the centre and R the radius. The option
 'Angle' sets ANG, the direction the dimension line lies
 along, in degrees, 45 by default, which keeps it clear of the centre
 lines. The option 'Text' gives the text S, which is
-otherwise the diameter symbol and the measured figure.
+otherwise the diameter symbol and the measured figure, and the option
+'Decimals' the places N the figure shows, an integer from
+0 to 8, in place of the drawing's Decimals.
 
 A round feature is dimensioned by its diameter and never by its radius,
 because a diameter is what a bore gauge and a micrometer measure. A
@@ -648,10 +656,11 @@ draw.Drawing.dim
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1185
+# length: 1352
 draw.Drawing: D = dim (D, P1, P2, OFFSET)
 draw.Drawing: D = dim (..., 'Direction', DIR)
 draw.Drawing: D = dim (..., 'Text', S)
+draw.Drawing: D = dim (..., 'Decimals', N)
 Append a dimension measuring between P1 and P2.
 
 OFFSET is the perpendicular distance in millimetres from the
@@ -676,6 +685,10 @@ size, a range, a note in place of a number. Without it the backend
 formats the measurement it computes, to the drawing's Decimals
 places. A dimension therefore carries no text of its own by default,
 which is precisely what keeps it truthful when the geometry changes.
+
+The option 'Decimals' gives the places N this dimension
+shows, an integer from 0 to 8, in place of the drawing's
+Decimals.
 
 
 # name: <cell-element>
@@ -1150,9 +1163,10 @@ draw.Drawing.ordinate
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1548
+# length: 1712
 draw.Drawing: D = ordinate (D, O, P, AXIS, L)
 draw.Drawing: D = ordinate (..., 'Text', S)
+draw.Drawing: D = ordinate (..., 'Decimals', N)
 Append an ordinate dimension, the distance of a point from a datum.
 
 O is the datum, P the feature dimensioned and AXIS
@@ -1172,7 +1186,9 @@ chain of dimensions.
 The label is the distance, without sign, to the drawing's
 Decimals places, measured each time the drawing is plotted or
 written, so it follows the geometry; the option 'Text' gives the
-literal text S instead.
+literal text S instead, and the option 'Decimals' the
+places N the value shows, an integer from 0 to 8, in place of the
+drawing's Decimals.
 
 ## A plate with two holes, dimensioned from its lower left corner
 D = draw.Drawing ();
@@ -1583,10 +1599,11 @@ draw.Drawing.radius
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 504
+# length: 550
 draw.Drawing: D = radius (D, C, R)
 draw.Drawing: D = radius (..., 'Angle', ANG)
 draw.Drawing: D = radius (..., 'Text', S)
+draw.Drawing: D = radius (..., 'Decimals', N)
 Append a radius dimension from a centre out to an arc.
 
 The arguments and options are those of diam, and ANG is the
@@ -2297,7 +2314,7 @@ draw.read
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 3435
+# length: 3311
 drafting: D = draw.read (FILE)
 Read a drawing from an ASCII DXF file.
 
@@ -2331,12 +2348,10 @@ as are the layout blocks a file defines; a block that is placed is kept.
 The drawing's Decimals, the places every dimension shows, come from
 the file: the places (DIMDEC) of the dimension style most of its
 dimensions use, else those of the style the header names in
-$DIMSTYLE, else the R12 header's $LUPREC, else 2. A file
-may show some dimensions at other places, by another style or by a
-dimension's own override, and an angle at the places its style gives
-angles (DIMADEC); since one drawing shows every dimension alike,
-those dimensions are counted in a warning. A dimension whose text hides
-its measurement is not counted.
+$DIMSTYLE, else the R12 header's $LUPREC, else 2. A
+dimension the file shows at other places, by another style or by its own
+override, and an angle at the places its style gives angles
+(DIMADEC), keeps those places as its own 'Decimals'.
 
 A drawing lies in the plane z = 0. An entity whose normal points
 down the z axis is mirrored into the plane facing up, as 2-D CAD

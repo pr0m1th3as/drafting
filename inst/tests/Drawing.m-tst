@@ -32,7 +32,8 @@
 %!               'colour'; 'lineweight'; 'pts'; 'closed'; 'radius'; ...
 %!               'angles'; 'angle'; ...
 %!               'text'; 'height'; 'offset'; 'direction'; 'pattern'; ...
-%!               'spacing'; 'block'; 'scale'; 'bulge'; 'shape'});
+%!               'spacing'; 'block'; 'scale'; 'bulge'; 'shape'; ...
+%!               'decimals'});
 %!error<draw.Drawing: NAME must be a non-empty character vector.> ...
 %! draw.Drawing (42)
 %!error<draw.Drawing: NAME must be a non-empty character vector.> ...
@@ -496,7 +497,7 @@
 %! D = D.arc ([0, 0], 1, 0, 90).circle ([0, 0], 2).text ([0, 0], 'A');
 %! D = D.hatch (geom.Region ([0, 0; 1, 0; 1, 1])).dim ([0, 0], [1, 0], 5);
 %! assert_equal (numel (D.Entities), 7);
-%! assert_equal (numel (fieldnames (D.Entities)), 20);
+%! assert_equal (numel (fieldnames (D.Entities)), 21);
 %! assert_equal ({D.Entities.type}, {'line', 'polyline', 'arc', 'circle', ...
 %!                                   'text', 'hatch', 'dim'});
 
@@ -542,6 +543,16 @@
 
 %!test  # Decimals is 2 by default
 %! assert_equal (draw.Drawing ().Decimals, 2);
+%!error<draw.Drawing.dim: Decimals must be an integer from 0 to 8.> ...
+%! draw.Drawing ().dim ([0, 0], [1, 0], 5, 'Decimals', 9)
+%!error<draw.Drawing.diam: Decimals must be an integer from 0 to 8.> ...
+%! draw.Drawing ().diam ([0, 0], 5, 'Decimals', -1)
+%!error<draw.Drawing.radius: Decimals must be an integer from 0 to 8.> ...
+%! draw.Drawing ().radius ([0, 0], 5, 'Decimals', 1.5)
+%!error<draw.Drawing.angdim: Decimals must be an integer from 0 to 8.> ...
+%! draw.Drawing ().angdim ([0, 0], [1, 0], [0, 1], 5, 'Decimals', '2')
+%!error<draw.Drawing.ordinate: Decimals must be an integer from 0 to 8.> ...
+%! draw.Drawing ().ordinate ([0, 0], [1, 1], 'x', [1, -1], 'Decimals', [])
 %!error<draw.colour: 'puce' is not a named colour> ...
 %! D = draw.Drawing (); D.Colour = 'puce';
 
@@ -2208,6 +2219,46 @@
 %! E = entities (D);
 %! assert_equal (E.text, '<>');
 
+%!test  # a dimension's own 'Decimals' overrides the drawing's
+%! D = draw.Drawing ().dim ([0, 0], [10, 10], 5, 'Decimals', 4);
+%! D.Decimals = 1;
+%! E = entities (D, 'dimensions', 'explode');
+%! assert_equal (E(6).text, '14.1421');
+
+%!test  # a diameter's own places
+%! D = draw.Drawing ().diam ([0, 0], 6.17283945, 'Decimals', 1);
+%! E = entities (D, 'dimensions', 'explode');
+%! assert_equal (E(end).text, '%%c12.3');
+
+%!test  # a radius's own places
+%! D = draw.Drawing ().radius ([0, 0], 1.23456, 'Decimals', 0);
+%! E = entities (D, 'dimensions', 'explode');
+%! assert_equal (E(end).text, 'R1');
+
+%!test  # an angle's own places
+%! D = draw.Drawing ().angdim ([0, 0], [10, 0], [10, 7], 5, 'Decimals', 2);
+%! E = entities (D, 'dimensions', 'explode');
+%! assert_equal (E(end).text, '34.99%%d');
+
+%!test  # an ordinate's own places
+%! D = draw.Drawing ().ordinate ([0, 0], [20/3, 15], 'x', [20/3, -10], ...
+%!                               'Decimals', 3);
+%! E = entities (D, 'dimensions', 'explode');
+%! assert_equal (E(strcmp ({E.type}, 'TEXT')).text, '6.667');
+
+%!test  # a dimension in a block keeps its own places
+%! B = draw.Drawing ().dim ([0, 0], [10, 10], 5, 'Decimals', 1);
+%! D = draw.Drawing ().block ('B', B).insert ('B', [0, 0]);
+%! D.Decimals = 3;
+%! E = entities (D, 'dimensions', 'explode');
+%! assert_equal (E(strcmp ({E.type}, 'TEXT')).text, '14.1');
+
+%!test  # a label equal to the measurement at its own places stays live
+%! D = draw.Drawing ().diam ([0, 0], 6.17283945, 'Text', '%%c12.3', ...
+%!                           'Decimals', 1);
+%! E = entities (D);
+%! assert_equal (E.text, '<>');
+
 %!test  # DimScale multiplies the ornament without moving the dimension line
 %! D = draw.Drawing ().dim ([0, 0], [100, 0], -20, 'Direction', 'horizontal');
 %! E1 = entities (D, 'dimensions', 'explode');
@@ -3235,6 +3286,35 @@
 %!   txt = fileread (fn);
 %!   assert_equal (numel (strfind (txt, sprintf ("271\n3\n"))), 1);
 %!   assert_equal (numel (strfind (txt, sprintf ("179\n3\n"))), 1);
+%! unwind_protect_cleanup
+%!   [~] = unlink (fn);
+%! end_unwind_protect
+%!test  # write: a dimension's own places override the style
+%! fn = [tempname(), '.dxf'];
+%! unwind_protect
+%!   write (draw.Drawing ().dim ([0, 0], [10, 0], -5, 'Decimals', 4), fn);
+%!   txt = fileread (fn);
+%!   assert_equal (numel (strfind (txt, ...
+%!                 sprintf ("1000\nDSTYLE\n1002\n{\n1070\n271\n1070\n4\n1002\n}\n"))), 1);
+%! unwind_protect_cleanup
+%!   [~] = unlink (fn);
+%! end_unwind_protect
+%!test  # write: an angle's override names DIMADEC too
+%! fn = [tempname(), '.dxf'];
+%! unwind_protect
+%!   D = draw.Drawing ().angdim ([0, 0], [10, 0], [0, 10], 5, 'Decimals', 0);
+%!   write (D, fn);
+%!   txt = fileread (fn);
+%!   assert_equal (numel (strfind (txt, sprintf ("1070\n179\n1070\n0\n"))), 1);
+%! unwind_protect_cleanup
+%!   [~] = unlink (fn);
+%! end_unwind_protect
+%!test  # write: an exploded dimension shows its own places
+%! fn = [tempname(), '.dxf'];
+%! unwind_protect
+%!   D = draw.Drawing ().dim ([0, 0], [10, 10], -5, 'Decimals', 4);
+%!   write (D, fn, 'Dimensions', 'explode');
+%!   assert_equal (numel (strfind (fileread (fn), "14.1421")), 1);
 %! unwind_protect_cleanup
 %!   [~] = unlink (fn);
 %! end_unwind_protect
