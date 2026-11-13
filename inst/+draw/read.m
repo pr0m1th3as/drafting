@@ -47,6 +47,16 @@
 ## of a dimension lives in a block nothing places, and that block is dropped,
 ## as are the layout blocks a file defines; a block that is placed is kept.
 ##
+## The drawing's @code{Decimals}, the places every dimension shows, come from
+## the file: the places (@code{DIMDEC}) of the dimension style most of its
+## dimensions use, else those of the style the header names in
+## @code{$DIMSTYLE}, else the R12 header's @code{$LUPREC}, else 2.  A file
+## may show some dimensions at other places, by another style or by a
+## dimension's own override, and an angle at the places its style gives
+## angles (@code{DIMADEC}); since one drawing shows every dimension alike,
+## those dimensions are counted in a warning.  A dimension whose text hides
+## its measurement is not counted.
+##
 ## A drawing lies in the plane @math{z = 0}.  An entity whose normal points
 ## down the @math{z} axis is mirrored into the plane facing up, as 2-D CAD
 ## programs treat it; heights are dropped.  An entity on any other plane, a
@@ -74,10 +84,17 @@ function D = read (FILE)
   if (nargin != 1)
     error ("draw.read: invalid number of input arguments.");
   endif
-  [D, labels, counts] = __dxf__ ('readdraw', FILE, 'draw.read');
+  [D, labels, counts, decimals, noted] = __dxf__ ('readdraw', FILE, ...
+                                                  'draw.read');
+  D.Decimals = decimals;
   if (! isempty (labels))
     msg = sprintf ("%d %s, ", [num2cell(counts); labels]{:});
     warning ("draw.read: skipped %s.", msg(1:end-2));
+  endif
+  if (noted > 0)
+    warning (strcat ("draw.read: %d DIMENSION shown at another precision", ...
+                     " in the file; the drawing shows %d decimal places."), ...
+             noted, decimals);
   endif
 
 endfunction
@@ -235,7 +252,8 @@ endfunction
 %!   warning (ws);
 %! end_unwind_protect
 
-%!test  # every dimension a real file carries comes back as a dimension
+%!warning<draw.read: 1 DIMENSION shown at another precision in the file; the drawing shows 2 decimal places.> ...
+%! ## every dimension a real file carries comes back as a dimension
 %! fn = fullfile (fileparts (fileparts (which ('draw.read'))), 'tests', ...
 %!                'fixtures', 'foreign_dims_2000.dxf');
 %! D = draw.read (fn);
@@ -246,30 +264,45 @@ endfunction
 %!test  # an aligned dimension is DXF type 1, which the package never writes
 %! fn = fullfile (fileparts (fileparts (which ('draw.read'))), 'tests', ...
 %!                'fixtures', 'foreign_dims_2000.dxf');
-%! D = draw.read (fn);
-%! d = D.Entities(strcmp ({D.Entities.type}, 'dim'));
-%! a = d(strcmp ({d.direction}, 'aligned'));
-%! assert_equal (numel (a), 1);
-%! assert_equal (norm (a.pts(2,:) - a.pts(1,:)), hypot (100, 60), 1e-9);
+%! ws = warning ('off', 'all');
+%! unwind_protect
+%!   D = draw.read (fn);
+%!   d = D.Entities(strcmp ({D.Entities.type}, 'dim'));
+%!   a = d(strcmp ({d.direction}, 'aligned'));
+%!   assert_equal (numel (a), 1);
+%!   assert_equal (norm (a.pts(2,:) - a.pts(1,:)), hypot (100, 60), 1e-9);
+%! unwind_protect_cleanup
+%!   warning (ws);
+%! end_unwind_protect
 
 %!test  # the linear dimensions measure the rectangle they were drawn on
 %! fn = fullfile (fileparts (fileparts (which ('draw.read'))), 'tests', ...
 %!                'fixtures', 'foreign_dims_2000.dxf');
-%! D = draw.read (fn);
-%! d = D.Entities(strcmp ({D.Entities.type}, 'dim'));
-%! L = cellfun (@(p) norm (p(2,:) - p(1,:)), {d.pts});
-%! assert_equal (sort (L), [60, 100, 100, hypot(100, 60)], 1e-9);
+%! ws = warning ('off', 'all');
+%! unwind_protect
+%!   D = draw.read (fn);
+%!   d = D.Entities(strcmp ({D.Entities.type}, 'dim'));
+%!   L = cellfun (@(p) norm (p(2,:) - p(1,:)), {d.pts});
+%!   assert_equal (sort (L), [60, 100, 100, hypot(100, 60)], 1e-9);
+%! unwind_protect_cleanup
+%!   warning (ws);
+%! end_unwind_protect
 
 %!test  # a real file's angle between two lines is measured where they meet
 %! fn = fullfile (fileparts (fileparts (which ('draw.read'))), 'tests', ...
 %!                'fixtures', 'foreign_dims_2000.dxf');
-%! D = draw.read (fn);
-%! a = D.Entities(strcmp ({D.Entities.type}, 'angdim'));
-%! assert_equal (a.pts, [0, 0; 100, 0; 100, 60], 1e-9);
-%! assert_equal (a.radius, hypot (32, 9), 1e-9);
-%! assert_equal (a.text, '');
-%! E = entities (D, 'Dimensions', 'explode');
-%! assert_equal (any (strcmp ({E.text}, '30.96%%d')), true);
+%! ws = warning ('off', 'all');
+%! unwind_protect
+%!   D = draw.read (fn);
+%!   a = D.Entities(strcmp ({D.Entities.type}, 'angdim'));
+%!   assert_equal (a.pts, [0, 0; 100, 0; 100, 60], 1e-9);
+%!   assert_equal (a.radius, hypot (32, 9), 1e-9);
+%!   assert_equal (a.text, '');
+%!   E = entities (D, 'Dimensions', 'explode');
+%!   assert_equal (any (strcmp ({E.text}, '30.96%%d')), true);
+%! unwind_protect_cleanup
+%!   warning (ws);
+%! end_unwind_protect
 
 %!test  # R14 declares no units, and is read as millimetres
 %! fn = fullfile (fileparts (fileparts (which ('draw.read'))), 'tests', ...
@@ -278,7 +311,8 @@ endfunction
 %! p = D.Entities(strcmp ({D.Entities.type}, 'polyline'));
 %! assert_equal (p.pts, [0, 0; 100, 0; 100, 60; 0, 60], 1e-9);
 
-%!test  # and a UTF-8 file, which is what R2007 onwards writes
+%!warning<draw.read: 1 DIMENSION shown at another precision in the file; the drawing shows 2 decimal places.> ...
+%! ## and a UTF-8 file, which is what R2007 onwards writes
 %! fn = fullfile (fileparts (fileparts (which ('draw.read'))), 'tests', ...
 %!                'fixtures', 'foreign_dims_2007.dxf');
 %! D = draw.read (fn);
@@ -585,6 +619,140 @@ endfunction
 %! D = readlayers (tmpf, ["0\nLWPOLYLINE\n8\n0\n90\n2\n70\n0\n43\n0.5\n" ...
 %!                        "10\n0\n20\n0\n10\n10\n20\n0\n"]);
 %! assert_equal (numentities (D), 1);
+
+%!function D = readdims (f, header, styles, ents)
+%!  txt = ["0\nSECTION\n2\nHEADER\n", header, "0\nENDSEC\n", ...
+%!         "0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nDIMSTYLE\n", styles, ...
+%!         "0\nENDTAB\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n", ents, ...
+%!         "0\nENDSEC\n0\nEOF\n"];
+%!  fid = fopen (f, 'w');
+%!  fputs (fid, txt);
+%!  fclose (fid);
+%!  unwind_protect
+%!    D = draw.read (f);
+%!  unwind_protect_cleanup
+%!    [~] = unlink (f);
+%!  end_unwind_protect
+%!endfunction
+
+%!function txt = lindim (style, extra)
+%!  txt = sprintf (["0\nDIMENSION\n8\n0\n3\n%s\n10\n0\n20\n5\n13\n0\n23\n0\n", ...
+%!                  "14\n10\n24\n0\n70\n0\n%s"], style, extra);
+%!endfunction
+
+%!test  # a drawing's precision comes back at 0 places
+%! D = draw.Drawing ().dim ([0, 0], [10, 0], 5);
+%! D.Decimals = 0;
+%! unwind_protect
+%!   write (D, tmpf);
+%!   R = draw.read (tmpf);
+%!   assert_equal (R.Decimals, 0);
+%! unwind_protect_cleanup
+%!   [~] = unlink (tmpf);
+%! end_unwind_protect
+
+%!test  # at 3 places
+%! D = draw.Drawing ().dim ([0, 0], [10, 0], 5);
+%! D.Decimals = 3;
+%! unwind_protect
+%!   write (D, tmpf);
+%!   R = draw.read (tmpf);
+%!   assert_equal (R.Decimals, 3);
+%! unwind_protect_cleanup
+%!   [~] = unlink (tmpf);
+%! end_unwind_protect
+
+%!test  # at 8 places
+%! D = draw.Drawing ().dim ([0, 0], [10, 0], 5);
+%! D.Decimals = 8;
+%! unwind_protect
+%!   write (D, tmpf);
+%!   R = draw.read (tmpf);
+%!   assert_equal (R.Decimals, 8);
+%! unwind_protect_cleanup
+%!   [~] = unlink (tmpf);
+%! end_unwind_protect
+
+%!test  # and from a drawing holding no dimension
+%! D = draw.Drawing ().line ([0, 0], [10, 0]);
+%! D.Decimals = 3;
+%! unwind_protect
+%!   write (D, tmpf);
+%!   R = draw.read (tmpf);
+%!   assert_equal (R.Decimals, 3);
+%! unwind_protect_cleanup
+%!   [~] = unlink (tmpf);
+%! end_unwind_protect
+
+%!test  # and from R12, whose styles hold no places, through $LUPREC
+%! D = draw.Drawing ().dim ([0, 0], [10, 0], 5);
+%! D.Decimals = 3;
+%! unwind_protect
+%!   write (D, tmpf, 'Version', 'R12');
+%!   R = draw.read (tmpf);
+%!   assert_equal (R.Decimals, 3);
+%! unwind_protect_cleanup
+%!   [~] = unlink (tmpf);
+%! end_unwind_protect
+
+%!warning<draw.read: 1 DIMENSION shown at another precision in the file; the drawing shows 3 decimal places.> ...
+%! D = readdims (tmpf, "", ["0\nDIMSTYLE\n2\nA\n70\n0\n271\n3\n", ...
+%!                          "0\nDIMSTYLE\n2\nB\n70\n0\n271\n1\n"], ...
+%!               [lindim('B', ""), lindim('A', ""), lindim('A', "")]);
+%! assert_equal (numentities (D), 3);
+
+%!warning<draw.read: 1 DIMENSION shown at another precision in the file; the drawing shows 2 decimal places.> ...
+%! D = readdims (tmpf, "", "0\nDIMSTYLE\n2\nA\n70\n0\n271\n2\n", ...
+%!               [lindim('A', ""), ...
+%!                lindim('A', ["1001\nACAD\n1000\nDSTYLE\n1002\n{\n", ...
+%!                             "1070\n271\n1070\n4\n1002\n}\n"])]);
+%! assert_equal (D.Decimals, 2);
+
+%!warning<draw.read: 1 DIMENSION shown at another precision in the file; the drawing shows 2 decimal places.> ...
+%! ang = ["0\nDIMENSION\n8\n0\n3\nA\n10\n5\n20\n5\n13\n10\n23\n0\n", ...
+%!        "14\n0\n24\n10\n15\n0\n25\n0\n70\n5\n"];
+%! D = readdims (tmpf, "", "0\nDIMSTYLE\n2\nA\n70\n0\n271\n2\n179\n0\n", ...
+%!               [lindim('A', ""), ang]);
+%! assert_equal (numentities (D), 2);
+
+%!test  # an angle whose DIMADEC is -1 shows the places of DIMDEC
+%! ang = ["0\nDIMENSION\n8\n0\n3\nA\n10\n5\n20\n5\n13\n10\n23\n0\n", ...
+%!        "14\n0\n24\n10\n15\n0\n25\n0\n70\n5\n"];
+%! lastwarn ('');
+%! D = readdims (tmpf, "", "0\nDIMSTYLE\n2\nA\n70\n0\n271\n2\n179\n-1\n", ...
+%!               ang);
+%! assert_equal (lastwarn (), '');
+
+%!test  # a text hiding the measurement is not counted
+%! lastwarn ('');
+%! D = readdims (tmpf, "", ["0\nDIMSTYLE\n2\nA\n70\n0\n271\n3\n", ...
+%!                          "0\nDIMSTYLE\n2\nB\n70\n0\n271\n1\n"], ...
+%!               [lindim('A', ""), lindim('B', "1\nTEN\n")]);
+%! assert_equal (lastwarn (), '');
+
+%!test  # a style without places passes to $LUPREC
+%! D = readdims (tmpf, "9\n$LUPREC\n70\n5\n", "0\nDIMSTYLE\n2\nA\n70\n0\n", ...
+%!               lindim('A', ""));
+%! assert_equal (D.Decimals, 5);
+
+%!test  # with no dimension, the style $DIMSTYLE names
+%! D = readdims (tmpf, "9\n$DIMSTYLE\n2\nA\n9\n$LUPREC\n70\n5\n", ...
+%!               "0\nDIMSTYLE\n2\nA\n70\n0\n271\n4\n", "");
+%! assert_equal (D.Decimals, 4);
+
+%!test  # a dimension of no style named takes STANDARD's places
+%! D = readdims (tmpf, "", "0\nDIMSTYLE\n2\nStandard\n70\n0\n271\n1\n", ...
+%!               strrep (lindim('X', ""), "3\nX\n", ""));
+%! assert_equal (D.Decimals, 1);
+
+%!test  # places past 8 are not taken
+%! D = readdims (tmpf, "", "0\nDIMSTYLE\n2\nA\n70\n0\n271\n12\n", ...
+%!               lindim('A', ""));
+%! assert_equal (D.Decimals, 2);
+
+%!test  # a file saying nothing of places reads at 2
+%! D = readdims (tmpf, "", "", lindim('A', ""));
+%! assert_equal (D.Decimals, 2);
 
 %!error<draw.read: invalid number of input arguments.> draw.read ()
 %!error<draw.read: FILE must be a non-empty character vector.> draw.read (1)

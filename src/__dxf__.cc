@@ -1370,6 +1370,10 @@ Writer::emitr2000 (ostringstream& s)
   puti (s, 70, 4);
   put (s, 9, "$MEASUREMENT");
   puti (s, 70, 1);
+  // The style the next dimension takes, so the drawing's places come back
+  // from a file holding no dimension
+  put (s, 9, "$DIMSTYLE");
+  put (s, 2, "DRAFTING");
   put (s, 0, "ENDSEC");
 
   put (s, 0, "SECTION");
@@ -2611,6 +2615,10 @@ struct Rec
   int colour = 256;
   int lw = -1;
   bool paper = false;
+  // A dimension's own places, from its ACAD DSTYLE override: -1 for none
+  // given; for the angle places, -2 for none and -1 for those of DIMDEC
+  int dimdec = -1;
+  int dimadec = -2;
 
   bool has (int c) const
   {
@@ -2792,6 +2800,18 @@ public:
     bool plot = true;
   };
   vector<Lay> layers;
+  // The dimension styles, with their places as the dimension records keep
+  // them; the style the header names for the next dimension drawn, and
+  // R12's places for lengths
+  struct Dst
+  {
+    string name;
+    int dec = -1;
+    int adec = -2;
+  };
+  vector<Dst> dimstyles;
+  string dimstyle;
+  int luprec = -1;
 
   void load (const string& f);
   string decode (const string& s) const;
@@ -2877,6 +2897,9 @@ Reader::records (size_t a, size_t b) const
     r.type = upper (trim (m_t[i].second));
     i++;
     bool inx = false, ours = false, brace = false;
+    // ACAD's DSTYLE data: a variable's group code, then its value
+    bool acad = false, dstyle = false, inds = false;
+    int var = -1;
     for (; i < b && m_t[i].first != 0; i++)
     {
       int c = m_t[i].first;
@@ -2885,6 +2908,8 @@ Reader::records (size_t a, size_t b) const
       {
         inx = true;
         ours = trim (v) == "DRAFTING";
+        acad = trim (v) == "ACAD";
+        dstyle = inds = false;
         if (ours)
           r.xdata.push_back (Tag (c, trim (v)));
         continue;
@@ -2893,6 +2918,26 @@ Reader::records (size_t a, size_t b) const
       {
         if (ours)
           r.xdata.push_back (Tag (c, v));
+        else if (acad)
+        {
+          if (c == 1000 && ! inds)
+            dstyle = trim (v) == "DSTYLE";
+          else if (c == 1002)
+          {
+            inds = dstyle && trim (v) == "{";
+            var = -1;
+          }
+          else if (inds && var < 0 && c == 1070)
+            var = atoi (v.c_str ());
+          else if (inds && var >= 0)
+          {
+            if (var == 271)
+              r.dimdec = atoi (v.c_str ());
+            else if (var == 179)
+              r.dimadec = atoi (v.c_str ());
+            var = -1;
+          }
+        }
         continue;
       }
       if (c == 102)
@@ -3024,6 +3069,10 @@ Reader::load (const string& f)
           units = atoi (m_t[k+1].second.c_str ());
         else if (var == "$DWGCODEPAGE")
           codepage = trim (m_t[k+1].second);
+        else if (var == "$DIMSTYLE")
+          dimstyle = trim (m_t[k+1].second);
+        else if (var == "$LUPREC")
+          luprec = atoi (m_t[k+1].second.c_str ());
       }
     }
     else if (name == "ENTITIES")
@@ -3050,6 +3099,16 @@ Reader::load (const string& f)
           if (r.has (370))
             l.lw = static_cast<int> (r.num (370));
           layers.push_back (l);
+        }
+        else if (r.type == "DIMSTYLE" && ! trim (r.str (2)).empty ())
+        {
+          Dst d;
+          d.name = trim (r.str (2));
+          if (r.has (271))
+            d.dec = static_cast<int> (r.num (271));
+          if (r.has (179))
+            d.adec = static_cast<int> (r.num (179));
+          dimstyles.push_back (d);
         }
     }
     else if (name == "BLOCKS")
@@ -4690,6 +4749,95 @@ insertnames (const vector<Rec>& recs)
   return n;
 }
 
+// The drawing's Decimals: the places of the style most dimensions use, else
+// of the style the header names, else R12's $LUPREC, else 2.  NOTED counts
+// the dimensions showing their measurement at other places, by their style
+// or their own override; their angles by DIMADEC, unless it says DIMDEC.
+static int
+dimplaces (const Reader& rd, const vector<size_t>& keep, int& noted)
+{
+  auto valid = [] (int p) { return p >= 0 && p <= 8; };
+  auto style = [&rd] (const string& name) -> const Reader::Dst *
+  {
+    for (const auto& d : rd.dimstyles)
+      if (upper (d.name) == upper (name))
+        return &d;
+    return nullptr;
+  };
+  vector<const Rec *> dims;
+  for (const auto& r : rd.ents)
+    if (r.type == "DIMENSION" && ! r.paper)
+      dims.push_back (&r);
+  for (size_t k : keep)
+    for (const auto& r : rd.blocks[k].ents)
+      if (r.type == "DIMENSION")
+        dims.push_back (&r);
+  auto styleof = [] (const Rec *r)
+  {
+    string s = trim (r->str (3));
+    return s.empty () ? string ("STANDARD") : s;
+  };
+
+  // The style most dimensions use, the first in the file on a tie
+  vector<string> used;
+  vector<int> count;
+  for (const Rec *r : dims)
+  {
+    string s = upper (styleof (r));
+    size_t k = 0;
+    while (k < used.size () && used[k] != s)
+      k++;
+    if (k == used.size ())
+    {
+      used.push_back (s);
+      count.push_back (0);
+    }
+    count[k]++;
+  }
+  int dec = -1;
+  if (! used.empty ())
+  {
+    size_t best = 0;
+    for (size_t k = 1; k < used.size (); k++)
+      if (count[k] > count[best])
+        best = k;
+    const Reader::Dst *d = style (used[best]);
+    if (d && valid (d->dec))
+      dec = d->dec;
+  }
+  if (dec < 0 && ! rd.dimstyle.empty ())
+  {
+    const Reader::Dst *d = style (rd.dimstyle);
+    if (d && valid (d->dec))
+      dec = d->dec;
+  }
+  if (dec < 0 && valid (rd.luprec))
+    dec = rd.luprec;
+  if (dec < 0)
+    dec = 2;
+
+  noted = 0;
+  for (const Rec *r : dims)
+  {
+    // A text without <> hides the measurement, so its places show nowhere
+    string txt = r->str (1, "<>");
+    if (! txt.empty () && txt.find ("<>") == string::npos)
+      continue;
+    const Reader::Dst *d = style (styleof (r));
+    int p = r->dimdec >= 0 ? r->dimdec : (d ? d->dec : -1);
+    int t = static_cast<int> (r->num (70)) & 7;
+    if (t == 2 || t == 5)
+    {
+      int a = r->dimadec != -2 ? r->dimadec : (d ? d->adec : -2);
+      if (a >= 0)
+        p = a;
+    }
+    if (valid (p) && p != dec)
+      noted++;
+  }
+  return dec;
+}
+
 static void
 cmdreaddraw (const octave_value_list& args, octave_value_list& out)
 {
@@ -4804,7 +4952,10 @@ cmdreaddraw (const octave_value_list& args, octave_value_list& out)
   }
   GroupHit gh = restoregroups (rd, false, sk);
   D = rp.run (D, rd.ents, defined, &gh);
-  out = ovl (D, sk.labels (), sk.counts ());
+  int noted = 0;
+  int dec = dimplaces (rd, keep, noted);
+  out = ovl (D, sk.labels (), sk.counts (), static_cast<double> (dec),
+             static_cast<double> (noted));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
