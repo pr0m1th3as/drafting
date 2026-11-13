@@ -545,6 +545,8 @@ struct WOpts
   bool fill = false;
   // The places a dimension shows its measurement to, the drawing's Decimals
   int decimals = 2;
+  // How a tolerance class is written, the drawing's FitForm
+  string fitform = "deviations";
 };
 
 class Writer
@@ -1313,6 +1315,12 @@ Writer::emitr12 (ostringstream& s)
   put (s, 2, "DRAFTING");
   puti (s, 70, 0);
   dimstylebody (s, true, opt);
+  if (opt.fitform != "deviations")
+  {
+    put (s, 1001, "DRAFTING");
+    put (s, 1000, "fitform");
+    put (s, 1000, opt.fitform);
+  }
   put (s, 0, "ENDTAB");
   put (s, 0, "ENDSEC");
 
@@ -1533,6 +1541,12 @@ Writer::emitr2000 (ostringstream& s)
   put (s, 2, "DRAFTING");
   puti (s, 70, 0);
   dimstylebody (s, true, opt);
+  if (opt.fitform != "deviations")
+  {
+    put (s, 1001, "DRAFTING");
+    put (s, 1000, "fitform");
+    put (s, 1000, opt.fitform);
+  }
   put (s, 0, "ENDTAB");
 
   table ("BLOCK_RECORD", tBrec, 2 + blocks.size ());
@@ -2290,7 +2304,8 @@ drawingitems (Writer& w, vector<Item>& dest, const octave_value& D,
           = octave::feval ("__ornament__",
                            ovl (D, static_cast<double> (i + 1),
                                 w.opt.dimscale,
-                                static_cast<double> (w.opt.decimals)), 2);
+                                static_cast<double> (w.opt.decimals),
+                                w.opt.fitform), 2);
         octave_value B = r(0);
         octave_value rec = r(1);
         if (rec.isempty () || w.opt.explode)
@@ -2341,8 +2356,11 @@ drawingitems (Writer& w, vector<Item>& dest, const octave_value& D,
                 own.push_back (Tag (1040, fmtnum (t(k))));
             }
             string form = mapstr (E, "form", i);
-            own.push_back (Tag (1000, "form"));
-            own.push_back (Tag (1000, form.empty () ? "deviations" : form));
+            if (! form.empty ())
+            {
+              own.push_back (Tag (1000, "form"));
+              own.push_back (Tag (1000, form));
+            }
             string text = mapstr (E, "text", i);
             if (! text.empty ())
             {
@@ -2597,7 +2615,10 @@ cmdwrite (const octave_value_list& args)
   }
 
   if (drawing)
+  {
     w.decimals = prop (objs(0), "Decimals").int_value ();
+    w.fitform = prop (objs(0), "FitForm").string_value ();
+  }
   Writer wr (w);
   if (drawing)
   {
@@ -2882,6 +2903,8 @@ public:
   vector<Dst> dimstyles;
   string dimstyle;
   int luprec = -1;
+  // The FitForm our DRAFTING style records, empty for the default
+  string fitform;
 
   void load (const string& f);
   string decode (const string& s) const;
@@ -3191,6 +3214,9 @@ Reader::load (const string& f)
           d.tp = r.num (47);
           d.tm = r.num (48);
           dimstyles.push_back (d);
+          for (size_t k = 0; k + 1 < r.xdata.size (); k++)
+            if (r.xdata[k].first == 1000 && r.xdata[k].second == "fitform")
+              fitform = trim (r.xdata[k+1].second);
         }
     }
     else if (name == "BLOCKS")
@@ -5080,6 +5106,9 @@ cmdreaddraw (const octave_value_list& args, octave_value_list& out)
   {
     const Reader::Blk& b = rd.blocks[k];
     octave_value B = call ("draw.Drawing", ovl (b.name));
+    B = setprop (B, "Decimals", octave_value (static_cast<double> (dec)));
+    if (! rd.fitform.empty ())
+      B = setprop (B, "FitForm", octave_value (rd.fitform));
     set<string> defined;
     vector<string> deps = insertnames (b.ents);
     for (const auto& d : deps)
@@ -5102,7 +5131,12 @@ cmdreaddraw (const octave_value_list& args, octave_value_list& out)
     spelt[upper (b.name)] = b.name;
   }
 
+  // The drawing's precision and form of classes first, so that each
+  // dimension is checked at the size it shows
   octave_value D = call ("draw.Drawing", ovl ("imported"));
+  D = setprop (D, "Decimals", octave_value (static_cast<double> (dec)));
+  if (! rd.fitform.empty ())
+    D = setprop (D, "FitForm", octave_value (rd.fitform));
   for (const auto& l : rd.layers)
     D = call ("layer", ovl (D, l.name, "Colour", static_cast<double> (l.colour),
                             "Linetype", l.ltype, "LineWeight",
@@ -5121,7 +5155,7 @@ cmdreaddraw (const octave_value_list& args, octave_value_list& out)
   }
   GroupHit gh = restoregroups (rd, false, sk);
   D = rp.run (D, rd.ents, defined, &gh);
-  out = ovl (D, sk.labels (), sk.counts (), static_cast<double> (dec));
+  out = ovl (D, sk.labels (), sk.counts ());
 }
 
 ////////////////////////////////////////////////////////////////////////////////

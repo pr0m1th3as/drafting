@@ -59,7 +59,8 @@
 ## from the data it keeps with the dimension, and one another program wrote,
 ## from @code{DIMTOL} or @code{DIMLIM} of its style or of its own override,
 ## as a numeric tolerance, written as limits only where the package draws
-## them.
+## them.  The drawing's @code{FitForm} comes back from a file the package
+## wrote.
 ##
 ## A drawing lies in the plane @math{z = 0}.  An entity whose normal points
 ## down the @math{z} axis is mirrored into the plane facing up, as 2-D CAD
@@ -88,8 +89,7 @@ function D = read (FILE)
   if (nargin != 1)
     error ("draw.read: invalid number of input arguments.");
   endif
-  [D, labels, counts, decimals] = __dxf__ ('readdraw', FILE, 'draw.read');
-  D.Decimals = decimals;
+  [D, labels, counts] = __dxf__ ('readdraw', FILE, 'draw.read');
   if (! isempty (labels))
     msg = sprintf ("%d %s, ", [num2cell(counts); labels]{:});
     warning ("draw.read: skipped %s.", msg(1:end-2));
@@ -714,7 +714,8 @@ endfunction
 %! end_unwind_protect
 
 %!test  # and limits
-%! D = draw.Drawing ().diam ([0, 0], 12.5, 'Tolerance', [0, 0.021], 'Form', 'limits');
+%! D = draw.Drawing ().diam ([0, 0], 12.5, 'Tolerance', [0, 0.021], ...
+%!                           'Form', 'limits');
 %! unwind_protect
 %!   write (D, tmpf);
 %!   R = draw.read (tmpf);
@@ -735,7 +736,8 @@ endfunction
 %! end_unwind_protect
 
 %!test  # a tolerance after a text keeps both
-%! D = draw.Drawing ().angdim ([0, 0], [10, 0], [0, 10], 5, 'Text', 'A', 'Tolerance', 0.5);
+%! D = draw.Drawing ().angdim ([0, 0], [10, 0], [0, 10], 5, 'Text', 'A', ...
+%!                             'Tolerance', 0.5);
 %! unwind_protect
 %!   write (D, tmpf);
 %!   R = draw.read (tmpf);
@@ -744,12 +746,56 @@ endfunction
 %!   [~] = unlink (tmpf);
 %! end_unwind_protect
 
-%!test  # R12 brings back the tolerance, though its text carries it
-%! D = draw.Drawing ().dim ([0, 0], [25, 0], 5, 'Tolerance', [-0.1, 0.05], 'Decimals', 3);
+%!test  # a class comes back as given, its form the drawing's
+%! D = draw.Drawing ().diam ([0, 0], 12.5, 'Tolerance', 'H7');
+%! unwind_protect
+%!   write (D, tmpf);
+%!   R = draw.read (tmpf);
+%!   assert_equal ({R.Entities.tolerance, R.Entities.form}, {'H7', ''});
+%! unwind_protect_cleanup
+%!   [~] = unlink (tmpf);
+%! end_unwind_protect
+
+%!test  # a class with a form of its own keeps it
+%! D = draw.Drawing ().dim ([0, 0], [30, 0], 5, 'Tolerance', 'f7', 'Form', 'limits');
+%! unwind_protect
+%!   write (D, tmpf);
+%!   R = draw.read (tmpf);
+%!   assert_equal ({R.Entities.tolerance, R.Entities.form}, ...
+%!                 {'f7', 'limits'});
+%! unwind_protect_cleanup
+%!   [~] = unlink (tmpf);
+%! end_unwind_protect
+
+%!test  # a fit pair, from R12 too
+%! D = draw.Drawing ().diam ([0, 0], 6, 'Tolerance', 'H7/g6');
 %! unwind_protect
 %!   write (D, tmpf, 'Version', 'R12');
 %!   R = draw.read (tmpf);
-%!   assert_equal ({R.Entities.text, R.Entities.tolerance, R.Entities.decimals}, ...
+%!   assert_equal ({R.Entities.tolerance, R.Entities.text}, {'H7/g6', ''});
+%! unwind_protect_cleanup
+%!   [~] = unlink (tmpf);
+%! end_unwind_protect
+
+%!test  # the drawing's FitForm comes back
+%! D = draw.Drawing ().diam ([0, 0], 12.5, 'Tolerance', 'H7');
+%! D.FitForm = 'class';
+%! unwind_protect
+%!   write (D, tmpf);
+%!   R = draw.read (tmpf);
+%!   assert_equal (R.FitForm, 'class');
+%! unwind_protect_cleanup
+%!   [~] = unlink (tmpf);
+%! end_unwind_protect
+
+%!test  # R12 brings back the tolerance, though its text carries it
+%! D = draw.Drawing ().dim ([0, 0], [25, 0], 5, 'Tolerance', [-0.1, 0.05], ...
+%!                          'Decimals', 3);
+%! unwind_protect
+%!   write (D, tmpf, 'Version', 'R12');
+%!   R = draw.read (tmpf);
+%!   assert_equal ({R.Entities.text, R.Entities.tolerance, ...
+%!                  R.Entities.decimals}, ...
 %!                 {'', [-0.1, 0.05], 3});
 %! unwind_protect_cleanup
 %!   [~] = unlink (tmpf);

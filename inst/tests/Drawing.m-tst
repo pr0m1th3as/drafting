@@ -553,15 +553,15 @@
 %! draw.Drawing ().angdim ([0, 0], [1, 0], [0, 1], 5, 'Decimals', '2')
 %!error<draw.Drawing.ordinate: Decimals must be an integer from 0 to 8.> ...
 %! draw.Drawing ().ordinate ([0, 0], [1, 1], 'x', [1, -1], 'Decimals', [])
-%!error<draw.Drawing.dim: Tolerance must be a positive scalar, a pair \[LOWER, UPPER\], 'min' or 'max'.> ...
+%!error<draw.Drawing.dim: Tolerance must be a positive scalar, a pair \[LOWER, UPPER\], 'min', 'max' or an ISO 286 class.> ...
 %! draw.Drawing ().dim ([0, 0], [1, 0], 5, 'Tolerance', 0)
-%!error<draw.Drawing.dim: Tolerance must be a positive scalar, a pair \[LOWER, UPPER\], 'min' or 'max'.> ...
+%!error<draw.Drawing.dim: Tolerance must be a positive scalar, a pair \[LOWER, UPPER\], 'min', 'max' or an ISO 286 class.> ...
 %! draw.Drawing ().dim ([0, 0], [1, 0], 5, 'Tolerance', [0.1, 0.2, 0.3])
-%!error<draw.Drawing.dim: Tolerance must be a positive scalar, a pair \[LOWER, UPPER\], 'min' or 'max'.> ...
+%!error<draw.Drawing.dim: Tolerance must be a positive scalar, a pair \[LOWER, UPPER\], 'min', 'max' or an ISO 286 class.> ...
 %! draw.Drawing ().dim ([0, 0], [1, 0], 5, 'Tolerance', NaN)
-%!error<draw.Drawing.dim: Tolerance must be a positive scalar, a pair \[LOWER, UPPER\], 'min' or 'max'.> ...
+%!error<draw.Drawing.dim: Tolerance must be a positive scalar, a pair \[LOWER, UPPER\], 'min', 'max' or an ISO 286 class.> ...
 %! draw.Drawing ().dim ([0, 0], [1, 0], 5, 'Tolerance', 'least')
-%!error<draw.Drawing.diam: Tolerance must be a positive scalar, a pair \[LOWER, UPPER\], 'min' or 'max'.> ...
+%!error<draw.Drawing.diam: Tolerance must be a positive scalar, a pair \[LOWER, UPPER\], 'min', 'max' or an ISO 286 class.> ...
 %! draw.Drawing ().diam ([0, 0], 5, 'Tolerance', {0.1})
 %!error<draw.Drawing.angdim: Tolerance must be \[LOWER, UPPER\] with LOWER below UPPER.> ...
 %! draw.Drawing ().angdim ([0, 0], [1, 0], [0, 1], 5, 'Tolerance', [0.1, -0.1])
@@ -569,8 +569,34 @@
 %! draw.Drawing ().dim ([0, 0], [1, 0], 5, 'Tolerance', [0.1, 0.1])
 %!error<draw.Drawing.ordinate: Tolerance 'max' is not available for an ordinate dimension.> ...
 %! draw.Drawing ().ordinate ([0, 0], [1, 1], 'x', [1, -1], 'Tolerance', 'max')
-%!error<draw.Drawing.dim: Form must be 'deviations' or 'limits'.> ...
+%!error<draw.Drawing.dim: Form must be 'class', 'deviations' or 'limits'.> ...
+%! draw.Drawing ().dim ([0, 0], [1, 0], 5, 'Tolerance', 0.1, 'Form', 'fit')
+%!error<draw.Drawing.dim: Form 'class' needs a tolerance class.> ...
 %! draw.Drawing ().dim ([0, 0], [1, 0], 5, 'Tolerance', 0.1, 'Form', 'class')
+%!error<draw.Drawing.radius: Tolerance classes are not available for a radius.> ...
+%! draw.Drawing ().radius ([0, 0], 5, 'Tolerance', 'H7')
+%!error<draw.Drawing.angdim: Tolerance classes are not available for an angular dimension.> ...
+%! draw.Drawing ().angdim ([0, 0], [1, 0], [0, 1], 5, 'Tolerance', 'H7')
+%!error<draw.Drawing.ordinate: Tolerance classes are not available for an ordinate dimension.> ...
+%! draw.Drawing ().ordinate ([0, 0], [1, 1], 'x', [1, -1], 'Tolerance', 'h7')
+%!error<draw.Drawing.dim: Tolerance 'H7' needs the measured value, which Text replaces.> ...
+%! draw.Drawing ().dim ([0, 0], [25, 0], 5, 'Text', 'A', 'Tolerance', 'H7')
+%!error<draw.Drawing.diam: Tolerance 'h7/G6' must name the hole class first, then the shaft class.> ...
+%! draw.Drawing ().diam ([0, 0], 5, 'Tolerance', 'h7/G6')
+%!error<draw.Drawing.diam: Tolerance 'g6/H7' must name the hole class first, then the shaft class.> ...
+%! draw.Drawing ().diam ([0, 0], 5, 'Tolerance', 'g6/H7')
+%!error<draw.Drawing.diam: 'Q7' is not an ISO 286 tolerance class.> ...
+%! draw.Drawing ().diam ([0, 0], 5, 'Tolerance', 'Q7')
+%!error<draw.Drawing.diam: ISO 286 defines no a9 for a size of 0.5 mm.> ...
+%! draw.Drawing ().diam ([0, 0], 0.25, 'Tolerance', 'a9')
+%!error<draw.Drawing.dim: ISO 286 defines no H7 for a size of 3200 mm.> ...
+%! draw.Drawing ().dim ([0, 0], [3200, 0], 5, 'Tolerance', 'H7/g6')
+%!error<draw.Drawing.diam: Form 'limits' is not available for a fit pair.> ...
+%! draw.Drawing ().diam ([0, 0], 5, 'Tolerance', 'H7/g6', 'Form', 'limits')
+%!error<draw.Drawing: FITFORM must be 'class', 'deviations' or 'limits'.> ...
+%! D = draw.Drawing (); D.FitForm = 'fit';
+%!test  # FitForm is 'deviations' by default
+%! assert_equal (draw.Drawing ().FitForm, 'deviations');
 %!error<draw.Drawing.dim: Form needs a Tolerance.> ...
 %! draw.Drawing ().dim ([0, 0], [1, 0], 5, 'Form', 'limits')
 %!error<draw.Drawing.diam: Form 'limits' needs a numeric Tolerance.> ...
@@ -2380,6 +2406,56 @@
 %! T = E(strcmp ({E.type}, 'TEXT'));
 %! assert_equal (T(2).pts(2) + T(2).height < E(3).pts(1,2), true);
 
+%!test  # a class with its deviations in brackets, the default FitForm
+%! D = draw.Drawing ().diam ([0, 0], 12.5, 'Tolerance', 'H7');
+%! assert_equal (tolerancetexts (D), {'%%c25 H7', '+0.021', '0'});
+
+%!test  # the brackets are two arcs either side of the deviations
+%! D = draw.Drawing ().diam ([0, 0], 12.5, 'Tolerance', 'H7');
+%! E = entities (D, 'dimensions', 'explode');
+%! C = E(strcmp ({E.type}, 'ARC'));
+%! T = E(strcmp ({E.type}, 'TEXT'));
+%! assert_equal (numel (C), 2);
+%! assert_equal (C(1).pts(1) - C(1).radius < T(2).pts(1), true);
+%! assert_equal (C(2).pts(1) + C(2).radius > T(2).pts(1) + 0.6 * T(2).height ...
+%!                                           * numel (T(2).text), true);
+
+%!test  # a class with its limits in brackets
+%! D = draw.Drawing ().diam ([0, 0], 15, 'Tolerance', 'f7', 'Form', 'limits');
+%! assert_equal (tolerancetexts (D), {'%%c30 f7', '29.980', '29.959'});
+
+%!test  # a class alone
+%! D = draw.Drawing ().diam ([0, 0], 15, 'Tolerance', 'f7', 'Form', 'class');
+%! assert_equal (tolerancetexts (D), {'%%c30 f7'});
+
+%!test  # a fit pair as its classes
+%! D = draw.Drawing ().diam ([0, 0], 6, 'Tolerance', 'H7/g6');
+%! assert_equal (tolerancetexts (D), {'%%c12 H7/g6'});
+
+%!test  # a linear size takes a class too
+%! D = draw.Drawing ().dim ([0, 0], [10, 0], 5, 'Tolerance', 'N9');
+%! assert_equal (tolerancetexts (D), {'10 N9', '0', '-0.036'});
+
+%!test  # FitForm writes every class without a form of its own
+%! D = draw.Drawing ().diam ([0, 0], 12.5, 'Tolerance', 'H7');
+%! D = D.diam ([0, 0], 15, 'Tolerance', 'f7', 'Form', 'deviations');
+%! D.FitForm = 'Class';
+%! assert_equal (tolerancetexts (D), {'%%c25 H7', '%%c30 f7', '-0.020', ...
+%!                                    '-0.041'});
+
+%!test  # the deviations of a class come from the size as shown
+%! D = draw.Drawing ().dim ([0, 0], [30.004, 0], 5, 'Tolerance', 'H7');
+%! assert_equal (tolerancetexts (D), {'30 H7', '+0.021', '0'});
+
+%!test  # at more places, the next size step
+%! D = draw.Drawing ().dim ([0, 0], [30.004, 0], 5, 'Tolerance', 'H7', ...
+%!                          'Decimals', 3);
+%! assert_equal (tolerancetexts (D), {'30.004 H7', '+0.025', '0'});
+
+%!test  # a class's deviations are stacked in the dimension record's text
+%! D = draw.Drawing ().diam ([0, 0], 12.5, 'Tolerance', 'H7');
+%! assert_equal (entities (D).text, '<> H7 (\S+0.021^0;)');
+
 %!test  # a limit in one direction is text in the dimension record
 %! D = draw.Drawing ().dim ([0, 0], [30.5, 0], 5, 'Tolerance', 'min');
 %! assert_equal (entities (D).text, '<> min.');
@@ -3057,76 +3133,82 @@
 %!               {'ELLIPSE', [1, 2], [20, 8], 30});
 
 %!test  # the picture of a dimension is its extension lines, ticks and label
-%! B = __ornament__ (draw.Drawing ().dim ([0, 0], [100, 0], -20), 1, 1, 2);
+%! B = __ornament__ (draw.Drawing ().dim ([0, 0], [100, 0], -20), 1, 1, 2, ...
+%!                   'deviations');
 %! assert_equal ({B.Entities.type}, {'line', 'line', 'line', 'line', ...
 %!                                   'line', 'text'});
 %!test  # and it is what plotting a dimension draws
 %! D = draw.Drawing ().dim ([0, 0], [100, 0], -20, 'Direction', 'horizontal');
-%! E = entities (__ornament__ (D, 1, 2, 2));
+%! E = entities (__ornament__ (D, 1, 2, 2, 'deviations'));
 %! F = entities (D, 'dimensions', 'explode', 'DimScale', 2);
 %! assert_equal ({E.type}, {F.type});
 %! assert_equal (vertcat (E.pts), vertcat (F.pts));
 %!test  # its record states a dimension as DXF type 0 with its rotation
 %! [~, REC] = __ornament__ (draw.Drawing ().dim ([0, 0], [0, 50], 10, ...
 %!                                               'Direction', 'vertical'), ...
-%!                          1, 1, 2);
+%!                          1, 1, 2, 'deviations');
 %! assert_equal (REC.angles, 0);
 %! assert_equal (REC.rotation, 90);
 %! assert_equal (size (REC.pts), [6, 2]);
 %! assert_equal (REC.text, '<>');
 %!test  # a diameter: its line, two ticks and the label, DXF type 3
-%! [B, REC] = __ornament__ (draw.Drawing ().diam ([0, 0], 5), 1, 1, 2);
+%! [B, REC] = __ornament__ (draw.Drawing ().diam ([0, 0], 5), 1, ...
+%!                          1, 2, 'deviations');
 %! assert_equal ({B.Entities.type}, {'line', 'line', 'line', 'text'});
 %! assert_equal (REC.angles, 3);
 %!test  # a radius: its line, one tick and the label, DXF type 4
-%! [B, REC] = __ornament__ (draw.Drawing ().radius ([0, 0], 5), 1, 1, 2);
+%! [B, REC] = __ornament__ (draw.Drawing ().radius ([0, 0], 5), 1, ...
+%!                          1, 2, 'deviations');
 %! assert_equal ({B.Entities.type}, {'line', 'line', 'text'});
 %! assert_equal (REC.angles, 4);
 %!test  # an angle: its arc, two ticks and the label, DXF type 5
 %! D = draw.Drawing ().angdim ([0, 0], [10, 0], [0, 10], 5);
-%! [B, REC] = __ornament__ (D, 1, 1, 2);
+%! [B, REC] = __ornament__ (D, 1, 1, 2, 'deviations');
 %! assert_equal ({B.Entities.type}, {'arc', 'line', 'line', 'text'});
 %! assert_equal (REC.angles, 5);
 %!test  # an ordinate measuring x: its leader and the label, DXF type 70
 %! D = draw.Drawing ().ordinate ([0, 0], [20, 15], 'x', [20, -10]);
-%! [B, REC] = __ornament__ (D, 1, 1, 2);
+%! [B, REC] = __ornament__ (D, 1, 1, 2, 'deviations');
 %! assert_equal ({B.Entities.type}, {'polyline', 'text'});
 %! assert_equal (REC.angles, 70);
 %!test  # an ordinate measuring y is DXF type 6
 %! D = draw.Drawing ().ordinate ([0, 0], [20, 15], 'y', [-10, 15]);
-%! [~, REC] = __ornament__ (D, 1, 1, 2);
+%! [~, REC] = __ornament__ (D, 1, 1, 2, 'deviations');
 %! assert_equal (REC.angles, 6);
 %!test  # a centre mark is its cross and has no record
-%! [B, REC] = __ornament__ (draw.Drawing ().centremark ([0, 0], 12), 1, 1, 2);
+%! [B, REC] = __ornament__ (draw.Drawing ().centremark ([0, 0], 12), 1, ...
+%!                          1, 2, 'deviations');
 %! assert_equal ({B.Entities.type}, {'line', 'line'});
 %! assert_equal (REC, []);
 %!test  # a leader is its path, its arrow and its note
 %! D = draw.Drawing ().leader ([0, 0; 10, 10], 'NOTE');
-%! [B, REC] = __ornament__ (D, 1, 1, 2);
+%! [B, REC] = __ornament__ (D, 1, 1, 2, 'deviations');
 %! assert_equal ({B.Entities.type}, {'polyline', 'line', 'line', 'text'});
 %! assert_equal (REC, []);
 %!test  # the picture keeps the layer, line type and colour it was drawn on
 %! D = draw.Drawing ();
 %! D.Layer = 'DIMS';
 %! D.Colour = 'red';
-%! B = __ornament__ (D.diam ([0, 0], 5), 1, 1, 2);
+%! B = __ornament__ (D.diam ([0, 0], 5), 1, 1, 2, 'deviations');
 %! assert_equal (unique ({B.Entities.layer}), {'DIMS'});
 %! assert_equal (unique ([B.Entities.colour]), 1);
 %!test  # the ornament scales with DIMSCALE
 %! D = draw.Drawing ().diam ([0, 0], 5);
-%! B1 = __ornament__ (D, 1, 1, 2);
-%! B4 = __ornament__ (D, 1, 4, 2);
+%! B1 = __ornament__ (D, 1, 1, 2, 'deviations');
+%! B4 = __ornament__ (D, 1, 4, 2, 'deviations');
 %! assert_equal (B4.Entities(4).height, 4 * B1.Entities(4).height);
 %!error<draw.Drawing.__ornament__: invalid number of input arguments.> ...
 %! __ornament__ (draw.Drawing ().diam ([0, 0], 5), 1)
 %!error<draw.Drawing.__ornament__: IDX must be the index of an entity of D.> ...
-%! __ornament__ (draw.Drawing ().diam ([0, 0], 5), 2, 1, 2)
+%! __ornament__ (draw.Drawing ().diam ([0, 0], 5), 2, 1, 2, 'deviations')
 %!error<draw.Drawing.__ornament__: DIMSCALE must be a real positive finite scalar.> ...
-%! __ornament__ (draw.Drawing ().diam ([0, 0], 5), 1, 0, 2)
+%! __ornament__ (draw.Drawing ().diam ([0, 0], 5), 1, 0, 2, 'deviations')
 %!error<draw.Drawing.__ornament__: DECIMALS must be an integer from 0 to 8.> ...
-%! __ornament__ (draw.Drawing ().diam ([0, 0], 5), 1, 1, 9)
+%! __ornament__ (draw.Drawing ().diam ([0, 0], 5), 1, 1, 9, 'deviations')
+%!error<draw.Drawing.__ornament__: FITFORM must be 'class', 'deviations' or 'limits'.> ...
+%! __ornament__ (draw.Drawing ().diam ([0, 0], 5), 1, 1, 2, 'fit')
 %!error<draw.Drawing.__ornament__: entity 1 is a line, not a dimension, centre mark or leader.> ...
-%! __ornament__ (draw.Drawing ().line ([0, 0], [1, 0]), 1, 1, 2)
+%! __ornament__ (draw.Drawing ().line ([0, 0], [1, 0]), 1, 1, 2, 'deviations')
 
 %!test  # the records of one drawing put into another
 %! D = draw.Drawing ().line ([0, 0; 1, 1], [1, 0; 2, 1]);
@@ -3419,8 +3501,8 @@
 %! unwind_protect
 %!   write (draw.Drawing ().dim ([0, 0], [10, 0], -5, 'Decimals', 4), fn);
 %!   txt = fileread (fn);
-%!   assert_equal (numel (strfind (txt, ...
-%!                 sprintf ("1000\nDSTYLE\n1002\n{\n1070\n271\n1070\n4\n1002\n}\n"))), 1);
+%!   ds = sprintf ("1000\nDSTYLE\n1002\n{\n1070\n271\n1070\n4\n1002\n}\n");
+%!   assert_equal (numel (strfind (txt, ds)), 1);
 %! unwind_protect_cleanup
 %!   [~] = unlink (fn);
 %! end_unwind_protect
@@ -3450,7 +3532,8 @@
 %!                               'Tolerance', [-0.1, 0.05]), fn);
 %!   txt = fileread (fn);
 %!   assert_equal (numel (strfind (txt, sprintf ("1070\n71\n1070\n1\n"))), 1);
-%!   assert_equal (numel (strfind (txt, sprintf ("1070\n47\n1040\n0.05\n"))), 1);
+%!   assert_equal (numel (strfind (txt, ...
+%!                 sprintf ("1070\n47\n1040\n0.05\n"))), 1);
 %!   assert_equal (numel (strfind (txt, sprintf ("1070\n48\n1040\n0.1\n"))), 1);
 %! unwind_protect_cleanup
 %!   [~] = unlink (fn);
@@ -3484,6 +3567,27 @@
 %!                               'Form', 'limits'), fn, 'Version', 'R12');
 %!   assert_equal (numel (strfind (fileread (fn), ...
 %!                 sprintf ("25.1/24.9\n"))), 1);
+%! unwind_protect_cleanup
+%!   [~] = unlink (fn);
+%! end_unwind_protect
+%!test  # write: R12 writes a class on one line
+%! fn = [tempname(), '.dxf'];
+%! unwind_protect
+%!   write (draw.Drawing ().diam ([0, 0], 12.5, 'Tolerance', 'H7'), fn, ...
+%!          'Version', 'R12');
+%!   assert_equal (numel (strfind (fileread (fn), ...
+%!                 sprintf ("<> H7 (+0.021/0)\n"))), 1);
+%! unwind_protect_cleanup
+%!   [~] = unlink (fn);
+%! end_unwind_protect
+%!test  # write: the drawing's FitForm goes with its dimension style
+%! fn = [tempname(), '.dxf'];
+%! unwind_protect
+%!   D = draw.Drawing ().diam ([0, 0], 12.5, 'Tolerance', 'H7');
+%!   D.FitForm = 'limits';
+%!   write (D, fn);
+%!   assert_equal (numel (strfind (fileread (fn), ...
+%!                 sprintf ("1000\nfitform\n1000\nlimits\n"))), 1);
 %! unwind_protect_cleanup
 %!   [~] = unlink (fn);
 %! end_unwind_protect

@@ -182,6 +182,32 @@ classdef Drawing
     ## @end deftp
     Decimals = 2;
 
+    ## -*- texinfo -*-
+    ## @deftp {draw.Drawing} {property} FitForm
+    ##
+    ## How a tolerance class is written
+    ##
+    ## The form of every ISO 286 tolerance class given to a dimension with
+    ## @qcode{'Tolerance'} and no @qcode{'Form'} of its own, as ISO 406 writes
+    ## them:
+    ##
+    ## @table @asis
+    ## @item @qcode{'deviations'}
+    ## the class and its deviations, the upper above the lower, in brackets:
+    ## @code{25 H7 (+0.021/0)}, the default;
+    ## @item @qcode{'limits'}
+    ## the class and the limits of size, the upper above the lower, in
+    ## brackets: @code{25 H7 (25.021/25.000)};
+    ## @item @qcode{'class'}
+    ## the class alone: @code{25 H7}.
+    ## @end table
+    ##
+    ## Like @code{Decimals}, it governs every dimension, those drawn before
+    ## it was set included, and those in its blocks.
+    ##
+    ## @end deftp
+    FitForm = 'deviations';
+
   endproperties
 
   properties (SetAccess = private)
@@ -321,6 +347,17 @@ classdef Drawing
         error ("draw.Drawing: DECIMALS must be an integer from 0 to 8.");
       endif
       this.Decimals = double (N);
+
+    endfunction
+
+    function this = set.FitForm (this, F)
+
+      if (! (ischar (F) && isrow (F)
+             && any (strcmpi (F, {'class', 'deviations', 'limits'}))))
+        error (strcat ("draw.Drawing: FITFORM must be 'class',", ...
+                       " 'deviations' or 'limits'."));
+      endif
+      this.FitForm = lower (F);
 
     endfunction
 
@@ -576,7 +613,7 @@ classdef Drawing
       opt = struct ('dimScale', dimScale, 'hatchMode', hatchMode, ...
                     'hatchScale', hatchScale, 'chordTol', chordTol, ...
                     'bulgeMode', bulgeMode, 'dimMode', dimMode, ...
-                    'decimals', D.Decimals);
+                    'decimals', D.Decimals, 'fitform', D.FitForm);
       resolve = strcmp (layerMode, 'resolve');
       [E, LOST, DIMS] = breakdown (D.Entities, opt, 0);
       E = resolvelayers (E, D.Layers, resolve, false);
@@ -630,9 +667,9 @@ classdef Drawing
     ## implementation of the ornament serves every backend.  DECIMALS is the
     ## caller's, since a block's dimensions take the precision of the drawing
     ## it is placed in.
-    function [B, REC] = __ornament__ (D, IDX, DIMSCALE, DECIMALS)
+    function [B, REC] = __ornament__ (D, IDX, DIMSCALE, DECIMALS, FITFORM)
 
-      if (nargin != 4)
+      if (nargin != 5)
         error ("draw.Drawing.__ornament__: invalid number of input arguments.");
       endif
       if (! isnumeric (IDX) || ! isscalar (IDX) || IDX != fix (IDX)
@@ -651,10 +688,19 @@ classdef Drawing
         error (strcat ("draw.Drawing.__ornament__: DECIMALS must be an", ...
                        " integer from 0 to 8."));
       endif
+      if (! (ischar (FITFORM)
+             && any (strcmp (FITFORM, {'class', 'deviations', 'limits'}))))
+        error (strcat ("draw.Drawing.__ornament__: FITFORM must be", ...
+                       " 'class', 'deviations' or 'limits'."));
+      endif
 
       e = D.Entities(IDX);
       if (! isempty (e.decimals))
         DECIMALS = e.decimals;
+      endif
+      if (ischar (e.tolerance) && ! any (strcmp (e.tolerance, {'min', 'max'}))
+          && isempty (e.form))
+        e.form = FITFORM;
       endif
       REC = [];
       switch (e.type)
@@ -678,7 +724,7 @@ classdef Drawing
       B = draw.Drawing ();
       B.Entities = partsentities (parts);
       if (! any (strcmp (e.type, {'centremark', 'leader'})))
-        d = dimrecord (e, '', e.type, DECIMALS);
+        d = dimrecord (e, '', e.type, DECIMALS, v);
         ## The text R12 writes, with the tolerance on its one line, and the
         ## overrides of the dimension style: group code and value
         pre = '';
@@ -697,7 +743,18 @@ classdef Drawing
           endif
         endif
         T = e.tolerance;
-        if (isnumeric (T) && ! isempty (T))
+        if (ischar (T) && ! any (strcmp (T, {'min', 'max'})))
+          ## A class on one line, without the codes that stack it
+          bare = e;
+          bare.tolerance = [];
+          line = dimrecord (bare, '', e.type, DECIMALS, v);
+          line = line.text;
+          [~, R] = tolerancetext (e, line, v, DECIMALS, '', '', 1);
+          line = [line, ' ', T];
+          if (! isempty (R))
+            line = [line, ' (', R{1}, '/', R{2}, ')'];
+          endif
+        elseif (isnumeric (T) && ! isempty (T))
           [main, R, A] = tolerancetext (e, d.text, v, DECIMALS, pre, suf, 1);
           if (isscalar (T))
             T = [-T, T];
@@ -1730,7 +1787,13 @@ classdef Drawing
     ## a bare 0; equal and opposite deviations are written as a symmetric
     ## tolerance;
     ## @item @qcode{'min'} or @qcode{'max'}, a size limited in one direction
-    ## only: @code{30.5 min.}
+    ## only: @code{30.5 min.};
+    ## @item an ISO 286 tolerance class, such as @qcode{'H7'} or
+    ## @qcode{'g6'}, its deviations looked up with @code{draw.isofit} at the
+    ## size as shown, and written in the drawing's @code{FitForm}:
+    ## @code{25 H7 (+0.021/0)}, the deviations in brackets;
+    ## @item a fit pair, the hole's class over the shaft's, such as
+    ## @qcode{'H7/g6'}, written as the classes alone: @code{25 H7/g6}.
     ## @end itemize
     ##
     ## A tolerance shows the places it needs, whatever @code{Decimals} says,
@@ -1740,9 +1803,16 @@ classdef Drawing
     ## above the lower, computed from the size as it is shown and both to the
     ## same places; @qcode{'deviations'}, the default, writes the deviations.
     ## Limits need the measured size, so they cannot go with @qcode{'Text'}.
-    ## A DXF file states a numeric tolerance as an override of the dimension
-    ## style, so a CAD program that measures the dimension again shows it;
-    ## @code{min.} and @code{max.} are text.
+    ## For a class, @qcode{'Form'} takes the place of the drawing's
+    ## @code{FitForm}: @qcode{'deviations'}, @qcode{'limits'}
+    ## (@code{25 H7 (25.021/25.000)}) or @qcode{'class'} (@code{25 H7}); a fit
+    ## pair takes @qcode{'class'} alone.  A class needs the measured size, so
+    ## it cannot go with @qcode{'Text'}, and must be one the standard defines
+    ## at the size shown.  A DXF file states a numeric tolerance as an
+    ## override of the dimension style, so a CAD program that measures the
+    ## dimension again shows it; @code{min.}, @code{max.} and a class are
+    ## text, and the deviations or limits of a class are figures that do not
+    ## follow a size changed in another program.
     ##
     ## @end deftypefn
     function this = dim (this, P1, P2, OFFSET, varargin)
@@ -1815,12 +1885,6 @@ classdef Drawing
                        " 'horizontal' or 'vertical'."));
       endif
 
-      [TOL, FORM, errmsg] = checktolerance (TOL, HASTOL, FORM, HASFORM, ...
-                                           'dim', ! isempty (LABEL));
-      if (! isempty (errmsg))
-        error ("draw.Drawing.dim: %s", errmsg);
-      endif
-
       DIRECTION = lower (DIRECTION);
       if (strcmp (DIRECTION, 'horizontal') && P1(1) == P2(1))
         error (strcat ("draw.Drawing.dim: a horizontal dimension needs two", ...
@@ -1829,6 +1893,26 @@ classdef Drawing
       if (strcmp (DIRECTION, 'vertical') && P1(2) == P2(2))
         error (strcat ("draw.Drawing.dim: a vertical dimension needs two", ...
                        " points differing in y."));
+      endif
+
+      switch (DIRECTION)
+        case 'horizontal'
+          v = abs (P2(1) - P1(1));
+        case 'vertical'
+          v = abs (P2(2) - P1(2));
+        otherwise
+          v = norm (P2 - P1);
+      endswitch
+      if (isempty (DECIMALS))
+        n = this.Decimals;
+      else
+        n = DECIMALS;
+      endif
+      [TOL, FORM, errmsg] = checktolerance (TOL, HASTOL, FORM, HASFORM, ...
+                                           'dim', ! isempty (LABEL), ...
+                                           round (v * 10 ^ n) / 10 ^ n);
+      if (! isempty (errmsg))
+        error ("draw.Drawing.dim: %s", errmsg);
       endif
 
       e = makeentity ('dim', pen (this));
@@ -1860,8 +1944,9 @@ classdef Drawing
     ## otherwise the diameter symbol and the measured figure, and the option
     ## @qcode{'Decimals'} the places @var{N} the figure shows, an integer from
     ## 0 to 8, in place of the drawing's @code{Decimals}.  The options
-    ## @qcode{'Tolerance'} and @qcode{'Form'} are those of @code{dim}; each
-    ## limit carries the diameter sign.
+    ## @qcode{'Tolerance'} and @qcode{'Form'} are those of @code{dim}, classes
+    ## and fit pairs included; each limit of a numeric tolerance carries the
+    ## diameter sign.
     ##
     ## A round feature is dimensioned by its diameter and never by its radius,
     ## because a diameter is what a bore gauge and a micrometer measure.  A
@@ -1893,7 +1978,8 @@ classdef Drawing
     ## The arguments and options are those of @code{diam}, and @var{ANG} is the
     ## direction the leader runs in.  The text is otherwise the letter R and
     ## the figure.  A radius takes a symmetric tolerance, deviations, or
-    ## @qcode{'min'} and @qcode{'max'} (@code{R0.5 max.}), but no limits.
+    ## @qcode{'min'} and @qcode{'max'} (@code{R0.5 max.}), but no limits and
+    ## no class.
     ##
     ## Use it for a fillet or any arc that is less than a full circle, where
     ## there is no diameter to measure across.
@@ -1925,8 +2011,9 @@ classdef Drawing
     ## measured angle and the degree symbol, and the option
     ## @qcode{'Decimals'} the places @var{N} the angle shows, an integer from
     ## 0 to 8, in place of the drawing's @code{Decimals}.  The options
-    ## @qcode{'Tolerance'} and @qcode{'Form'} are those of @code{dim}, in
-    ## degrees, every number carrying the degree sign:
+    ## @qcode{'Tolerance'} and @qcode{'Form'} are those of @code{dim}, but for
+    ## the classes of ISO 286, in degrees, every number carrying the degree
+    ## sign:
     ## @code{15.5@textdegree{} ±0.25@textdegree{}}.
     ##
     ## The angle measured is the one from the first arm to the second going
@@ -2006,7 +2093,7 @@ classdef Drawing
       endif
 
       [TOL, FORM, errmsg] = checktolerance (TOL, HASTOL, FORM, HASFORM, ...
-                                           'angdim', ! isempty (LABEL));
+                                           'angdim', ! isempty (LABEL), NaN);
       if (! isempty (errmsg))
         error ("draw.Drawing.angdim: %s", errmsg);
       endif
@@ -2142,7 +2229,7 @@ classdef Drawing
       endif
 
       [TOL, FORM, errmsg] = checktolerance (TOL, HASTOL, FORM, HASFORM, ...
-                                           'ordinate', ! isempty (LABEL));
+                                           'ordinate', ! isempty (LABEL), NaN);
       if (! isempty (errmsg))
         error ("draw.Drawing.ordinate: %s", errmsg);
       endif
@@ -3977,6 +4064,11 @@ function [E, LOST, DIMS] = breakdown (src, opt, nDim)
     if (! isempty (e.decimals))
       n = e.decimals;
     endif
+    ## A tolerance class without a form of its own takes the drawing's
+    if (ischar (e.tolerance) && ! any (strcmp (e.tolerance, {'min', 'max'}))
+        && isempty (e.form))
+      e.form = opt.fitform;
+    endif
 
     switch (e.type)
 
@@ -4042,12 +4134,12 @@ function [E, LOST, DIMS] = breakdown (src, opt, nDim)
         endfor
 
       case {'diam', 'radius'}
-        parts = explodecirc (e, dimScale, n);
+        [parts, v] = explodecirc (e, dimScale, n);
         if (strcmp (dimMode, 'associative'))
           nDim++;
           bn = sprintf ('*D%d', nDim);
           DIMS(end+1) = struct ('name', bn, 'entities', {parts});
-          E(end+1) = dimrecord (e, bn, e.type, n);
+          E(end+1) = dimrecord (e, bn, e.type, n, v);
         else
           for kk = 1:numel (parts)
             E(end+1) = parts(kk);
@@ -4055,12 +4147,12 @@ function [E, LOST, DIMS] = breakdown (src, opt, nDim)
         endif
 
       case 'angdim'
-        parts = explodeang (e, dimScale, n);
+        [parts, v] = explodeang (e, dimScale, n);
         if (strcmp (dimMode, 'associative'))
           nDim++;
           bn = sprintf ('*D%d', nDim);
           DIMS(end+1) = struct ('name', bn, 'entities', {parts});
-          E(end+1) = dimrecord (e, bn, 'angdim', n);
+          E(end+1) = dimrecord (e, bn, 'angdim', n, v);
           continue;
         endif
         for kk = 1:numel (parts)
@@ -4068,12 +4160,12 @@ function [E, LOST, DIMS] = breakdown (src, opt, nDim)
         endfor
 
       case 'ordinate'
-        parts = explodeord (e, dimScale, n);
+        [parts, v] = explodeord (e, dimScale, n);
         if (strcmp (dimMode, 'associative'))
           nDim++;
           bn = sprintf ('*D%d', nDim);
           DIMS(end+1) = struct ('name', bn, 'entities', {parts});
-          E(end+1) = dimrecord (e, bn, 'ordinate', n);
+          E(end+1) = dimrecord (e, bn, 'ordinate', n, v);
         else
           for kk = 1:numel (parts)
             E(end+1) = parts(kk);
@@ -4123,12 +4215,12 @@ function [E, LOST, DIMS] = breakdown (src, opt, nDim)
         endif
 
       case 'dim'
-        parts = explodedim (e, dimScale, n);
+        [parts, v] = explodedim (e, dimScale, n);
         if (strcmp (dimMode, 'associative'))
           nDim++;
           bn = sprintf ('*D%d', nDim);
           DIMS(end+1) = struct ('name', bn, 'entities', {parts});
-          E(end+1) = dimrecord (e, bn, 'dim', n);
+          E(end+1) = dimrecord (e, bn, 'dim', n, v);
         else
           for jj = 1:numel (parts)
             E(end+1) = parts(jj);
@@ -4302,8 +4394,15 @@ function e = dimcircle (this, kind, C, R, opts)
       || ! isfinite (ANG))
     error ("draw.Drawing.%s: Angle must be a real finite scalar.", kind);
   endif
+  if (isempty (DECIMALS))
+    n = this.Decimals;
+  else
+    n = DECIMALS;
+  endif
+  v = R * (1 + strcmp (kind, 'diam'));
   [TOL, FORM, errmsg] = checktolerance (TOL, HASTOL, FORM, HASFORM, ...
-                                       kind, ! isempty (LABEL));
+                                       kind, ! isempty (LABEL), ...
+                                       round (v * 10 ^ n) / 10 ^ n);
   if (! isempty (errmsg))
     error ("draw.Drawing.%s: %s", kind, errmsg);
   endif
@@ -4881,7 +4980,7 @@ endfunction
 ## block that holds its picture.  The definition points are what makes the
 ## dimension associative: a CAD application re-measures from them, which is why
 ## the text is emitted as "<>" unless the caller overrode it.
-function d = dimrecord (e, blockname, kind, n)
+function d = dimrecord (e, blockname, kind, n, v)
 
   d = mkent ('DIMENSION', e, [0, 0]);
   d.block = blockname;
@@ -4894,9 +4993,18 @@ function d = dimrecord (e, blockname, kind, n)
       && ! strcmp (e.text, autolabel (e, kind, n)))
     d.text = e.text;
   endif
-  ## A limit in one direction has no dimension style variable, so it is text
-  if (isfield (e, 'tolerance') && ischar (e.tolerance))
-    d.text = [d.text, ' ', e.tolerance, '.'];
+  ## A limit in one direction and a class have no dimension style variable,
+  ## so they are text: a class's deviations or limits stacked in brackets by
+  ## the codes of MTEXT, which a dimension's text takes
+  T = e.tolerance;
+  if (any (strcmp (T, {'min', 'max'})))
+    d.text = [d.text, ' ', T, '.'];
+  elseif (ischar (T))
+    [~, R] = tolerancetext (e, d.text, v, n, '', '', 1);
+    d.text = [d.text, ' ', T];
+    if (! isempty (R))
+      d.text = [d.text, ' (\S', R{1}, '^', R{2}, ';)'];
+    endif
   endif
 
   switch (kind)
@@ -4990,18 +5098,24 @@ endfunction
 
 ## Validate the tolerance options of a dimension of KIND, returning an error
 ## message body for the caller to raise.  HASTOL and HASFORM say whether each
-## option was given, HASTEXT whether 'Text' was.  T comes back as a symmetric
-## tolerance, a row [LOWER, UPPER], 'min' or 'max', or empty; FORM as
-## 'limits' or ''.
+## option was given, HASTEXT whether 'Text' was, and SHOWN is the size the
+## dimension shows, at which a tolerance class must be defined.  T comes back
+## as a symmetric tolerance, a row [LOWER, UPPER], 'min' or 'max', a class
+## or a fit pair as given, or empty; FORM as 'limits' or '' for a number,
+## and as given or '', the drawing's, for a class.
 function [T, FORM, errmsg] = checktolerance (T, HASTOL, FORM, HASFORM, kind,
-                                             HASTEXT)
+                                             HASTEXT, SHOWN)
 
   errmsg = '';
-  if (strcmp (kind, 'radius'))
-    noun = 'a radius';
-  else
-    noun = 'an ordinate dimension';
-  endif
+  switch (kind)
+    case 'radius'
+      noun = 'a radius';
+    case 'angdim'
+      noun = 'an angular dimension';
+    otherwise
+      noun = 'an ordinate dimension';
+  endswitch
+  isclass = false;
   if (! HASTOL)
     T = [];
   elseif (ischar (T) && isrow (T) && any (strcmpi (T, {'min', 'max'})))
@@ -5010,6 +5124,38 @@ function [T, FORM, errmsg] = checktolerance (T, HASTOL, FORM, HASFORM, kind,
       errmsg = sprintf ("Tolerance '%s' is not available for %s.", T, noun);
       return;
     endif
+  elseif (ischar (T) && isrow (T)
+          && ! isempty (regexp (T, '^[A-Za-z]+\d+(/[A-Za-z]+\d+)?$', 'once')))
+    isclass = true;
+    if (! any (strcmp (kind, {'dim', 'diam'})))
+      errmsg = sprintf ("Tolerance classes are not available for %s.", noun);
+      return;
+    endif
+    if (HASTEXT)
+      errmsg = sprintf (strcat ("Tolerance '%s' needs the measured value,", ...
+                                " which Text replaces."), T);
+      return;
+    endif
+    C = strsplit (T, '/');
+    if (numel (C) == 2 && ! (strcmp (C{1}, upper (C{1}))
+                             && strcmp (C{2}, lower (C{2}))))
+      errmsg = sprintf (strcat ("Tolerance '%s' must name the hole class", ...
+                                " first, then the shaft class."), T);
+      return;
+    endif
+    for k = 1:numel (C)
+      if (! (SHOWN > 0 && SHOWN <= 3150))
+        errmsg = sprintf ("ISO 286 defines no %s for a size of %g mm.", ...
+                          C{k}, SHOWN);
+        return;
+      endif
+      try
+        draw.isofit (SHOWN, C{k});
+      catch err
+        errmsg = regexprep (err.message, '^draw\.isofit: ', '');
+        return;
+      end_try_catch
+    endfor
   elseif (isnumeric (T) && isreal (T) && all (isfinite (T(:)))
           && ((isscalar (T) && T > 0) || isequal (size (T), [1, 2])))
     T = double (T);
@@ -5019,7 +5165,7 @@ function [T, FORM, errmsg] = checktolerance (T, HASTOL, FORM, HASFORM, kind,
     endif
   else
     errmsg = strcat ("Tolerance must be a positive scalar, a pair", ...
-                     " [LOWER, UPPER], 'min' or 'max'.");
+                     " [LOWER, UPPER], 'min', 'max' or an ISO 286 class.");
     return;
   endif
   if (! HASFORM)
@@ -5027,13 +5173,19 @@ function [T, FORM, errmsg] = checktolerance (T, HASTOL, FORM, HASFORM, kind,
     return;
   endif
   if (! (ischar (FORM) && isrow (FORM)
-         && any (strcmpi (FORM, {'deviations', 'limits'}))))
-    errmsg = "Form must be 'deviations' or 'limits'.";
+         && any (strcmpi (FORM, {'class', 'deviations', 'limits'}))))
+    errmsg = "Form must be 'class', 'deviations' or 'limits'.";
     return;
   endif
   FORM = lower (FORM);
   if (! HASTOL)
     errmsg = "Form needs a Tolerance.";
+  elseif (isclass)
+    if (any (T == '/') && ! strcmp (FORM, 'class'))
+      errmsg = sprintf ("Form '%s' is not available for a fit pair.", FORM);
+    endif
+  elseif (strcmp (FORM, 'class'))
+    errmsg = "Form 'class' needs a tolerance class.";
   elseif (strcmp (FORM, 'limits'))
     if (ischar (T))
       errmsg = "Form 'limits' needs a numeric Tolerance.";
@@ -5051,19 +5203,39 @@ endfunction
 ## The text of a dimension with its tolerance.  LABEL is the text without
 ## one, V the value it measures, N the places that value shows, PRE and SUF
 ## what each limit is written between (the diameter sign, the degree sign)
-## and HGT the text height.  MAIN stands where the label stands; R, the upper
-## and the lower deviation, stands to its right, the lower on its baseline,
-## as ISO 406 writes them; A, the upper limit, stands above it.  W is the
-## width of the whole and X how far it rises above one line, measured as the
-## label is, at six tenths of the height a character.
-function [main, R, A, W, X] = tolerancetext (e, label, v, n, pre, suf, hgt)
+## and HGT the text height.  MAIN stands where the label stands; R, two lines
+## upper over lower, stands to its right, the lower on its baseline, as ISO
+## 406 writes deviations, in brackets when B is true, as it writes those of
+## a class; A, the upper limit, stands above it.  W is the width of the
+## whole and X how far it rises above one line, measured as the label is,
+## at six tenths of the height a character.
+function [main, R, A, W, X, B] = tolerancetext (e, label, v, n, pre, suf, hgt)
 
   main = label;
   R = {};
   A = '';
+  B = false;
   T = e.tolerance;
-  if (ischar (T))
+  shown = round (v * 10 ^ n) / 10 ^ n;
+  if (any (strcmp (T, {'min', 'max'})))
     main = [label, ' ', T, '.'];
+  elseif (ischar (T))
+    ## A class, with its deviations or limits in brackets after it; a fit
+    ## pair, as its classes alone
+    main = [label, ' ', T];
+    if (! any (T == '/') && ! strcmp (e.form, 'class'))
+      D = draw.isofit (shown, T);
+      if (strcmp (e.form, 'limits'))
+        p = max (places (shown), places (D));
+        R = {sprintf('%.*f', p, shown + D(2)), ...
+             sprintf('%.*f', p, shown + D(1))};
+      else
+        p = places (D);
+        R = {sprintf('%+.*f', p, D(2)), sprintf('%+.*f', p, D(1))};
+        R(D([2, 1]) == 0) = {'0'};
+      endif
+      B = true;
+    endif
   elseif (! isempty (T))
     if (isscalar (T))
       T = [-T, T];
@@ -5071,7 +5243,6 @@ function [main, R, A, W, X] = tolerancetext (e, label, v, n, pre, suf, hgt)
     if (strcmp (e.form, 'limits'))
       ## The limits of the size as shown, both at the places of the finer of
       ## it and the deviations
-      shown = round (v * 10 ^ n) / 10 ^ n;
       p = max (places (shown), places (T));
       main = [pre, sprintf('%.*f', p, shown + T(1)), suf];
       A = [pre, sprintf('%.*f', p, shown + T(2)), suf];
@@ -5089,7 +5260,9 @@ function [main, R, A, W, X] = tolerancetext (e, label, v, n, pre, suf, hgt)
   W = cw * numel (main);
   X = 0;
   if (! isempty (R))
-    W += cw * (1 + max (numel (R{1}), numel (R{2})));
+    ## A space, and in brackets a bracket and a fifth of a height either
+    ## side of the lines
+    W += cw * (1 + max (numel (R{1}), numel (R{2}))) + B * 0.9 * hgt;
     X = 1.5 * hgt;
   elseif (! isempty (A))
     W = cw * max (numel (main), numel (A));
@@ -5109,20 +5282,39 @@ function p = places (V)
 endfunction
 
 ## The text set beside a dimension's label, whose baseline starts at P and
-## which is WM wide: the deviations R to its right, upper above lower, or the
-## upper limit A above it, one line of 1.5 heights up
-function parts = stackparts (e, R, A, P, wm, hgt)
+## which is WM wide: the two lines R to its right, upper above lower, in
+## brackets drawn as arcs when B is true, or the upper limit A above it, one
+## line of 1.5 heights up
+function parts = stackparts (e, R, A, P, wm, hgt, B)
 
   parts = repmat (mkent ('TEXT', e, P), 1, 0);
   if (! isempty (R))
     x = P(1) + wm + 0.6 * hgt;
+    if (B)
+      ## Each bracket bows a quarter of a height across the two lines, from
+      ## below the lower to above the upper
+      s = 0.25 * hgt;
+      c = 1.55 * hgt;
+      r = (c ^ 2 + s ^ 2) / (2 * s);
+      a = asind (c / r);
+      ym = P(2) + 1.1 * hgt;
+      left = mkent ('ARC', e, [x + r, ym]);
+      left.radius = r;
+      left.angles = [180 - a, 180 + a];
+      x += s + 0.2 * hgt;
+      xr = x + 0.6 * hgt * max (numel (R{1}), numel (R{2})) + 0.2 * hgt;
+      right = mkent ('ARC', e, [xr + s - r, ym]);
+      right.radius = r;
+      right.angles = [360 - a, a];
+      parts = [left, right];
+    endif
     up = mkent ('TEXT', e, [x, P(2) + 1.5 * hgt]);
     up.text = R{1};
     up.height = hgt;
     lo = mkent ('TEXT', e, [x, P(2)]);
     lo.text = R{2};
     lo.height = hgt;
-    parts = [up, lo];
+    parts = [parts, up, lo];
   elseif (! isempty (A))
     up = mkent ('TEXT', e, [P(1), P(2) + 1.5 * hgt]);
     up.text = A;
@@ -5196,14 +5388,14 @@ function [parts, v] = explodecirc (e, scale, ndec)
     v = e.radius;
     pre = '';
   endif
-  [main, R, A] = tolerancetext (e, label, v, ndec, pre, '', hgt);
+  [main, R, A, ~, ~, B] = tolerancetext (e, label, v, ndec, pre, '', hgt);
   P = outer + 0.5 * hgt * (u + n);
   t = mkent ('TEXT', e, P);
   t.text = main;
   t.height = hgt;
   t.rotation = 0;
   parts(end+1) = t;
-  parts = [parts, stackparts(e, R, A, P, 0.6 * hgt * numel (main), hgt)];
+  parts = [parts, stackparts(e, R, A, P, 0.6 * hgt * numel (main), hgt, B)];
 
 endfunction
 
@@ -5235,14 +5427,15 @@ function [parts, v] = explodeang (e, scale, ndec)
     label = autolabel (e, e.type, ndec);
   endif
   v = mod (a2 - a1, 360);
-  [main, R, A] = tolerancetext (e, label, v, ndec, '', '%%d', hgt);
+  [main, R, A, ~, ~, B] = tolerancetext (e, label, v, ndec, '', '%%d', ...
+                                          hgt);
   P = V + (e.radius + 0.5 * hgt) * [cosd(am), sind(am)];
   t = mkent ('TEXT', e, P);
   t.text = main;
   t.height = hgt;
   t.rotation = 0;
   parts(end+1) = t;
-  parts = [parts, stackparts(e, R, A, P, 0.6 * hgt * numel (main), hgt)];
+  parts = [parts, stackparts(e, R, A, P, 0.6 * hgt * numel (main), hgt, B)];
 
 endfunction
 
@@ -5279,7 +5472,8 @@ function [parts, v] = explodeord (e, scale, ndec)
   else
     label = e.text;
   endif
-  [main, R, A, wid, rise] = tolerancetext (e, label, v, ndec, '', '', hgt);
+  [main, R, A, wid, rise, B] = tolerancetext (e, label, v, ndec, '', '', ...
+                                              hgt);
   if (k == 2)
     ## Up or down the sheet: the label centred past the end
     ix = L(1) - wid / 2;
@@ -5303,7 +5497,7 @@ function [parts, v] = explodeord (e, scale, ndec)
   t.rotation = 0;
   parts(end+1) = t;
   parts = [parts, stackparts(e, R, A, [ix, iy], 0.6 * hgt * numel (main), ...
-                             hgt)];
+                             hgt, B)];
 
 endfunction
 
@@ -5478,7 +5672,8 @@ function [parts, v] = explodedim (e, scale, ndec)
   ## application substitutes here, and being slightly out matters far less than
   ## a label sitting nowhere near the middle.
   mid = (A1 + A2) / 2;
-  [main, R, A, wid, rise] = tolerancetext (e, label, v, ndec, '', '', hgt);
+  [main, R, A, wid, rise, B] = tolerancetext (e, label, v, ndec, '', '', ...
+                                              hgt);
   side = sign0 (e.offset) * N;
 
   if (abs (side(2)) >= abs (side(1)))
@@ -5505,7 +5700,7 @@ function [parts, v] = explodedim (e, scale, ndec)
   t.height = hgt;
   parts(end+1) = t;
   parts = [parts, stackparts(e, R, A, [ix, iy], 0.6 * hgt * numel (main), ...
-                             hgt)];
+                             hgt, B)];
 
 endfunction
 
