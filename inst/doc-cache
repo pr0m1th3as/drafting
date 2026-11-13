@@ -1355,7 +1355,7 @@ draw.Drawing.plot
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 4764
+# length: 4919
 draw.Drawing: plot (D)
 draw.Drawing: plot (HAX, D)
 draw.Drawing: plot (..., Name, Value)
@@ -1476,9 +1476,11 @@ per model unit, and each string is sized from its own entity height
 instead:
 at a plot scale of 1:S that factor is 72 / (25.4 *
 S),
-which is what draw.Drawing.print supplies. For a rendering where
-text is to
-scale by construction, use draw.Drawing.tikz.
+which is what draw.Drawing.print supplies. Text sized so counts
+toward the limits at six tenths of its height a character, as the
+package lays it out, rather than by the toolkit's rectangle for it.
+For a rendering where text is to scale by construction, use
+draw.Drawing.tikz.
 
 See also:
 draw.Drawing,
@@ -1580,7 +1582,7 @@ draw.Drawing.print
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 3731
+# length: 4201
 draw.Drawing: print (D, FILE)
 draw.Drawing: print (D, FILE, Name, Value, ...)
 draw.Drawing: [PAPER, SCALE] = print (...)
@@ -1606,7 +1608,9 @@ Name Default Meaning
 'Paper' 'A4' sheet, named 'A0' to
 'A5', or [width, height] in millimetres
 'Orientation' 'landscape' or
-'portrait'; ignored when 'Paper' is given as a size
+'portrait'; by default the orientation of a sheet the drawing
+is framed on, else landscape; ignored when 'Paper' is given as
+a size
 'Scale' fitted plot scale denominator: 50 means
 1:50. The default picks the largest preferred scale the sheet holds
 'Margin' 10 blank border kept around the drawing,
@@ -1622,7 +1626,13 @@ no line weight of its own or of its layer
 A layer whose plot is false in Layers is left off the
 paper, as is a layer that is not visible, but a layer not printed keeps
 its place on the sheet: the trimmed edge draw.titleblock draws
-on such a layer still places the sheet on the paper.
+on such a layer still places the sheet on the paper. A drawing framed
+so, by a closed polyline on a layer not printed that bounds all of its
+geometry, is fitted by that edge alone, and stands on paper of its own
+orientation unless 'Orientation' says otherwise. Text is
+measured at six tenths of its height a character, as the package lays
+it out, not by the rectangle the graphics toolkit reports for it, which
+runs wider than the text drawn.
 
 [PAPER, SCALE] = draw.Drawing.print (...) returns
 the sheet size actually used, in millimetres, and the scale denominator,

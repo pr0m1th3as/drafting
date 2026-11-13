@@ -2015,6 +2015,18 @@
 %!error<draw.Drawing.plot: LTScale must be a positive real finite scalar.> ...
 %! plot (draw.Drawing (), 'LTScale', -1)
 
+%!test  # text sized to the drawing is measured by the package's rule
+%! f = figure ('visible', 'off');
+%! unwind_protect
+%!   ax = axes ('parent', f);
+%!   D = draw.Drawing ().line ([0, 0], [10, 0]);
+%!   D = D.text ([0, 5], 'ABCDEFGHIJ', 'Height', 10);
+%!   plot (D, 'Axes', ax, 'Margin', 0, 'FontScale', 1);
+%!   assert_equal ([xlim(ax), ylim(ax)], [0, 60, 0, 15], 1e-9);
+%! unwind_protect_cleanup
+%!   close (f);
+%! end_unwind_protect
+
 
 ## The sheet is the size asked for, and the scale is reported
 %!testif ; any (strcmp (graphics_toolkit (), {'qt', 'gnuplot'}))
@@ -3367,6 +3379,39 @@
 %!   D = draw.Drawing ().circle ([150, 110], 40);
 %!   [P, S] = print (merge (draw.titleblock ('A4'), D), fn, 'Margin', 0);
 %!   assert_equal ([P, S], [297, 210, 1]);
+%! unwind_protect_cleanup
+%!   [~] = unlink (fn);
+%! end_unwind_protect
+
+## A sheet is placed by its trimmed edge, though its text runs near it
+%!testif ; any (strcmp (graphics_toolkit (), {'qt', 'gnuplot'}))
+%! fn = [tempname(), '.pdf'];
+%! unwind_protect
+%!   F = struct ('units', 'mm', 'tolerance', 'ISO 2768-mK');
+%!   [P, S] = print (draw.titleblock ('A4', F), fn, 'Margin', 0);
+%!   assert_equal ([P, S], [297, 210, 1]);
+%! unwind_protect_cleanup
+%!   [~] = unlink (fn);
+%! end_unwind_protect
+
+## A sheet stood upright is printed on paper stood upright
+%!testif ; any (strcmp (graphics_toolkit (), {'qt', 'gnuplot'}))
+%! fn = [tempname(), '.pdf'];
+%! unwind_protect
+%!   T = draw.titleblock ('A4', 'Orientation', 'portrait');
+%!   [P, S] = print (T, fn, 'Margin', 0);
+%!   assert_equal ([P, S], [210, 297, 1]);
+%! unwind_protect_cleanup
+%!   [~] = unlink (fn);
+%! end_unwind_protect
+
+## unless the orientation is given
+%!testif ; any (strcmp (graphics_toolkit (), {'qt', 'gnuplot'}))
+%! fn = [tempname(), '.pdf'];
+%! unwind_protect
+%!   T = draw.titleblock ('A4', 'Orientation', 'portrait');
+%!   [P, S] = print (T, fn, 'Margin', 0, 'Orientation', 'landscape');
+%!   assert_equal ([P, S], [297, 210, 2]);
 %! unwind_protect_cleanup
 %!   [~] = unlink (fn);
 %! end_unwind_protect

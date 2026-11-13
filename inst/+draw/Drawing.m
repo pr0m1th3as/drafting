@@ -3012,9 +3012,11 @@ classdef Drawing
     ## instead:
     ## at a plot scale of @math{1:S} that factor is @code{72 / (25.4 *
     ## @var{S})},
-    ## which is what @code{draw.Drawing.print} supplies. For a rendering where
-    ## text is to
-    ## scale by construction, use @code{draw.Drawing.tikz}.
+    ## which is what @code{draw.Drawing.print} supplies.  Text sized so counts
+    ## toward the limits at six tenths of its height a character, as the
+    ## package lays it out, rather than by the toolkit's rectangle for it.
+    ## For a rendering where text is to scale by construction, use
+    ## @code{draw.Drawing.tikz}.
     ##
     ## @seealso{draw.Drawing, draw.Drawing.tikz, draw.Drawing.print,
     ## draw.Drawing.write}
@@ -3311,7 +3313,7 @@ classdef Drawing
         ## so the frame would follow the figure's shape rather than the
         ## drawing's, and draw.Drawing.print, which reads its extents from
         ## here, would fit the sheet against an extent the drawing has not got.
-        [xl, yl] = contentlimits (H);
+        [xl, yl] = contentlimits (H, opt.FontScale);
 
         if (all (isfinite ([xl, yl])))
           ## A drawing with no extent in one direction -- a single horizontal
@@ -3377,7 +3379,9 @@ classdef Drawing
     ## @item @qcode{'Paper'} @tab @qcode{'A4'} @tab sheet, named @qcode{'A0'} to
     ## @qcode{'A5'}, or @code{[@var{width}, @var{height}]} in millimetres
     ## @item @qcode{'Orientation'} @tab @qcode{'landscape'} @tab or
-    ## @qcode{'portrait'}; ignored when @qcode{'Paper'} is given as a size
+    ## @qcode{'portrait'}; by default the orientation of a sheet the drawing
+    ## is framed on, else landscape; ignored when @qcode{'Paper'} is given as
+    ## a size
     ## @item @qcode{'Scale'} @tab fitted @tab plot scale denominator: 50 means
     ## 1:50.  The default picks the largest preferred scale the sheet holds
     ## @item @qcode{'Margin'} @tab 10 @tab blank border kept around the drawing,
@@ -3394,7 +3398,13 @@ classdef Drawing
     ## A layer whose @code{plot} is false in @code{Layers} is left off the
     ## paper, as is a layer that is not visible, but a layer not printed keeps
     ## its place on the sheet: the trimmed edge @code{draw.titleblock} draws
-    ## on such a layer still places the sheet on the paper.
+    ## on such a layer still places the sheet on the paper.  A drawing framed
+    ## so, by a closed polyline on a layer not printed that bounds all of its
+    ## geometry, is fitted by that edge alone, and stands on paper of its own
+    ## orientation unless @qcode{'Orientation'} says otherwise.  Text is
+    ## measured at six tenths of its height a character, as the package lays
+    ## it out, not by the rectangle the graphics toolkit reports for it, which
+    ## runs wider than the text drawn.
     ##
     ## @code{[@var{PAPER}, @var{SCALE}] = draw.Drawing.print (@dots{})} returns
     ## the sheet size actually used, in millimetres, and the scale denominator,
@@ -3459,6 +3469,7 @@ classdef Drawing
 
       opt = struct ('Paper', 'A4', 'Orientation', 'landscape', 'Scale', [], ...
                     'Margin', 10, 'Resolution', 600, 'LineWidth', 0.35);
+      ORIENTED = false;
       for ii = 1:2:numel (varargin)
         name = varargin{ii};
         val = varargin{ii+1};
@@ -3470,6 +3481,7 @@ classdef Drawing
             opt.Paper = val;
           case 'orientation'
             opt.Orientation = val;
+            ORIENTED = true;
           case 'scale'
             if (isempty (val))
               error ("draw.Drawing.print: Scale must not be empty.");
@@ -3520,6 +3532,14 @@ classdef Drawing
       ## keep their place on the sheet, as the trimmed edge of a title block
       ## places it, but leave no ink
       D = expand (D);
+      ## A sheet's trimmed edge, which places it on the paper, and which
+      ## stands it upright on a named paper unless told otherwise
+      edge = sheetedge (D);
+      if (! isempty (edge) && ! ORIENTED && ischar (opt.Paper)
+          && diff (edge([1, 3])) < diff (edge([2, 4])))
+        opt.Orientation = 'portrait';
+        PAPER = papersize (opt.Paper, opt.Orientation);
+      endif
       P = D;
       printed = upper ({D.Layers([D.Layers.plot]).name});
       P.Entities = D.Entities(ismember (upper ({D.Entities.layer}), printed));
@@ -3547,8 +3567,12 @@ classdef Drawing
       fig = figure ('visible', 'off');
       unwind_protect
         ax = axes ('parent', fig);
-        plot (D, 'Axes', ax, 'Margin', 0);
+        plot (D, 'Axes', ax, 'Margin', 0, 'FontScale', 72 / 25.4);
         span = [diff(xlim(ax)), diff(ylim(ax))];
+        ## A sheet is placed by its trimmed edge, whatever its text does
+        if (! isempty (edge))
+          span = edge(3:4) - edge(1:2);
+        endif
 
         SCALE = choosescale (span, usable, opt.Scale);
         if (isempty (SCALE))
@@ -3573,6 +3597,9 @@ classdef Drawing
                      'LTScale', SCALE, 'DimScale', SCALE, ...
                      'HatchScale', SCALE);
           span = [diff(xlim(ax)), diff(ylim(ax))];
+          if (! isempty (edge))
+            span = edge(3:4) - edge(1:2);
+          endif
           if (all (span / SCALE <= usable + 1e-9) || ! isempty (opt.Scale))
             break;
           endif
@@ -3592,6 +3619,10 @@ classdef Drawing
         endif
         xl = xlim (ax);
         yl = ylim (ax);
+        if (! isempty (edge))
+          xl = edge([1, 3]);
+          yl = edge([2, 4]);
+        endif
         if (P.numentities () < D.numentities ())
           cla (ax);
           plot (P, 'Axes', ax, 'Margin', 0, ...
@@ -4797,17 +4828,55 @@ endfunction
 ## is cut into its dashes and each is a separate object, which is what lets all
 ## seven patterns render as themselves rather than collapsing onto the four
 ## styles a figure provides.
+## The box [XMIN, YMIN, XMAX, YMAX] of the trimmed edge of a sheet in the
+## expanded drawing D, or empty: a closed polyline on a layer not printed,
+## whose box is the box of the whole drawing, as draw.titleblock draws it
+function box = sheetedge (D)
+
+  box = [];
+  off = upper ({D.Layers(! [D.Layers.plot]).name});
+  if (isempty (off))
+    return;
+  endif
+  B = bbox (D);
+  for k = 1:numel (D.Entities)
+    e = D.Entities(k);
+    if (strcmp (e.type, 'polyline') && e.closed
+        && any (strcmp (upper (e.layer), off)))
+      c = [min(e.pts(:,1:2), [], 1), max(e.pts(:,1:2), [], 1)];
+      if (all (abs (c - B) <= 1e-9 * max (1, max (abs (B)))))
+        box = c;
+        return;
+      endif
+    endif
+  endfor
+
+endfunction
+
 ## The extents of what was actually drawn, in data units.  A text object
 ## contributes the rectangle it renders into rather than its insertion point,
-## since a string near an edge would otherwise be cut off; text is sized in
-## points, so widening the limits shrinks it and the correction only ever errs
-## towards more room.
-function [xl, yl] = contentlimits (H)
+## since a string near an edge would otherwise be cut off.  Text sized in
+## points takes the rectangle the toolkit reports; widening the limits shrinks
+## it, so the correction only ever errs towards more room.  Text sized to the
+## drawing, at FONTSCALE points a unit, takes the rectangle the package's rule
+## gives it, six tenths of its height a character from its baseline up, turned
+## with it: the toolkit's own rectangle runs to about twice the width drawn,
+## and would push a sheet onto a coarser scale than it needs.
+function [xl, yl] = contentlimits (H, fontscale)
 
   xl = [Inf, -Inf];
   yl = [Inf, -Inf];
   for k = 1:numel (H)
-    if (strcmp (get (H(k), 'type'), 'text'))
+    if (strcmp (get (H(k), 'type'), 'text') && ! isempty (fontscale))
+      h = get (H(k), 'fontsize') / fontscale;
+      w = 0.6 * h * numel (get (H(k), 'string'));
+      p = get (H(k), 'position');
+      a = get (H(k), 'rotation');
+      C = [0, w, w, 0; 0, 0, h, h];
+      C = [cosd(a), -sind(a); sind(a), cosd(a)] * C;
+      x = p(1) + C(1,:);
+      y = p(2) + C(2,:);
+    elseif (strcmp (get (H(k), 'type'), 'text'))
       e = get (H(k), 'extent');
       x = [e(1), e(1) + e(3)];
       y = [e(2), e(2) + e(4)];
@@ -5348,18 +5417,27 @@ function [main, R, A, W, X, B] = tolerancetext (e, label, v, n, pre, suf, hgt)
       R = strcat (R, suf);
     endif
   endif
-  cw = 0.6 * hgt;
-  W = cw * numel (main);
+  W = textwidth (main, hgt);
   X = 0;
   if (! isempty (R))
     ## A space, and in brackets a bracket and a fifth of a height either
     ## side of the lines
-    W += cw * (1 + max (numel (R{1}), numel (R{2}))) + B * 0.9 * hgt;
+    W += 0.6 * hgt + max (textwidth (R{1}, hgt), textwidth (R{2}, hgt)) ...
+         + B * 0.9 * hgt;
     X = 1.5 * hgt;
   elseif (! isempty (A))
-    W = cw * max (numel (main), numel (A));
+    W = max (textwidth (main, hgt), textwidth (A, hgt));
     X = 1.5 * hgt;
   endif
+
+endfunction
+
+## The width of the text S at the height HGT, at six tenths of the height a
+## character, the diameter, degree and plus-minus codes counted as the one
+## sign they draw
+function w = textwidth (S, hgt)
+
+  w = 0.6 * hgt * numel (regexprep (S, '%%[cdpCDP]', '.'));
 
 endfunction
 
@@ -5394,7 +5472,8 @@ function parts = stackparts (e, R, A, P, wm, hgt, B)
       left.radius = r;
       left.angles = [180 - a, 180 + a];
       x += s + 0.2 * hgt;
-      xr = x + 0.6 * hgt * max (numel (R{1}), numel (R{2})) + 0.2 * hgt;
+      xr = x + max (textwidth (R{1}, hgt), textwidth (R{2}, hgt)) ...
+           + 0.2 * hgt;
       right = mkent ('ARC', e, [xr + s - r, ym]);
       right.radius = r;
       right.angles = [360 - a, a];
@@ -5487,7 +5566,7 @@ function [parts, v] = explodecirc (e, scale, ndec)
   t.height = hgt;
   t.rotation = 0;
   parts(end+1) = t;
-  parts = [parts, stackparts(e, R, A, P, 0.6 * hgt * numel (main), hgt, B)];
+  parts = [parts, stackparts(e, R, A, P, textwidth (main, hgt), hgt, B)];
 
 endfunction
 
@@ -5527,7 +5606,7 @@ function [parts, v] = explodeang (e, scale, ndec)
   t.height = hgt;
   t.rotation = 0;
   parts(end+1) = t;
-  parts = [parts, stackparts(e, R, A, P, 0.6 * hgt * numel (main), hgt, B)];
+  parts = [parts, stackparts(e, R, A, P, textwidth (main, hgt), hgt, B)];
 
 endfunction
 
@@ -5588,7 +5667,7 @@ function [parts, v] = explodeord (e, scale, ndec)
   t.height = hgt;
   t.rotation = 0;
   parts(end+1) = t;
-  parts = [parts, stackparts(e, R, A, [ix, iy], 0.6 * hgt * numel (main), ...
+  parts = [parts, stackparts(e, R, A, [ix, iy], textwidth (main, hgt), ...
                              hgt, B)];
 
 endfunction
@@ -5791,7 +5870,7 @@ function [parts, v] = explodedim (e, scale, ndec)
   t.text = main;
   t.height = hgt;
   parts(end+1) = t;
-  parts = [parts, stackparts(e, R, A, [ix, iy], 0.6 * hgt * numel (main), ...
+  parts = [parts, stackparts(e, R, A, [ix, iy], textwidth (main, hgt), ...
                              hgt, B)];
 
 endfunction
