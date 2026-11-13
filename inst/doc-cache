@@ -1958,7 +1958,7 @@ draw.Drawing.tolframe
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 2656
+# length: 3593
 draw.Drawing: D = tolframe (D, P, CHAR, VALUE)
 draw.Drawing: D = tolframe (..., Name, Value, ...)
 Append a tolerance frame: a geometrical tolerance as ISO 1101 writes it.
@@ -1969,7 +1969,13 @@ The frame is a row of compartments: the symbol of the characteristic,
 the width of the tolerance zone in millimetres, and the datums it is
 measured from, if any.
 
-P is the point the frame stands at, the middle of its left end.
+P is a path as leader takes it, one point a row: from the
+feature the tolerance applies to, where the leader is ticked, to where
+the frame stands, the middle of whichever end faces the leader, so a
+leader coming in from the right meets the frame's right end. A single
+point places the frame free, by the middle of its left end, for a
+frame tied to its feature some other way.
+
 CHAR names the characteristic as ISO 1101 does, regardless of
 case: 'straightness', 'flatness', 'circularity',
 'cylindricity', 'lineprofile' and
@@ -1979,6 +1985,13 @@ case: 'straightness', 'flatness', 'circularity',
 which has the same symbol), 'symmetry', 'runout' and
 'totalrunout'. VALUE is the width of the tolerance zone,
 a positive number.
+
+Two characteristics of one feature are written in two frames, one under
+the other, aligned at their left ends, as ISO 1101 stacks them:
+CHAR a cell of two names and VALUE two values, and the
+options 'Zone', 'Modifiers' and 'Datums' each a
+cell of two, one for each frame, '' for no zone sign. The
+leader meets the first frame.
 
 'Zone'
 'diameter' writes the sign Ø before the value, for a zone
@@ -1992,6 +2005,13 @@ A row cell of at most three datum compartments, ranked from left to
 right: a letter, 'A'; a common datum of two features,
 'A-B'; or letters whose order does not matter, 'AB'. A
 datum's own material condition follows its letter: 'B(M)'.
+'Note'
+A remark written above the frame, such as '6x',
+'6 holes' or 'common zone'.
+'AllAround'
+true draws a circle at the leader's first bend, for a tolerance
+that applies all around the outline; the leader then needs three points
+or more.
 
 The frame refuses what ISO 1101 does not allow in it. Straightness,
 flatness, circularity and cylindricity tolerate a single feature and take
@@ -2010,10 +2030,10 @@ ISO 7083 sets them, at the height of dimension text: 5 mm with 2.5 mm
 lettering. Like a dimension's ornament it keeps its size on paper, and
 stays upright, whatever the drawing is scaled or turned by.
 
-D = draw.Drawing ().tolframe ([0, 0], 'position', 0.1, ...
-'Zone', 'diameter', ...
-'Modifiers', {'M'}, ...
-'Datums', {'A', 'B', 'C'});
+D = draw.Drawing ().circle ([0, 0], 4);
+D = D.tolframe ([2.8, 2.8; 10, 10; 14, 10], 'position', 0.1, ...
+'Zone', 'diameter', 'Modifiers', {'M'}, ...
+'Datums', {'A', 'B', 'C'}, 'Note', '4x');
 
 See also:
 draw.Drawing.dim,

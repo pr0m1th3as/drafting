@@ -2354,7 +2354,13 @@ classdef Drawing
     ## the width of the tolerance zone in millimetres, and the datums it is
     ## measured from, if any.
     ##
-    ## @var{P} is the point the frame stands at, the middle of its left end.
+    ## @var{P} is a path as @code{leader} takes it, one point a row: from the
+    ## feature the tolerance applies to, where the leader is ticked, to where
+    ## the frame stands, the middle of whichever end faces the leader, so a
+    ## leader coming in from the right meets the frame's right end.  A single
+    ## point places the frame free, by the middle of its left end, for a
+    ## frame tied to its feature some other way.
+    ##
     ## @var{CHAR} names the characteristic as ISO 1101 does, regardless of
     ## case: @qcode{'straightness'}, @qcode{'flatness'}, @qcode{'circularity'},
     ## @qcode{'cylindricity'}, @qcode{'lineprofile'} and
@@ -2364,6 +2370,13 @@ classdef Drawing
     ## which has the same symbol), @qcode{'symmetry'}, @qcode{'runout'} and
     ## @qcode{'totalrunout'}.  @var{VALUE} is the width of the tolerance zone,
     ## a positive number.
+    ##
+    ## Two characteristics of one feature are written in two frames, one under
+    ## the other, aligned at their left ends, as ISO 1101 stacks them:
+    ## @var{CHAR} a cell of two names and @var{VALUE} two values, and the
+    ## options @qcode{'Zone'}, @qcode{'Modifiers'} and @qcode{'Datums'} each a
+    ## cell of two, one for each frame, @qcode{''} for no zone sign.  The
+    ## leader meets the first frame.
     ##
     ## @table @asis
     ## @item @qcode{'Zone'}
@@ -2378,6 +2391,13 @@ classdef Drawing
     ## right: a letter, @qcode{'A'}; a common datum of two features,
     ## @qcode{'A-B'}; or letters whose order does not matter, @qcode{'AB'}.  A
     ## datum's own material condition follows its letter: @qcode{'B(M)'}.
+    ## @item @qcode{'Note'}
+    ## A remark written above the frame, such as @qcode{'6x'},
+    ## @qcode{'6 holes'} or @qcode{'common zone'}.
+    ## @item @qcode{'AllAround'}
+    ## @code{true} draws a circle at the leader's first bend, for a tolerance
+    ## that applies all around the outline; the leader then needs three points
+    ## or more.
     ## @end table
     ##
     ## The frame refuses what ISO 1101 does not allow in it.  Straightness,
@@ -2399,10 +2419,10 @@ classdef Drawing
     ##
     ## @example
     ## @group
-    ## D = draw.Drawing ().tolframe ([0, 0], 'position', 0.1, ...
-    ##                               'Zone', 'diameter', ...
-    ##                               'Modifiers', @{'M'@}, ...
-    ##                               'Datums', @{'A', 'B', 'C'@});
+    ## D = draw.Drawing ().circle ([0, 0], 4);
+    ## D = D.tolframe ([2.8, 2.8; 10, 10; 14, 10], 'position', 0.1, ...
+    ##                 'Zone', 'diameter', 'Modifiers', @{'M'@}, ...
+    ##                 'Datums', @{'A', 'B', 'C'@}, 'Note', '4x');
     ## @end group
     ## @end example
     ##
@@ -2413,30 +2433,37 @@ classdef Drawing
       if (nargin < 4)
         error ("draw.Drawing.tolframe: invalid number of input arguments.");
       endif
-      errmsg = checkpt (P);
+      errmsg = checkpts (P);
       if (! isempty (errmsg))
         error ("draw.Drawing.tolframe: P %s", errmsg);
       endif
-      names = {'straightness', 'flatness', 'circularity', 'cylindricity', ...
-               'lineprofile', 'surfaceprofile', 'parallelism', ...
-               'perpendicularity', 'angularity', 'position', 'coaxiality', ...
-               'concentricity', 'symmetry', 'runout', 'totalrunout'};
-      if (! (ischar (CHAR) && isrow (CHAR) && any (strcmpi (CHAR, names))))
-        error (strcat ("draw.Drawing.tolframe: CHAR must name a", ...
-                       " characteristic of ISO 1101."));
+      ## One frame, or two stacked, each option then a cell of two
+      if (iscell (CHAR))
+        if (! (iscellstr (CHAR) && numel (CHAR) == 2))
+          error (strcat ("draw.Drawing.tolframe: CHAR must name a", ...
+                         " characteristic of ISO 1101, or two in a cell", ...
+                         " for frames stacked."));
+        endif
+        nf = 2;
+        CHAR = CHAR(:)';
+      else
+        nf = 1;
+        CHAR = {CHAR};
       endif
-      CHAR = lower (CHAR);
-      if (! (isnumeric (VALUE) && isreal (VALUE) && isscalar (VALUE)
-             && isfinite (VALUE) && VALUE > 0))
-        error ("draw.Drawing.tolframe: VALUE must be a positive real scalar.");
+      if (! (isnumeric (VALUE) && isreal (VALUE) && numel (VALUE) == nf
+             && all (isfinite (VALUE(:))) && all (VALUE(:) > 0)))
+        error (strcat ("draw.Drawing.tolframe: VALUE must be a positive", ...
+                       " real scalar, or two for frames stacked."));
       endif
       if (mod (numel (varargin), 2) != 0)
         error (strcat ("draw.Drawing.tolframe: Name/Value arguments must", ...
                        " come in pairs."));
       endif
-      ZONE = '';
-      MODS = {};
-      DATUMS = {};
+      ZONE = repmat ({''}, 1, nf);
+      MODS = repmat ({{}}, 1, nf);
+      DATUMS = repmat ({{}}, 1, nf);
+      NOTE = '';
+      ALLAROUND = false;
       for ii = 1:2:numel (varargin)
         name = varargin{ii};
         val = varargin{ii+1};
@@ -2445,74 +2472,62 @@ classdef Drawing
                          " character vectors."));
         endif
         switch (lower (name))
-          case 'zone'
-            if (! (ischar (val) && isrow (val) && strcmpi (val, 'diameter')))
+          case {'zone', 'modifiers', 'datums'}
+            ## A frame's option as given, or two in a cell for frames stacked
+            if (nf == 2)
+              if (! (iscell (val) && numel (val) == 2))
+                error (strcat ("draw.Drawing.tolframe: %s must be a cell", ...
+                               " of two for frames stacked."), name);
+              endif
+              val = val(:)';
+            elseif (strcmpi (name, 'zone') && isempty (val))
               error ("draw.Drawing.tolframe: Zone must be 'diameter'.");
+            else
+              val = {val};
             endif
-            ZONE = 'diameter';
-          case 'modifiers'
-            if (! (iscellstr (val) && all (ismember (upper (val), ...
-                                                     {'M', 'L', 'P'})))
-                || numel (unique (upper (val))) != numel (val))
-              error (strcat ("draw.Drawing.tolframe: Modifiers must be a", ...
-                             " cell of distinct 'M', 'L' and 'P'."));
+            switch (lower (name))
+              case 'zone'
+                ZONE = val;
+              case 'modifiers'
+                MODS = val;
+              otherwise
+                DATUMS = val;
+            endswitch
+          case 'note'
+            if (! (ischar (val) && isrow (val)))
+              error (strcat ("draw.Drawing.tolframe: Note must be a", ...
+                             " non-empty character vector."));
             endif
-            MODS = upper (val(:)');
-          case 'datums'
-            if (! (iscellstr (val) && numel (val) <= 3
-                   && all (! cellfun (@isempty, regexp (val, ...
-                                '^([A-Z]+|[A-Z]-[A-Z])(\([ML]\))?$', 'once')))))
-              error (strcat ("draw.Drawing.tolframe: Datums must be a cell", ...
-                             " of at most three datum compartments, such", ...
-                             " as 'A', 'A-B', 'AB' or 'B(M)'."));
+            NOTE = val;
+          case 'allaround'
+            if (! (islogical (val) && isscalar (val)))
+              error (strcat ("draw.Drawing.tolframe: AllAround must be a", ...
+                             " logical scalar."));
             endif
-            DATUMS = val(:)';
+            ALLAROUND = val;
           otherwise
             error ("draw.Drawing.tolframe: unknown option '%s'.", name);
         endswitch
       endfor
+      if (ALLAROUND && rows (P) < 3)
+        error (strcat ("draw.Drawing.tolframe: AllAround needs a leader", ...
+                       " with a bend, three points or more."));
+      endif
 
-      ## What ISO 1101 allows in one frame
-      single = {'straightness', 'flatness', 'circularity', 'cylindricity'};
-      related = {'parallelism', 'perpendicularity', 'angularity', ...
-                 'coaxiality', 'concentricity', 'symmetry', 'runout', ...
-                 'totalrunout'};
-      if (any (strcmp (CHAR, single)) && ! isempty (DATUMS))
-        error ("draw.Drawing.tolframe: %s takes no datum.", CHAR);
-      endif
-      if (any (strcmp (CHAR, related)) && isempty (DATUMS))
-        error ("draw.Drawing.tolframe: %s needs a datum.", CHAR);
-      endif
-      if (! isempty (ZONE)
-          && ! any (strcmp (CHAR, {'straightness', 'parallelism', ...
-                                   'perpendicularity', 'angularity', ...
-                                   'position', 'coaxiality', ...
-                                   'concentricity'})))
-        error ("draw.Drawing.tolframe: Zone 'diameter' is not for %s.", CHAR);
-      endif
-      if (all (ismember ({'M', 'L'}, MODS)))
-        error ("draw.Drawing.tolframe: Modifiers takes M or L, not both.");
-      endif
-      if (any (ismember ({'M', 'L'}, MODS))
-          && any (strcmp (CHAR, {'flatness', 'circularity', 'cylindricity', ...
-                                 'lineprofile', 'surfaceprofile', ...
-                                 'runout', 'totalrunout'})))
-        error (strcat ("draw.Drawing.tolframe: M and L are for axes and", ...
-                       " median planes, not for %s."), CHAR);
-      endif
-      if (any (strcmp ('P', MODS))
-          && ! any (strcmp (CHAR, {'parallelism', 'perpendicularity', ...
-                                   'angularity', 'position', 'coaxiality', ...
-                                   'concentricity', 'symmetry'})))
-        error (strcat ("draw.Drawing.tolframe: P is for tolerances of", ...
-                       " orientation and location, not for %s."), CHAR);
-      endif
+      R = struct ('char', {}, 'value', {}, 'zone', {}, 'modifiers', {}, ...
+                  'datums', {});
+      for k = 1:nf
+        [row, errmsg] = framerow (CHAR{k}, VALUE(k), ZONE{k}, MODS{k}, ...
+                                  DATUMS{k});
+        if (! isempty (errmsg))
+          error ("draw.Drawing.tolframe: %s", errmsg);
+        endif
+        R(k) = row;
+      endfor
 
       e = makeentity ('tolframe', pen (this));
       e.pts = P;
-      e.frame = struct ('char', CHAR, 'value', double (VALUE), ...
-                        'zone', ZONE, 'modifiers', {MODS}, ...
-                        'datums', {DATUMS});
+      e.frame = struct ('rows', R, 'note', NOTE, 'allaround', ALLAROUND);
       this.Entities(end+1) = e;
 
     endfunction
@@ -5893,20 +5908,144 @@ function parts = explodeleader (e, scale)
 
 endfunction
 
-## A tolerance frame: its compartments, the symbol of its characteristic and
-## its modifier circles drawn as lines and arcs on the grid of ISO 7083, whose
-## spacing is the thickness of line, a tenth of the text height, and the
-## frame twenty of it tall; the value and the datum letters as text.  P is
-## the middle of its left end.
+## One row of a tolerance frame, validated, and checked against what ISO
+## 1101 allows in a frame, as the struct the frame keeps; ERRMSG the body of
+## the error when it is not.  ZONE is '' for none, MODS and DATUMS cells.
+function [row, errmsg] = framerow (CHAR, VALUE, ZONE, MODS, DATUMS)
+
+  row = struct ('char', '', 'value', [], 'zone', '', 'modifiers', {{}}, ...
+                'datums', {{}});
+  errmsg = '';
+  names = {'straightness', 'flatness', 'circularity', 'cylindricity', ...
+           'lineprofile', 'surfaceprofile', 'parallelism', ...
+           'perpendicularity', 'angularity', 'position', 'coaxiality', ...
+           'concentricity', 'symmetry', 'runout', 'totalrunout'};
+  if (! (ischar (CHAR) && isrow (CHAR) && any (strcmpi (CHAR, names))))
+    errmsg = "CHAR must name a characteristic of ISO 1101.";
+    return;
+  endif
+  CHAR = lower (CHAR);
+  if (! (isempty (ZONE)
+         || (ischar (ZONE) && isrow (ZONE) && strcmpi (ZONE, 'diameter'))))
+    errmsg = "Zone must be 'diameter'.";
+    return;
+  endif
+  if (! (iscellstr (MODS) && all (ismember (upper (MODS), {'M', 'L', 'P'}))
+         && numel (unique (upper (MODS))) == numel (MODS)))
+    errmsg = "Modifiers must be a cell of distinct 'M', 'L' and 'P'.";
+    return;
+  endif
+  MODS = upper (MODS(:)');
+  if (! (iscellstr (DATUMS) && numel (DATUMS) <= 3
+         && all (! cellfun (@isempty, regexp (DATUMS, ...
+                     '^([A-Z]+|[A-Z]-[A-Z])(\([ML]\))?$', 'once')))))
+    errmsg = strcat ("Datums must be a cell of at most three datum", ...
+                     " compartments, such as 'A', 'A-B', 'AB' or 'B(M)'.");
+    return;
+  endif
+  single = {'straightness', 'flatness', 'circularity', 'cylindricity'};
+  related = {'parallelism', 'perpendicularity', 'angularity', ...
+             'coaxiality', 'concentricity', 'symmetry', 'runout', ...
+             'totalrunout'};
+  if (any (strcmp (CHAR, single)) && ! isempty (DATUMS))
+    errmsg = sprintf ("%s takes no datum.", CHAR);
+  elseif (any (strcmp (CHAR, related)) && isempty (DATUMS))
+    errmsg = sprintf ("%s needs a datum.", CHAR);
+  elseif (! isempty (ZONE)
+          && ! any (strcmp (CHAR, {'straightness', 'parallelism', ...
+                                   'perpendicularity', 'angularity', ...
+                                   'position', 'coaxiality', ...
+                                   'concentricity'})))
+    errmsg = sprintf ("Zone 'diameter' is not for %s.", CHAR);
+  elseif (all (ismember ({'M', 'L'}, MODS)))
+    errmsg = "Modifiers takes M or L, not both.";
+  elseif (any (ismember ({'M', 'L'}, MODS))
+          && any (strcmp (CHAR, {'flatness', 'circularity', ...
+                                 'cylindricity', 'lineprofile', ...
+                                 'surfaceprofile', 'runout', ...
+                                 'totalrunout'})))
+    errmsg = sprintf (strcat ("M and L are for axes and median planes,", ...
+                              " not for %s."), CHAR);
+  elseif (any (strcmp ('P', MODS))
+          && ! any (strcmp (CHAR, {'parallelism', 'perpendicularity', ...
+                                   'angularity', 'position', 'coaxiality', ...
+                                   'concentricity', 'symmetry'})))
+    errmsg = sprintf (strcat ("P is for tolerances of orientation and", ...
+                              " location, not for %s."), CHAR);
+  endif
+  if (isempty (errmsg))
+    row = struct ('char', CHAR, 'value', double (VALUE), ...
+                  'zone', lower (ZONE), 'modifiers', {MODS}, ...
+                  'datums', {DATUMS(:)'});
+  endif
+
+endfunction
+
+## A tolerance frame: its row or two rows stacked, the second under the
+## first and aligned with it at the left, as ISO 1101 stacks them; its leader
+## from the feature, ticked there as a leader is, to the end of the frame
+## that faces it; its note above it; and the circle of all-around at the
+## leader's first bend.  The frame stands at the leader's last point, or at
+## the one point given for a frame standing free, the middle of its end.
 function parts = explodetolframe (e, scale)
+
+  h = 2.5 * scale;
+  H = 2 * h;
+  P = e.pts;
+  F = e.frame;
+  [parts, W] = framerowparts (e, F.rows(1), scale);
+  for k = 2:numel (F.rows)
+    p2 = framerowparts (e, F.rows(k), scale);
+    for m = 1:numel (p2)
+      p2(m).pts(:,2) -= (k - 1) * H;
+    endfor
+    parts = [parts, p2];
+  endfor
+  ## The end of the frame facing a leader that comes in from the right
+  fromright = rows (P) >= 2 && P(end-1,1) > P(end,1);
+  d = P(end,:) - [fromright * W, 0];
+  for m = 1:numel (parts)
+    parts(m).pts += d;
+  endfor
+  if (! isempty (F.note))
+    t = mkent ('TEXT', e, [d(1), P(end,2) + h + 0.8 * scale]);
+    t.text = F.note;
+    t.height = h;
+    parts(end+1) = t;
+  endif
+  if (rows (P) >= 2)
+    tick = 1.25 * scale;
+    parts(end+1) = mkent ('POLYLINE', e, P);
+    v = P(2,:) - P(1,:);
+    if (norm (v) > 0)
+      v /= norm (v);
+      n = [-v(2), v(1)];
+      parts(end+1) = mkent ('LINE', e, [P(1,:); P(1,:) + tick * (v + n / 2)]);
+      parts(end+1) = mkent ('LINE', e, [P(1,:); P(1,:) + tick * (v - n / 2)]);
+    endif
+  endif
+  if (F.allaround)
+    c = mkent ('CIRCLE', e, P(2,:));
+    c.radius = 0.7 * h;
+    parts(end+1) = c;
+  endif
+
+endfunction
+
+## One row of a tolerance frame, F, with the middle of its left end at the
+## origin: its compartments, the symbol of its characteristic and its
+## modifier circles drawn as lines and arcs on the grid of ISO 7083, whose
+## spacing is the thickness of line, a tenth of the text height, and the
+## frame twenty of it tall; the value and the datum letters as text.  W is
+## its width.
+function [parts, W] = framerowparts (e, f, scale)
 
   h = 2.5 * scale;
   H = 2 * h;
   u = H / 20;
   gap = max (2 * u, 0.7 * scale);
-  f = e.frame;
-  x0 = e.pts(1);
-  y0 = e.pts(2) - h;
+  x0 = 0;
+  y0 = -h;
   base = y0 + h / 2;
   parts = repmat (mkent ('LINE', e, [0, 0; 0, 0]), 1, 0);
 
@@ -5975,6 +6114,7 @@ function parts = explodetolframe (e, scale)
   for k = 2:numel (stops) - 1
     parts(end+1) = mkent ('LINE', e, [stops(k), y0; stops(k), y0 + H]);
   endfor
+  W = stops(end) - stops(1);
 
 endfunction
 
