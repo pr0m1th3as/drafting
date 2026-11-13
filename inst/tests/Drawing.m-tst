@@ -2629,6 +2629,7 @@
 %!                                           'AllAround', true));
 %! C = E(strcmp ({E.type}, 'CIRCLE'));
 %! assert_equal (C.pts, [10, 10]);
+%! assert_equal (C.radius, 1.25, 1e-12);
 
 %!test  # two frames stacked, the second under the first, aligned at the left
 %! D = draw.Drawing ().tolframe ([0, 0], {'circularity', 'parallelism'}, ...

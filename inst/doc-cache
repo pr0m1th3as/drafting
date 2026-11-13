@@ -1958,7 +1958,7 @@ draw.Drawing.tolframe
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 3593
+# length: 3777
 draw.Drawing: D = tolframe (D, P, CHAR, VALUE)
 draw.Drawing: D = tolframe (..., Name, Value, ...)
 Append a tolerance frame: a geometrical tolerance as ISO 1101 writes it.
@@ -2011,7 +2011,9 @@ A remark written above the frame, such as '6x',
 'AllAround'
 true draws a circle at the leader's first bend, for a tolerance
 that applies all around the outline; the leader then needs three points
-or more.
+or more. The circle's radius, half the text height, is the package's
+own choice and not based on an ISO standard: the editions of ISO 1101
+and ISO 7083 this method follows give no size for it.
 
 The frame refuses what ISO 1101 does not allow in it. Straightness,
 flatness, circularity and cylindricity tolerate a single feature and take

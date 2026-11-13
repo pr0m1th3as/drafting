@@ -2397,7 +2397,9 @@ classdef Drawing
     ## @item @qcode{'AllAround'}
     ## @code{true} draws a circle at the leader's first bend, for a tolerance
     ## that applies all around the outline; the leader then needs three points
-    ## or more.
+    ## or more.  The circle's radius, half the text height, is the package's
+    ## own choice and not based on an ISO standard: the editions of ISO 1101
+    ## and ISO 7083 this method follows give no size for it.
     ## @end table
     ##
     ## The frame refuses what ISO 1101 does not allow in it.  Straightness,
@@ -6024,9 +6026,11 @@ function parts = explodetolframe (e, scale)
       parts(end+1) = mkent ('LINE', e, [P(1,:); P(1,:) + tick * (v - n / 2)]);
     endif
   endif
+  ## The circle of all-around at half the text height in radius, a size of
+  ## the package's own: the ISO editions this follows give none
   if (F.allaround)
     c = mkent ('CIRCLE', e, P(2,:));
-    c.radius = 0.7 * h;
+    c.radius = 0.5 * h;
     parts(end+1) = c;
   endif
 
