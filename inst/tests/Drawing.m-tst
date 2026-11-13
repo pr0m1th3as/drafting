@@ -33,7 +33,7 @@
 %!               'angles'; 'angle'; ...
 %!               'text'; 'height'; 'offset'; 'direction'; 'pattern'; ...
 %!               'spacing'; 'block'; 'scale'; 'bulge'; 'shape'; ...
-%!               'decimals'; 'tolerance'; 'form'; 'frame'});
+%!               'decimals'; 'tolerance'; 'form'; 'frame'; 'exact'});
 %!error<draw.Drawing: NAME must be a non-empty character vector.> ...
 %! draw.Drawing (42)
 %!error<draw.Drawing: NAME must be a non-empty character vector.> ...
@@ -497,7 +497,7 @@
 %! D = D.arc ([0, 0], 1, 0, 90).circle ([0, 0], 2).text ([0, 0], 'A');
 %! D = D.hatch (geom.Region ([0, 0; 1, 0; 1, 1])).dim ([0, 0], [1, 0], 5);
 %! assert_equal (numel (D.Entities), 7);
-%! assert_equal (numel (fieldnames (D.Entities)), 24);
+%! assert_equal (numel (fieldnames (D.Entities)), 25);
 %! assert_equal ({D.Entities.type}, {'line', 'polyline', 'arc', 'circle', ...
 %!                                   'text', 'hatch', 'dim'});
 
@@ -2783,6 +2783,167 @@
 %!error<draw.Drawing.tolframe: P is for tolerances of orientation and location, not for runout.> ...
 %! draw.Drawing ().tolframe ([0, 0], 'runout', 0.1, 'Modifiers', {'P'}, ...
 %!                           'Datums', {'A'})
+
+%!test  # a dimension is not exact unless asked
+%! D = draw.Drawing ().dim ([0, 0], [40, 0], 10);
+%! assert_equal (D.Entities.exact, false);
+%! assert_equal (D.Entities.frame, []);
+
+%!test  # an exact dimension's value stands in a box twice the text height
+%! D = draw.Drawing ().dim ([0, 0], [40, 0], 10, 'Exact', true);
+%! assert_equal (D.Entities.exact, true);
+%! E = frameparts (D);
+%! B = E(strcmp ({E.type}, 'POLYLINE'));
+%! assert_equal (B.closed, true);
+%! assert_equal (B.pts, [16.625, 10.8; 23.375, 10.8; 23.375, 15.8; ...
+%!                       16.625, 15.8], 1e-12);
+%! T = E(strcmp ({E.type}, 'TEXT'));
+%! assert_equal (T.pts, [18.5, 12.05], 1e-12);
+
+%!test  # the box clears a dimension line drawn above it
+%! E = frameparts (draw.Drawing ().dim ([0, 0], [40, 0], -10, 'Exact', true));
+%! B = E(strcmp ({E.type}, 'POLYLINE'));
+%! assert_equal ([min(B.pts(:,2)), max(B.pts(:,2))], [-15.8, -10.8], 1e-12);
+
+%!test  # an exact diameter is boxed where its text stood
+%! E = frameparts (draw.Drawing ().diam ([0, 0], 5, 'Exact', true));
+%! B = E(strcmp ({E.type}, 'POLYLINE'));
+%! P = 5 * [cosd(45), sind(45)] + [0, 1.25 * sqrt(2)];
+%! assert_equal (B.pts, P + [0, 0; 8.25, 0; 8.25, 5; 0, 5], 1e-12);
+%! T = E(strcmp ({E.type}, 'TEXT'));
+%! assert_equal (T.pts, P + [1.875, 1.25], 1e-12);
+
+%!test  # an exact radius is boxed where its text stood
+%! D = draw.Drawing ().radius ([0, 0], 5, 'Exact', true);
+%! assert_equal (D.Entities.exact, true);
+%! E = frameparts (D);
+%! B = E(strcmp ({E.type}, 'POLYLINE'));
+%! P = 5 * [cosd(45), sind(45)] + [0, 1.25 * sqrt(2)];
+%! assert_equal (B.pts, P + [0, 0; 6.75, 0; 6.75, 5; 0, 5], 1e-12);
+%! T = E(strcmp ({E.type}, 'TEXT'));
+%! assert_equal ({T.text, T.pts}, {'R5', P + [1.875, 1.25]}, 1e-12);
+
+%!test  # an exact angle is boxed where its text stood
+%! D = draw.Drawing ().angdim ([0, 0], [10, 0], [0, 10], 8, 'Exact', true);
+%! E = frameparts (D);
+%! B = E(strcmp ({E.type}, 'POLYLINE'));
+%! P = 9.25 * [cosd(45), sind(45)];
+%! assert_equal (B.pts, P + [0, 0; 8.25, 0; 8.25, 5; 0, 5], 1e-12);
+%! T = E(strcmp ({E.type}, 'TEXT'));
+%! assert_equal (T.pts, P + [1.875, 1.25], 1e-12);
+
+%!test  # an exact ordinate is boxed past the end of its leader
+%! D = draw.Drawing ().ordinate ([0, 0], [20, 15], 'x', [20, -10], ...
+%!                               'Exact', true);
+%! E = frameparts (D);
+%! P = E(strcmp ({E.type}, 'POLYLINE'));
+%! B = P([P.closed]);
+%! assert_equal ([min(B.pts); max(B.pts)], [16.625, -15.8; 23.375, -10.8], ...
+%!               1e-12);
+%! T = E(strcmp ({E.type}, 'TEXT'));
+%! assert_equal (T.pts, [18.5, -14.55], 1e-12);
+
+%!test  # a frame on a dimension keeps its record
+%! D = draw.Drawing ().dim ([0, 0], [40, 0], -10, ...
+%!                          'Frame', {'position', 0.1, 'Datums', {'A'}});
+%! assert_equal (D.Entities.frame.rows.char, 'position');
+%! assert_equal (D.Entities.frame.rows.datums, {'A'});
+
+%!test  # a frame goes under a label below the dimension line
+%! D = draw.Drawing ().dim ([0, 0], [40, 0], -10, 'Frame', {'flatness', 0.02});
+%! E = frameparts (D);
+%! F = E(strcmp ({E.type}, 'POLYLINE')).pts;
+%! assert_equal ([min(F(:,1)), min(F(:,2)), max(F(:,2))], ...
+%!               [18.5, -19.1, -14.1], 1e-12);
+
+%!test  # and over a label above it, so it never crosses the line
+%! D = draw.Drawing ().dim ([0, 0], [40, 0], 10, 'Frame', {'flatness', 0.02});
+%! E = frameparts (D);
+%! F = E(strcmp ({E.type}, 'POLYLINE')).pts;
+%! assert_equal ([min(F(:,1)), min(F(:,2)), max(F(:,2))], ...
+%!               [18.5, 14.1, 19.1], 1e-12);
+
+%!test  # a frame clears an exact dimension's box
+%! D = draw.Drawing ().dim ([0, 0], [40, 0], 10, 'Exact', true, ...
+%!                          'Frame', {'flatness', 0.02});
+%! E = frameparts (D);
+%! P = E(strcmp ({E.type}, 'POLYLINE'));
+%! assert_equal ([max(P(1).pts(:,2)), min(P(2).pts(:,2))], [15.8, 16.6], ...
+%!               1e-12);
+
+%!test  # two frames stack under a dimension
+%! D = draw.Drawing ().dim ([0, 0], [40, 0], -10, 'Frame', ...
+%!                          {{'flatness', 'straightness'}, [0.02, 0.01]});
+%! E = frameparts (D);
+%! P = E(strcmp ({E.type}, 'POLYLINE'));
+%! assert_equal ([max(P(1).pts(:,2)), min(P(2).pts(:,2))], [-14.1, -24.1], ...
+%!               1e-12);
+
+%!test  # a diameter's frame goes over its text when the line comes up to it
+%! D = draw.Drawing ().diam ([0, 0], 5, 'Frame', ...
+%!                           {'straightness', 0.02, 'Zone', 'diameter'});
+%! E = frameparts (D);
+%! F = E(strcmp ({E.type}, 'POLYLINE')).pts;
+%! P = 5 * [cosd(45), sind(45)] + [0, 1.25 * sqrt(2)];
+%! assert_equal ([min(F(:,1)), min(F(:,2)), max(F(:,2))], ...
+%!               [P(1), P(2) + 3.3, P(2) + 8.3], 1e-12);
+
+%!test  # and under it when the line comes down to it
+%! D = draw.Drawing ().diam ([0, 0], 5, 'Angle', 315, 'Frame', ...
+%!                           {'straightness', 0.02, 'Zone', 'diameter'});
+%! E = frameparts (D);
+%! F = E(strcmp ({E.type}, 'POLYLINE')).pts;
+%! P = 5 * [cosd(315), sind(315)] + [1.25 * sqrt(2), 0];
+%! assert_equal ([min(F(:,1)), min(F(:,2)), max(F(:,2))], ...
+%!               [P(1), P(2) - 5.8, P(2) - 0.8], 1e-12);
+
+%!test  # over the text, the frame clears the deviations of a class
+%! D = draw.Drawing ().diam ([0, 0], 8, 'Tolerance', 'H7', 'Frame', ...
+%!                           {'position', 0.05, 'Zone', 'diameter', ...
+%!                            'Datums', {'A'}});
+%! E = frameparts (D);
+%! F = E(strcmp ({E.type}, 'POLYLINE')).pts;
+%! T = E(strcmp ({E.type}, 'TEXT'));
+%! low = min (F(:,2));
+%! assert_equal (all (arrayfun (@(t) t.pts(2) + t.height, T) <= low ...
+%!                    | arrayfun (@(t) t.pts(2), T) >= low), true);
+
+%!error<draw.Drawing.dim: Exact must be a logical scalar.> ...
+%! draw.Drawing ().dim ([0, 0], [40, 0], 10, 'Exact', 1)
+%!error<draw.Drawing.dim: Exact takes no Tolerance: a theoretically exact dimension is not toleranced.> ...
+%! draw.Drawing ().dim ([0, 0], [40, 0], 10, 'Exact', true, 'Tolerance', 0.1)
+%!error<draw.Drawing.diam: Exact must be a logical scalar.> ...
+%! draw.Drawing ().diam ([0, 0], 5, 'Exact', 'yes')
+%!error<draw.Drawing.diam: Exact takes no Tolerance: a theoretically exact dimension is not toleranced.> ...
+%! draw.Drawing ().diam ([0, 0], 5, 'Exact', true, 'Tolerance', 'H7')
+%!error<draw.Drawing.angdim: Exact must be a logical scalar.> ...
+%! draw.Drawing ().angdim ([0, 0], [10, 0], [0, 10], 8, 'Exact', [true, true])
+%!error<draw.Drawing.angdim: Exact takes no Tolerance: a theoretically exact dimension is not toleranced.> ...
+%! draw.Drawing ().angdim ([0, 0], [10, 0], [0, 10], 8, 'Exact', true, ...
+%!                         'Tolerance', 0.5)
+%!error<draw.Drawing.ordinate: Exact must be a logical scalar.> ...
+%! draw.Drawing ().ordinate ([0, 0], [20, 15], 'x', [20, -10], 'Exact', 0)
+%!error<draw.Drawing.ordinate: Exact takes no Tolerance: a theoretically exact dimension is not toleranced.> ...
+%! draw.Drawing ().ordinate ([0, 0], [20, 15], 'x', [20, -10], ...
+%!                           'Exact', true, 'Tolerance', 0.1)
+%!error<draw.Drawing.radius: Exact takes no Tolerance: a theoretically exact dimension is not toleranced.> ...
+%! draw.Drawing ().radius ([0, 0], 5, 'Exact', true, 'Tolerance', 'max')
+%!error<draw.Drawing.radius: Frame is not available for a radius.> ...
+%! draw.Drawing ().radius ([0, 0], 5, 'Frame', {'flatness', 0.02})
+%!error<draw.Drawing.dim: Frame must be a cell {CHAR, VALUE, Name, Value, ...}.> ...
+%! draw.Drawing ().dim ([0, 0], [40, 0], 10, 'Frame', 'flatness')
+%!error<draw.Drawing.dim: Frame must be a cell {CHAR, VALUE, Name, Value, ...}.> ...
+%! draw.Drawing ().dim ([0, 0], [40, 0], 10, 'Frame', {'flatness'})
+%!error<draw.Drawing.dim: Frame: parallelism needs a datum.> ...
+%! draw.Drawing ().dim ([0, 0], [40, 0], 10, 'Frame', {'parallelism', 0.1})
+%!error<draw.Drawing.diam: Frame: a frame on a dimension takes no Note or AllAround.> ...
+%! draw.Drawing ().diam ([0, 0], 5, 'Frame', {'flatness', 0.02, 'Note', '2x'})
+%!error<draw.Drawing.diam: Frame: a frame on a dimension takes no Note or AllAround.> ...
+%! draw.Drawing ().diam ([0, 0], 5, 'Frame', {'flatness', 0.02, ...
+%!                                            'AllAround', true})
+%!error<draw.Drawing.angdim: unknown option 'Frame'.> ...
+%! draw.Drawing ().angdim ([0, 0], [10, 0], [0, 10], 8, ...
+%!                         'Frame', {'flatness', 0.02})
 
 %!test  # a limit in one direction is text in the dimension record
 %! D = draw.Drawing ().dim ([0, 0], [30.5, 0], 5, 'Tolerance', 'min');

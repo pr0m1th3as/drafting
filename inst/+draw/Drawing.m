@@ -271,7 +271,7 @@ classdef Drawing
                        'pattern', {}, 'spacing', {}, 'block', {}, ...
                        'scale', {}, 'bulge', {}, 'shape', {}, ...
                        'decimals', {}, 'tolerance', {}, 'form', {}, ...
-                       'frame', {});
+                       'frame', {}, 'exact', {});
 
   endproperties
 
@@ -1751,6 +1751,8 @@ classdef Drawing
     ## @deftypefnx {draw.Drawing} {@var{D} =} dim (@dots{}, @qcode{'Decimals'}, @var{N})
     ## @deftypefnx {draw.Drawing} {@var{D} =} dim (@dots{}, @qcode{'Tolerance'}, @var{T})
     ## @deftypefnx {draw.Drawing} {@var{D} =} dim (@dots{}, @qcode{'Form'}, @var{FORM})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} dim (@dots{}, @qcode{'Exact'}, @var{TF})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} dim (@dots{}, @qcode{'Frame'}, @var{F})
     ##
     ## Append a dimension measuring between @var{P1} and @var{P2}.
     ##
@@ -1822,6 +1824,27 @@ classdef Drawing
     ## text, and the deviations or limits of a class are figures that do not
     ## follow a size changed in another program.
     ##
+    ## The option @qcode{'Exact'} set to @code{true} makes the dimension
+    ## theoretically exact, as ISO 1101 calls a size that locates, orients or
+    ## shapes a tolerance zone: its value is written in a rectangular frame as
+    ## tall as a tolerance frame, as ISO 7083 draws it.  A theoretically exact
+    ## dimension has no tolerance: it takes no @qcode{'Tolerance'}, and the
+    ## general tolerance of the title block does not apply to it.  How far the
+    ## feature may stray is stated by the tolerance frames that refer to it.
+    ##
+    ## The option @qcode{'Frame'} gives the feature the dimension sizes a
+    ## geometrical tolerance, @var{F} a cell
+    ## @code{@{@var{CHAR}, @var{VALUE}, @var{Name}, @var{Value}, @dots{}@}}
+    ## holding the arguments of @code{tolframe} after the path: the
+    ## characteristic, the value, and the options @qcode{'Zone'},
+    ## @qcode{'Modifiers'} and @qcode{'Datums'}, two of each for frames
+    ## stacked.  It takes no @qcode{'Note'} or @qcode{'AllAround'}, which
+    ## belong to a frame on a leader.  A frame shown with a dimension applies,
+    ## as ISO 1101 reads it, to the feature of size, its axis or median plane,
+    ## and not to its surface.  It stands by the label on the side away from
+    ## the dimension line, above a label above the line and under any other,
+    ## so that it never crosses the line.
+    ##
     ## @end deftypefn
     function this = dim (this, P1, P2, OFFSET, varargin)
 
@@ -1850,6 +1873,8 @@ classdef Drawing
       HASTOL = false;
       FORM = '';
       HASFORM = false;
+      FRAMEARG = {};
+      EXACT = false;
       if (mod (numel (varargin), 2) != 0)
         error ("draw.Drawing.dim: Name/Value arguments must come in pairs.");
       endif
@@ -1883,6 +1908,16 @@ classdef Drawing
           case 'form'
             FORM = varargin{ii+1};
             HASFORM = true;
+          case 'exact'
+            EXACT = varargin{ii+1};
+            if (! (islogical (EXACT) && isscalar (EXACT)))
+              error ("draw.Drawing.dim: Exact must be a logical scalar.");
+            endif
+          case 'frame'
+            FRAMEARG = varargin{ii+1};
+            if (! (iscell (FRAMEARG) && numel (FRAMEARG) >= 2))
+              FRAMEARG = 'bad';
+            endif
           otherwise
             error ("draw.Drawing.dim: unknown option '%s'.", name);
         endswitch
@@ -1922,6 +1957,15 @@ classdef Drawing
       if (! isempty (errmsg))
         error ("draw.Drawing.dim: %s", errmsg);
       endif
+      if (EXACT && ! isempty (TOL))
+        error (strcat ("draw.Drawing.%s: Exact takes no Tolerance: a", ...
+                       " theoretically exact dimension is not toleranced."), ...
+               'dim');
+      endif
+      [FRAME, errmsg] = dimframe (FRAMEARG);
+      if (! isempty (errmsg))
+        error ("draw.Drawing.%s: %s", 'dim', errmsg);
+      endif
 
       e = makeentity ('dim', pen (this));
       e.pts = [P1; P2];
@@ -1931,6 +1975,8 @@ classdef Drawing
       e.decimals = DECIMALS;
       e.tolerance = TOL;
       e.form = FORM;
+      e.exact = EXACT;
+      e.frame = FRAME;
       this.Entities(end+1) = e;
 
     endfunction
@@ -1942,6 +1988,8 @@ classdef Drawing
     ## @deftypefnx {draw.Drawing} {@var{D} =} diam (@dots{}, @qcode{'Decimals'}, @var{N})
     ## @deftypefnx {draw.Drawing} {@var{D} =} diam (@dots{}, @qcode{'Tolerance'}, @var{T})
     ## @deftypefnx {draw.Drawing} {@var{D} =} diam (@dots{}, @qcode{'Form'}, @var{FORM})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} diam (@dots{}, @qcode{'Exact'}, @var{TF})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} diam (@dots{}, @qcode{'Frame'}, @var{F})
     ##
     ## Append a diameter dimension across a circle.
     ##
@@ -1954,7 +2002,9 @@ classdef Drawing
     ## 0 to 8, in place of the drawing's @code{Decimals}.  The options
     ## @qcode{'Tolerance'} and @qcode{'Form'} are those of @code{dim}, classes
     ## and fit pairs included; each limit of a numeric tolerance carries the
-    ## diameter sign.
+    ## diameter sign.  The options @qcode{'Exact'} and @qcode{'Frame'} are
+    ## those of @code{dim}; the frame stands over the text when the dimension
+    ## line comes up to it and under it otherwise.
     ##
     ## A round feature is dimensioned by its diameter and never by its radius,
     ## because a diameter is what a bore gauge and a micrometer measure.  A
@@ -1980,6 +2030,7 @@ classdef Drawing
     ## @deftypefnx {draw.Drawing} {@var{D} =} radius (@dots{}, @qcode{'Text'}, @var{S})
     ## @deftypefnx {draw.Drawing} {@var{D} =} radius (@dots{}, @qcode{'Decimals'}, @var{N})
     ## @deftypefnx {draw.Drawing} {@var{D} =} radius (@dots{}, @qcode{'Tolerance'}, @var{T})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} radius (@dots{}, @qcode{'Exact'}, @var{TF})
     ##
     ## Append a radius dimension from a centre out to an arc.
     ##
@@ -1988,6 +2039,13 @@ classdef Drawing
     ## the figure.  A radius takes a symmetric tolerance, deviations, or
     ## @qcode{'min'} and @qcode{'max'} (@code{R0.5 max.}), but no limits and
     ## no class.
+    ##
+    ## A radius takes @qcode{'Exact'}, for the arcs of an outline whose shape
+    ## a profile tolerance sets, which ISO 1101 dimensions only with
+    ## theoretically exact values.  It takes no @qcode{'Frame'}: a frame shown
+    ## with a dimension applies to a feature of size, which an arc measured by
+    ## its radius is not, so a tolerance of the arc goes on a leader to its
+    ## surface, with @code{tolframe}.
     ##
     ## Use it for a fillet or any arc that is less than a full circle, where
     ## there is no diameter to measure across.
@@ -2010,6 +2068,7 @@ classdef Drawing
     ## @deftypefnx {draw.Drawing} {@var{D} =} angdim (@dots{}, @qcode{'Decimals'}, @var{N})
     ## @deftypefnx {draw.Drawing} {@var{D} =} angdim (@dots{}, @qcode{'Tolerance'}, @var{T})
     ## @deftypefnx {draw.Drawing} {@var{D} =} angdim (@dots{}, @qcode{'Form'}, @var{FORM})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} angdim (@dots{}, @qcode{'Exact'}, @var{TF})
     ##
     ## Append an angular dimension at a vertex.
     ##
@@ -2022,7 +2081,9 @@ classdef Drawing
     ## @qcode{'Tolerance'} and @qcode{'Form'} are those of @code{dim}, but for
     ## the classes of ISO 286, in degrees, every number carrying the degree
     ## sign:
-    ## @code{15.5@textdegree{} ±0.25@textdegree{}}.
+    ## @code{15.5@textdegree{} ±0.25@textdegree{}}.  The option
+    ## @qcode{'Exact'} is that of @code{dim}: an exact angle, such as the
+    ## angle of a hole on a pitch circle, in its frame.
     ##
     ## The angle measured is the one from the first arm to the second going
     ## counter-clockwise, so giving the arms the other way round dimensions the
@@ -2053,6 +2114,8 @@ classdef Drawing
       HASTOL = false;
       FORM = '';
       HASFORM = false;
+      FRAMEARG = {};
+      EXACT = false;
       if (mod (numel (varargin), 2) != 0)
         error ("draw.Drawing.angdim: Name/Value arguments must come in pairs.");
       endif
@@ -2085,6 +2148,11 @@ classdef Drawing
           case 'form'
             FORM = varargin{ii+1};
             HASFORM = true;
+          case 'exact'
+            EXACT = varargin{ii+1};
+            if (! (islogical (EXACT) && isscalar (EXACT)))
+              error ("draw.Drawing.angdim: Exact must be a logical scalar.");
+            endif
           otherwise
             error ("draw.Drawing.angdim: unknown option '%s'.", name);
         endswitch
@@ -2105,6 +2173,11 @@ classdef Drawing
       if (! isempty (errmsg))
         error ("draw.Drawing.angdim: %s", errmsg);
       endif
+      if (EXACT && ! isempty (TOL))
+        error (strcat ("draw.Drawing.%s: Exact takes no Tolerance: a", ...
+                       " theoretically exact dimension is not toleranced."), ...
+               'angdim');
+      endif
       e = makeentity ('angdim', pen (this));
       e.pts = [V(:)'; P1(:)'; P2(:)'];
       e.radius = RAD;
@@ -2112,6 +2185,7 @@ classdef Drawing
       e.decimals = DECIMALS;
       e.tolerance = TOL;
       e.form = FORM;
+      e.exact = EXACT;
       this.Entities(end+1) = e;
 
     endfunction
@@ -2121,6 +2195,7 @@ classdef Drawing
     ## @deftypefnx {draw.Drawing} {@var{D} =} ordinate (@dots{}, @qcode{'Text'}, @var{S})
     ## @deftypefnx {draw.Drawing} {@var{D} =} ordinate (@dots{}, @qcode{'Decimals'}, @var{N})
     ## @deftypefnx {draw.Drawing} {@var{D} =} ordinate (@dots{}, @qcode{'Tolerance'}, @var{T})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} ordinate (@dots{}, @qcode{'Exact'}, @var{TF})
     ##
     ## Append an ordinate dimension, the distance of a point from a datum.
     ##
@@ -2144,7 +2219,8 @@ classdef Drawing
     ## literal text @var{S} instead, and the option @qcode{'Decimals'} the
     ## places @var{N} the value shows, an integer from 0 to 8, in place of the
     ## drawing's @code{Decimals}.  The option @qcode{'Tolerance'} is that of
-    ## @code{dim}, a symmetric tolerance or deviations only.
+    ## @code{dim}, a symmetric tolerance or deviations only, and the option
+    ## @qcode{'Exact'} is that of @code{dim}.
     ##
     ## @example
     ## @group
@@ -2189,6 +2265,8 @@ classdef Drawing
       HASTOL = false;
       FORM = '';
       HASFORM = false;
+      FRAMEARG = {};
+      EXACT = false;
       if (mod (numel (varargin), 2) != 0)
         error (strcat ("draw.Drawing.ordinate: Name/Value arguments must", ...
                        " come in pairs."));
@@ -2222,6 +2300,11 @@ classdef Drawing
           case 'form'
             FORM = varargin{ii+1};
             HASFORM = true;
+          case 'exact'
+            EXACT = varargin{ii+1};
+            if (! (islogical (EXACT) && isscalar (EXACT)))
+              error ("draw.Drawing.ordinate: Exact must be a logical scalar.");
+            endif
           otherwise
             error ("draw.Drawing.ordinate: unknown option '%s'.", name);
         endswitch
@@ -2241,6 +2324,11 @@ classdef Drawing
       if (! isempty (errmsg))
         error ("draw.Drawing.ordinate: %s", errmsg);
       endif
+      if (EXACT && ! isempty (TOL))
+        error (strcat ("draw.Drawing.%s: Exact takes no Tolerance: a", ...
+                       " theoretically exact dimension is not toleranced."), ...
+               'ordinate');
+      endif
       e = makeentity ('ordinate', pen (this));
       e.pts = [O; P; L];
       e.direction = AXIS;
@@ -2248,6 +2336,7 @@ classdef Drawing
       e.decimals = DECIMALS;
       e.tolerance = TOL;
       e.form = FORM;
+      e.exact = EXACT;
       this.Entities(end+1) = e;
 
     endfunction
@@ -2442,97 +2531,18 @@ classdef Drawing
       if (! isempty (errmsg))
         error ("draw.Drawing.tolframe: P %s", errmsg);
       endif
-      ## One frame, or two stacked, each option then a cell of two
-      if (iscell (CHAR))
-        if (! (iscellstr (CHAR) && numel (CHAR) == 2))
-          error (strcat ("draw.Drawing.tolframe: CHAR must name a", ...
-                         " characteristic of ISO 1101, or two in a cell", ...
-                         " for frames stacked."));
-        endif
-        nf = 2;
-        CHAR = CHAR(:)';
-      else
-        nf = 1;
-        CHAR = {CHAR};
+      [F, errmsg] = framespec (CHAR, VALUE, varargin);
+      if (! isempty (errmsg))
+        error ("draw.Drawing.tolframe: %s", errmsg);
       endif
-      if (! (isnumeric (VALUE) && isreal (VALUE) && numel (VALUE) == nf
-             && all (isfinite (VALUE(:))) && all (VALUE(:) > 0)))
-        error (strcat ("draw.Drawing.tolframe: VALUE must be a positive", ...
-                       " real scalar, or two for frames stacked."));
-      endif
-      if (mod (numel (varargin), 2) != 0)
-        error (strcat ("draw.Drawing.tolframe: Name/Value arguments must", ...
-                       " come in pairs."));
-      endif
-      ZONE = repmat ({''}, 1, nf);
-      MODS = repmat ({{}}, 1, nf);
-      DATUMS = repmat ({{}}, 1, nf);
-      NOTE = '';
-      ALLAROUND = false;
-      for ii = 1:2:numel (varargin)
-        name = varargin{ii};
-        val = varargin{ii+1};
-        if (! ischar (name) || ! isrow (name))
-          error (strcat ("draw.Drawing.tolframe: option names must be", ...
-                         " character vectors."));
-        endif
-        switch (lower (name))
-          case {'zone', 'modifiers', 'datums'}
-            ## A frame's option as given, or two in a cell for frames stacked
-            if (nf == 2)
-              if (! (iscell (val) && numel (val) == 2))
-                error (strcat ("draw.Drawing.tolframe: %s must be a cell", ...
-                               " of two for frames stacked."), name);
-              endif
-              val = val(:)';
-            elseif (strcmpi (name, 'zone') && isempty (val))
-              error ("draw.Drawing.tolframe: Zone must be 'diameter'.");
-            else
-              val = {val};
-            endif
-            switch (lower (name))
-              case 'zone'
-                ZONE = val;
-              case 'modifiers'
-                MODS = val;
-              otherwise
-                DATUMS = val;
-            endswitch
-          case 'note'
-            if (! (ischar (val) && isrow (val)))
-              error (strcat ("draw.Drawing.tolframe: Note must be a", ...
-                             " non-empty character vector."));
-            endif
-            NOTE = val;
-          case 'allaround'
-            if (! (islogical (val) && isscalar (val)))
-              error (strcat ("draw.Drawing.tolframe: AllAround must be a", ...
-                             " logical scalar."));
-            endif
-            ALLAROUND = val;
-          otherwise
-            error ("draw.Drawing.tolframe: unknown option '%s'.", name);
-        endswitch
-      endfor
-      if (ALLAROUND && rows (P) < 3)
+      if (F.allaround && rows (P) < 3)
         error (strcat ("draw.Drawing.tolframe: AllAround needs a leader", ...
                        " with a bend, three points or more."));
       endif
 
-      R = struct ('char', {}, 'value', {}, 'zone', {}, 'modifiers', {}, ...
-                  'datums', {});
-      for k = 1:nf
-        [row, errmsg] = framerow (CHAR{k}, VALUE(k), ZONE{k}, MODS{k}, ...
-                                  DATUMS{k});
-        if (! isempty (errmsg))
-          error ("draw.Drawing.tolframe: %s", errmsg);
-        endif
-        R(k) = row;
-      endfor
-
       e = makeentity ('tolframe', pen (this));
       e.pts = P;
-      e.frame = struct ('rows', R, 'note', NOTE, 'allaround', ALLAROUND);
+      e.frame = F;
       this.Entities(end+1) = e;
 
     endfunction
@@ -4672,7 +4682,7 @@ function e = makeentity (type, p)
               'height', [], 'offset', [], 'direction', '', 'pattern', '', ...
               'spacing', [], 'block', '', 'scale', [], 'bulge', [], ...
               'shape', [], 'decimals', [], 'tolerance', [], 'form', '', ...
-              'frame', []);
+              'frame', [], 'exact', false);
 
 endfunction
 
@@ -4715,6 +4725,8 @@ function e = dimcircle (this, kind, C, R, opts)
   HASTOL = false;
   FORM = '';
   HASFORM = false;
+  FRAMEARG = {};
+  EXACT = false;
   for ii = 1:2:numel (opts)
     name = opts{ii};
     if (! ischar (name) || ! isrow (name))
@@ -4744,6 +4756,16 @@ function e = dimcircle (this, kind, C, R, opts)
       case 'form'
         FORM = opts{ii+1};
         HASFORM = true;
+      case 'exact'
+        EXACT = opts{ii+1};
+        if (! (islogical (EXACT) && isscalar (EXACT)))
+          error ("draw.Drawing.%s: Exact must be a logical scalar.", kind);
+        endif
+      case 'frame'
+        FRAMEARG = opts{ii+1};
+        if (! (iscell (FRAMEARG) && numel (FRAMEARG) >= 2))
+          FRAMEARG = 'bad';
+        endif
       otherwise
         error ("draw.Drawing.%s: unknown option '%s'.", kind, name);
     endswitch
@@ -4764,6 +4786,18 @@ function e = dimcircle (this, kind, C, R, opts)
   if (! isempty (errmsg))
     error ("draw.Drawing.%s: %s", kind, errmsg);
   endif
+  if (strcmp (kind, 'radius') && ! isempty (FRAMEARG))
+    error ("draw.Drawing.radius: Frame is not available for a radius.");
+  endif
+  if (EXACT && ! isempty (TOL))
+    error (strcat ("draw.Drawing.%s: Exact takes no Tolerance: a", ...
+                   " theoretically exact dimension is not toleranced."), ...
+           kind);
+  endif
+  [FRAME, errmsg] = dimframe (FRAMEARG);
+  if (! isempty (errmsg))
+    error ("draw.Drawing.%s: %s", kind, errmsg);
+  endif
 
   e = makeentity (kind, pen (this));
   e.pts = C(:)';
@@ -4773,6 +4807,8 @@ function e = dimcircle (this, kind, C, R, opts)
   e.decimals = DECIMALS;
   e.tolerance = TOL;
   e.form = FORM;
+  e.exact = EXACT;
+  e.frame = FRAME;
 
 endfunction
 
@@ -5829,14 +5865,33 @@ function [parts, v] = explodecirc (e, scale, ndec)
     v = e.radius;
     pre = '';
   endif
-  [main, R, A, ~, ~, B] = tolerancetext (e, label, v, ndec, pre, '', hgt);
+  [main, R, A, ~, rise, B] = tolerancetext (e, label, v, ndec, pre, '', hgt);
   P = outer + 0.5 * hgt * (u + n);
-  t = mkent ('TEXT', e, P);
+  ## A theoretically exact value in its box, the box where the text stood
+  Q = P;
+  blockh = hgt + rise;
+  if (e.exact)
+    blockh = 2 * hgt;
+    parts(end+1) = exactbox (e, P, textwidth (main, hgt) + 1.5 * hgt, hgt);
+    Q = P + [0.75, 0.5] * hgt;
+  endif
+  t = mkent ('TEXT', e, Q);
   t.text = main;
   t.height = hgt;
   t.rotation = 0;
   parts(end+1) = t;
-  parts = [parts, stackparts(e, R, A, P, textwidth (main, hgt), hgt, B)];
+  parts = [parts, stackparts(e, R, A, Q, textwidth (main, hgt), hgt, B)];
+  ## A frame by the text, on the side away from the line as on a linear
+  ## dimension: over the text when the line comes up to it, under it else
+  if (! isempty (e.frame))
+    tgap = 0.8 * scale;
+    if (u(2) > 0)
+      TL = P + [0, blockh + tgap + 2 * hgt * numel(e.frame.rows)];
+    else
+      TL = P - [0, tgap];
+    endif
+    parts = [parts, frameat(e, e.frame, scale, TL)];
+  endif
 
 endfunction
 
@@ -5871,6 +5926,10 @@ function [parts, v] = explodeang (e, scale, ndec)
   [main, R, A, ~, ~, B] = tolerancetext (e, label, v, ndec, '', '%%d', ...
                                           hgt);
   P = V + (e.radius + 0.5 * hgt) * [cosd(am), sind(am)];
+  if (e.exact)
+    parts(end+1) = exactbox (e, P, textwidth (main, hgt) + 1.5 * hgt, hgt);
+    P += [0.75, 0.5] * hgt;
+  endif
   t = mkent ('TEXT', e, P);
   t.text = main;
   t.height = hgt;
@@ -5915,30 +5974,42 @@ function [parts, v] = explodeord (e, scale, ndec)
   endif
   [main, R, A, wid, rise, B] = tolerancetext (e, label, v, ndec, '', '', ...
                                               hgt);
+  ## The label as a block, its text inside: a theoretically exact value's
+  ## box, or the text with what rises above it
+  blockh = hgt + rise;
+  pad = [0, 0];
+  if (e.exact)
+    wid += 1.5 * hgt;
+    blockh = 2 * hgt;
+    pad = [0.75, 0.5] * hgt;
+  endif
   if (k == 2)
     ## Up or down the sheet: the label centred past the end
     ix = L(1) - wid / 2;
     if (s > 0)
       iy = L(2) + tgap;
     else
-      iy = L(2) - tgap - hgt - rise;
+      iy = L(2) - tgap - blockh;
     endif
   else
     ## Across the sheet: the label beside the end
-    iy = L(2) - (hgt + rise) / 2;
+    iy = L(2) - blockh / 2;
     if (s > 0)
       ix = L(1) + tgap;
     else
       ix = L(1) - tgap - wid;
     endif
   endif
-  t = mkent ('TEXT', e, [ix, iy]);
+  if (e.exact)
+    parts(end+1) = exactbox (e, [ix, iy], wid, hgt);
+  endif
+  t = mkent ('TEXT', e, [ix, iy] + pad);
   t.text = main;
   t.height = hgt;
   t.rotation = 0;
   parts(end+1) = t;
-  parts = [parts, stackparts(e, R, A, [ix, iy], textwidth (main, hgt), ...
-                             hgt, B)];
+  parts = [parts, stackparts(e, R, A, [ix, iy] + pad, ...
+                             textwidth (main, hgt), hgt, B)];
 
 endfunction
 
@@ -5974,6 +6045,128 @@ function parts = explodeleader (e, scale)
   t.height = hgt;
   t.rotation = 0;
   parts(end+1) = t;
+
+endfunction
+
+## The 'Frame' of a dimension, ARG as given ({} when none), as the struct the
+## entity keeps, or empty; ERRMSG the body of the error when it is wrong.  A
+## frame on a dimension stands under its text and has no leader, so it takes
+## no Note or AllAround: the count goes in the dimension's own text.
+function [F, errmsg] = dimframe (ARG)
+
+  F = [];
+  errmsg = '';
+  if (iscell (ARG) && isempty (ARG))
+    return;
+  endif
+  if (! iscell (ARG))
+    errmsg = "Frame must be a cell {CHAR, VALUE, Name, Value, ...}.";
+    return;
+  endif
+  [F, errmsg] = framespec (ARG{1}, ARG{2}, ARG(3:end));
+  if (! isempty (errmsg))
+    errmsg = ["Frame: ", errmsg];
+  elseif (! isempty (F.note) || F.allaround)
+    F = [];
+    errmsg = "Frame: a frame on a dimension takes no Note or AllAround.";
+  endif
+
+endfunction
+
+## A tolerance frame from CHAR, VALUE and the cell OPTS of its Name/Value
+## pairs, as tolframe and the 'Frame' of a dimension take them: one frame, or
+## two stacked, each option then a cell of two.  F is the struct the entity
+## keeps, its rows, note and all-around; ERRMSG the body of the error when
+## the arguments are wrong.
+function [F, errmsg] = framespec (CHAR, VALUE, opts)
+
+  F = [];
+  errmsg = '';
+  if (iscell (CHAR))
+    if (! (iscellstr (CHAR) && numel (CHAR) == 2))
+      errmsg = strcat ("CHAR must name a characteristic of ISO 1101, or", ...
+                       " two in a cell for frames stacked.");
+      return;
+    endif
+    nf = 2;
+    CHAR = CHAR(:)';
+  else
+    nf = 1;
+    CHAR = {CHAR};
+  endif
+  if (! (isnumeric (VALUE) && isreal (VALUE) && numel (VALUE) == nf
+         && all (isfinite (VALUE(:))) && all (VALUE(:) > 0)))
+    errmsg = strcat ("VALUE must be a positive real scalar, or two for", ...
+                     " frames stacked.");
+    return;
+  endif
+  if (mod (numel (opts), 2) != 0)
+    errmsg = "Name/Value arguments must come in pairs.";
+    return;
+  endif
+  ZONE = repmat ({''}, 1, nf);
+  MODS = repmat ({{}}, 1, nf);
+  DATUMS = repmat ({{}}, 1, nf);
+  NOTE = '';
+  ALLAROUND = false;
+  for ii = 1:2:numel (opts)
+    name = opts{ii};
+    val = opts{ii+1};
+    if (! ischar (name) || ! isrow (name))
+      errmsg = "option names must be character vectors.";
+      return;
+    endif
+    switch (lower (name))
+      case {'zone', 'modifiers', 'datums'}
+        if (nf == 2)
+          if (! (iscell (val) && numel (val) == 2))
+            errmsg = sprintf ("%s must be a cell of two for frames stacked.",
+                              name);
+            return;
+          endif
+          val = val(:)';
+        elseif (strcmpi (name, 'zone') && isempty (val))
+          errmsg = "Zone must be 'diameter'.";
+          return;
+        else
+          val = {val};
+        endif
+        switch (lower (name))
+          case 'zone'
+            ZONE = val;
+          case 'modifiers'
+            MODS = val;
+          otherwise
+            DATUMS = val;
+        endswitch
+      case 'note'
+        if (! (ischar (val) && isrow (val)))
+          errmsg = "Note must be a non-empty character vector.";
+          return;
+        endif
+        NOTE = val;
+      case 'allaround'
+        if (! (islogical (val) && isscalar (val)))
+          errmsg = "AllAround must be a logical scalar.";
+          return;
+        endif
+        ALLAROUND = val;
+      otherwise
+        errmsg = sprintf ("unknown option '%s'.", name);
+        return;
+    endswitch
+  endfor
+  R = struct ('char', {}, 'value', {}, 'zone', {}, 'modifiers', {}, ...
+              'datums', {});
+  for k = 1:nf
+    [row, errmsg] = framerow (CHAR{k}, VALUE(k), ZONE{k}, MODS{k}, ...
+                              DATUMS{k});
+    if (! isempty (errmsg))
+      return;
+    endif
+    R(k) = row;
+  endfor
+  F = struct ('rows', R, 'note', NOTE, 'allaround', ALLAROUND);
 
 endfunction
 
@@ -6094,23 +6287,13 @@ endfunction
 function parts = explodetolframe (e, scale)
 
   h = 2.5 * scale;
-  H = 2 * h;
   P = e.pts;
   F = e.frame;
-  [parts, W] = framerowparts (e, F.rows(1), scale);
-  for k = 2:numel (F.rows)
-    p2 = framerowparts (e, F.rows(k), scale);
-    for m = 1:numel (p2)
-      p2(m).pts(:,2) -= (k - 1) * H;
-    endfor
-    parts = [parts, p2];
-  endfor
   ## The end of the frame facing a leader that comes in from the right
+  [~, W] = framerowparts (e, F.rows(1), scale);
   fromright = rows (P) >= 2 && P(end-1,1) > P(end,1);
   d = P(end,:) - [fromright * W, 0];
-  for m = 1:numel (parts)
-    parts(m).pts += d;
-  endfor
+  parts = frameat (e, F, scale, d + [0, h]);
   if (! isempty (F.note))
     t = mkent ('TEXT', e, [d(1), P(end,2) + h + 0.8 * scale]);
     t.text = F.note;
@@ -6135,6 +6318,37 @@ function parts = explodetolframe (e, scale)
     c.radius = 0.5 * h;
     parts(end+1) = c;
   endif
+
+endfunction
+
+## The rows of the tolerance frame F, the second under the first and aligned
+## with it at the left, the top left corner of the first at TL; W is the
+## width of the first and H the height of them all
+function [parts, W, H] = frameat (e, F, scale, TL)
+
+  h = 2.5 * scale;
+  [parts, W] = framerowparts (e, F.rows(1), scale);
+  for k = 2:numel (F.rows)
+    p2 = framerowparts (e, F.rows(k), scale);
+    for m = 1:numel (p2)
+      p2(m).pts(:,2) -= (k - 1) * 2 * h;
+    endfor
+    parts = [parts, p2];
+  endfor
+  for m = 1:numel (parts)
+    parts(m).pts += TL - [0, h];
+  endfor
+  H = 2 * h * numel (F.rows);
+
+endfunction
+
+## The box of a theoretically exact dimension, as ISO 7083 draws it: as tall
+## as a tolerance frame, twice the text height, its bottom left corner at B
+## and W wide
+function b = exactbox (e, B, W, hgt)
+
+  b = mkent ('POLYLINE', e, B + [0, 0; W, 0; W, 2 * hgt; 0, 2 * hgt]);
+  b.closed = true;
 
 endfunction
 
@@ -6436,19 +6650,30 @@ function [parts, v] = explodedim (e, scale, ndec)
   [main, R, A, wid, rise, B] = tolerancetext (e, label, v, ndec, '', '', ...
                                               hgt);
   side = sign0 (e.offset) * N;
+  ## The label as a block, its text inside: a theoretically exact value's
+  ## box, or the text with what rises above it
+  blockh = hgt + rise;
+  pad = [0, 0];
+  if (e.exact)
+    wid += 1.5 * hgt;
+    blockh = 2 * hgt;
+    pad = [0.75, 0.5] * hgt;
+  endif
 
+  above = false;
   if (abs (side(2)) >= abs (side(1)))
     ## Dimension line lies across the sheet: the label goes above or below it
     ix = mid(1) - wid / 2;
     if (side(2) >= 0)
       iy = mid(2) + tgap;
+      above = true;
     else
-      iy = mid(2) - tgap - hgt - rise;
+      iy = mid(2) - tgap - blockh;
     endif
   else
     ## Dimension line lies up the sheet: the label goes beside it, and the
     ## text stays horizontal, so it is the width that must clear the line
-    iy = mid(2) - (hgt + rise) / 2;
+    iy = mid(2) - blockh / 2;
     if (side(1) >= 0)
       ix = mid(1) + tgap;
     else
@@ -6456,12 +6681,26 @@ function [parts, v] = explodedim (e, scale, ndec)
     endif
   endif
 
-  t = mkent ('TEXT', e, [ix, iy]);
+  if (e.exact)
+    parts(end+1) = exactbox (e, [ix, iy], wid, hgt);
+  endif
+  t = mkent ('TEXT', e, [ix, iy] + pad);
   t.text = main;
   t.height = hgt;
   parts(end+1) = t;
-  parts = [parts, stackparts(e, R, A, [ix, iy], textwidth (main, hgt), ...
-                             hgt, B)];
+  parts = [parts, stackparts(e, R, A, [ix, iy] + pad, ...
+                             textwidth (main, hgt), hgt, B)];
+  ## A frame beyond the label, on the side away from the dimension line, so
+  ## it never crosses the line: above a label above the line, under it else
+  if (! isempty (e.frame))
+    if (above)
+      nrows = numel (e.frame.rows);
+      TL = [ix, iy + blockh + tgap + 2 * hgt * nrows];
+    else
+      TL = [ix, iy - tgap];
+    endif
+    parts = [parts, frameat(e, e.frame, scale, TL)];
+  endif
 
 endfunction
 

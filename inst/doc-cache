@@ -413,12 +413,13 @@ draw.Drawing.angdim
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1103
+# length: 1259
 draw.Drawing: D = angdim (D, V, P1, P2, RAD)
 draw.Drawing: D = angdim (..., 'Text', S)
 draw.Drawing: D = angdim (..., 'Decimals', N)
 draw.Drawing: D = angdim (..., 'Tolerance', T)
 draw.Drawing: D = angdim (..., 'Form', FORM)
+draw.Drawing: D = angdim (..., 'Exact', TF)
 Append an angular dimension at a vertex.
 
 V is the vertex, P1 and P2 points along the two arms,
@@ -430,7 +431,9 @@ measured angle and the degree symbol, and the option
 'Tolerance' and 'Form' are those of dim, but for
 the classes of ISO 286, in degrees, every number carrying the degree
 sign:
-15.5 ±0.25.
+15.5 ±0.25. The option
+'Exact' is that of dim: an exact angle, such as the
+angle of a hole on a pitch circle, in its frame.
 
 The angle measured is the one from the first arm to the second going
 counter-clockwise, so giving the arms the other way round dimensions the
@@ -705,13 +708,15 @@ draw.Drawing.diam
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1163
+# length: 1390
 draw.Drawing: D = diam (D, C, R)
 draw.Drawing: D = diam (..., 'Angle', ANG)
 draw.Drawing: D = diam (..., 'Text', S)
 draw.Drawing: D = diam (..., 'Decimals', N)
 draw.Drawing: D = diam (..., 'Tolerance', T)
 draw.Drawing: D = diam (..., 'Form', FORM)
+draw.Drawing: D = diam (..., 'Exact', TF)
+draw.Drawing: D = diam (..., 'Frame', F)
 Append a diameter dimension across a circle.
 
 C is the centre and R the radius. The option
@@ -723,7 +728,9 @@ otherwise the diameter symbol and the measured figure, and the option
 0 to 8, in place of the drawing's Decimals. The options
 'Tolerance' and 'Form' are those of dim, classes
 and fit pairs included; each limit of a numeric tolerance carries the
-diameter sign.
+diameter sign. The options 'Exact' and 'Frame' are
+those of dim; the frame stands over the text when the dimension
+line comes up to it and under it otherwise.
 
 A round feature is dimensioned by its diameter and never by its radius,
 because a diameter is what a bore gauge and a micrometer measure. A
@@ -755,13 +762,15 @@ draw.Drawing.dim
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 3200
+# length: 4394
 draw.Drawing: D = dim (D, P1, P2, OFFSET)
 draw.Drawing: D = dim (..., 'Direction', DIR)
 draw.Drawing: D = dim (..., 'Text', S)
 draw.Drawing: D = dim (..., 'Decimals', N)
 draw.Drawing: D = dim (..., 'Tolerance', T)
 draw.Drawing: D = dim (..., 'Form', FORM)
+draw.Drawing: D = dim (..., 'Exact', TF)
+draw.Drawing: D = dim (..., 'Frame', F)
 Append a dimension measuring between P1 and P2.
 
 OFFSET is the perpendicular distance in millimetres from the
@@ -827,6 +836,27 @@ override of the dimension style, so a CAD program that measures the
 dimension again shows it; min., max. and a class are
 text, and the deviations or limits of a class are figures that do not
 follow a size changed in another program.
+
+The option 'Exact' set to true makes the dimension
+theoretically exact, as ISO 1101 calls a size that locates, orients or
+shapes a tolerance zone: its value is written in a rectangular frame as
+tall as a tolerance frame, as ISO 7083 draws it. A theoretically exact
+dimension has no tolerance: it takes no 'Tolerance', and the
+general tolerance of the title block does not apply to it. How far the
+feature may stray is stated by the tolerance frames that refer to it.
+
+The option 'Frame' gives the feature the dimension sizes a
+geometrical tolerance, F a cell
+{CHAR, VALUE, Name, Value, ...}
+holding the arguments of tolframe after the path: the
+characteristic, the value, and the options 'Zone',
+'Modifiers' and 'Datums', two of each for frames
+stacked. It takes no 'Note' or 'AllAround', which
+belong to a frame on a leader. A frame shown with a dimension applies,
+as ISO 1101 reads it, to the feature of size, its axis or median plane,
+and not to its surface. It stands by the label on the side away from
+the dimension line, above a label above the line and under any other,
+so that it never crosses the line.
 
 
 # name: <cell-element>
@@ -1301,11 +1331,12 @@ draw.Drawing.ordinate
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 1842
+# length: 1927
 draw.Drawing: D = ordinate (D, O, P, AXIS, L)
 draw.Drawing: D = ordinate (..., 'Text', S)
 draw.Drawing: D = ordinate (..., 'Decimals', N)
 draw.Drawing: D = ordinate (..., 'Tolerance', T)
+draw.Drawing: D = ordinate (..., 'Exact', TF)
 Append an ordinate dimension, the distance of a point from a datum.
 
 O is the datum, P the feature dimensioned and AXIS
@@ -1328,7 +1359,8 @@ written, so it follows the geometry; the option 'Text' gives the
 literal text S instead, and the option 'Decimals' the
 places N the value shows, an integer from 0 to 8, in place of the
 drawing's Decimals. The option 'Tolerance' is that of
-dim, a symmetric tolerance or deviations only.
+dim, a symmetric tolerance or deviations only, and the option
+'Exact' is that of dim.
 
 ## A plate with two holes, dimensioned from its lower left corner
 D = draw.Drawing ();
@@ -1749,12 +1781,13 @@ draw.Drawing.radius
 # name: <cell-element>
 # type: sq_string
 # elements: 1
-# length: 707
+# length: 1105
 draw.Drawing: D = radius (D, C, R)
 draw.Drawing: D = radius (..., 'Angle', ANG)
 draw.Drawing: D = radius (..., 'Text', S)
 draw.Drawing: D = radius (..., 'Decimals', N)
 draw.Drawing: D = radius (..., 'Tolerance', T)
+draw.Drawing: D = radius (..., 'Exact', TF)
 Append a radius dimension from a centre out to an arc.
 
 The arguments and options are those of diam, and ANG is the
@@ -1762,6 +1795,13 @@ direction the leader runs in. The text is otherwise the letter R and
 the figure. A radius takes a symmetric tolerance, deviations, or
 'min' and 'max' (R0.5 max.), but no limits and
 no class.
+
+A radius takes 'Exact', for the arcs of an outline whose shape
+a profile tolerance sets, which ISO 1101 dimensions only with
+theoretically exact values. It takes no 'Frame': a frame shown
+with a dimension applies to a feature of size, which an arc measured by
+its radius is not, so a tolerance of the arc goes on a leader to its
+surface, with tolframe.
 
 Use it for a fillet or any arc that is less than a full circle, where
 there is no diameter to measure across.
