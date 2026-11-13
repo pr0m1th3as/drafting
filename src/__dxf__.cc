@@ -2299,7 +2299,8 @@ drawingitems (Writer& w, vector<Item>& dest, const octave_value& D,
                 mapnum (E, "scale", i, 1), mapnum (E, "angle", i, 0));
     else if (type == "dim" || type == "diam" || type == "radius"
              || type == "angdim" || type == "ordinate"
-             || type == "centremark" || type == "leader")
+             || type == "centremark" || type == "leader"
+             || type == "tolframe")
       {
         if (i >= orn.numel () || ! orn(i).iscell ())
           error ("__dxf__: no picture is given for entity %d.",

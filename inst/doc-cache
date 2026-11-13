@@ -2,7 +2,7 @@
 # name: cache
 # type: cell
 # rows: 3
-# columns: 251
+# columns: 252
 # name: <cell-element>
 # type: sq_string
 # elements: 1
@@ -1945,6 +1945,86 @@ draw.Drawing.write
 # elements: 1
 # length: 69
 Render a drawing as a TikZ picture for inclusion in the LaTeX report.
+
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 21
+draw.Drawing.tolframe
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 2656
+draw.Drawing: D = tolframe (D, P, CHAR, VALUE)
+draw.Drawing: D = tolframe (..., Name, Value, ...)
+Append a tolerance frame: a geometrical tolerance as ISO 1101 writes it.
+
+A geometrical tolerance limits the form, orientation, location or
+run-out of a feature, where a dimension's tolerance limits its size.
+The frame is a row of compartments: the symbol of the characteristic,
+the width of the tolerance zone in millimetres, and the datums it is
+measured from, if any.
+
+P is the point the frame stands at, the middle of its left end.
+CHAR names the characteristic as ISO 1101 does, regardless of
+case: 'straightness', 'flatness', 'circularity',
+'cylindricity', 'lineprofile' and
+'surfaceprofile' (the profiles of any line and of any surface),
+'parallelism', 'perpendicularity', 'angularity',
+'position', 'coaxiality' (or 'concentricity',
+which has the same symbol), 'symmetry', 'runout' and
+'totalrunout'. VALUE is the width of the tolerance zone,
+a positive number.
+
+'Zone'
+'diameter' writes the sign Ø before the value, for a zone
+that is a circle or a cylinder.
+'Modifiers'
+A cell of any of 'M' (maximum material condition), 'L'
+(least material condition) and 'P' (projected tolerance zone),
+each written after the value as its letter in a circle.
+'Datums'
+A row cell of at most three datum compartments, ranked from left to
+right: a letter, 'A'; a common datum of two features,
+'A-B'; or letters whose order does not matter, 'AB'. A
+datum's own material condition follows its letter: 'B(M)'.
+
+The frame refuses what ISO 1101 does not allow in it. Straightness,
+flatness, circularity and cylindricity tolerate a single feature and take
+no datum; the orientations, coaxiality, symmetry and the run-outs relate
+features and need one; the profiles and position may have one or not.
+Ø is for straightness, the orientations, position and coaxiality,
+whose zones can be cylinders. M and L apply to axes and
+median planes (ISO 2692), so flatness, circularity, cylindricity, the
+profiles and the run-outs, which always tolerate a surface or a line,
+refuse them; on the others the frame cannot tell an axis from a surface
+and leaves that to the drawing. P is for tolerances of
+orientation and location.
+
+The frame is as tall as twice its text and its lines a tenth of it, as
+ISO 7083 sets them, at the height of dimension text: 5 mm with 2.5 mm
+lettering. Like a dimension's ornament it keeps its size on paper, and
+stays upright, whatever the drawing is scaled or turned by.
+
+D = draw.Drawing ().tolframe ([0, 0], 'position', 0.1, ...
+'Zone', 'diameter', ...
+'Modifiers', {'M'}, ...
+'Datums', {'A', 'B', 'C'});
+
+See also:
+draw.Drawing.dim,
+draw.Drawing.leader
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 72
+Append a tolerance frame: a geometrical tolerance as ISO 1101 writes it.
 
 
 

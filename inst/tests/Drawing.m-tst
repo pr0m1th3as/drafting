@@ -33,7 +33,7 @@
 %!               'angles'; 'angle'; ...
 %!               'text'; 'height'; 'offset'; 'direction'; 'pattern'; ...
 %!               'spacing'; 'block'; 'scale'; 'bulge'; 'shape'; ...
-%!               'decimals'; 'tolerance'; 'form'});
+%!               'decimals'; 'tolerance'; 'form'; 'frame'});
 %!error<draw.Drawing: NAME must be a non-empty character vector.> ...
 %! draw.Drawing (42)
 %!error<draw.Drawing: NAME must be a non-empty character vector.> ...
@@ -497,7 +497,7 @@
 %! D = D.arc ([0, 0], 1, 0, 90).circle ([0, 0], 2).text ([0, 0], 'A');
 %! D = D.hatch (geom.Region ([0, 0; 1, 0; 1, 1])).dim ([0, 0], [1, 0], 5);
 %! assert_equal (numel (D.Entities), 7);
-%! assert_equal (numel (fieldnames (D.Entities)), 23);
+%! assert_equal (numel (fieldnames (D.Entities)), 24);
 %! assert_equal ({D.Entities.type}, {'line', 'polyline', 'arc', 'circle', ...
 %!                                   'text', 'hatch', 'dim'});
 
@@ -2468,6 +2468,184 @@
 %! D = draw.Drawing ().diam ([0, 0], 12.5, 'Tolerance', 'H7');
 %! assert_equal (entities (D).text, '<> H7 (\S+0.021^0;)');
 
+%!function E = frameparts (D)
+%!  E = entities (D, 'dimensions', 'explode');
+%!endfunction
+
+%!function n = symbolcount (name)
+%!  ## lines, circles and arcs inside the first compartment, five wide
+%!  args = {};
+%!  if (any (strcmp (name, {'parallelism', 'perpendicularity', ...
+%!                           'angularity', 'symmetry', 'runout', ...
+%!                           'totalrunout', 'coaxiality'})))
+%!    args = {'Datums', {'A'}};
+%!  endif
+%!  E = frameparts (draw.Drawing ().tolframe ([0, 0], name, 0.1, args{:}));
+%!  inside = arrayfun (@(e) all (e.pts(:,1) > 1e-9 & e.pts(:,1) < 5 - 1e-9), E);
+%!  n = [sum(inside & strcmp ({E.type}, 'LINE')), ...
+%!       sum(inside & strcmp ({E.type}, 'CIRCLE')), ...
+%!       sum(inside & strcmp ({E.type}, 'ARC'))];
+%!endfunction
+
+%!test  # a tolerance frame is twice the text height tall
+%! E = frameparts (draw.Drawing ().tolframe ([0, 0], 'flatness', 0.05));
+%! P = E(strcmp ({E.type}, 'POLYLINE')).pts;
+%! assert_equal ([min(P(:,2)), max(P(:,2))], [-2.5, 2.5], 1e-12);
+
+%!test  # DimScale scales it
+%! E = entities (draw.Drawing ().tolframe ([0, 0], 'flatness', 0.05), ...
+%!               'dimensions', 'explode', 'DimScale', 2);
+%! P = E(strcmp ({E.type}, 'POLYLINE')).pts;
+%! assert_equal ([min(P(:,2)), max(P(:,2))], [-5, 5], 1e-12);
+
+%!test  # its first compartment is square
+%! E = frameparts (draw.Drawing ().tolframe ([0, 0], 'flatness', 0.05));
+%! L = E(strcmp ({E.type}, 'LINE'));
+%! full = arrayfun (@(e) abs (diff (e.pts(:,2))) > 5 - 1e-9, L);
+%! assert_equal (min (arrayfun (@(e) e.pts(1,1), L(full))), 5, 1e-12);
+
+%!test  # straightness: one line
+%! assert_equal (symbolcount ('straightness'), [1, 0, 0]);
+
+%!test  # flatness: a parallelogram
+%! assert_equal (symbolcount ('flatness'), [4, 0, 0]);
+
+%!test  # circularity: a circle
+%! assert_equal (symbolcount ('circularity'), [0, 1, 0]);
+
+%!test  # cylindricity: a circle between two lines
+%! assert_equal (symbolcount ('cylindricity'), [2, 1, 0]);
+
+%!test  # profile of any line: an arc
+%! assert_equal (symbolcount ('lineprofile'), [0, 0, 1]);
+
+%!test  # profile of any surface: an arc on its chord
+%! assert_equal (symbolcount ('surfaceprofile'), [1, 0, 1]);
+
+%!test  # parallelism: two slanted lines
+%! assert_equal (symbolcount ('parallelism'), [2, 0, 0]);
+
+%!test  # perpendicularity: a base and a stem
+%! assert_equal (symbolcount ('perpendicularity'), [2, 0, 0]);
+
+%!test  # angularity: two lines at a vertex
+%! assert_equal (symbolcount ('angularity'), [2, 0, 0]);
+
+%!test  # position: a circle and a cross
+%! assert_equal (symbolcount ('position'), [2, 1, 0]);
+
+%!test  # coaxiality: two concentric circles
+%! assert_equal (symbolcount ('coaxiality'), [0, 2, 0]);
+
+%!test  # symmetry: three lines
+%! assert_equal (symbolcount ('symmetry'), [3, 0, 0]);
+
+%!test  # run-out: an arrow
+%! assert_equal (symbolcount ('runout'), [3, 0, 0]);
+
+%!test  # total run-out: two arrows on a base
+%! assert_equal (symbolcount ('totalrunout'), [7, 0, 0]);
+
+%!test  # the value, with the sign of a circular zone
+%! E = frameparts (draw.Drawing ().tolframe ([0, 0], 'position', 0.1, ...
+%!                                           'Zone', 'diameter'));
+%! assert_equal ({E(strcmp ({E.type}, 'TEXT')).text}, {'%%c0.1'});
+
+%!test  # a modifier is its letter in a circle after the value
+%! E = frameparts (draw.Drawing ().tolframe ([0, 0], 'straightness', 0.1, ...
+%!                                           'Zone', 'diameter', ...
+%!                                           'Modifiers', {'m'}));
+%! T = E(strcmp ({E.type}, 'TEXT'));
+%! C = E(strcmp ({E.type}, 'CIRCLE'));
+%! assert_equal ({T.text}, {'%%c0.1', 'M'});
+%! assert_equal (C.radius, 1.75, 1e-12);
+%! assert_equal (C.pts(1) > T(1).pts(1), true);
+
+%!test  # each datum has a compartment of its own, in order
+%! E = frameparts (draw.Drawing ().tolframe ([0, 0], 'position', 0.1, ...
+%!                                           'Datums', {'A', 'B', 'C'}));
+%! assert_equal ({E(strcmp ({E.type}, 'TEXT')).text}, {'0.1', 'A', 'B', 'C'});
+
+%!test  # a datum compartment is at least square
+%! E = frameparts (draw.Drawing ().tolframe ([0, 0], 'parallelism', 0.06, ...
+%!                                           'Datums', {'B'}));
+%! P = E(strcmp ({E.type}, 'POLYLINE')).pts;
+%! L = E(strcmp ({E.type}, 'LINE'));
+%! full = arrayfun (@(e) abs (diff (e.pts(:,2))) > 5 - 1e-9, L);
+%! assert_equal (max (P(:,1)) - max (arrayfun (@(e) e.pts(1,1), L(full))), ...
+%!               5, 1e-12);
+
+%!test  # a common datum and a datum's own modifier
+%! E = frameparts (draw.Drawing ().tolframe ([0, 0], 'position', 0.1, ...
+%!                                           'Datums', {'A-B', 'C(M)'}));
+%! assert_equal ({E(strcmp ({E.type}, 'TEXT')).text}, {'0.1', 'A-B', 'C', 'M'});
+
+%!test  # the frame keeps its size on paper when the drawing is scaled
+%! D = draw.Drawing ().tolframe ([10, 10], 'flatness', 0.05);
+%! E = frameparts (D.transform ('scale', 2));
+%! P = E(strcmp ({E.type}, 'POLYLINE')).pts;
+%! assert_equal ([min(P(:,2)), max(P(:,2))], [17.5, 22.5], 1e-12);
+
+%!test  # and stays upright when it is turned
+%! D = draw.Drawing ().tolframe ([10, 0], 'flatness', 0.05);
+%! E = frameparts (D.transform ('rotate', 30));
+%! P = E(strcmp ({E.type}, 'POLYLINE')).pts;
+%! assert_equal (unique (round (P(:,2) * 1e9) / 1e9)', ...
+%!               10 * sind (30) + [-2.5, 2.5], 1e-9);
+
+%!test  # a frame is written to DXF as its lines, arcs and text
+%! fn = [tempname(), '.dxf'];
+%! unwind_protect
+%!   D = draw.Drawing ().tolframe ([0, 0], 'coaxiality', 0.03, ...
+%!                                 'Zone', 'diameter', 'Datums', {'A-B'});
+%!   write (D, fn);
+%!   R = draw.read (fn);
+%!   assert_equal (R.numentities (), numel (frameparts (D)));
+%! unwind_protect_cleanup
+%!   [~] = unlink (fn);
+%! end_unwind_protect
+
+%!error<draw.Drawing.tolframe: invalid number of input arguments.> ...
+%! draw.Drawing ().tolframe ([0, 0], 'flatness')
+%!error<draw.Drawing.tolframe: P must be a real finite 1-by-2 vector.> ...
+%! draw.Drawing ().tolframe ([0, 0, 0], 'flatness', 0.1)
+%!error<draw.Drawing.tolframe: CHAR must name a characteristic of ISO 1101.> ...
+%! draw.Drawing ().tolframe ([0, 0], 'roundness', 0.1)
+%!error<draw.Drawing.tolframe: VALUE must be a positive real scalar.> ...
+%! draw.Drawing ().tolframe ([0, 0], 'flatness', 0)
+%!error<draw.Drawing.tolframe: Name/Value arguments must come in pairs.> ...
+%! draw.Drawing ().tolframe ([0, 0], 'flatness', 0.1, 'Zone')
+%!error<draw.Drawing.tolframe: option names must be character vectors.> ...
+%! draw.Drawing ().tolframe ([0, 0], 'flatness', 0.1, 1, 2)
+%!error<draw.Drawing.tolframe: unknown option 'Note'.> ...
+%! draw.Drawing ().tolframe ([0, 0], 'flatness', 0.1, 'Note', '6x')
+%!error<draw.Drawing.tolframe: Zone must be 'diameter'.> ...
+%! draw.Drawing ().tolframe ([0, 0], 'position', 0.1, 'Zone', 'square')
+%!error<draw.Drawing.tolframe: Modifiers must be a cell of distinct 'M', 'L' and 'P'.> ...
+%! draw.Drawing ().tolframe ([0, 0], 'position', 0.1, 'Modifiers', {'M', 'm'})
+%!error<draw.Drawing.tolframe: Modifiers must be a cell of distinct 'M', 'L' and 'P'.> ...
+%! draw.Drawing ().tolframe ([0, 0], 'position', 0.1, 'Modifiers', 'M')
+%!error<draw.Drawing.tolframe: Datums must be a cell of at most three datum compartments, such as 'A', 'A-B', 'AB' or 'B\(M\)'.> ...
+%! draw.Drawing ().tolframe ([0, 0], 'position', 0.1, ...
+%!                           'Datums', {'A', 'B', 'C', 'D'})
+%!error<draw.Drawing.tolframe: Datums must be a cell of at most three datum compartments, such as 'A', 'A-B', 'AB' or 'B\(M\)'.> ...
+%! draw.Drawing ().tolframe ([0, 0], 'position', 0.1, 'Datums', {'a'})
+%!error<draw.Drawing.tolframe: Datums must be a cell of at most three datum compartments, such as 'A', 'A-B', 'AB' or 'B\(M\)'.> ...
+%! draw.Drawing ().tolframe ([0, 0], 'position', 0.1, 'Datums', {'A-B-C'})
+%!error<draw.Drawing.tolframe: flatness takes no datum.> ...
+%! draw.Drawing ().tolframe ([0, 0], 'flatness', 0.1, 'Datums', {'A'})
+%!error<draw.Drawing.tolframe: parallelism needs a datum.> ...
+%! draw.Drawing ().tolframe ([0, 0], 'parallelism', 0.1)
+%!error<draw.Drawing.tolframe: Zone 'diameter' is not for flatness.> ...
+%! draw.Drawing ().tolframe ([0, 0], 'flatness', 0.1, 'Zone', 'diameter')
+%!error<draw.Drawing.tolframe: Modifiers takes M or L, not both.> ...
+%! draw.Drawing ().tolframe ([0, 0], 'position', 0.1, 'Modifiers', {'M', 'L'})
+%!error<draw.Drawing.tolframe: M and L are for axes and median planes, not for flatness.> ...
+%! draw.Drawing ().tolframe ([0, 0], 'flatness', 0.1, 'Modifiers', {'M'})
+%!error<draw.Drawing.tolframe: P is for tolerances of orientation and location, not for runout.> ...
+%! draw.Drawing ().tolframe ([0, 0], 'runout', 0.1, 'Modifiers', {'P'}, ...
+%!                           'Datums', {'A'})
+
 %!test  # a limit in one direction is text in the dimension record
 %! D = draw.Drawing ().dim ([0, 0], [30.5, 0], 5, 'Tolerance', 'min');
 %! assert_equal (entities (D).text, '<> min.');
@@ -3219,7 +3397,7 @@
 %! __ornament__ (draw.Drawing ().diam ([0, 0], 5), 1, 1, 9, 'deviations')
 %!error<draw.Drawing.__ornament__: FITFORM must be 'class', 'deviations' or 'limits'.> ...
 %! __ornament__ (draw.Drawing ().diam ([0, 0], 5), 1, 1, 2, 'fit')
-%!error<draw.Drawing.__ornament__: entity 1 is a line, not a dimension, centre mark or leader.> ...
+%!error<draw.Drawing.__ornament__: entity 1 is a line, not a dimension, centre mark, leader or tolerance frame.> ...
 %! __ornament__ (draw.Drawing ().line ([0, 0], [1, 0]), 1, 1, 2, 'deviations')
 
 %!test  # the records of one drawing put into another
