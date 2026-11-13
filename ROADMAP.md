@@ -243,6 +243,15 @@ their view direction, circled detail callouts carrying their own scale,
 numbered leaders, and a bill of materials table. They are out of 0.3.0 and no
 version is set; the views of the drawings of solids need the marks.
 
+**Title-block templates.** A firm keeps its title block as a CAD block
+whose fillable fields are attribute definitions (`ATTDEF`), each placement
+carrying its own values (`ATTRIB`). Read with its attributes, such a block is
+filled field by field and written back with them intact, so the fields stay
+editable in CAD, and `draw.titleblock` becomes a template of the same kind.
+It needs attributes as a new kind of entity through the drawing model, every
+backend and DXF both ways; which kinds of attribute it takes is settled when
+it is built. No version is set.
+
 **Weld symbols.** The symbols of ISO 2553 on an arrow and reference line:
 the elementary and supplementary symbols, the weld's size and length, and
 the tail for the process. A welded frame is a drawing like any other, but
