@@ -661,12 +661,14 @@ classdef Drawing
 
     ## The picture of the ornament IDX of D, a dimension, centre mark or
     ## leader, as a drawing of its lines and text at DIMSCALE, its measurement
-    ## to DECIMALS places, and for a dimension the record a file states it by:
-    ## the definition points in the order of DXF group codes 10, 11, 13, 14, 15
-    ## and 16, the DXF dimension type, the text and the rotation.  One
-    ## implementation of the ornament serves every backend.  DECIMALS is the
-    ## caller's, since a block's dimensions take the precision of the drawing
-    ## it is placed in.
+    ## to DECIMALS places and its classes in the form FITFORM, and for a
+    ## dimension the record a file states it by: the definition points in the
+    ## order of DXF group codes 10, 11, 13, 14, 15 and 16, the DXF dimension
+    ## type, the text, the rotation, the text R12 writes and the overrides of
+    ## the dimension style.  One implementation of the ornament serves every
+    ## backend; write gives the DXF writer what it makes.  DECIMALS and
+    ## FITFORM are the caller's, since a block's dimensions take those of the
+    ## drawing it is placed in.
     function [B, REC] = __ornament__ (D, IDX, DIMSCALE, DECIMALS, FITFORM)
 
       if (nargin != 5)
@@ -3932,7 +3934,63 @@ classdef Drawing
       if (nargin < 2)
         error ("draw.Drawing.write: invalid number of input arguments.");
       endif
-      __dxf__ ('write', FILE, {this}, varargin, 'draw.Drawing.write');
+      ## The options of a drawing are read here, where its dimensions are
+      ## drawn; the file's own, such as 'Version', go on to the writer
+      if (mod (numel (varargin), 2) != 0)
+        error ("draw.Drawing.write: Name/Value arguments must come in pairs.");
+      endif
+      DIMSCALE = 1;
+      EXPLODE = false;
+      EXPAND = false;
+      rest = {};
+      for ii = 1:2:numel (varargin)
+        name = varargin{ii};
+        val = varargin{ii+1};
+        if (! ischar (name) || ! isrow (name))
+          error (strcat ("draw.Drawing.write: option names must be", ...
+                         " character vectors."));
+        endif
+        switch (lower (name))
+          case 'dimensions'
+            if (! (ischar (val) && isrow (val)
+                   && any (strcmpi (val, {'associative', 'explode'}))))
+              error (strcat ("draw.Drawing.write: Dimensions must be", ...
+                             " 'associative' or 'explode'."));
+            endif
+            EXPLODE = strcmpi (val, 'explode');
+          case 'blocks'
+            if (! (ischar (val) && isrow (val)
+                   && any (strcmpi (val, {'reference', 'expand'}))))
+              error (strcat ("draw.Drawing.write: Blocks must be", ...
+                             " 'reference' or 'expand'."));
+            endif
+            EXPAND = strcmpi (val, 'expand');
+          case 'dimscale'
+            if (! (isnumeric (val) && isreal (val) && isscalar (val)
+                   && isfinite (val) && val > 0))
+              error (strcat ("draw.Drawing.write: DimScale must be a", ...
+                             " positive finite scalar."));
+            endif
+            DIMSCALE = double (val);
+          otherwise
+            rest(end+1:end+2) = {name, val};
+        endswitch
+      endfor
+      D = this;
+      if (EXPAND)
+        D = D.expand ();
+      endif
+      ## The picture and the record of each dimension, centre mark and
+      ## leader, of the drawing and of every block it defines, at the
+      ## drawing's precision and form of classes
+      O = ornaments (D, DIMSCALE, this.Decimals, this.FitForm);
+      B = struct ('name', {}, 'ornaments', {});
+      if (! EXPAND)
+        B = blockornaments (D, B, DIMSCALE, this.Decimals, this.FitForm);
+      endif
+      __dxf__ ('write', FILE, {D}, rest, 'draw.Drawing.write', ...
+               struct ('explode', EXPLODE, 'expand', EXPAND, ...
+                       'ornaments', {O}, 'blocks', B));
 
     endfunction
 
@@ -5059,6 +5117,40 @@ function d = dimrecord (e, blockname, kind, n, v)
       d.angles = 6 + 64 * strcmp (e.direction, 'x');
 
   endswitch
+
+endfunction
+
+## The picture and the record of each dimension, centre mark and leader of
+## the drawing D, a cell with one element for each entity, empty for the
+## others
+function O = ornaments (D, dimscale, decimals, fitform)
+
+  O = cell (1, numel (D.Entities));
+  for ii = 1:numel (D.Entities)
+    if (any (strcmp (D.Entities(ii).type, {'dim', 'diam', 'radius', ...
+                                            'angdim', 'ordinate', ...
+                                            'centremark', 'leader'})))
+      [P, REC] = __ornament__ (D, ii, dimscale, decimals, fitform);
+      O{ii} = {P, REC};
+    endif
+  endfor
+
+endfunction
+
+## B with the ornaments of every block the drawing D defines, and those its
+## blocks define, once for each name, as the writer meets them
+function B = blockornaments (D, B, dimscale, decimals, fitform)
+
+  for ii = 1:numel (D.Blocks)
+    name = D.Blocks(ii).name;
+    if (! any (strcmpi (name, {B.name})))
+      sub = D.Blocks(ii).drawing;
+      B(end+1) = struct ('name', name, ...
+                         'ornaments', {ornaments(sub, dimscale, decimals, ...
+                                                 fitform)});
+      B = blockornaments (sub, B, dimscale, decimals, fitform);
+    endif
+  endfor
 
 endfunction
 

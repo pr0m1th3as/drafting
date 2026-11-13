@@ -541,7 +541,6 @@ struct WOpts
   double ltscale = 1;
   bool explode = false;
   bool expand = false;
-  double dimscale = 1;
   bool fill = false;
   // The places a dimension shows its measurement to, the drawing's Decimals
   int decimals = 2;
@@ -2192,10 +2191,12 @@ lwcode (const octave_value& v)
 }
 
 // The entities of a drawing; INBLOCK leaves paths and regions ungrouped,
-// since a group holds entities of the model alone
+// since a group holds entities of the model alone.  ORN holds, for each
+// dimension, centre mark and leader, the picture and the record the drawing
+// gave it, a cell of the two.
 static void
 drawingitems (Writer& w, vector<Item>& dest, const octave_value& D,
-              bool inblock)
+              bool inblock, const Cell& orn)
 {
   octave_map E = prop (D, "Entities").map_value ();
   V3 up = v3 (0, 0, 1);
@@ -2300,21 +2301,19 @@ drawingitems (Writer& w, vector<Item>& dest, const octave_value& D,
              || type == "angdim" || type == "ordinate"
              || type == "centremark" || type == "leader")
       {
-        octave_value_list r
-          = octave::feval ("__ornament__",
-                           ovl (D, static_cast<double> (i + 1),
-                                w.opt.dimscale,
-                                static_cast<double> (w.opt.decimals),
-                                w.opt.fitform), 2);
+        if (i >= orn.numel () || ! orn(i).iscell ())
+          error ("__dxf__: no picture is given for entity %d.",
+                 static_cast<int> (i + 1));
+        Cell r = orn(i).cell_value ();
         octave_value B = r(0);
         octave_value rec = r(1);
         if (rec.isempty () || w.opt.explode)
         {
-          drawingitems (w, dest, B, true);
+          drawingitems (w, dest, B, true, Cell ());
           continue;
         }
         vector<Item> pic;
-        drawingitems (w, pic, B, true);
+        drawingitems (w, pic, B, true, Cell ());
         // The picture on layer 0 and by block, as CAD programs draw it, so
         // the DIMENSION's own layer and properties govern it
         for (auto& it : pic)
@@ -2388,7 +2387,7 @@ drawingitems (Writer& w, vector<Item>& dest, const octave_value& D,
 // are an error rather than one standing in for the other.
 static void
 drawingblocks (Writer& w, const octave_value& D,
-               map<string, octave_value>& seen)
+               map<string, octave_value>& seen, const octave_map& orn)
 {
   octave_map B = prop (D, "Blocks").map_value ();
   vector<octave_value> subs;
@@ -2405,8 +2404,12 @@ drawingblocks (Writer& w, const octave_value& D,
       continue;
     }
     seen[upper (name)] = sub;
+    Cell bo;
+    for (octave_idx_type k = 0; k < orn.numel (); k++)
+      if (upper (orn.contents ("name")(k).string_value ()) == upper (name))
+        bo = orn.contents ("ornaments")(k).cell_value ();
     vector<Item> items;
-    drawingitems (w, items, sub, true);
+    drawingitems (w, items, sub, true, bo);
     Writer::Block blk;
     blk.name = name;
     blk.anon = false;
@@ -2415,7 +2418,7 @@ drawingblocks (Writer& w, const octave_value& D,
     subs.push_back (sub);
   }
   for (const auto& sub : subs)
-    drawingblocks (w, sub, seen);
+    drawingblocks (w, sub, seen, orn);
 }
 
 // The highest number N of a block named *DN in the drawing D or in the
@@ -2507,7 +2510,7 @@ writefile (const string& file, const string& text)
 static void
 cmdwrite (const octave_value_list& args)
 {
-  if (args.length () != 5)
+  if (args.length () != 5 && args.length () != 6)
     error ("__dxf__: invalid number of input arguments.");
   g_caller = args(4).string_value ();
   if (! ischarrow (args(1)))
@@ -2565,29 +2568,6 @@ cmdwrite (const octave_value_list& args)
                g_caller.c_str ());
       w.ltscale = v.double_value ();
     }
-    else if (drawing && name == "dimensions")
-    {
-      string s = ischarrow (v) ? lower (v.string_value ()) : "";
-      if (s != "associative" && s != "explode")
-        error ("%s: Dimensions must be 'associative' or 'explode'.",
-               g_caller.c_str ());
-      w.explode = s == "explode";
-    }
-    else if (drawing && name == "blocks")
-    {
-      string s = ischarrow (v) ? lower (v.string_value ()) : "";
-      if (s != "reference" && s != "expand")
-        error ("%s: Blocks must be 'reference' or 'expand'.",
-               g_caller.c_str ());
-      w.expand = s == "expand";
-    }
-    else if (drawing && name == "dimscale")
-    {
-      if (! posfinite (v))
-        error ("%s: DimScale must be a positive finite scalar.",
-               g_caller.c_str ());
-      w.dimscale = v.double_value ();
-    }
     else if (! drawing && name == "layer")
       layer = perobject (v, n, many, ischarrow,
                          "Layer must be a non-empty character vector.",
@@ -2614,8 +2594,19 @@ cmdwrite (const octave_value_list& args)
              opts(k).string_value ().c_str ());
   }
 
+  // A drawing comes drawn: its options read, its blocks expanded if so
+  // asked, and the picture and record of each dimension made
+  octave_map ornmap;
+  Cell orn;
   if (drawing)
   {
+    if (args.length () != 6 || ! args(5).isstruct ())
+      error ("__dxf__: a drawing needs its dimensions drawn.");
+    octave_scalar_map dd = args(5).scalar_map_value ();
+    w.explode = dd.contents ("explode").bool_value ();
+    w.expand = dd.contents ("expand").bool_value ();
+    orn = dd.contents ("ornaments").cell_value ();
+    ornmap = dd.contents ("blocks").map_value ();
     w.decimals = prop (objs(0), "Decimals").int_value ();
     w.fitform = prop (objs(0), "FitForm").string_value ();
   }
@@ -2623,8 +2614,6 @@ cmdwrite (const octave_value_list& args)
   if (drawing)
   {
     octave_value D = objs(0);
-    if (w.expand)
-      D = call ("expand", ovl (D));
     // Every layer of the drawing's table, in the table's order
     octave_map L = prop (D, "Layers").map_value ();
     for (octave_idx_type k = 0; k < L.numel (); k++)
@@ -2639,13 +2628,13 @@ cmdwrite (const octave_value_list& args)
       wr.deflayer (L.contents ("name")(k).string_value (), r);
     }
     wr.ndim = lastdim (D);
-    drawingitems (wr, wr.model, D, false);
+    drawingitems (wr, wr.model, D, false, orn);
     // Expanded, the blocks are in place of their inserts and nothing
     // refers to them
     if (! w.expand)
     {
       map<string, octave_value> seen;
-      drawingblocks (wr, D, seen);
+      drawingblocks (wr, D, seen, ornmap);
     }
   }
   else
