@@ -66,7 +66,9 @@
 ## they were given, where they now stand if a CAD program moved them whole;
 ## one changed in any other way, or written to R12 or inside a block, returns
 ## as its lines and text.  A dimension returns with its tolerance frame while
-## the frame's group is in the file, and theoretically exact if it was.
+## the frame's group is in the file, and theoretically exact if it was.  A
+## dimension whose text is @code{(<>)}, its measurement in parentheses,
+## returns auxiliary, with no tolerance whatever its style states.
 ##
 ## A drawing lies in the plane @math{z = 0}.  An entity whose normal points
 ## down the @math{z} axis is mirrored into the plane facing up, as 2-D CAD

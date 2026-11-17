@@ -2424,7 +2424,9 @@ drawingitems (Writer& w, vector<Item>& dest, const octave_value& D,
         if (E.isfield ("tolerance"))
           T = E.contents ("tolerance")(i);
         bool exact = E.isfield ("exact") && mapnum (E, "exact", i, 0) != 0;
-        if ((T.is_defined () && ! T.isempty ()) || exact)
+        bool aux = E.isfield ("auxiliary")
+                   && mapnum (E, "auxiliary", i, 0) != 0;
+        if ((T.is_defined () && ! T.isempty ()) || exact || aux)
         {
           own = {Tag (1001, "DRAFTING"), Tag (1000, "dimension")};
           if (T.is_defined () && ! T.isempty ())
@@ -2457,6 +2459,11 @@ drawingitems (Writer& w, vector<Item>& dest, const octave_value& D,
           if (exact)
           {
             own.push_back (Tag (1000, "exact"));
+            own.push_back (Tag (1070, "1"));
+          }
+          if (aux)
+          {
+            own.push_back (Tag (1000, "auxiliary"));
             own.push_back (Tag (1070, "1"));
           }
         }
@@ -5090,11 +5097,23 @@ private:
           extra.append (ovl ("Exact", true));
           k++;
         }
+        else if (item == "auxiliary")
+        {
+          extra.append (ovl ("Auxiliary", true));
+          k++;
+        }
       }
     }
     else
     {
       txt = m_rd.decode (r.str (1, "<>"));
+      // A measured text in parentheses, as an auxiliary dimension is written
+      bool aux = txt == "(<>)";
+      if (aux)
+      {
+        txt = "<>";
+        extra.append (ovl ("Auxiliary", true));
+      }
       places = shownplaces (m_rd, r);
       if (places == m_dec)
         places = -1;
@@ -5105,7 +5124,8 @@ private:
       int lim = r.dimlim >= 0 ? r.dimlim : (d ? d->lim : 0);
       double tp = ! std::isnan (r.dimtp) ? r.dimtp : (d ? d->tp : 0);
       double tm = ! std::isnan (r.dimtm) ? r.dimtm : (d ? d->tm : 0);
-      if ((tol == 1 || lim == 1) && -tm < tp)
+      // An auxiliary dimension is not toleranced, whatever its style says
+      if (! aux && (tol == 1 || lim == 1) && -tm < tp)
       {
         if (tp == tm)
           extra.append (ovl ("Tolerance", tp));
