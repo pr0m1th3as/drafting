@@ -33,7 +33,8 @@
 %!               'angles'; 'angle'; ...
 %!               'text'; 'height'; 'offset'; 'direction'; 'pattern'; ...
 %!               'spacing'; 'block'; 'scale'; 'bulge'; 'shape'; ...
-%!               'decimals'; 'tolerance'; 'form'; 'frame'; 'exact'});
+%!               'decimals'; 'tolerance'; 'form'; 'frame'; 'exact'; ...
+%!               'auxiliary'});
 %!error<draw.Drawing: NAME must be a non-empty character vector.> ...
 %! draw.Drawing (42)
 %!error<draw.Drawing: NAME must be a non-empty character vector.> ...
@@ -497,7 +498,7 @@
 %! D = D.arc ([0, 0], 1, 0, 90).circle ([0, 0], 2).text ([0, 0], 'A');
 %! D = D.hatch (geom.Region ([0, 0; 1, 0; 1, 1])).dim ([0, 0], [1, 0], 5);
 %! assert_equal (numel (D.Entities), 7);
-%! assert_equal (numel (fieldnames (D.Entities)), 25);
+%! assert_equal (numel (fieldnames (D.Entities)), 26);
 %! assert_equal ({D.Entities.type}, {'line', 'polyline', 'arc', 'circle', ...
 %!                                   'text', 'hatch', 'dim'});
 
@@ -2962,6 +2963,45 @@
 %! R = __roundtrip__ (D, 'Version', 'R12');
 %! assert_equal (R.Entities.exact, true);
 
+%!test  # an auxiliary dimension is written measured, in parentheses
+%! fn = [tempname(), '.dxf'];
+%! unwind_protect
+%!   write (draw.Drawing ().dim ([0, 0], [25, 0], 10, 'Auxiliary', true), fn);
+%!   assert_equal (any (strcmp (__dxflines__ (fn), '(<>)')), true);
+%! unwind_protect_cleanup
+%!   [~] = unlink (fn);
+%! end_unwind_protect
+
+%!test  # so it is in R12
+%! fn = [tempname(), '.dxf'];
+%! unwind_protect
+%!   write (draw.Drawing ().dim ([0, 0], [25, 0], 10, 'Auxiliary', true), ...
+%!          fn, 'Version', 'R12');
+%!   assert_equal (any (strcmp (__dxflines__ (fn), '(<>)')), true);
+%! unwind_protect_cleanup
+%!   [~] = unlink (fn);
+%! end_unwind_protect
+
+%!test  # an auxiliary dimension comes back auxiliary and measured
+%! D = draw.Drawing ().dim ([0, 0], [25, 0], 10, 'Auxiliary', true);
+%! R = __roundtrip__ (D);
+%! assert_equal ({R.Entities.auxiliary, R.Entities.text}, {true, ''});
+
+%!test  # with the text it was given
+%! D = draw.Drawing ().diam ([0, 0], 4, 'Text', '4x %%c8', 'Auxiliary', true);
+%! R = __roundtrip__ (D);
+%! assert_equal ({R.Entities.auxiliary, R.Entities.text}, {true, '4x %%c8'});
+
+%!test  # and from R12
+%! D = draw.Drawing ().dim ([0, 0], [25, 0], 10, 'Auxiliary', true);
+%! R = __roundtrip__ (D, 'Version', 'R12');
+%! assert_equal (R.Entities.auxiliary, true);
+
+%!test  # a dimension of another program reading "(<>)" is auxiliary
+%! D = draw.Drawing ().dim ([0, 0], [25, 0], 10, 'Text', '(<>)');
+%! R = __roundtrip__ (D);
+%! assert_equal ({R.Entities.auxiliary, R.Entities.text}, {true, ''});
+
 %!test  # dimensions written exploded take their frames with them
 %! D = draw.Drawing ().dim ([0, 0], [40, 0], -10, 'Frame', ...
 %!                          {'flatness', 0.02});
@@ -3244,6 +3284,92 @@
 %!error<draw.Drawing.angdim: unknown option 'Frame'.> ...
 %! draw.Drawing ().angdim ([0, 0], [10, 0], [0, 10], 8, ...
 %!                         'Frame', {'flatness', 0.02})
+
+%!test  # a dimension is not auxiliary unless asked
+%! D = draw.Drawing ().dim ([0, 0], [25, 0], 10);
+%! assert_equal (D.Entities.auxiliary, false);
+
+%!test  # an auxiliary dimension is marked so
+%! D = draw.Drawing ().dim ([0, 0], [25, 0], 10, 'Auxiliary', true);
+%! assert_equal (D.Entities.auxiliary, true);
+
+%!test  # an auxiliary dimension's value is drawn in parentheses
+%! E = frameparts (draw.Drawing ().dim ([0, 0], [25, 0], 10, ...
+%!                                      'Auxiliary', true));
+%! assert_equal (E(strcmp ({E.type}, 'TEXT')).text, '(25)');
+
+%!test  # so is an auxiliary diameter, its sign inside
+%! E = frameparts (draw.Drawing ().diam ([0, 0], 12.5, 'Auxiliary', true));
+%! assert_equal (E(strcmp ({E.type}, 'TEXT')).text, '(%%c25)');
+
+%!test  # an auxiliary radius
+%! E = frameparts (draw.Drawing ().radius ([0, 0], 3, 'Auxiliary', true));
+%! assert_equal (E(strcmp ({E.type}, 'TEXT')).text, '(R3)');
+
+%!test  # an auxiliary angle, its degree sign inside
+%! E = frameparts (draw.Drawing ().angdim ([0, 0], [10, 0], [0, 10], 8, ...
+%!                                         'Auxiliary', true));
+%! assert_equal (E(strcmp ({E.type}, 'TEXT')).text, '(90%%d)');
+
+%!test  # an auxiliary ordinate
+%! E = frameparts (draw.Drawing ().ordinate ([0, 0], [20, 15], 'x', ...
+%!                                           [20, -10], 'Auxiliary', true));
+%! assert_equal (E(strcmp ({E.type}, 'TEXT')).text, '(20)');
+
+%!test  # a text given to an auxiliary dimension is put in parentheses
+%! E = frameparts (draw.Drawing ().diam ([0, 0], 4, 'Text', '4x %%c8', ...
+%!                                       'Auxiliary', true));
+%! assert_equal (E(strcmp ({E.type}, 'TEXT')).text, '(4x %%c8)');
+
+%!test  # an auxiliary dimension's record keeps it measured, in parentheses
+%! D = draw.Drawing ().dim ([0, 0], [25, 0], 10, 'Auxiliary', true);
+%! assert_equal (entities (D).text, '(<>)');
+
+%!test  # and a given text in parentheses
+%! D = draw.Drawing ().diam ([0, 0], 4, 'Text', '4x %%c8', 'Auxiliary', true);
+%! assert_equal (entities (D).text, '(4x %%c8)');
+
+%!error<draw.Drawing.dim: Auxiliary must be a logical scalar.> ...
+%! draw.Drawing ().dim ([0, 0], [25, 0], 10, 'Auxiliary', 1)
+%!error<draw.Drawing.dim: Auxiliary takes no Tolerance: an auxiliary dimension is given for information only.> ...
+%! draw.Drawing ().dim ([0, 0], [25, 0], 10, 'Auxiliary', true, ...
+%!                      'Tolerance', 0.1)
+%!error<draw.Drawing.dim: Auxiliary takes no Exact: an auxiliary dimension is given for information only.> ...
+%! draw.Drawing ().dim ([0, 0], [25, 0], 10, 'Auxiliary', true, ...
+%!                      'Exact', true)
+%!error<draw.Drawing.dim: Auxiliary takes no Frame: an auxiliary dimension is given for information only.> ...
+%! draw.Drawing ().dim ([0, 0], [25, 0], 10, 'Auxiliary', true, ...
+%!                      'Frame', {'flatness', 0.02})
+%!error<draw.Drawing.diam: Auxiliary must be a logical scalar.> ...
+%! draw.Drawing ().diam ([0, 0], 5, 'Auxiliary', 'yes')
+%!error<draw.Drawing.diam: Auxiliary takes no Tolerance: an auxiliary dimension is given for information only.> ...
+%! draw.Drawing ().diam ([0, 0], 5, 'Auxiliary', true, 'Tolerance', 'H7')
+%!error<draw.Drawing.diam: Auxiliary takes no Exact: an auxiliary dimension is given for information only.> ...
+%! draw.Drawing ().diam ([0, 0], 5, 'Auxiliary', true, 'Exact', true)
+%!error<draw.Drawing.diam: Auxiliary takes no Frame: an auxiliary dimension is given for information only.> ...
+%! draw.Drawing ().diam ([0, 0], 5, 'Auxiliary', true, ...
+%!                       'Frame', {'flatness', 0.02})
+%!error<draw.Drawing.radius: Auxiliary takes no Tolerance: an auxiliary dimension is given for information only.> ...
+%! draw.Drawing ().radius ([0, 0], 5, 'Auxiliary', true, 'Tolerance', 'max')
+%!error<draw.Drawing.radius: Auxiliary takes no Exact: an auxiliary dimension is given for information only.> ...
+%! draw.Drawing ().radius ([0, 0], 5, 'Auxiliary', true, 'Exact', true)
+%!error<draw.Drawing.angdim: Auxiliary must be a logical scalar.> ...
+%! draw.Drawing ().angdim ([0, 0], [10, 0], [0, 10], 8, ...
+%!                         'Auxiliary', [true, true])
+%!error<draw.Drawing.angdim: Auxiliary takes no Tolerance: an auxiliary dimension is given for information only.> ...
+%! draw.Drawing ().angdim ([0, 0], [10, 0], [0, 10], 8, ...
+%!                         'Auxiliary', true, 'Tolerance', 0.5)
+%!error<draw.Drawing.angdim: Auxiliary takes no Exact: an auxiliary dimension is given for information only.> ...
+%! draw.Drawing ().angdim ([0, 0], [10, 0], [0, 10], 8, ...
+%!                         'Auxiliary', true, 'Exact', true)
+%!error<draw.Drawing.ordinate: Auxiliary must be a logical scalar.> ...
+%! draw.Drawing ().ordinate ([0, 0], [20, 15], 'x', [20, -10], 'Auxiliary', 0)
+%!error<draw.Drawing.ordinate: Auxiliary takes no Tolerance: an auxiliary dimension is given for information only.> ...
+%! draw.Drawing ().ordinate ([0, 0], [20, 15], 'x', [20, -10], ...
+%!                           'Auxiliary', true, 'Tolerance', 0.1)
+%!error<draw.Drawing.ordinate: Auxiliary takes no Exact: an auxiliary dimension is given for information only.> ...
+%! draw.Drawing ().ordinate ([0, 0], [20, 15], 'x', [20, -10], ...
+%!                           'Auxiliary', true, 'Exact', true)
 
 %!test  # a limit in one direction is text in the dimension record
 %! D = draw.Drawing ().dim ([0, 0], [30.5, 0], 5, 'Tolerance', 'min');
