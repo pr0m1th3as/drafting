@@ -1763,7 +1763,7 @@ classdef Drawing
 ##                             Available Methods                              ##
 ##                                                                            ##
 ## 'dim'             'diam'            'radius'          'angdim'             ##
-## 'ordinate'        'centremark'      'leader'                               ##
+## 'ordinate'        'chain'           'centremark'      'leader'             ##
 ################################################################################
 
   methods (Access = public)
@@ -2436,6 +2436,230 @@ classdef Drawing
       e.exact = EXACT;
       e.auxiliary = AUX;
       this.Entities(end+1) = e;
+
+    endfunction
+
+    ## -*- texinfo -*-
+    ## @deftypefn  {draw.Drawing} {@var{D} =} chain (@var{D}, @var{P}, @var{OFFSET})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} chain (@dots{}, @qcode{'Direction'}, @var{DIR})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} chain (@dots{}, @qcode{'Text'}, @var{S})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} chain (@dots{}, @qcode{'Decimals'}, @var{N})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} chain (@dots{}, @qcode{'Tolerance'}, @var{T})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} chain (@dots{}, @qcode{'Form'}, @var{FORM})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} chain (@dots{}, @qcode{'Exact'}, @var{TF})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} chain (@dots{}, @qcode{'Auxiliary'}, @var{K})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} chain (@dots{}, @qcode{'Overall'}, @var{GAP})
+    ##
+    ## Append a chain of dimensions, one from each point to the next, all on
+    ## one dimension line, as ISO 129 dimensions in a chain.
+    ##
+    ## @var{P} holds the points, one a row, at least two.  Each link is a
+    ## dimension between two neighbouring points, appended as @code{dim}
+    ## appends it, so a chain of two points is one dimension, and a chain is
+    ## edited, written and read back as the dimensions it is made of.
+    ##
+    ## The option @qcode{'Direction'} is that of @code{dim}, and
+    ## @qcode{'horizontal'} by default.  A horizontal chain takes its points in
+    ## order of increasing @math{x} and a vertical one in order of increasing
+    ## @math{y}, whatever order @var{P} gives them in.  An aligned chain needs
+    ## every point on one line, and runs along it from the first row of
+    ## @var{P} towards the point farthest from it.  Two points at one place
+    ## along the chain are an error.
+    ##
+    ## @var{OFFSET} places the dimension line as for @code{dim}, measured from
+    ## the first point along the chain: when positive, above a horizontal
+    ## chain and to the left of a vertical one.  Every link stands on that one
+    ## line, wherever its own points lie.
+    ##
+    ## The options @qcode{'Text'}, @qcode{'Decimals'}, @qcode{'Tolerance'},
+    ## @qcode{'Form'} and @qcode{'Exact'} are those of @code{dim}, each given
+    ## once for every link, or as a cell of one element for each link, in
+    ## order along the chain.  An empty element leaves its link without the
+    ## option, so a @qcode{'Text'} cell holds @qcode{''} for a link that is
+    ## measured.  A link is no feature of size, so a chain takes no
+    ## @qcode{'Frame'}.
+    ##
+    ## Tolerances add up along a chain: the distance from the first point to
+    ## the last may stray by the sum of the tolerances of the links.  ISO 129
+    ## uses a chain only where that does not affect the function of the part.
+    ## With every link given, the overall length follows from them, and so
+    ## does any one link from the overall length and the others, so a
+    ## dimension that closes the chain is auxiliary, given in parentheses for
+    ## information only.  The option @qcode{'Overall'} adds the overall
+    ## dimension, from the first point to the last, auxiliary, on a line
+    ## @var{GAP} beyond the chain's, on the side the chain's line stands
+    ## from the first point; it takes @qcode{'Decimals'} when that is given
+    ## once, and none of the other options.  The option @qcode{'Auxiliary'}
+    ## marks instead link @var{K}, counted from the first point along the
+    ## chain, as auxiliary: a tolerance, form or exact value given once
+    ## applies to every other link, and a cell must leave the element of
+    ## link @var{K} empty.  A chain has
+    ## one such dimension at most, so the two options cannot be given
+    ## together, and a chain of one link takes neither.
+    ##
+    ## An error in the dimension of one link is raised with the number of the
+    ## link.
+    ##
+    ## @example
+    ## @group
+    ## ## Three holes in a row, chained from the left edge, with the overall
+    ## D = draw.Drawing ();
+    ## D = D.polyline (geom.Polyline ([0, 0; 100, 0; 100, 40; 0, 40], ...
+    ##                                'Closed', true));
+    ## D = D.circle ([20, 20; 50, 20; 80, 20], 4);
+    ## D = D.chain ([0, 40; 20, 20; 50, 20; 80, 20], 10, 'Overall', 8);
+    ## @end group
+    ## @end example
+    ##
+    ## @seealso{draw.Drawing.dim, draw.Drawing.ordinate}
+    ## @end deftypefn
+    function this = chain (this, P, OFFSET, varargin)
+
+      if (nargin < 3)
+        error ("draw.Drawing.chain: invalid number of input arguments.");
+      endif
+      errmsg = checkpts (P);
+      if (! isempty (errmsg))
+        error ("draw.Drawing.chain: P %s", errmsg);
+      endif
+      if (rows (P) < 2)
+        error ("draw.Drawing.chain: P must hold at least two points.");
+      endif
+      if (! isfloat (OFFSET) || ! isreal (OFFSET) || ! isscalar (OFFSET)
+          || ! isfinite (OFFSET))
+        error ("draw.Drawing.chain: OFFSET must be a real finite scalar.");
+      endif
+      DIRECTION = 'horizontal';
+      LINKOPTS = cell (0, 2);
+      AUXK = [];
+      GAP = [];
+      if (mod (numel (varargin), 2) != 0)
+        error ("draw.Drawing.chain: Name/Value arguments must come in pairs.");
+      endif
+      for ii = 1:2:numel (varargin)
+        name = varargin{ii};
+        val = varargin{ii+1};
+        if (! ischar (name) || ! isrow (name))
+          error ("draw.Drawing.chain: option names must be character vectors.");
+        endif
+        switch (lower (name))
+          case 'direction'
+            DIRECTION = val;
+          case {'text', 'decimals', 'tolerance', 'form', 'exact'}
+            LINKOPTS(end+1,:) = {name, val};
+          case 'auxiliary'
+            AUXK = val;
+            if (! (isnumeric (AUXK) && isreal (AUXK) && isscalar (AUXK)
+                   && isfinite (AUXK) && AUXK == fix (AUXK) && AUXK >= 1))
+              error (strcat ("draw.Drawing.chain: Auxiliary must be the", ...
+                             " number of a link."));
+            endif
+          case 'overall'
+            GAP = val;
+            if (! (isfloat (GAP) && isreal (GAP) && isscalar (GAP)
+                   && isfinite (GAP) && GAP > 0))
+              error (strcat ("draw.Drawing.chain: Overall must be a", ...
+                             " positive real scalar."));
+            endif
+          otherwise
+            error ("draw.Drawing.chain: unknown option '%s'.", name);
+        endswitch
+      endfor
+      if (! ischar (DIRECTION) || ! isrow (DIRECTION)
+          || ! any (strcmpi (DIRECTION, {'aligned', 'horizontal', 'vertical'})))
+        error (strcat ("draw.Drawing.chain: Direction must be 'aligned',", ...
+                       " 'horizontal' or 'vertical'."));
+      endif
+      DIRECTION = lower (DIRECTION);
+      n = rows (P) - 1;
+      if (n == 1 && ! isempty (GAP))
+        error (strcat ("draw.Drawing.chain: Overall needs a chain of two", ...
+                       " links or more."));
+      endif
+      if (n == 1 && ! isempty (AUXK))
+        error (strcat ("draw.Drawing.chain: Auxiliary needs a chain of two", ...
+                       " links or more."));
+      endif
+      if (! isempty (GAP) && ! isempty (AUXK))
+        error (strcat ("draw.Drawing.chain: Overall and Auxiliary cannot", ...
+                       " be given together: a chain has one auxiliary", ...
+                       " dimension at most."));
+      endif
+      if (AUXK > n)
+        error (strcat ("draw.Drawing.chain: Auxiliary must be the number", ...
+                       " of a link, at most %d."), n);
+      endif
+      for jj = 1:rows (LINKOPTS)
+        if (iscell (LINKOPTS{jj,2}) && numel (LINKOPTS{jj,2}) != n)
+          error (strcat ("draw.Drawing.chain: %s must be one value for", ...
+                         " every link, or a cell of %d, one for each."), ...
+                 LINKOPTS{jj,1}, n);
+        endif
+      endfor
+
+      ## The direction of the chain and the points in order along it
+      switch (DIRECTION)
+        case 'horizontal'
+          U = [1, 0];
+        case 'vertical'
+          U = [0, 1];
+        otherwise
+          [span, far] = max (sqrt (sumsq (P - P(1,:), 2)));
+          if (span == 0)
+            error (strcat ("draw.Drawing.chain: P holds two points at one", ...
+                           " place along the chain."));
+          endif
+          U = (P(far,:) - P(1,:)) / span;
+          if (any (abs ((P - P(1,:)) * [-U(2); U(1)]) > 1e-9 * span))
+            error (strcat ("draw.Drawing.chain: an aligned chain needs", ...
+                           " every point on one line."));
+          endif
+      endswitch
+      [s, i] = sort (P * U');
+      P = P(i,:);
+      if (any (diff (s) == 0))
+        error (strcat ("draw.Drawing.chain: P holds two points at one", ...
+                       " place along the chain."));
+      endif
+
+      ## Every link on the line OFFSET from the first point
+      N = [-U(2), U(1)];
+      c = P(1,:) * N' + OFFSET;
+      for k = 1:n
+        args = {'Direction', DIRECTION};
+        for jj = 1:rows (LINKOPTS)
+          val = LINKOPTS{jj,2};
+          if (iscell (val))
+            val = val{k};
+          elseif (k == AUXK && ! strcmpi (LINKOPTS{jj,1}, 'decimals')
+                  && ! strcmpi (LINKOPTS{jj,1}, 'text'))
+            continue;
+          endif
+          if (! isempty (val))
+            args(end+1:end+2) = {LINKOPTS{jj,1}, val};
+          endif
+        endfor
+        if (k == AUXK)
+          args(end+1:end+2) = {'Auxiliary', true};
+        endif
+        try
+          this = this.dim (P(k,:), P(k+1,:), c - P(k,:) * N', args{:});
+        catch err
+          error ("draw.Drawing.chain: link %d: %s", k, ...
+                 regexprep (err.message, '^draw\.Drawing\.dim: ', ''));
+        end_try_catch
+      endfor
+
+      ## The overall dimension, GAP beyond the chain's line
+      if (! isempty (GAP))
+        side = sign (OFFSET) + (OFFSET == 0);
+        args = {'Direction', DIRECTION, 'Auxiliary', true};
+        jj = find (strcmpi (LINKOPTS(:,1), 'decimals'), 1, 'last');
+        if (! isempty (jj) && ! iscell (LINKOPTS{jj,2}))
+          args(end+1:end+2) = {'Decimals', LINKOPTS{jj,2}};
+        endif
+        this = this.dim (P(1,:), P(end,:), OFFSET + side * GAP, args{:});
+      endif
 
     endfunction
 
