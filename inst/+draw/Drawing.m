@@ -271,7 +271,7 @@ classdef Drawing
                        'pattern', {}, 'spacing', {}, 'block', {}, ...
                        'scale', {}, 'bulge', {}, 'shape', {}, ...
                        'decimals', {}, 'tolerance', {}, 'form', {}, ...
-                       'frame', {}, 'exact', {});
+                       'frame', {}, 'exact', {}, 'auxiliary', {});
 
   endproperties
 
@@ -1777,6 +1777,7 @@ classdef Drawing
     ## @deftypefnx {draw.Drawing} {@var{D} =} dim (@dots{}, @qcode{'Form'}, @var{FORM})
     ## @deftypefnx {draw.Drawing} {@var{D} =} dim (@dots{}, @qcode{'Exact'}, @var{TF})
     ## @deftypefnx {draw.Drawing} {@var{D} =} dim (@dots{}, @qcode{'Frame'}, @var{F})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} dim (@dots{}, @qcode{'Auxiliary'}, @var{TF})
     ##
     ## Append a dimension measuring between @var{P1} and @var{P2}.
     ##
@@ -1869,6 +1870,15 @@ classdef Drawing
     ## the dimension line, above a label above the line and under any other,
     ## so that it never crosses the line.
     ##
+    ## The option @qcode{'Auxiliary'} set to @code{true} makes the dimension
+    ## auxiliary, as ISO 129 calls a dimension given for information only: one
+    ## derived from others on the drawing, such as the overall length of a
+    ## chain whose every link is given.  Its text is written in parentheses,
+    ## a text given with @qcode{'Text'} too, and in a DXF file as
+    ## @code{(<>)}, so that it stays measured.  It governs neither making nor
+    ## inspecting the part, so it takes no @qcode{'Tolerance'}, no
+    ## @qcode{'Exact'} and no @qcode{'Frame'}.
+    ##
     ## @end deftypefn
     function this = dim (this, P1, P2, OFFSET, varargin)
 
@@ -1899,6 +1909,7 @@ classdef Drawing
       HASFORM = false;
       FRAMEARG = {};
       EXACT = false;
+      AUX = false;
       if (mod (numel (varargin), 2) != 0)
         error ("draw.Drawing.dim: Name/Value arguments must come in pairs.");
       endif
@@ -1936,6 +1947,11 @@ classdef Drawing
             EXACT = varargin{ii+1};
             if (! (islogical (EXACT) && isscalar (EXACT)))
               error ("draw.Drawing.dim: Exact must be a logical scalar.");
+            endif
+          case 'auxiliary'
+            AUX = varargin{ii+1};
+            if (! (islogical (AUX) && isscalar (AUX)))
+              error ("draw.Drawing.dim: Auxiliary must be a logical scalar.");
             endif
           case 'frame'
             FRAMEARG = varargin{ii+1};
@@ -1986,6 +2002,21 @@ classdef Drawing
                        " theoretically exact dimension is not toleranced."), ...
                'dim');
       endif
+      if (AUX && ! isempty (TOL))
+        error (strcat ("draw.Drawing.%s: Auxiliary takes no Tolerance: an", ...
+                       " auxiliary dimension is given for information", ...
+                       " only."), 'dim');
+      endif
+      if (AUX && EXACT)
+        error (strcat ("draw.Drawing.%s: Auxiliary takes no Exact: an", ...
+                       " auxiliary dimension is given for information", ...
+                       " only."), 'dim');
+      endif
+      if (AUX && ! isempty (FRAMEARG))
+        error (strcat ("draw.Drawing.%s: Auxiliary takes no Frame: an", ...
+                       " auxiliary dimension is given for information", ...
+                       " only."), 'dim');
+      endif
       [FRAME, errmsg] = dimframe (FRAMEARG);
       if (! isempty (errmsg))
         error ("draw.Drawing.%s: %s", 'dim', errmsg);
@@ -2000,6 +2031,7 @@ classdef Drawing
       e.tolerance = TOL;
       e.form = FORM;
       e.exact = EXACT;
+      e.auxiliary = AUX;
       e.frame = FRAME;
       this.Entities(end+1) = e;
 
@@ -2014,6 +2046,7 @@ classdef Drawing
     ## @deftypefnx {draw.Drawing} {@var{D} =} diam (@dots{}, @qcode{'Form'}, @var{FORM})
     ## @deftypefnx {draw.Drawing} {@var{D} =} diam (@dots{}, @qcode{'Exact'}, @var{TF})
     ## @deftypefnx {draw.Drawing} {@var{D} =} diam (@dots{}, @qcode{'Frame'}, @var{F})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} diam (@dots{}, @qcode{'Auxiliary'}, @var{TF})
     ##
     ## Append a diameter dimension across a circle.
     ##
@@ -2026,9 +2059,9 @@ classdef Drawing
     ## 0 to 8, in place of the drawing's @code{Decimals}.  The options
     ## @qcode{'Tolerance'} and @qcode{'Form'} are those of @code{dim}, classes
     ## and fit pairs included; each limit of a numeric tolerance carries the
-    ## diameter sign.  The options @qcode{'Exact'} and @qcode{'Frame'} are
-    ## those of @code{dim}; the frame stands over the text when the dimension
-    ## line comes up to it and under it otherwise.
+    ## diameter sign.  The options @qcode{'Exact'}, @qcode{'Frame'} and
+    ## @qcode{'Auxiliary'} are those of @code{dim}; the frame stands over the
+    ## text when the dimension line comes up to it and under it otherwise.
     ##
     ## A round feature is dimensioned by its diameter and never by its radius,
     ## because a diameter is what a bore gauge and a micrometer measure.  A
@@ -2055,6 +2088,7 @@ classdef Drawing
     ## @deftypefnx {draw.Drawing} {@var{D} =} radius (@dots{}, @qcode{'Decimals'}, @var{N})
     ## @deftypefnx {draw.Drawing} {@var{D} =} radius (@dots{}, @qcode{'Tolerance'}, @var{T})
     ## @deftypefnx {draw.Drawing} {@var{D} =} radius (@dots{}, @qcode{'Exact'}, @var{TF})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} radius (@dots{}, @qcode{'Auxiliary'}, @var{TF})
     ##
     ## Append a radius dimension from a centre out to an arc.
     ##
@@ -2069,7 +2103,8 @@ classdef Drawing
     ## theoretically exact values.  It takes no @qcode{'Frame'}: a frame shown
     ## with a dimension applies to a feature of size, which an arc measured by
     ## its radius is not, so a tolerance of the arc goes on a leader to its
-    ## surface, with @code{tolframe}.
+    ## surface, with @code{tolframe}.  The option @qcode{'Auxiliary'} is that
+    ## of @code{dim}.
     ##
     ## Use it for a fillet or any arc that is less than a full circle, where
     ## there is no diameter to measure across.
@@ -2093,6 +2128,7 @@ classdef Drawing
     ## @deftypefnx {draw.Drawing} {@var{D} =} angdim (@dots{}, @qcode{'Tolerance'}, @var{T})
     ## @deftypefnx {draw.Drawing} {@var{D} =} angdim (@dots{}, @qcode{'Form'}, @var{FORM})
     ## @deftypefnx {draw.Drawing} {@var{D} =} angdim (@dots{}, @qcode{'Exact'}, @var{TF})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} angdim (@dots{}, @qcode{'Auxiliary'}, @var{TF})
     ##
     ## Append an angular dimension at a vertex.
     ##
@@ -2107,7 +2143,8 @@ classdef Drawing
     ## sign:
     ## @code{15.5@textdegree{} ±0.25@textdegree{}}.  The option
     ## @qcode{'Exact'} is that of @code{dim}: an exact angle, such as the
-    ## angle of a hole on a pitch circle, in its frame.
+    ## angle of a hole on a pitch circle, in its frame.  The option
+    ## @qcode{'Auxiliary'} is that of @code{dim} too.
     ##
     ## The angle measured is the one from the first arm to the second going
     ## counter-clockwise, so giving the arms the other way round dimensions the
@@ -2140,6 +2177,7 @@ classdef Drawing
       HASFORM = false;
       FRAMEARG = {};
       EXACT = false;
+      AUX = false;
       if (mod (numel (varargin), 2) != 0)
         error ("draw.Drawing.angdim: Name/Value arguments must come in pairs.");
       endif
@@ -2177,6 +2215,12 @@ classdef Drawing
             if (! (islogical (EXACT) && isscalar (EXACT)))
               error ("draw.Drawing.angdim: Exact must be a logical scalar.");
             endif
+          case 'auxiliary'
+            AUX = varargin{ii+1};
+            if (! (islogical (AUX) && isscalar (AUX)))
+              error (strcat ("draw.Drawing.angdim: Auxiliary must be a", ...
+                             " logical scalar."));
+            endif
           otherwise
             error ("draw.Drawing.angdim: unknown option '%s'.", name);
         endswitch
@@ -2202,6 +2246,16 @@ classdef Drawing
                        " theoretically exact dimension is not toleranced."), ...
                'angdim');
       endif
+      if (AUX && ! isempty (TOL))
+        error (strcat ("draw.Drawing.%s: Auxiliary takes no Tolerance: an", ...
+                       " auxiliary dimension is given for information", ...
+                       " only."), 'angdim');
+      endif
+      if (AUX && EXACT)
+        error (strcat ("draw.Drawing.%s: Auxiliary takes no Exact: an", ...
+                       " auxiliary dimension is given for information", ...
+                       " only."), 'angdim');
+      endif
       e = makeentity ('angdim', pen (this));
       e.pts = [V(:)'; P1(:)'; P2(:)'];
       e.radius = RAD;
@@ -2210,6 +2264,7 @@ classdef Drawing
       e.tolerance = TOL;
       e.form = FORM;
       e.exact = EXACT;
+      e.auxiliary = AUX;
       this.Entities(end+1) = e;
 
     endfunction
@@ -2220,6 +2275,7 @@ classdef Drawing
     ## @deftypefnx {draw.Drawing} {@var{D} =} ordinate (@dots{}, @qcode{'Decimals'}, @var{N})
     ## @deftypefnx {draw.Drawing} {@var{D} =} ordinate (@dots{}, @qcode{'Tolerance'}, @var{T})
     ## @deftypefnx {draw.Drawing} {@var{D} =} ordinate (@dots{}, @qcode{'Exact'}, @var{TF})
+    ## @deftypefnx {draw.Drawing} {@var{D} =} ordinate (@dots{}, @qcode{'Auxiliary'}, @var{TF})
     ##
     ## Append an ordinate dimension, the distance of a point from a datum.
     ##
@@ -2243,8 +2299,8 @@ classdef Drawing
     ## literal text @var{S} instead, and the option @qcode{'Decimals'} the
     ## places @var{N} the value shows, an integer from 0 to 8, in place of the
     ## drawing's @code{Decimals}.  The option @qcode{'Tolerance'} is that of
-    ## @code{dim}, a symmetric tolerance or deviations only, and the option
-    ## @qcode{'Exact'} is that of @code{dim}.
+    ## @code{dim}, a symmetric tolerance or deviations only, and the options
+    ## @qcode{'Exact'} and @qcode{'Auxiliary'} are those of @code{dim}.
     ##
     ## @example
     ## @group
@@ -2291,6 +2347,7 @@ classdef Drawing
       HASFORM = false;
       FRAMEARG = {};
       EXACT = false;
+      AUX = false;
       if (mod (numel (varargin), 2) != 0)
         error (strcat ("draw.Drawing.ordinate: Name/Value arguments must", ...
                        " come in pairs."));
@@ -2329,6 +2386,12 @@ classdef Drawing
             if (! (islogical (EXACT) && isscalar (EXACT)))
               error ("draw.Drawing.ordinate: Exact must be a logical scalar.");
             endif
+          case 'auxiliary'
+            AUX = varargin{ii+1};
+            if (! (islogical (AUX) && isscalar (AUX)))
+              error (strcat ("draw.Drawing.ordinate: Auxiliary must be a", ...
+                             " logical scalar."));
+            endif
           otherwise
             error ("draw.Drawing.ordinate: unknown option '%s'.", name);
         endswitch
@@ -2353,6 +2416,16 @@ classdef Drawing
                        " theoretically exact dimension is not toleranced."), ...
                'ordinate');
       endif
+      if (AUX && ! isempty (TOL))
+        error (strcat ("draw.Drawing.%s: Auxiliary takes no Tolerance: an", ...
+                       " auxiliary dimension is given for information", ...
+                       " only."), 'ordinate');
+      endif
+      if (AUX && EXACT)
+        error (strcat ("draw.Drawing.%s: Auxiliary takes no Exact: an", ...
+                       " auxiliary dimension is given for information", ...
+                       " only."), 'ordinate');
+      endif
       e = makeentity ('ordinate', pen (this));
       e.pts = [O; P; L];
       e.direction = AXIS;
@@ -2361,6 +2434,7 @@ classdef Drawing
       e.tolerance = TOL;
       e.form = FORM;
       e.exact = EXACT;
+      e.auxiliary = AUX;
       this.Entities(end+1) = e;
 
     endfunction
@@ -4718,7 +4792,7 @@ function e = makeentity (type, p)
               'height', [], 'offset', [], 'direction', '', 'pattern', '', ...
               'spacing', [], 'block', '', 'scale', [], 'bulge', [], ...
               'shape', [], 'decimals', [], 'tolerance', [], 'form', '', ...
-              'frame', [], 'exact', false);
+              'frame', [], 'exact', false, 'auxiliary', false);
 
 endfunction
 
@@ -4763,6 +4837,7 @@ function e = dimcircle (this, kind, C, R, opts)
   HASFORM = false;
   FRAMEARG = {};
   EXACT = false;
+  AUX = false;
   for ii = 1:2:numel (opts)
     name = opts{ii};
     if (! ischar (name) || ! isrow (name))
@@ -4797,6 +4872,11 @@ function e = dimcircle (this, kind, C, R, opts)
         if (! (islogical (EXACT) && isscalar (EXACT)))
           error ("draw.Drawing.%s: Exact must be a logical scalar.", kind);
         endif
+      case 'auxiliary'
+        AUX = opts{ii+1};
+        if (! (islogical (AUX) && isscalar (AUX)))
+          error ("draw.Drawing.%s: Auxiliary must be a logical scalar.", kind);
+        endif
       case 'frame'
         FRAMEARG = opts{ii+1};
         if (! (iscell (FRAMEARG) && numel (FRAMEARG) >= 2))
@@ -4830,6 +4910,21 @@ function e = dimcircle (this, kind, C, R, opts)
                    " theoretically exact dimension is not toleranced."), ...
            kind);
   endif
+  if (AUX && ! isempty (TOL))
+    error (strcat ("draw.Drawing.%s: Auxiliary takes no Tolerance: an", ...
+                   " auxiliary dimension is given for information", ...
+                   " only."), kind);
+  endif
+  if (AUX && EXACT)
+    error (strcat ("draw.Drawing.%s: Auxiliary takes no Exact: an", ...
+                   " auxiliary dimension is given for information", ...
+                   " only."), kind);
+  endif
+  if (AUX && ! isempty (FRAMEARG))
+    error (strcat ("draw.Drawing.%s: Auxiliary takes no Frame: an", ...
+                   " auxiliary dimension is given for information", ...
+                   " only."), kind);
+  endif
   [FRAME, errmsg] = dimframe (FRAMEARG);
   if (! isempty (errmsg))
     error ("draw.Drawing.%s: %s", kind, errmsg);
@@ -4844,6 +4939,7 @@ function e = dimcircle (this, kind, C, R, opts)
   e.tolerance = TOL;
   e.form = FORM;
   e.exact = EXACT;
+  e.auxiliary = AUX;
   e.frame = FRAME;
 
 endfunction
@@ -5461,6 +5557,10 @@ function d = dimrecord (e, blockname, kind, n, v)
       && ! strcmp (e.text, autolabel (e, kind, n)))
     d.text = e.text;
   endif
+  ## An auxiliary dimension's text in parentheses, "(<>)" while it is measured
+  if (isfield (e, 'auxiliary') && e.auxiliary)
+    d.text = ['(', d.text, ')'];
+  endif
   ## A limit in one direction and a class have no dimension style variable,
   ## so they are text: a class's deviations or limits stacked in brackets by
   ## the codes of MTEXT, which a dimension's text takes
@@ -5903,6 +6003,10 @@ function [parts, v, nframe] = explodecirc (e, scale, ndec)
     v = e.radius;
     pre = '';
   endif
+  ## An auxiliary dimension's text in parentheses, as ISO 129 gives it
+  if (e.auxiliary)
+    label = ['(', label, ')'];
+  endif
   [main, R, A, wid, rise, B] = tolerancetext (e, label, v, ndec, pre, '', ...
                                               hgt);
   ## The label as a block, its text inside: a theoretically exact value's
@@ -5983,6 +6087,10 @@ function [parts, v] = explodeang (e, scale, ndec)
     label = autolabel (e, e.type, ndec);
   endif
   v = mod (a2 - a1, 360);
+  ## An auxiliary dimension's text in parentheses, as ISO 129 gives it
+  if (e.auxiliary)
+    label = ['(', label, ')'];
+  endif
   [main, R, A, ~, ~, B] = tolerancetext (e, label, v, ndec, '', '%%d', ...
                                           hgt);
   P = V + (e.radius + 0.5 * hgt) * [cosd(am), sind(am)];
@@ -6031,6 +6139,10 @@ function [parts, v] = explodeord (e, scale, ndec)
     label = decfmt (v, ndec);
   else
     label = e.text;
+  endif
+  ## An auxiliary dimension's text in parentheses, as ISO 129 gives it
+  if (e.auxiliary)
+    label = ['(', label, ')'];
   endif
   [main, R, A, wid, rise, B] = tolerancetext (e, label, v, ndec, '', '', ...
                                               hgt);
@@ -6727,6 +6839,10 @@ function [parts, v, nframe] = explodedim (e, scale, ndec)
     label = decfmt (v, ndec);
   else
     label = e.text;
+  endif
+  ## An auxiliary dimension's text in parentheses, as ISO 129 gives it
+  if (e.auxiliary)
+    label = ['(', label, ')'];
   endif
 
   ## Place the label clear of the dimension line, on the far side from the
