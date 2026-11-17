@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Tolerance frames and datums - drafting guide</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" integrity="sha512-1ycn6IcaQQ40/MKBW2W4Rhis/DbILU74C1vSrLJxCq57o941Ym01SwNsOMqvEBFlcgUa6xLiPY/NS5R+E6ztJQ==" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/css/bootstrap.min.css" integrity="sha384-KyZXEAg3QhqLMpG8r+8fhAXLRk2vvoC2f3B09zVXn8CA5QIVfZOJ3BCsw2P0p/We" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-U1DAWAznBHeqEIlVSCgzq+c9gqGAJn5c/t99JyeKa9xxaYpSvHU5awsuZVVFIhvj" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="guide.css">
+  </head>
+  <body>
+    <div class="bg-dark">
+      <div class="container-xl">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+          <div class="container-fluid">
+            <a class="navbar-brand" href="index.html">
+              <img src="../assets/drafting.png" alt="drafting" class="d-inline-block align-top" width="25" height="25">
+              drafting guide
+            </a>
+            <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+              <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+              <ul class="navbar-nav">
+                <li class="nav-item">
+                  <a class="nav-link" href="https://pr0m1th3as.github.io/drafting-models/">
+                    <i class="fas fa-cubes"></i>
+                    Models
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="../index.html">
+                    <i class="fas fa-book"></i>
+                    Function reference
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="https://github.com/pr0m1th3as/drafting">
+                    <i class="fab fa-github"></i>
+                    Source
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </nav>
+      </div>
+    </div>
+    <div class="container-xl my-4">
+      <div class="row">
+        <div class="col-md-3 col-lg-2 mb-4">
+          <nav class="guide-nav">
+<!-- guide-nav -->
+            <h6>Guide</h6>
+            <ul>
+              <li><a href="index.html">Overview</a></li>
+              <li><a href="layout.html">Package layout</a></li>
+              <li><a href="dxf.html">DXF and the classes</a></li>
+            </ul>
+            <h6>Octave</h6>
+            <ul>
+              <li><a href="primer.html">A brief Octave primer</a></li>
+            </ul>
+            <h6>Standards</h6>
+            <ul>
+              <li><a href="standards_threads.html">Threads and tapped holes</a></li>
+              <li><a href="standards_holes.html">Clearance holes, counterbores and countersinks</a></li>
+              <li><a href="standards_knurling.html">Knurls</a></li>
+            </ul>
+            <h6>Tutorials</h6>
+            <ul>
+              <li><a href="01_first_part.html">A first part</a></li>
+              <li><a href="02_outlines.html">Outlines: polylines, splines, paths and regions</a></li>
+              <li><a href="03_regions.html">Working with regions</a></li>
+              <li><a href="04_coordinate_systems.html">Coordinate systems</a></li>
+              <li><a href="05_solids_from_regions.html">Solids from regions</a></li>
+              <li><a href="06_primitives_and_booleans.html">Primitives, booleans and transforms</a></li>
+              <li><a href="07_features.html">Features: holes, pockets, fillets, chamfers and shells</a></li>
+              <li><a href="08_sections_and_projections.html">Sections and projections</a></li>
+              <li><a href="09_drawings.html">Technical drawings</a></li>
+              <li><a href="10_meshes.html">Meshes</a></li>
+              <li><a href="11_assemblies.html">Assemblies</a></li>
+              <li><a href="12_from_openscad.html">For OpenSCAD users</a></li>
+              <li><a href="13_surfaces.html">Surfaces through a grid</a></li>
+              <li><a href="14_parts_as_functions.html">Parts as functions</a></li>
+              <li><a href="15_testing_parts.html">Testing parts</a></li>
+              <li><a href="16_holes_and_threads.html">Holes and threads</a></li>
+              <li><a href="17_clearance_holes.html">Clearance holes, counterbores and countersinks</a></li>
+              <li><a href="18_looking_inside.html">Looking inside a model</a></li>
+              <li><a href="19_knurling.html">Knurling</a></li>
+              <li><a href="20_naming_faces.html">Naming faces</a></li>
+              <li><a href="21_tolerances.html">Tolerances and fits</a></li>
+              <li><a href="22_tolerance_frames.html" class="active">Tolerance frames and datums</a></li>
+            </ul>
+<!-- /guide-nav -->
+          </nav>
+        </div>
+        <main class="col-md-9 col-lg-10">
+<h1>Tolerance frames and datums</h1>
+<p>A tolerance on a dimension limits a size. It says nothing about whether a face is flat, square to another, or where a hole stands. Those are geometrical tolerances, which ISO 1101 writes in tolerance frames. This page draws the frames, names the datums they are measured from, and gives the theoretically exact dimensions that place a tolerance zone.</p>
+<h2>A frame on a leader</h2>
+<p><code>tolframe</code> draws a frame at the end of a leader from the feature it tolerates. The frame is a row of compartments: the symbol of the characteristic, the width of the tolerance zone in millimetres, and the datums, if any. Here the top face of a block may lie anywhere between two parallel planes 0.05 apart: it is flat to 0.05.</p>
+<p><code>datum</code> names a feature as a datum: a letter in a square, joined to a triangle standing on the feature. The bottom face is datum A, and the right face must be square to it within 0.1.</p>
+<pre class="code-in"><code>B = draw.Drawing ('block');
+B = B.polyline (geom.Polyline ([0, 0; 60, 0; 60, 25; 0, 25], ...
+                               'Closed', true));
+B = B.tolframe ([40, 25; 40, 35; 48, 35], 'flatness', 0.05);
+B = B.datum ([20, 0; 20, -10], 'A');
+B = B.tolframe ([60, 12; 70, 12], 'perpendicularity', 0.1, ...
+                'Datums', {'A'});
+plot (B, 'FontScale', 5);</code></pre>
+<figure class="shot"><img src="img/22_tolerance_frames-1.png" alt="Tolerance frames and datums, picture 1"></figure>
+<p>The leader starts on the feature and ends where the frame stands, at the middle of whichever end of the frame faces it. A frame given a single point stands free, by the middle of its left end.</p>
+<h2>The fourteen characteristics</h2>
+<p>ISO 1101 has fourteen characteristics, each with its symbol, drawn here as lines and arcs and not taken from a font. Straightness, flatness, circularity and cylindricity tolerate the form of a single feature and take no datum. The orientations, coaxiality, symmetry and the run-outs relate one feature to another and need one. The profiles and position may have one or not.</p>
+<pre class="code-in"><code>names = {'straightness', 'flatness', 'circularity', 'cylindricity', ...
+         'lineprofile', 'surfaceprofile', 'position', ...
+         'parallelism', 'perpendicularity', 'angularity', 'coaxiality', ...
+         'symmetry', 'runout', 'totalrunout'};
+S = draw.Drawing ('characteristics');
+for k = 1:7
+  S = S.tolframe ([0, -10 * k], names{k}, 0.01 * k);
+  S = S.text ([16, -10 * k - 1.25], names{k});
+  S = S.tolframe ([60, -10 * k], names{k+7}, 0.01 * (k + 7), ...
+                  'Datums', {'A'});
+  S = S.text ([80, -10 * k - 1.25], names{k+7});
+endfor
+plot (S, 'FontScale', 4);</code></pre>
+<figure class="shot"><img src="img/22_tolerance_frames-2.png" alt="Tolerance frames and datums, picture 2"></figure>
+<p>The frame refuses what ISO 1101 does not allow in it, such as a datum for flatness, which tolerates a face on its own.</p>
+<pre class="code-in"><code>B.tolframe ([40, 25; 40, 35], 'flatness', 0.05, 'Datums', {'A'});</code></pre>
+<pre class="code-out"><code>draw.Drawing.tolframe: flatness takes no datum.</code></pre>
+<h2>Zones, modifiers and datums</h2>
+<p>A zone that is a circle or a cylinder, such as the zone an axis must lie in, takes the sign Ø before its width: <code>'Zone', 'diameter'</code>. After the width come the modifiers, each a letter in a circle: M for the maximum material condition, L for the least, P for a projected zone. Up to three datums follow, ranked from left to right, each with its own material condition if it has one, and a note such as a count stands above the frame.</p>
+<pre class="code-in"><code>P = draw.Drawing ('frame');
+P = P.tolframe ([0, 0], 'position', 0.05, 'Zone', 'diameter', ...
+                'Modifiers', {'M'}, 'Datums', {'A', 'B(M)', 'C'}, ...
+                'Note', '4x');
+P = P.tolframe ([0, -15], 'coaxiality', 0.02, 'Zone', 'diameter', ...
+                'Datums', {'A-B'});
+plot (P, 'FontScale', 9);</code></pre>
+<figure class="shot"><img src="img/22_tolerance_frames-3.png" alt="Tolerance frames and datums, picture 3"></figure>
+<p>The second frame measures from a common datum, the axis the two features A and B establish together, written <code>'A-B'</code>.</p>
+<p>Two characteristics of one feature are written in two frames, one under the other: <code>CHAR</code> a cell of two names, <code>VALUE</code> two values, and each of <code>'Zone'</code>, <code>'Modifiers'</code> and <code>'Datums'</code> a cell of two, one for each frame. Here the top face is parallel to A within 0.1, and flat within 0.05.</p>
+<pre class="code-in"><code>B = B.tolframe ([20, 25; 20, 40; 12, 40], {'parallelism', 'flatness'}, ...
+                [0.1, 0.05], 'Datums', {{'A'}, {}});
+plot (B, 'FontScale', 5);</code></pre>
+<figure class="shot"><img src="img/22_tolerance_frames-4.png" alt="Tolerance frames and datums, picture 4"></figure>
+<h2>Theoretically exact dimensions</h2>
+<p>A position tolerance says how far a hole's axis may stray from where it should be, so where it should be must be stated without a tolerance of its own. That is a theoretically exact dimension: <code>'Exact', true</code> on <code>dim</code>, <code>diam</code>, <code>radius</code>, <code>angdim</code> or <code>ordinate</code> writes its value in a frame. It takes no <code>'Tolerance'</code>, and the general tolerance of the title block does not apply to it; how far the feature may stray is the tolerance frame's to say.</p>
+<p><code>'Frame'</code> puts a tolerance frame on the feature the dimension sizes, the arguments of <code>tolframe</code> after the path given in a cell. Shown with a dimension, the frame applies to the feature of size, here the axis of each hole, and stands by the label on the side away from the dimension line. Here a plate carries four holes 8 mm across, plus 0.1. The axis of each must lie in a cylinder 0.2 across, centred where the exact dimensions from the edges A and B put it. The circled M lets the cylinder grow by as much as the hole is larger than its smallest size.</p>
+<pre class="code-in"><code>H = draw.Drawing ('plate');
+C = [35, 20; 85, 20; 35, 50; 85, 50];
+H = H.polyline (geom.Polyline ([0, 0; 120, 0; 120, 70; 0, 70], ...
+                               'Closed', true));
+H = H.circle (C, 4).centremark (C, 4);
+H = H.datum ([0, 35; -8, 35], 'A');
+H = H.datum ([60, 0; 60, -8], 'B');
+H = H.dim ([0, 70], [35, 50], 8, 'Direction', 'horizontal', 'Exact', true);
+H = H.dim ([0, 70], [85, 50], 16, 'Direction', 'horizontal', ...
+           'Exact', true);
+H = H.dim ([120, 0], [85, 20], -8, 'Direction', 'vertical', 'Exact', true);
+H = H.dim ([120, 0], [85, 50], -16, 'Direction', 'vertical', ...
+           'Exact', true);
+H = H.diam ([35, 20], 4, 'Angle', 225, 'Text', '4x %%c8', ...
+            'Tolerance', [0, 0.1], ...
+            'Frame', {'position', 0.2, 'Zone', 'diameter', ...
+                      'Modifiers', {'M'}, 'Datums', {'A', 'B'}});
+plot (H, 'FontScale', 2.75);</code></pre>
+<figure class="shot"><img src="img/22_tolerance_frames-5.png" alt="Tolerance frames and datums, picture 5"></figure>
+<p>The count before the size is no measurement, so it is written with <code>'Text'</code>, and the tolerance follows the text. A dimension takes a frame on <code>dim</code> and <code>diam</code> only. A radius takes <code>'Exact'</code>, since the arcs of a contour toleranced by its profile are exact, but no <code>'Frame'</code>: a radius is no feature of size, and its tolerance frame goes on a leader.</p>
+<h2>All around</h2>
+<p>A profile tolerance on a leader with a bend and <code>'AllAround', true</code> applies to the whole outline, which a circle at the bend says. The corner radius of this plate is exact, so the profile alone limits it.</p>
+<pre class="code-in"><code>R = draw.Drawing ('profile');
+R = R.polyline (fillet (geom.Polyline ([0, 0; 60, 0; 60, 30; 0, 30], ...
+                                       'Closed', true), 8));
+R = R.radius ([52, 22], 8, 'Exact', true);
+R = R.tolframe ([30, 30; 30, 40; 38, 40], 'lineprofile', 0.1, ...
+                'AllAround', true);
+plot (R, 'FontScale', 5);</code></pre>
+<figure class="shot"><img src="img/22_tolerance_frames-6.png" alt="Tolerance frames and datums, picture 6"></figure>
+<h2>In a DXF file</h2>
+<p><code>write</code> puts a tolerance frame or a datum symbol in a DXF file as the lines, arcs and text it is drawn with, gathered in a group, so any CAD program shows it as drawn. The group carries a record of what it is, and <a href="../draw.read.html"><code>draw.read</code></a> reads the frame back as a frame, as long as every member of the group is there and all of them moved alike. A dimension's frame is drawn beside the dimension and comes back as part of it.</p>
+<pre class="code-in"><code>write (H, 'plate.dxf');
+D = draw.read ('plate.dxf');
+plot (D, 'FontScale', 2.75);</code></pre>
+<figure class="shot"><img src="img/22_tolerance_frames-7.png" alt="Tolerance frames and datums, picture 7"></figure>
+<nav class="d-flex justify-content-between my-5">
+<a href="21_tolerances.html">&larr; Tolerances and fits</a>
+</nav>
+
+        </main>
+      </div>
+    </div>
+  </body>
+</html>
