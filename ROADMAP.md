@@ -71,7 +71,7 @@ it changes what the package is. In rough order of value:
 |---|---|
 | Dimensional tolerances | symmetric (`±0.05`), deviations (`+0.1/-0.05`) and limit dimensions (`25.05/24.95`); ISO fits (`25 H7 (+0.021/0)`) from the whole ISO 286 system, fit pairs (`H7/g6`) and angle tolerances; a general tolerance in the title block |
 | Feature control frames | all 14 symbols of ISO 1101, a Ø zone, up to three datums with common datums, the modifiers for maximum and least material, projected and common zones, all-around, a count above the frame and two frames stacked; datum feature symbols |
-| Baseline and chain dimensions | baseline dimensions from one datum, building on `ordinate`, and chains whose overall or one auxiliary link is shown in parentheses |
+| Baseline and chain dimensions | baseline dimensions from one datum, as parallel dimension lines, and chains whose overall or one auxiliary link is shown in parentheses |
 | Surface finish | the full single-requirement symbol and the general indication |
 
 Every group follows ISO; ASME Y14.5 is not covered. A tolerance belongs to
