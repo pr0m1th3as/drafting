@@ -2,7 +2,7 @@
 # name: cache
 # type: cell
 # rows: 3
-# columns: 253
+# columns: 254
 # name: <cell-element>
 # type: sq_string
 # elements: 1
@@ -619,6 +619,96 @@ draw.linetype
 # elements: 1
 # length: 64
 Append the small cross that marks the centre of a round feature.
+
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 18
+draw.Drawing.chain
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 3207
+draw.Drawing: D = chain (D, P, OFFSET)
+draw.Drawing: D = chain (..., 'Direction', DIR)
+draw.Drawing: D = chain (..., 'Text', S)
+draw.Drawing: D = chain (..., 'Decimals', N)
+draw.Drawing: D = chain (..., 'Tolerance', T)
+draw.Drawing: D = chain (..., 'Form', FORM)
+draw.Drawing: D = chain (..., 'Exact', TF)
+draw.Drawing: D = chain (..., 'Auxiliary', K)
+draw.Drawing: D = chain (..., 'Overall', GAP)
+Append a chain of dimensions, one from each point to the next, all on
+one dimension line, as ISO 129 dimensions in a chain.
+
+P holds the points, one a row, at least two. Each link is a
+dimension between two neighbouring points, appended as dim
+appends it, so a chain of two points is one dimension, and a chain is
+edited, written and read back as the dimensions it is made of.
+
+The option 'Direction' is that of dim, and
+'horizontal' by default. A horizontal chain takes its points in
+order of increasing x and a vertical one in order of increasing
+y, whatever order P gives them in. An aligned chain needs
+every point on one line, and runs along it from the first row of
+P towards the point farthest from it. Two points at one place
+along the chain are an error.
+
+OFFSET places the dimension line as for dim, measured from
+the first point along the chain: when positive, above a horizontal
+chain and to the left of a vertical one. Every link stands on that one
+line, wherever its own points lie.
+
+The options 'Text', 'Decimals', 'Tolerance',
+'Form' and 'Exact' are those of dim, each given
+once for every link, or as a cell of one element for each link, in
+order along the chain. An empty element leaves its link without the
+option, so a 'Text' cell holds '' for a link that is
+measured. A link is no feature of size, so a chain takes no
+'Frame'.
+
+Tolerances add up along a chain: the distance from the first point to
+the last may stray by the sum of the tolerances of the links. ISO 129
+uses a chain only where that does not affect the function of the part.
+With every link given, the overall length follows from them, and so
+does any one link from the overall length and the others, so a
+dimension that closes the chain is auxiliary, given in parentheses for
+information only. The option 'Overall' adds the overall
+dimension, from the first point to the last, auxiliary, on a line
+GAP beyond the chain's, on the side the chain's line stands
+from the first point; it takes 'Decimals' when that is given
+once, and none of the other options. The option 'Auxiliary'
+marks instead link K, counted from the first point along the
+chain, as auxiliary: a tolerance, form or exact value given once
+applies to every other link, and a cell must leave the element of
+link K empty. A chain has
+one such dimension at most, so the two options cannot be given
+together, and a chain of one link takes neither.
+
+An error in the dimension of one link is raised with the number of the
+link.
+
+## Three holes in a row, chained from the left edge, with the overall
+D = draw.Drawing ();
+D = D.polyline (geom.Polyline ([0, 0; 100, 0; 100, 40; 0, 40], ...
+'Closed', true));
+D = D.circle ([20, 20; 50, 20; 80, 20], 4);
+D = D.chain ([0, 40; 20, 20; 50, 20; 80, 20], 10, 'Overall', 8);
+
+See also:
+draw.Drawing.dim,
+draw.Drawing.ordinate
+
+
+# name: <cell-element>
+# type: sq_string
+# elements: 1
+# length: 123
+Append a chain of dimensions, one from each point to the next, all on one dimension line, as ISO 129 dimensions in a chain.
 
 
 
